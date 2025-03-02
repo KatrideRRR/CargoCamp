@@ -161,7 +161,6 @@ router.post('/register', async (req, res) => {
     }
 });
 
-
 // Вход пользователя
 router.post('/login', async (req, res) => {
     const { phone, password } = req.body;
