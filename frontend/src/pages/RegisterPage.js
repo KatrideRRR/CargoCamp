@@ -14,6 +14,7 @@ const RegisterPage = () => {
     const [isSmsSent, setIsSmsSent] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isAgreementChecked, setIsAgreementChecked] = useState(false);
+    const apiUrl = process.env.REACT_APP_API_URL;
 
     const handleCaptchaChange = (value) => {
         setCaptchaValue(value);
@@ -21,7 +22,7 @@ const RegisterPage = () => {
     // Отправка SMS-кода
     const sendSmsCode = async () => {
         try {
-            await axios.post("http://localhost:5000/api/auth/send-sms", { phone });
+            await axios.post("${apiUrl}/api/auth/send-sms", { phone });
             setIsSmsSent(true);
             alert("Код подтверждения отправлен на ваш номер");
         } catch (err) {
@@ -41,7 +42,7 @@ const RegisterPage = () => {
         }
 
         try {
-            const response = await axios.post('http://localhost:5000/api/auth/register', { username, phone, password, smsCode, captchaToken: captchaValue
+            const response = await axios.post('${apiUrl}/api/auth/register', { username, phone, password, smsCode, captchaToken: captchaValue
             });
             const { token } = response.data;
             localStorage.setItem('authToken', token); // Сохраняем токен
