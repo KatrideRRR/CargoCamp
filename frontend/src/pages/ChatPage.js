@@ -4,6 +4,7 @@ import axios from 'axios';
 import {useParams} from 'react-router-dom';
 import '../styles/ChatPage.css';
 import {useUser} from '../utils/userContext';
+const apiUrl = process.env.REACT_APP_API_URL;
 
 const ChatPage = () => {
     const {orderId} = useParams();
@@ -18,7 +19,7 @@ const ChatPage = () => {
 
     useEffect(() => {
         // Подключаемся к серверу
-        socket.current = io('http://localhost:5000');
+        socket.current = io(process.env.REACT_APP_SOCKET_URL);
 
         if (currentUser) {
             // Присоединяемся к чату с нашим userId
@@ -53,15 +54,15 @@ const ChatPage = () => {
             try {
                 setLoading(true);
 
-                const {data: order} = await axios.get(`http://localhost:5000/api/orders/${orderId}`, {
+                const {data: order} = await axios.get(`${apiUrl}/api/orders/${orderId}`, {
                     headers: {Authorization: `Bearer ${localStorage.getItem('authToken')}`},
                 });
 
                 const userId = order.creatorId === currentUser.id ? order.executorId : order.creatorId;
-                const {data: user} = await axios.get(`http://localhost:5000/api/auth/${userId}`);
+                const {data: user} = await axios.get(`${apiUrl}/api/auth/${userId}`);
                 setSelectedUser(user);
 
-                const {data: messagesData} = await axios.get(`http://localhost:5000/api/messages/${orderId}`, {
+                const {data: messagesData} = await axios.get(`${apiUrl}/api/messages/${orderId}`, {
                     headers: {Authorization: `Bearer ${localStorage.getItem('authToken')}`},
                 });
                 setMessages(messagesData);
@@ -92,7 +93,7 @@ const ChatPage = () => {
 
             // Отправляем сообщение в базу данных через API
             const { data } = await axios.post(
-                'http://localhost:5000/api/messages',
+                `${apiUrl}/api/messages`,
                 messageData,
                 { headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` } }
             );

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../utils/authContext";
 import { useUser } from "../utils/userContext";
 import "../styles/LoginPage.css";
+const apiUrl = process.env.REACT_APP_API_URL;
 
 const LoginPage = () => {
     const [phone, setPhone] = useState("");
@@ -17,7 +18,7 @@ const LoginPage = () => {
     const handleLogin = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post("http://localhost:5000/api/auth/login", { phone, password });
+            const response = await axios.post(`${apiUrl}/api/auth/login`, { phone, password });
             const { token, user } = response.data;
             localStorage.setItem("authToken", token);
             login(token);
@@ -38,7 +39,7 @@ const LoginPage = () => {
     // Восстановление пароля через SMS
     const handleRecoverPassword = async () => {
         try {
-            const response = await axios.post("http://localhost:5000/api/auth/recover-password", { phone });
+            const response = await axios.post(`${apiUrl}/api/auth/recover-password`, { phone });
             setMessage(response.data.message);
         } catch (err) {
             setError(err.response?.data?.message || "Ошибка восстановления пароля");

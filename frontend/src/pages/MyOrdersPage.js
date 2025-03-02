@@ -4,8 +4,9 @@ import axiosInstance from '../utils/axiosInstance';
 import io from 'socket.io-client';
 import styles from '../styles/MyOrdersPage.module.css';
 import {AuthContext} from "../utils/authContext";
+const apiUrl = process.env.REACT_APP_API_URL;
 
-const socket = io('http://localhost:5000');
+const socket = io(process.env.REACT_APP_SOCKET_URL);
 
 const MyOrdersPage = () => {
     const { userId } = useParams();
@@ -148,7 +149,7 @@ const MyOrdersPage = () => {
 
                                     {Array.isArray(order.images) && order.images.length > 0 ? (
                                         order.images.map((image, index) => (
-                                            <img key={index} src={`http://localhost:5000${image}`} alt={`Order Image ${index + 1}`} className={styles.orderImage} />
+                                            <img key={index} src={`${apiUrl}${image}`} alt={`Order Image ${index + 1}`} className={styles.orderImage} />
                                         ))
                                     ) : (
                                         <p>Изображений нет</p>

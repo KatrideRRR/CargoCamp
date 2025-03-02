@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axiosInstance from '../utils/axiosInstance';
 import '../styles/OrderHistotyPage.css'
+const apiUrl = process.env.REACT_APP_API_URL;
+
 const OrderHistoryPage = () => {
     const { userId } = useParams(); // Получаем ID пользователя из URL
     const [orders, setOrders] = useState([]);

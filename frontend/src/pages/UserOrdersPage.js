@@ -4,7 +4,8 @@ import axiosInstance from '../utils/axiosInstance';
 import '../styles/OrdersPage.css';
 import io from 'socket.io-client';
 
-const socket = io('http://localhost:5000');
+const socket = io(process.env.REACT_APP_SOCKET_URL);
+const apiUrl = process.env.REACT_APP_API_URL;
 
 const UserOrdersPage = () => {
     const { userId } = useParams(); // Получаем ID пользователя из URL
@@ -116,7 +117,7 @@ const UserOrdersPage = () => {
 
                                         {Array.isArray(order.images) && order.images.length > 0 ? (
                                             order.images.map((image, index) => {
-                                                const imageUrl = `http://localhost:5000${image}`;
+                                                const imageUrl = `${apiUrl}${image}`;
                                                 return <img key={index} src={imageUrl} alt={`Order Image ${index + 1}`}
                                                             className="order-image"/>;
                                             })

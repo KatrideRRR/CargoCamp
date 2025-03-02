@@ -6,7 +6,7 @@ import '../styles/modalContext.css'
 
 export const ModalContext = createContext();
 
-const socket = io('http://localhost:5000'); // Подключаем WebSocket
+const socket = io(process.env.REACT_APP_SOCKET_URL); // Подключаем WebSocket
 
 export const ModalProvider = ({ children }) => {
     const [modalData, setModalData] = useState(null);

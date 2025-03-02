@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import ReCAPTCHA from "react-google-recaptcha";
+const apiUrl = process.env.REACT_APP_API_URL;
 
 const RegisterPage = () => {
     const [username, setUsername] = useState('');
@@ -21,7 +22,7 @@ const RegisterPage = () => {
     // Отправка SMS-кода
     const sendSmsCode = async () => {
         try {
-            await axios.post("http://localhost:5000/api/auth/send-sms", { phone });
+            await axios.post(`${apiUrl}/api/auth/send-sms`, { phone });
             setIsSmsSent(true);
             alert("Код подтверждения отправлен на ваш номер");
         } catch (err) {
@@ -41,7 +42,7 @@ const RegisterPage = () => {
         }
 
         try {
-            const response = await axios.post('http://localhost:5000/api/auth/register', { username, phone, password, smsCode, captchaToken: captchaValue
+            const response = await axios.post(`${apiUrl}/api/auth/register`, { username, phone, password, smsCode, captchaToken: captchaValue
             });
             const { token } = response.data;
             localStorage.setItem('authToken', token); // Сохраняем токен
