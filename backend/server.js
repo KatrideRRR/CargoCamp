@@ -21,7 +21,7 @@ const io = initializeSocket(server);
 const db = require('./models');
 db.sequelize.sync();
 
-app.use(cors({  origin: ['http://localhost:3000', 'http://localhost:3001'], methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization'] }));
+app.use(cors({  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://18.193.72.111:3000'], methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization'] }));
 app.use(bodyParser.json());
 app.use('/api/orders', orderRoutes(io));
 app.use('/api/auth', authRoutes);
