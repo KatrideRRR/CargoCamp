@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from "../utils/authContext";
 import axios from "axios";
 import '../styles/ProfilePage.css';  // Импортируем CSS файл
+const apiUrl = process.env.REACT_APP_API_URL;
 
 const ProfilePage = () => {
     const [profile, setProfile] = useState(null);
@@ -25,7 +26,7 @@ const ProfilePage = () => {
             formData.append('documents', file);
         }
 
-        const response = await fetch('http://localhost:5000/api/auth/upload-documents', {
+        const response = await fetch(`${apiUrl}/api/auth/upload-documents`, {
             method: 'POST',
             body: formData,
             headers: { Authorization: `Bearer ${token}` },
@@ -48,7 +49,7 @@ const ProfilePage = () => {
             }
 
             try {
-                const response = await axios.get('http://localhost:5000/api/auth/profile', {
+                const response = await axios.get(`${apiUrl}/api/auth/profile`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
 

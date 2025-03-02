@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { YMaps, Map, Placemark } from '@pbe/react-yandex-maps';
 import axios from 'axios';
 import { io } from 'socket.io-client';
+const apiUrl = process.env.REACT_APP_API_URL;
 
-const socket = io('http://localhost:5000'); // Подключаемся к WebSocket серверу
+const socket = io(process.env.REACT_APP_SOCKET_URL);
 
 const HomePage = () => {
     const [orders, setOrders] = useState([]); // Список заказов
@@ -11,7 +12,7 @@ const HomePage = () => {
 // Функция загрузки заказов
     const fetchOrders = async () => {
         try {
-            const response = await axios.get('http://localhost:5000/api/orders/all', {
+            const response = await axios.get(`${apiUrl}/api/orders/all`, {
                 params: { status: 'pending' },
             });
             const ordersWithCoordinates = response.data.filter(order => order.coordinates);

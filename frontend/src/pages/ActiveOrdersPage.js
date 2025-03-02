@@ -6,8 +6,9 @@ import { useAuth } from '../utils/authContext';
 import io from 'socket.io-client';
 import { useMediaQuery } from 'react-responsive';
 import { FaPhone, FaComments, FaRoute, FaExclamationTriangle, FaCheck, FaTrash } from 'react-icons/fa';
+const apiUrl = process.env.REACT_APP_API_URL;
 
-const socket = io('http://localhost:5000'); // Подключение к WebSocket
+const socket = io(process.env.REACT_APP_SOCKET_URL); // Подключение к WebSocket
 
 const ActiveOrdersPage = () => {
     const [orders, setOrders] = useState([]);
@@ -31,7 +32,7 @@ const ActiveOrdersPage = () => {
 
         const fetchActiveOrders = async () => {
             try {
-                const response = await axios.get('http://localhost:5000/api/orders/active-orders', {
+                const response = await axios.get(`${apiUrl}/api/orders/active-orders`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 setOrders(response.data);
@@ -70,7 +71,7 @@ const ActiveOrdersPage = () => {
             const token = localStorage.getItem('authToken');
 
             // 1. Отправляем оценку на сервер
-            await axios.post("http://localhost:5000/api/auth/rate", {
+            await axios.post(`${apiUrl}/api/auth/rate`, {
                 userId: selectedOrder.executorId === user.id
                     ? selectedOrder.creatorId
                     : selectedOrder.executorId,
@@ -80,7 +81,7 @@ const ActiveOrdersPage = () => {
             });
 
             // 2. Завершаем заказ
-            await axios.post(`http://localhost:5000/api/orders/complete/${selectedOrder.id}`,
+            await axios.post(`${apiUrl}/api/orders/complete/${selectedOrder.id}`,
                 {}, // Тело запроса пустое
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -118,7 +119,7 @@ const ActiveOrdersPage = () => {
         }
 
         try {
-            const response = await axios.post('http://localhost:5000/api/orders/complain', {
+            const response = await axios.post(`${apiUrl}/api/orders/complain`, {
                 orderId: selectedOrderId,
                 complaintText,
             }, {

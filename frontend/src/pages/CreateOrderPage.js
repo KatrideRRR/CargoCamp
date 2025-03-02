@@ -5,6 +5,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { useNavigate } from "react-router-dom";
 import { YMaps, Map, Placemark } from "@pbe/react-yandex-maps";
 import "../styles/CreateOrderPage.css";
+const apiUrl = process.env.REACT_APP_API_URL;
 
 function CreateOrderPage({currentUserId}) {
     const [formData, setFormData] = useState({
@@ -41,7 +42,7 @@ function CreateOrderPage({currentUserId}) {
 
     useEffect(() => {
         // Получение списка категорий при загрузке компонента
-        axios.get('http://localhost:5000/api/category')
+        axios.get(`${apiUrl}/api/category`)
             .then(response => {
                 setCategory(response.data);
             })
@@ -60,7 +61,7 @@ function CreateOrderPage({currentUserId}) {
         }
 
         // Получение подкатегорий для выбранной категории
-        axios.get(`http://localhost:5000/api/category/subcategory/${categoryId}`)
+        axios.get(`${apiUrl}/api/category/subcategory/${categoryId}`)
             .then(response => {
                 setSubcategory(response.data);
             })
@@ -190,7 +191,7 @@ function CreateOrderPage({currentUserId}) {
         }
 
         try {
-            await axios.post("http://localhost:5000/api/orders/", data, {
+            await axios.post(`${apiUrl}/api/orders/`, data, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                     "Content-Type": "multipart/form-data",
@@ -204,7 +205,7 @@ function CreateOrderPage({currentUserId}) {
         }
 
         try {
-            const response = await fetch("http://localhost:5000/api/payments/create", {
+            const response = await fetch(`${apiUrl}/api/payments/create`, {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify(paymentType)

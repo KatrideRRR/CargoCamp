@@ -3,10 +3,10 @@ import axiosInstance from '../utils/axiosInstance';
 import { Link } from 'react-router-dom';
 import '../styles/OrdersPage.css';
 import io from 'socket.io-client';
-import { FaMoneyBillWave, FaShieldAlt, FaCreditCard } from "react-icons/fa";
 import Modal from 'react-modal';  // Импортируем модуль для модального окна
+const apiUrl = process.env.REACT_APP_API_URL;
 
-const socket = io('http://localhost:5000');
+const socket = io(process.env.REACT_APP_SOCKET_URL);
 
 const OrdersPage = () => {
     const [orders, setOrders] = useState([]);
@@ -318,7 +318,7 @@ const OrdersPage = () => {
                     <div className="modal-content">
                         <div className="image-navigation">
                             <button onClick={prevImage} className="prev-button">◀</button>
-                            <img src={`http://localhost:5000${currentImages[currentImageIndex]}`} alt="Full-size view" className="modal-image" />
+                            <img src={`${apiUrl}${currentImages[currentImageIndex]}`} alt="Full-size view" className="modal-image" />
                             <button onClick={nextImage} className="next-button">▶</button>
                         </div>
                     </div>
