@@ -50,8 +50,9 @@ module.exports = (io) => {
 
     // Add a new order
     router.post('/', authenticateToken, upload.array('images', 5), async (req, res) => {  // 'images' — это поле для загрузки
-        const { address, description, workTime, proposedSum, type, categoryId, subcategoryId} = req.body;
+        const { address, description, workTime, proposedSum, type, categoryId, subcategoryId, paymentType} = req.body;
         const userId = req.user.id;
+        console.log(req.body); // Посмотреть входящие данные
 
         try {
             if (!address) {
@@ -70,6 +71,8 @@ module.exports = (io) => {
             // Собираем все фото в массив
             const photoUrls = req.files ? req.files.map(file => `/uploads/orders/${file.filename}`) : [];
 
+            const paymentType = Array.isArray(req.body.paymentType) ? req.body.paymentType[0] : req.body.paymentType;
+
             const newOrder = await Order.create({
                 userId,
                 address,
@@ -84,6 +87,7 @@ module.exports = (io) => {
                 status: 'pending',
                 categoryId,
                 subcategoryId,
+                paymentType
             });
 
             io.emit('orderUpdated'); // Отправляем событие обновления заказов
@@ -122,7 +126,7 @@ module.exports = (io) => {
                 attributes: [
                     'id', 'createdAt', 'address', 'description', 'workTime',
                     'images', 'proposedSum', 'creatorId', 'coordinates',
-                    'type', 'executorId', 'status'
+                    'type', 'executorId', 'status', 'paymentType'
                 ],
                 where: whereClause,
                 include: [

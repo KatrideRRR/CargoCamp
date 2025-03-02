@@ -349,3 +349,70 @@
 .order-title strong {
     color: #007aff;
 }
+
+.orders-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.order-card {
+    position: relative;  /* Для позиционирования иконки */
+    background: #f9f9f9;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+}
+
+.order-card h3 {
+    font-size: 18px;
+    margin-bottom: 8px;
+}
+
+.payment-icon-container {
+    position: absolute;
+    top: 30px; /* Сдвигаем вниз, чтобы иконка была ниже заголовка */
+    right: 8px;
+    text-align: center;
+}
+
+.payment-icon {
+    font-size: 20px; /* Размер иконки */
+    display: block;
+}
+
+.payment-label {
+    font-size: 12px;
+    margin-top: 4px; /* Отступ между иконкой и подписью */
+    font-weight: bold;
+}
+
+/* Стили для модального окна */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal {
+    background-color: white;
+    border-radius: 10px;
+    padding: 20px;
+    max-width: 90%;
+    max-height: 90%;
+    overflow: hidden;
+}
+
+.modal-image {
+    width: 100%;
+    height: auto;
+}
+
+
+

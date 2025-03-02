@@ -39,8 +39,15 @@ module.exports = (sequelize) => {
             createdAt: { type: DataTypes.DATE, allowNull: true, defaultValue: null },
             categoryId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'Category', key: 'id' } },
             subcategoryId: { type: DataTypes.INTEGER, allowNull: true, references: { model: 'Subcategory', key: 'id' } },
-            requestedExecutors: {type: DataTypes.JSON, allowNull: false, defaultValue: []
-            }
+            requestedExecutors: {type: DataTypes.JSON, allowNull: false, defaultValue: []},
+            paymentStatus: { // Добавлен новый статус для оплаты
+                type: DataTypes.ENUM('paid', 'pending', 'unpaid'),
+                defaultValue: 'pending', // Статус по умолчанию
+            },
+            paymentType: {
+                type: DataTypes.ENUM('cash', 'secure', 'installment'),
+                allowNull: false
+            },
         },
         {
             sequelize,

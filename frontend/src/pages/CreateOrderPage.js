@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { YMaps, Map, Placemark } from "@pbe/react-yandex-maps";
 import "../styles/CreateOrderPage.css";
 
-function CreateOrderPage({ currentUserId }) {
+function CreateOrderPage({currentUserId}) {
     const [formData, setFormData] = useState({
         description: "",
         address: "",
@@ -26,11 +26,16 @@ function CreateOrderPage({ currentUserId }) {
     const [selectedCategory, setSelectedCategory] = useState('');
     const [selectedSubcategory, setSelectedSubcategory] = useState('');
     const [addressSuggestions, setAddressSuggestions] = useState([]); // Подсказки для адреса
-
-
+    const [paymentType, setPaymentType] = useState("");
+    const [selectedMethod, setSelectedMethod] = useState(null);
+    const paymentMethods = [
+        { id: "cash", label: "Наличные", icon: "💵" },
+        { id: "guarantee", label: "Гарантия", icon: "🛡️" },
+        { id: "installments", label: "Рассрочка", icon: "💳" },
+    ];
     const handleImageChange = (event) => {
         const files = event.target.files;
-        setImages(Array.from(files)); // Преобразуем FileList в массив
+        setImages(prevImages => [...prevImages, ...Array.from(files)]);
     };
 
 
@@ -49,6 +54,11 @@ function CreateOrderPage({ currentUserId }) {
         const categoryId = event.target.value;
         setSelectedCategory(categoryId);
 
+        if (!categoryId) {
+            setSubcategory([]);
+            return;
+        }
+
         // Получение подкатегорий для выбранной категории
         axios.get(`http://localhost:5000/api/category/subcategory/${categoryId}`)
             .then(response => {
@@ -58,7 +68,6 @@ function CreateOrderPage({ currentUserId }) {
                 console.error('Ошибка при загрузке подкатегорий', error);
             });
     };
-
 
 
     const getMinTime = (selectedDate) => {
@@ -73,12 +82,12 @@ function CreateOrderPage({ currentUserId }) {
             );
         } else {
             // Для других дат минимальное время — начало суток
-            return new Date(0, 0, 0, 0, 0, 0);
+            return new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0);
         }
     };
 
     const handleTypeInputChange = (value) => {
-        setFormData({ ...formData, type: value });
+        setFormData({...formData, type: value});
     };
 
     useEffect(() => {
@@ -87,11 +96,11 @@ function CreateOrderPage({ currentUserId }) {
             alert("Вы не авторизованы! Пожалуйста, войдите в систему.");
             navigate("/login");
         }
-    }, [navigate, formData.workTime]);
+    }, [navigate]);
 
     const handleAddressChange = async (e) => {
         const address = e.target.value;
-        setFormData({ ...formData, address });
+        setFormData({...formData, address});
 
         // Если вводим хотя бы 3 символа, начинаем запрашивать подсказки
         if (address.length > 3) {
@@ -114,7 +123,7 @@ function CreateOrderPage({ currentUserId }) {
     };
 
     const handleAddressSelect = async (address) => {
-        setFormData({ ...formData, address });
+        setFormData({...formData, address});
         setAddressSuggestions([]); // Закрываем список подсказок
 
         // Запрос координат для выбранного адреса
@@ -135,10 +144,17 @@ function CreateOrderPage({ currentUserId }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
+        if (!paymentType) {
+            setError("Пожалуйста, выберите тип оплаты");
+            return;
+        }
+        setFormData(prevState => ({ ...prevState, paymentType }));
 
         const orderData = {
             categoryId: selectedCategory,
             subcategoryId: selectedSubcategory,
+            description: "Оплата за услугу",
+            paymentType: paymentType,  // Убедитесь, что это поле отправляется
         };
         // Отправить данные на сервер
         console.log('Создание заказа:', orderData);
@@ -148,10 +164,12 @@ function CreateOrderPage({ currentUserId }) {
 
         // Добавляем все поля из formData в FormData
         Object.keys(formData).forEach((key) => {
-            if (key !== "images") {
+            if (formData[key] !== null && formData[key] !== undefined && key !== "images") {
                 data.append(key, formData[key]);
             }
+
         });
+        data.append("paymentType", paymentType); // Добавляем в FormData
         data.append("categoryId", Number(selectedCategory));
         data.append("subcategoryId", Number(selectedSubcategory));
 
@@ -184,14 +202,38 @@ function CreateOrderPage({ currentUserId }) {
             console.error("Ошибка при создании заказа:", err);
             setError("Не удалось создать заказ. Попробуйте снова.");
         }
-    };
 
+        try {
+            const response = await fetch("http://localhost:5000/api/payments/create", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(paymentType)
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.paymentUrl) {
+                window.location.href = data.paymentUrl;
+            } else {
+                alert("Ошибка при создании платежа");
+            }
+        } catch (err) {
+            console.error("Ошибка при создании платежа:", err);
+        }
+
+    };
 
     const handleDescriptionChange = (e) => {
         const textarea = e.target;
         textarea.style.height = "auto"; // Сброс высоты
         textarea.style.height = `${textarea.scrollHeight}px`; // Установка высоты на основе контента
-        setFormData({ ...formData, description: textarea.value });
+        setFormData({...formData, description: textarea.value});
+    };
+
+    const handleSelect = (event, paymentId) => {
+        event.preventDefault();
+        setSelectedMethod(paymentId);
+        setPaymentType(paymentId); // Обновляем состояние paymentType
     };
 
     return (
@@ -360,6 +402,20 @@ function CreateOrderPage({ currentUserId }) {
                                 )}
                             </div>
 
+                            <h3>Выберите способ оплаты</h3>
+                            <div className="payment-selector">
+                                {paymentMethods.map((paymentType) => (
+                                    <button
+                                        key={paymentType.id}
+                                        className={`payment-option ${selectedMethod === paymentType.id ? "selected" : ""}`}
+                                        onClick={(event) => handleSelect(event, paymentType.id)}
+                                    >
+
+                                        <span className="payment-icon">{paymentType.icon}</span>
+                                        <span className="payment-label">{paymentType.label}</span>
+                                    </button>
+                                ))}
+                            </div>
                             <button type="submit" className="submit-button">
                                 Создать заказ
                             </button>
@@ -368,8 +424,8 @@ function CreateOrderPage({ currentUserId }) {
                 </div>
             </div>
         </YMaps>
-)
-;
+    )
+        ;
 }
 
 export default CreateOrderPage;

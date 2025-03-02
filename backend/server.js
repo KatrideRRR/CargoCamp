@@ -11,6 +11,7 @@ const authRoutes = require('./routes/auth');
 const messagesRoutes = require('./routes/messages');
 const categoryRouter = require('./routes/category');
 const adminRoutes = require('./routes/admin');
+const paymentRoutes = require("./routes/paymentRoutes");
 
 const app = express();
 const server = http.createServer(app);
@@ -28,6 +29,7 @@ app.use('/api/messages', messagesRoutes);
 app.use('/uploads', express.static('uploads'));
 app.use('/api/category', categoryRouter);
 app.use('/api/admin', adminRoutes);
+app.use("/api/payments", paymentRoutes);
 
 // Database connection
 const Sequelize = require('sequelize');

@@ -68,7 +68,7 @@ function OrdersPage() {
                     <tr>
                         <th>ID заказа</th>
                         <th>Дата создания</th>
-                        <th>Статус</th>
+                        <th>Статус оплаты</th>
                         <th>Действия</th>
                     </tr>
                     </thead>

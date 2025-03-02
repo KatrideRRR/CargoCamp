@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import axiosInstance from '../utils/axiosInstance';
-import { Link } from 'react-router-dom'; // Импортируем Link для навигации
+import { Link } from 'react-router-dom';
 import '../styles/OrdersPage.css';
 import io from 'socket.io-client';
-import axios from "axios";
+import { FaMoneyBillWave, FaShieldAlt, FaCreditCard } from "react-icons/fa";
+import Modal from 'react-modal';  // Импортируем модуль для модального окна
 
 const socket = io('http://localhost:5000');
 
@@ -15,11 +16,47 @@ const OrdersPage = () => {
     const [categories, setCategories] = useState([]);
     const [subcategories, setSubcategories] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState('');
+    const [isModalOpen, setIsModalOpen] = useState(false);  // Состояние для модального окна
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);  // Индекс текущего изображения
+    const [currentImages, setCurrentImages] = useState([]);  // Массив изображений для отображения
     const [selectedSubcategory, setSelectedSubcategory] = useState('');
+    const paymentMethods = [
+        { id: "cash", label: "Наличные", icon: "💵" },
+        { id: "guarantee", label: "Гарантия", icon: "🛡️" },
+        { id: "installments", label: "Рассрочка", icon: "💳" },
+    ];
 
     useEffect(() => {
         fetchCategories();
     }, []);
+
+    // Функция для получения иконки по способу оплаты
+    const getPaymentIcon = (paymentType) => {
+        const method = paymentMethods.find(method => method.id === paymentType);
+        return method ? method.icon : "";
+    };
+
+    const openModal = (images) => {
+        setCurrentImages(images);
+        setCurrentImageIndex(0);  // Начать с первого изображения
+        setIsModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setIsModalOpen(false);
+        setCurrentImageIndex(0);  // Сброс индекса при закрытии
+        setCurrentImages([]);
+    };
+
+    const nextImage = () => {
+        setCurrentImageIndex((prevIndex) => (prevIndex + 1) % currentImages.length);  // Переход к следующему изображению
+    };
+
+    const prevImage = () => {
+        setCurrentImageIndex((prevIndex) => (prevIndex - 1 + currentImages.length) % currentImages.length);  // Переход к предыдущему изображению
+    };
+
+
 
     useEffect(() => {
         const fetchOrders = async () => {
@@ -203,6 +240,11 @@ const OrdersPage = () => {
                                                 ID {order.creatorId}.
                                                 Создан {new Date(order.createdAt).toLocaleString()}
                                             </p>
+                                            {/* Иконка способа оплаты ниже заголовка */}
+                                            <div className="payment-icon-container">
+                                                <span className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
+                                                <span className="payment-label">{paymentMethods.find(method => method.id === order.paymentType)?.label}</span>
+                                            </div>
                                         </div>
 
                                         <div className="order-left">
@@ -221,19 +263,30 @@ const OrdersPage = () => {
                                                 создателя:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
                                             </p>
 
-
                                         </div>
+
 
                                         {Array.isArray(order.images) && order.images.length > 0 ? (
                                             order.images.map((image, index) => {
                                                 const imageUrl = `http://localhost:5000${image}`;
-                                                return <img key={index} src={imageUrl} alt={`Order Image ${index + 1}`}
-                                                            className="order-image"/>;
+                                                return (
+                                                    <img
+                                                        key={index}
+                                                        src={imageUrl}
+                                                        alt={`Order Image ${index + 1}`}
+                                                        className="order-image"
+                                                        onClick={() => openModal(order.images)} // Открываем модальное окно при клике
+                                                    />
+                                                );
                                             })
                                         ) : (
                                             <p>Изображений нет</p>
                                         )}
+
+
                                     </div>
+
+
 
                                     {/* Кнопка для перехода на страницу жалоб для создателя */}
                                     {creator.username && (
@@ -254,6 +307,25 @@ const OrdersPage = () => {
                 ) : (
                     <p className="no-orders">Нет доступных заказов.</p>
                 )}
+                <Modal
+                    appElement={document.getElementById('root')}
+                    isOpen={isModalOpen}
+                    onRequestClose={closeModal}
+                    contentLabel="Full Image Modal"
+                    className="modal"
+                    overlayClassName="modal-overlay"
+                >
+                    <div className="modal-content">
+                        <div className="image-navigation">
+                            <button onClick={prevImage} className="prev-button">◀</button>
+                            <img src={`http://localhost:5000${currentImages[currentImageIndex]}`} alt="Full-size view" className="modal-image" />
+                            <button onClick={nextImage} className="next-button">▶</button>
+                        </div>
+                    </div>
+                </Modal>
+
+
+
             </div>
         </div>
     );
