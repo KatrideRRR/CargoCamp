@@ -106,7 +106,6 @@ router.post('/upload-documents',authenticateToken, upload.array('documents', 5),
 router.post('/register', async (req, res) => {
     const { username, phone, password, captchaToken, smsCode } = req.body;
 
-
     if (!captchaToken) {
         return res.status(400).json({ error: "Капча не пройдена" });
     }
@@ -116,6 +115,7 @@ router.post('/register', async (req, res) => {
     }
 
     try {
+        // Проверка reCAPTCHA
         const response = await axios.post(
             `https://www.google.com/recaptcha/api/siteverify`,
             null,
@@ -137,45 +137,29 @@ router.post('/register', async (req, res) => {
     }
 
     try {
+        // Проверка на существующего пользователя
         const userExists = await User.findOne({ where: { phone } });
         if (userExists) return res.status(400).json({ message: "Телефон уже используется" });
 
+        // Хеширование пароля
         const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Создание нового пользователя
         const newUser = await User.create({ username, phone, password: hashedPassword, verified: true });
 
         smsCodes.delete(phone); // Удаляем код после успешной регистрации
 
+        // Генерация токена
         const token = jwt.sign({ id: newUser.id, phone: newUser.phone }, process.env.JWT_SECRET, { expiresIn: "1h" });
+
         return res.status(201).json({ message: "Пользователь зарегистрирован", token });
+
     } catch (error) {
         console.error("Ошибка регистрации:", error);
         return res.status(500).json({ message: "Ошибка сервера" });
     }
-
-
-
-    if (!phone || !password) {
-        return res.status(400).json({ error: 'Укажите номер телефона и пароль' });
-    }
-
-    console.log("API-ключ SMS.RU:", SMSRU_API_KEY);
-
-    try {
-        const userExists = await User.findOne({ where: { phone } });
-        if (userExists) {
-            return res.status(400).json({ message: 'Phone already in use' });
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = await User.create({ username, phone, password: hashedPassword });
-
-        const token = jwt.sign({ id: newUser.id, phone: newUser.phone }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        res.status(201).json({ message: 'User registered', token });
-    } catch (error) {
-        console.error('Registration error:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
 });
+
 
 // Вход пользователя
 router.post('/login', async (req, res) => {
