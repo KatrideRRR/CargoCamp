@@ -103,6 +103,7 @@ router.post('/upload-documents',authenticateToken, upload.array('documents', 5),
 });
 
 // Регистрация пользователя
+// Регистрация пользователя
 router.post('/register', async (req, res) => {
     const { username, phone, password, captchaToken, smsCode } = req.body;
 
