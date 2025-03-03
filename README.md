@@ -1,2 +1,2 @@
-# CargoCamp-Frontend
-Репозиторий для фронтенда на React
+# CargoCamp
+Репозиторий для веб приложения на React
