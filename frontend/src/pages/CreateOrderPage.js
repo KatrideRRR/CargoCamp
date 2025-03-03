@@ -15,6 +15,7 @@ function CreateOrderPage({currentUserId}) {
         photoUrl: null,
         proposedSum: "",
         type: "",
+        paymentType: "",  // Добавлено для хранения типа оплаты
     });
 
     const [error, setError] = useState("");
@@ -141,6 +142,12 @@ function CreateOrderPage({currentUserId}) {
         }
     };
 
+    const handleSelect = (event, paymentId) => {
+        event.preventDefault();
+        setSelectedMethod(paymentId);
+        setPaymentType(paymentId); // Обновляем состояние paymentType
+        setFormData(prevState => ({ ...prevState, paymentType: paymentId })); // Обновляем formData
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -149,13 +156,12 @@ function CreateOrderPage({currentUserId}) {
             setError("Пожалуйста, выберите тип оплаты");
             return;
         }
-        setFormData(prevState => ({ ...prevState, paymentType }));
 
         const orderData = {
             categoryId: selectedCategory,
             subcategoryId: selectedSubcategory,
             description: "Оплата за услугу",
-            paymentType: paymentType,  // Убедитесь, что это поле отправляется
+            paymentType: formData.paymentType,  // Передаем paymentType из formData
         };
         // Отправить данные на сервер
         console.log('Создание заказа:', orderData);
@@ -170,7 +176,6 @@ function CreateOrderPage({currentUserId}) {
             }
 
         });
-        data.append("paymentType", paymentType); // Добавляем в FormData
         data.append("categoryId", Number(selectedCategory));
         data.append("subcategoryId", Number(selectedSubcategory));
 
@@ -231,11 +236,6 @@ function CreateOrderPage({currentUserId}) {
         setFormData({...formData, description: textarea.value});
     };
 
-    const handleSelect = (event, paymentId) => {
-        event.preventDefault();
-        setSelectedMethod(paymentId);
-        setPaymentType(paymentId); // Обновляем состояние paymentType
-    };
 
     return (
         <YMaps query={{apikey: "bf97867b-5ffb-4fc4-9fd5-8997874b300e"}}>
