@@ -19,7 +19,7 @@ const UserOrdersPage = () => {
             try {
                 const response = await axiosInstance.get(`/orders/creator/${userId}`);
                 setOrders(response.data);
-                const creatorIds = [...new Set(response.data.map(order => order.creatorId))]; // Уникальные ID создателей
+                const creatorIds = [...new Set(response.data.map(order => order.userId))]; // Уникальные ID создателей
                 const creatorsData = {};
 
                 for (const id of creatorIds) {

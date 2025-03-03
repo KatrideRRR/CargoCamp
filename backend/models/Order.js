@@ -1,4 +1,5 @@
 const { Model, DataTypes } = require('sequelize');
+const Sequelize = require('sequelize'); // Добавляем импорт Sequelize
 
 module.exports = (sequelize) => {
     class Order extends Model {

@@ -545,7 +545,7 @@ module.exports = (io) => {
                 include: [
                     { model: db.Category, as: 'category', attributes: ['id', 'name'] },
                     { model: db.Subcategory, as: 'subcategory', attributes: ['id', 'name'] },
-                    { model: db.User, as: 'User', attributes: ['id', 'username'] }
+                    { model: db.User, as: 'users', attributes: ['id', 'username'] }
                 ]
 
             });
