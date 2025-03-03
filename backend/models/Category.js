@@ -12,7 +12,7 @@ module.exports = (sequelize, DataTypes) => {
             unique: true
         }
     }, {
-        tableName: 'Category',
+        tableName: 'category',
         timestamps: true,
     });
 

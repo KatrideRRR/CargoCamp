@@ -66,10 +66,11 @@ module.exports = (sequelize) => {
         {
             sequelize,
             modelName: 'User',
+            tableName: 'users',
         }
     );
     User.associate = (models) => {
-        User.hasMany(models.Order, {
+        User.hasMany(models.order, {
             foreignKey: 'userId',
             as: 'orders',
         });

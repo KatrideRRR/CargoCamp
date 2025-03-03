@@ -1,4 +1,4 @@
-// routes/category.js
+// routes/Category.js
 const express = require('express');
 const { Category, Subcategory } = require('../models');
 const router = express.Router();

@@ -4,7 +4,7 @@ module.exports = (sequelize) => {
     class Order extends Model {
         static associate(models) {
 
-            Order.belongsTo(models.User, { foreignKey: 'userId', as: 'user' });
+            Order.belongsTo(models.User, { foreignKey: 'userId', as: 'users' });
             Order.belongsTo(models.Category, { foreignKey: 'categoryId', as: 'category' });
             Order.belongsTo(models.Subcategory, { foreignKey: 'subcategoryId', as: 'subcategory' });
         }
@@ -18,7 +18,7 @@ module.exports = (sequelize) => {
             workTime: { type: DataTypes.DATE, allowNull: true },
             proposedSum: { type: DataTypes.INTEGER, allowNull: true },
             coordinates: { type: DataTypes.STRING, allowNull: true },
-            userId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'Users', key: 'id' } },
+            userId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'User', key: 'id' } },
             status: { type: DataTypes.ENUM('pending', 'active', 'completed'), defaultValue: 'pending' },
             executorId: { type: DataTypes.INTEGER, allowNull: true },
             type: { type: DataTypes.STRING, allowNull: false },
@@ -45,7 +45,7 @@ module.exports = (sequelize) => {
                 defaultValue: 'pending', // Статус по умолчанию
             },
             paymentType: {
-                type: DataTypes.ENUM('cash', 'secure', 'installment'),
+                type: DataTypes.ENUM('cash', 'guarantee', 'installment'),
                 allowNull: false
             },
         },

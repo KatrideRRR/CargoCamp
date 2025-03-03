@@ -20,7 +20,7 @@ module.exports = (sequelize, DataTypes) => {
             onDelete: 'CASCADE'
         }
     }, {
-        tableName: 'Subcategory',
+        tableName: 'subcategory',
         timestamps: true,
     });
 
