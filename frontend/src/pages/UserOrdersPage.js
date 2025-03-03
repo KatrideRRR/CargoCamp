@@ -8,18 +8,18 @@ const socket = io(process.env.REACT_APP_SOCKET_URL);
 const apiUrl = process.env.REACT_APP_API_URL;
 
 const UserOrdersPage = () => {
-    const { userId } = useParams(); // Получаем ID пользователя из URL
+    const { userId: paramUserId } = useParams(); // Получаем ID пользователя из URL
     const [orders, setOrders] = useState([]);
     const [error, setError] = useState(null);
     const [creatorsInfo, setCreatorsInfo] = useState({}); // Данные о создателях заказов
-    const [setUserId] = useState(null);
+    const [userId, setUserId] = useState(null); // Правильно задаем состояние
 
     useEffect(() => {
         const fetchUserOrders = async () => {
             try {
-                const response = await axiosInstance.get(`/orders/creator/${userId}`);
+                const response = await axiosInstance.get(`/orders/creator/${paramUserId}`);
                 setOrders(response.data);
-                const creatorIds = [...new Set(response.data.map(order => order.userId))]; // Уникальные ID создателей
+                const creatorIds = [...new Set(response.data.map(order => order.creatorId))]; // Уникальные ID создателей
                 const creatorsData = {};
 
                 for (const id of creatorIds) {
@@ -52,7 +52,7 @@ const UserOrdersPage = () => {
         fetchUserData();
 
         if (userId) {
-            console.log("🔄 Подключаем WebSocket для пользователя:", userId);
+            console.log("🔄 Подключаем WebSocket для пользователя:", paramUserId);
 
             socket.on('orderRequested', (data) => {
                 console.log("🔔 Получен запрос на заказ:", data);
