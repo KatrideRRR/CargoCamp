@@ -155,8 +155,6 @@ const ActiveOrdersPage = () => {
                 {orders.length > 0 ? (
                     <ul className="orders-list">
                         {orders.map((order) => {
-                            const isCreator = order.creatorId === user.id;
-                            const isExecutor = order.executorId === user.id;
                             const isCompletedByUser = Array.isArray(order.completedBy) && order.completedBy.includes(user.id);
                             const isWaitingForOther = Array.isArray(order.completedBy) && order.completedBy.length === 1;
 
@@ -221,40 +219,7 @@ const ActiveOrdersPage = () => {
 
 
                                     </div>
-                                    {showRatingModal && selectedOrder?.id === order.id && (
-                                        <div className="modal">
-                                            <h2>Оцените участника</h2>
-                                            <div className="stars">
-                                                {[1, 2, 3, 4, 5].map((star) => (
-                                                    <span
-                                                        key={star}
-                                                        className={star <= rating ? "star selected" : "star"}
-                                                        onClick={() => setRating(star)}
-                                                    >
-                    ★
-                </span>
-                                                ))}
-                                            </div>
-                                            <button onClick={submitRating} disabled={rating === 0}>
-                                                Завершить заказ
-                                            </button>
-                                        </div>
-                                    )}
-                                    {/* Модальное окно для жалобы */}
-                                    {showComplaintModal && selectedOrderId === order.id && (
-                                        <div className="modal">
-                                            <h2>Напишите свою жалобу:</h2>
-                                            <textarea
-                                                value={complaintText}
-                                                onChange={(e) => setComplaintText(e.target.value)}
-                                                rows="5"
-                                                placeholder="Введите текст жалобы"
-                                            />
-                                            <button onClick={handleSubmitComplaint}>Отправить жалобу</button>
-                                            <button onClick={() => setShowComplaintModal(false)}>Закрыть
-                                            </button>
-                                        </div>
-                                    )}
+                                    
                                 </li>
                             );
                         })}
@@ -263,6 +228,34 @@ const ActiveOrdersPage = () => {
                     <p className="no-orders">Нет активных заказов.</p>
                 )}
             </div>
+            {/* Модальное окно для оценки */}
+            {showRatingModal && (
+                <div className="modal-overlay" onClick={() => setShowRatingModal(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()}>
+                        <h2>Оцените участника</h2>
+                        <div className="stars">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                                <span key={star} className={star <= rating ? "star selected" : "star"}
+                                      onClick={() => setRating(star)}>★</span>
+                            ))}
+                        </div>
+                        <button onClick={submitRating} disabled={rating === 0}>Завершить заказ</button>
+                    </div>
+                </div>
+            )}
+
+            {/* Модальное окно для жалобы */}
+            {showComplaintModal && (
+                <div className="modal-overlay" onClick={() => setShowComplaintModal(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()}>
+                        <h2>Напишите жалобу:</h2>
+                        <textarea value={complaintText} onChange={(e) => setComplaintText(e.target.value)}
+                                  rows="5" placeholder="Введите текст жалобы" />
+                        <button onClick={handleSubmitComplaint}>Отправить</button>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 };

@@ -47,11 +47,17 @@ const MyOrdersPage = () => {
                 setOrders(ordersWithExecutors);
 
             } catch (err) {
-                console.error('Ошибка при загрузке заказов:', err);
+                if (err.response && err.response.status === 404) {
+                    setOrders([]); // Просто ставим пустой массив, чтобы не было ошибки
+                } else {
+                    console.error('Ошибка при загрузке заказов:', err);
+                    setError('Ошибка загрузки данных');
+                }
             } finally {
                 setLoading(false);
             }
         };
+
 
         const checkAuthUser = async () => {
             try {
@@ -92,7 +98,7 @@ const MyOrdersPage = () => {
             socket.off('orderRequest', handleOrderRequest);
             socket.off('orderUpdated', fetchOrders);
         };
-    }, [userId, navigate]);
+    }, [userId, navigate, setHasNewRequests]);
 
 
     const approveExecutor = async (orderId, executorId) => {

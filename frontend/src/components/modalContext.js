@@ -1,7 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import axiosInstance from '../utils/axiosInstance';
-import { useNavigate } from 'react-router-dom'; // Используем useNavigate
 import '../styles/modalContext.css'
 
 export const ModalContext = createContext();
@@ -9,14 +8,13 @@ export const ModalContext = createContext();
 const socket = io(process.env.REACT_APP_SOCKET_URL); // Подключаем WebSocket
 
 export const ModalProvider = ({ children }) => {
-    const [modalData, setModalData] = useState(null);
+    const [setModalData] = useState(null);
     const [userId, setUserId] = useState(null);
     const [notificationData, setNotificationData] = useState(null); // Для уведомлений исполнителю
     const [completionNotificationData, setCompletionNotificationData] = useState(null); // Уведомление по завершению заказа
     const [showRatingModal, setShowRatingModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [rating, setRating] = useState(0);
-    const navigate = useNavigate();
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -30,16 +28,6 @@ export const ModalProvider = ({ children }) => {
         };
 
         fetchUserData();
-
-        const fetchExecutorData = async (executorId) => {
-            try {
-                const response = await axiosInstance.get(`/auth/${executorId}`);
-                return response.data;
-            } catch (error) {
-                console.error("❌ Ошибка загрузки данных исполнителя:", error);
-                return null;
-            }
-        };
 
         if (userId) {
             console.log("🔄 Подключаем WebSocket для пользователя:", userId);
@@ -79,43 +67,6 @@ export const ModalProvider = ({ children }) => {
             };
         }
     }, [userId]);
-
-    const openModal = (data) => {
-        setModalData(data);
-    };
-
-    const closeModal = () => {
-        setModalData(null);
-    };
-
-    const handleApproveOrder = async (orderId, executorId) => {
-        try {
-            console.log(`👍 Одобрение заказа ${orderId} для исполнителя ${executorId}`);
-            await axiosInstance.post(`/orders/${orderId}/approve`, {
-                executorId: executorId,
-            });
-
-            closeModal();
-        } catch (error) {
-            console.error("❌ Ошибка при одобрении заказа:", error);
-            alert(error.response?.data?.message || "Не удалось одобрить заказ");
-        }
-    };
-
-    const handleRejectOrder = async (orderId) => {
-        try {
-            await axiosInstance.post(`/orders/${orderId}/reject`);
-            closeModal();
-        } catch (error) {
-            console.error("Ошибка при отклонении исполнителя:", error);
-            alert(error.response?.data?.message || "Не удалось отклонить исполнителя");
-        }
-    };
-
-    const handleGoToComplaints = (executorId, orderId) => {
-        // Используем navigate для перехода
-        navigate(`/complaints/${executorId}?orderId=${orderId}`);
-    };
 
     const handleCompleteOrder = async (orderId, creatorId, executorId) => {
         console.log("▶ Начало завершения заказа", { orderId, creatorId, executorId });
@@ -181,27 +132,6 @@ export const ModalProvider = ({ children }) => {
     return (
         <ModalContext.Provider value={{ openModal: setModalData, closeModal: () => setModalData(null) }}>
             {children}
-
-            {/* Основное модальное окно */}
-            {modalData && (
-                <div className="modal-overlay">
-
-                    <div className="modal">
-                        <h2>{modalData.title}</h2>
-                        <p>{modalData.description}</p>
-                        <button onClick={modalData.onConfirm}>Одобрить</button>
-                        <button onClick={modalData.onCancel}>Отклонить</button>
-
-                        {/* Кнопка для перехода к жалобам на исполнителя */}
-                        {modalData.executorId && (
-                            <button onClick={() => handleGoToComplaints(modalData.executorId, modalData.orderId)}>
-                                Перейти к жалобам на исполнителя
-                            </button>
-                        )}
-                    </div>
-
-                </div>
-                    )}
 
                     {/* Уведомление для исполнителя в виде модала */}
                     {notificationData && (

@@ -172,18 +172,13 @@ module.exports = (io) => {
         try {
             // Ищем заказ по ID, включая данные о пользователе
             const order = await Order.findByPk(id, {
-                include: { model: db.User, as: 'user', attributes: ['id', 'username', 'phone'] },
+                include: { model: db.User, as: 'users', attributes: ['id', 'username', 'phone'] },
             });
 
             // Если заказ не найден
             if (!order) {
                 return res.status(404).json({ message: 'Order not found' });
             }
-
-            // Убираем проверку на авторизацию, чтобы любой пользователь мог получить доступ
-            // Проверка на доступность для создателя и исполнителя исключена
-
-            // Если текущий пользователь - исполнитель, добавляем информацию о телефоне
 
             res.json(order);
         } catch (error) {
@@ -192,7 +187,7 @@ module.exports = (io) => {
         }
     });
 
-// Запрос на выполнение заказа
+    // Запрос на выполнение заказа
     router.post("/:id/request", authenticateToken, async (req, res) => {
         const { id } = req.params; // ID заказа
         const executorId = req.user.id; // ID исполнителя
@@ -257,19 +252,27 @@ module.exports = (io) => {
                 return res.status(404).json({ message: 'Заказ не найден' });
             }
 
-            // Парсим массив ID исполнителей
+    // Парсим массив ID исполнителей
             let requestedExecutors = [];
             if (order.requestedExecutors) {
-                try {
-                    requestedExecutors = JSON.parse(order.requestedExecutors);
-                    if (!Array.isArray(requestedExecutors)) {
+                // Проверяем, что строка не пуста и является строкой
+                if (typeof order.requestedExecutors === 'string' && order.requestedExecutors.trim() !== '') {
+                    try {
+                        requestedExecutors = JSON.parse(order.requestedExecutors);
+                        // Проверяем, что результат парсинга является массивом
+                        if (!Array.isArray(requestedExecutors)) {
+                            requestedExecutors = [];
+                        }
+                    } catch (error) {
+                        console.error('Ошибка парсинга requestedExecutors:', error);
                         requestedExecutors = [];
                     }
-                } catch (error) {
-                    console.error('Ошибка парсинга requestedExecutors:', error);
+                } else {
+                    // Если строка пуста или невалидна, присваиваем пустой массив
                     requestedExecutors = [];
                 }
             }
+
 
             if (requestedExecutors.length === 0) {
                 return res.json([]);
@@ -550,9 +553,10 @@ module.exports = (io) => {
 
             });
 
-            if (!orders.length) {
-                return res.status(404).json({ message: 'Заказы не найдены' });
+            if (!orders || orders.length === 0) {
+                return res.status(200).json([]); // Возвращаем пустой массив вместо 404
             }
+
 
             res.json(orders);
         } catch (error) {

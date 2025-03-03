@@ -150,7 +150,7 @@ router.post('/register', async (req, res) => {
         smsCodes.delete(phone); // Удаляем код после успешной регистрации
 
         // Генерация токена
-        const token = jwt.sign({ id: newUser.id, phone: newUser.phone }, process.env.JWT_SECRET, { expiresIn: "1h" });
+        const token = jwt.sign({ id: newUser.id, phone: newUser.phone }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
         return res.status(201).json({ message: "Пользователь зарегистрирован", token });
 
@@ -178,7 +178,7 @@ router.post('/login', async (req, res) => {
         }
 
 
-        const token = jwt.sign({ id: user.id, phone: user.phone }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign({ id: user.id, phone: user.phone }, process.env.JWT_SECRET, { expiresIn: '7d' });
         res.json({ token, user: { id: user.id, username: user.username, phone: user.phone, rating: user.rating || 5 } });
     } catch (error) {
         console.error('Login error:', error);

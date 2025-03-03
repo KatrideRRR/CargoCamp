@@ -38,7 +38,7 @@ router.post('/create', async (req, res) => {
             case 'cash':
                 commission = 200;
                 break;
-            case 'secure':
+            case 'guarantee':
                 commission = Math.round(proposedSum * 0.05);
                 proposedSum += commission;
                 break;

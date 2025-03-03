@@ -7,7 +7,7 @@ import { YMaps, Map, Placemark } from "@pbe/react-yandex-maps";
 import "../styles/CreateOrderPage.css";
 const apiUrl = process.env.REACT_APP_API_URL;
 
-function CreateOrderPage({currentUserId}) {
+function CreateOrderPage() {
     const [formData, setFormData] = useState({
         description: "",
         address: "",
@@ -208,24 +208,25 @@ function CreateOrderPage({currentUserId}) {
             console.error("Ошибка при создании заказа:", err);
             setError("Не удалось создать заказ. Попробуйте снова.");
         }
+        console.log(paymentType);
 
-        try {
-            const response = await fetch(`${apiUrl}/api/payments/create`, {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify(paymentType)
-            });
-
-            const data = await response.json();
-
-            if (data.success && data.paymentUrl) {
-                window.location.href = data.paymentUrl;
-            } else {
-                alert("Ошибка при создании платежа");
-            }
-        } catch (err) {
-            console.error("Ошибка при создании платежа:", err);
-        }
+//        try {
+//            const response = await fetch(`${apiUrl}/api/payments/create`, {
+//                method: "POST",
+//                headers: {"Content-Type": "application/json"},
+//                body: JSON.stringify(paymentType)
+//            });
+//
+//          const data = await response.json();
+//
+//          if (data.success && data.paymentUrl) {
+//            window.location.href = data.paymentUrl;
+//            } else {
+//                alert("Ошибка при создании платежа");
+//           }
+//        } catch (err) {
+//            console.error("Ошибка при создании платежа:", err);
+//        }
 
     };
 

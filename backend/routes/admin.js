@@ -117,7 +117,7 @@ router.post('/create-user', authMiddleware, adminMiddleware, async (req, res) =>
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = await User.create({ username, phone, password: hashedPassword });
 
-        const token = jwt.sign({ id: newUser.id, phone: newUser.phone }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign({ id: newUser.id, phone: newUser.phone }, process.env.JWT_SECRET, { expiresIn: '7d' });
         res.status(201).json({ message: 'Пользователь зарегистрирован', token });
     } catch (error) {
         console.error('Ошибка при создании пользователя:', error);
@@ -210,7 +210,7 @@ router.post('/login', async (req, res) => {
         }
 
         // Создание JWT токена для администратора
-        const token = jwt.sign({ id: user.id, phone: user.phone, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign({ id: user.id, phone: user.phone, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
         // Возвращаем токен и информацию о пользователе
         res.json({
