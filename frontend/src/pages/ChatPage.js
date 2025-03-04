@@ -22,6 +22,7 @@ const ChatPage = () => {
     const socket = useRef(null);
 
     useEffect(() => {
+
         socket.current = io(process.env.REACT_APP_SOCKET_URL);
 
         if (currentUser) {
