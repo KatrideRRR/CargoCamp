@@ -102,19 +102,6 @@
     border-bottom-left-radius: 4px;
 }
 
-/* Контейнер ввода */
-.chat-input-container {
-    display: flex;
-    align-items: center;
-    padding: 10px;
-    background: #fff;
-    border-top: 1px solid #ddd;
-    position: fixed;
-    bottom: 67px; /* Высота BottomMenu */
-    width: 100%;
-    max-width: 800px;
-    z-index: 100;
-}
 
 /* Исправлено: контейнер сообщений всегда прижат к вводу */
 .chat-messages {
