@@ -8,3 +8,6 @@
 .DS_Store
 /backend/package-lock.json
 .env.local
+.env
+/backend/.env
+.gitignore
