@@ -166,6 +166,8 @@ const ActiveOrdersPage = () => {
                                             ID {order.creatorId}.
                                             Создан {new Date(order.createdAt).toLocaleString()}
                                         </p>
+                                        <p><strong>ID Исполнителя:</strong> {order.executorId} </p>
+
                                     </div>
                                     <p><strong>Название:</strong> {order.type}</p>
                                     <p>
@@ -185,18 +187,18 @@ const ActiveOrdersPage = () => {
 
                                         <button className="call-button"
                                                 onClick={() => window.open(`tel:${order.phone}`)}>
-                                            {isMobile ? <FaPhone /> : "Позвонить"}
+                                            {isMobile ? <FaPhone/> : "Позвонить"}
                                         </button>
                                         <button className="message-button"
                                                 onClick={() => navigate(`/messages/${order.id}`)}>
-                                            {isMobile ? <FaComments /> : "Сообщение"}
+                                            {isMobile ? <FaComments/> : "Сообщение"}
                                         </button>
                                         <button className="route-button">
-                                            {isMobile ? <FaRoute /> : "Маршрут"}
+                                            {isMobile ? <FaRoute/> : "Маршрут"}
                                         </button>
                                         <button className="complain-button"
                                                 onClick={() => handleComplaint(order.id)}>
-                                            {isMobile ? <FaExclamationTriangle /> : "Пожаловаться"}
+                                            {isMobile ? <FaExclamationTriangle/> : "Пожаловаться"}
                                         </button>
 
 
@@ -205,21 +207,20 @@ const ActiveOrdersPage = () => {
                                                 <>
                                                     <button className="remove-button"
                                                             onClick={() => handleRemoveOrder(order.id)}>
-                                                        {isMobile ? <FaTrash /> : "Удалить"}
+                                                        {isMobile ? <FaTrash/> : "Удалить"}
                                                     </button>
                                                 </>
                                             ) : null
                                         ) : (
                                             <button className="complete-button"
                                                     onClick={() => handleCompleteOrder(order.id)}>
-                                                {isMobile ? <FaCheck /> : "Завершить"}
+                                                {isMobile ? <FaCheck/> : "Завершить"}
                                             </button>
                                         )}
 
 
-
                                     </div>
-                                    
+
                                 </li>
                             );
                         })}

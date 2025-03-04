@@ -39,26 +39,53 @@
 
 /* Заголовок чата */
 .chat-header {
-    padding: 16px;
-    background-color: #007bff;
+    padding: 10px;
+    background-color: #4f6173;
     color: white;
-    font-size: 18px;
+    font-size: 15px;
     font-weight: bold;
     text-align: center;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* Контейнер сообщений */
 .chat-messages {
     flex: 1;
     overflow-y: auto;
     padding: 16px;
+    padding-bottom: 80px; /* увеличил отступ снизу, чтобы сообщения не скрывались */
     display: flex;
     flex-direction: column;
     gap: 8px;
     background-color: #f7f7f7;
     transition: padding-bottom 0.2s ease-in-out;
 }
+
+.chat-input-container {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    background: #fff;
+    border-top: 1px solid #ddd;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    z-index: 100;
+}
+
+
+/* Когда появляется новое сообщение, прокручиваем контейнер */
+.chat-messages::-webkit-scrollbar {
+    width: 8px;
+}
+.chat-messages::-webkit-scrollbar-thumb {
+    background-color: #888;
+    border-radius: 4px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+    background-color: #555;
+}
+
 
 /* Сообщения */
 .chat-message {
@@ -88,19 +115,6 @@
     border-bottom-left-radius: 4px;
 }
 
-/* Контейнер ввода */
-.chat-input-container {
-    display: flex;
-    align-items: center;
-    padding: 10px;
-    background: #fff;
-    border-top: 1px solid #ddd;
-    position: fixed;
-    bottom: 67px; /* Высота BottomMenu */
-    width: 100%;
-    max-width: 800px;
-    z-index: 100;
-}
 
 /* Исправлено: контейнер сообщений всегда прижат к вводу */
 .chat-messages {
