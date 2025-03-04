@@ -170,26 +170,6 @@ const OrdersPage = () => {
         }
     };
 
-
-    const handleCategorySearch = async () => {
-        console.log("🔍 Поиск в категории:", selectedCategory);
-        if (!selectedCategory) {
-            console.warn("⚠ Нет выбранной категории, фильтрация не выполняется");
-            return;
-        }
-
-        try {
-            const response = await axiosInstance.get('/orders/all', {
-                params: { categoryId: selectedCategory }
-            });
-
-            console.log("📦 Отфильтрованные заказы:", response.data);
-            setOrders(response.data);
-        } catch (error) {
-            console.error("❌ Ошибка при поиске в категории:", error);
-        }
-    };
-
     const handleRequestOrder = async (orderId) => {
         try {
             await axiosInstance.post(`/orders/${orderId}/request`);
@@ -273,7 +253,7 @@ const OrdersPage = () => {
                                                     <img
                                                         key={index}
                                                         src={imageUrl}
-                                                        alt={`Order Image ${index + 1}`}
+                                                        alt={`Order pic ${index + 1}`}
                                                         className="order-image"
                                                         onClick={() => openModal(order.images)} // Открываем модальное окно при клике
                                                     />

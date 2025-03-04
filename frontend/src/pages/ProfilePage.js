@@ -11,11 +11,6 @@ const ProfilePage = () => {
     const [error, setError] = useState(null);
     const navigate = useNavigate();
     const { logout, isAuthenticated } = useAuth();
-    const [selectedFiles, setSelectedFiles] = useState(null);
-
-    const handleFileChange = (event) => {
-        setSelectedFiles(event.target.files);
-    };
 
     const handleUploadDocuments = async (files) => {
         if (!files) return;

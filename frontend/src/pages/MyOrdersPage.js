@@ -155,7 +155,7 @@ const MyOrdersPage = () => {
 
                                     {Array.isArray(order.images) && order.images.length > 0 ? (
                                         order.images.map((image, index) => (
-                                            <img key={index} src={`${apiUrl}${image}`} alt={`Order Image ${index + 1}`} className={styles.orderImage} />
+                                            <img key={index} src={`${apiUrl}${image}`} alt={`Order pic ${index + 1}`} className={styles.orderImage} />
                                         ))
                                     ) : (
                                         <p>Изображений нет</p>

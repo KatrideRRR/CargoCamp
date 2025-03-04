@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -7,6 +8,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const axios = require("axios");
+const SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
 
 // Настройка хранения файлов (загружаем в папку uploads/)
 const storage = multer.diskStorage({
@@ -32,8 +34,6 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
-
-const SMSRU_API_KEY = "706A8778-9606-1CA6-F061-72BA6F3A60E3"; // Замените на ваш API-ключ
 
 // Функция для генерации нового пароля
 const generateTemporaryPassword = () => {
@@ -121,7 +121,7 @@ router.post('/register', async (req, res) => {
             null,
             {
                 params: {
-                    secret: "6LeZUOAqAAAAABZ3mEk5a2-CqfhlU8e7n0-dneDC",
+                    secret: SECRET_KEY,
                     response: captchaToken
                 }
             }

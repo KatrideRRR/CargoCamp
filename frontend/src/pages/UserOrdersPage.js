@@ -64,7 +64,7 @@ const UserOrdersPage = () => {
                 socket.off('orderUpdated');
             };
         }
-    }, [userId]);
+    }, [userId, paramUserId]);
 
     const handleRequestOrder = async (orderId) => {
         try {
@@ -118,7 +118,7 @@ const UserOrdersPage = () => {
                                         {Array.isArray(order.images) && order.images.length > 0 ? (
                                             order.images.map((image, index) => {
                                                 const imageUrl = `${apiUrl}${image}`;
-                                                return <img key={index} src={imageUrl} alt={`Order Image ${index + 1}`}
+                                                return <img key={index} src={imageUrl} alt={`Order pic ${index + 1}`}
                                                             className="order-image"/>;
                                             })
                                         ) : (

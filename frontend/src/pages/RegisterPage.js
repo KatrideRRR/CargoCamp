@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import ReCAPTCHA from "react-google-recaptcha";
+
 const apiUrl = process.env.REACT_APP_API_URL;
 
 const RegisterPage = () => {
@@ -15,10 +16,10 @@ const RegisterPage = () => {
     const [isSmsSent, setIsSmsSent] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isAgreementChecked, setIsAgreementChecked] = useState(false);
+    const handleCaptchaChange = (value) => {setCaptchaValue(value);};
+    const siteKey = process.env.REACT_APP_RECAPTCHA_SITE_KEY;
 
-    const handleCaptchaChange = (value) => {
-        setCaptchaValue(value);
-    };
+
     // Отправка SMS-кода
     const sendSmsCode = async () => {
         try {
@@ -32,7 +33,6 @@ const RegisterPage = () => {
     const handleOpenModal = () => setIsModalOpen(true);
     const handleCloseModal = () => setIsModalOpen(false);
     const handleCheckboxChange = () => setIsAgreementChecked(!isAgreementChecked);
-
 
     const handleRegister = async (e) => {
         e.preventDefault();
@@ -94,7 +94,7 @@ const RegisterPage = () => {
                         />
                     </div>
                     <ReCAPTCHA
-                        sitekey="6LeZUOAqAAAAAO8RbiFwH4WsUXxQgt9TUzeGrghl"
+                        sitekey={siteKey} // Достаем ключ из переменной среды
                         onChange={handleCaptchaChange}
                     />
 
@@ -106,9 +106,10 @@ const RegisterPage = () => {
                         />
                         <span>
                         Я согласен с{' '}
-                            <a href="#" onClick={handleOpenModal}>
-                            пользовательским соглашением
-                        </a>
+                            <button className="link-button" onClick={handleOpenModal}>
+    пользовательским соглашением
+</button>
+
                     </span>
                     </div>
 
@@ -279,6 +280,29 @@ const RegisterPage = () => {
                     line-height: 1.6;
                     max-height: 70vh;
                     overflow-y: auto;
+                }
+
+                .link-button {
+                    background: none;
+                    border: none;
+                    color: #007BFF;
+                    text-decoration: underline;
+                    cursor: pointer;
+                    font-size: 16px;
+                    padding: 0;
+                    display: inline;
+                }
+
+                .link-button:hover {
+                    color: #0056b3;
+                }
+
+                .link-button:focus {
+                    outline: none;
+                }
+
+                .link-button:active {
+                    color: #003366;
                 }
 
                 h3 {
