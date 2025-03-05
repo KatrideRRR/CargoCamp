@@ -247,7 +247,7 @@ router.get('/:id', async (req, res) => {
 router.get('/user/:id', async (req, res) => {
     try {
         const user = await User.findByPk(req.params.id, {
-            attributes: ['id', 'username', 'rating', 'complaintsCount', 'complaints']
+            attributes: ['id', 'username', 'rating', 'complaintsCount', 'complaints', 'phone']
         });
         if (!user) return res.status(404).json({ message: "Пользователь не найден" });
         res.json(user);
@@ -320,6 +320,5 @@ router.post("/recover-password", async (req, res) => {
         return res.status(500).json({ message: "Ошибка сервера" });
     }
 });
-
 
 module.exports = router;

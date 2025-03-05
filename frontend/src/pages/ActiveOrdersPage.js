@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import axios from 'axios';
-import { useNavigate } from "react-router-dom";
+import {useNavigate} from "react-router-dom";
 import '../styles/ActiveOrdersPage.css';
-import { useAuth } from '../utils/authContext';
+import {useAuth} from '../utils/authContext';
 import io from 'socket.io-client';
-import { useMediaQuery } from 'react-responsive';
-import { FaPhone, FaComments, FaRoute, FaExclamationTriangle, FaCheck, FaTrash } from 'react-icons/fa';
+import {useMediaQuery} from 'react-responsive';
+import {FaPhone, FaComments, FaRoute, FaExclamationTriangle, FaCheck, FaTrash} from 'react-icons/fa';
+
 const apiUrl = process.env.REACT_APP_API_URL;
 
 const socket = io(process.env.REACT_APP_SOCKET_URL); // Подключение к WebSocket
@@ -14,14 +15,14 @@ const ActiveOrdersPage = () => {
     const [orders, setOrders] = useState([]);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const {user} = useAuth();
     const [showRatingModal, setShowRatingModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [rating, setRating] = useState(0);
     const [showComplaintModal, setShowComplaintModal] = useState(false);
     const [selectedOrderId, setSelectedOrderId] = useState(null);
     const [complaintText, setComplaintText] = useState('');
-    const isMobile = useMediaQuery({ maxWidth: 768 });
+    const isMobile = useMediaQuery({maxWidth: 768});
 
     useEffect(() => {
         const token = localStorage.getItem('authToken');
@@ -33,7 +34,7 @@ const ActiveOrdersPage = () => {
         const fetchActiveOrders = async () => {
             try {
                 const response = await axios.get(`${apiUrl}/api/orders/active-orders`, {
-                    headers: { Authorization: `Bearer ${token}` },
+                    headers: {Authorization: `Bearer ${token}`},
                 });
                 setOrders(response.data);
             } catch (err) {
@@ -77,19 +78,19 @@ const ActiveOrdersPage = () => {
                     : selectedOrder.executorId,
                 rating,
             }, {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {Authorization: `Bearer ${token}`},
             });
 
             // 2. Завершаем заказ
             await axios.post(`${apiUrl}/api/orders/complete/${selectedOrder.id}`,
                 {}, // Тело запроса пустое
-                { headers: { Authorization: `Bearer ${token}` } }
+                {headers: {Authorization: `Bearer ${token}`}}
             );
 
             // 3. Обновляем состояние заказов в интерфейсе
             setOrders((prevOrders) =>
                 prevOrders.map((order) =>
-                    order.id === selectedOrder.id ? { ...order, completed: true } : order
+                    order.id === selectedOrder.id ? {...order, completed: true} : order
                 )
             );
 
@@ -102,6 +103,21 @@ const ActiveOrdersPage = () => {
             console.error("Ошибка при завершении заказа или отправке рейтинга", error);
         }
     };
+
+    const getUserPhone = async (userId) => {
+        const token = localStorage.getItem('authToken');
+        return axios.get(`${apiUrl}/api/auth/user/${userId}`, {
+            headers: {Authorization: `Bearer ${token}`},
+        })
+            .then(response => {
+                console.log(response);
+                return response.data.phone;
+            })
+            .catch(error => {
+                console.error('Ошибка при получении телефона:', error);
+            });
+    };
+
 
     const handleComplaint = (orderId) => {
         setSelectedOrderId(orderId);
@@ -119,13 +135,12 @@ const ActiveOrdersPage = () => {
         }
 
         try {
-            const response = await axios.post(`${apiUrl}/api/orders/complain`, {
+            await axios.post(`${apiUrl}/api/orders/complain`, {
                 orderId: selectedOrderId,
                 complaintText,
             }, {
-                headers: { Authorization: `Bearer ${token}` }, // Убедитесь, что токен передается в заголовке
+                headers: {Authorization: `Bearer ${token}`}, // Убедитесь, что токен передается в заголовке
             });
-            console.log(response);
             alert('Жалоба отправлена');
             setShowComplaintModal(false);
             setComplaintText('');
@@ -186,7 +201,10 @@ const ActiveOrdersPage = () => {
                                     <div className="action-buttons">
 
                                         <button className="call-button"
-                                                onClick={() => window.open(`tel:${order.phone}`)}>
+                                                onClick={async () => {
+                                                    const phone = user.id === order.creatorId ? await getUserPhone(order.executorId) : await getUserPhone(order.creatorId);
+                                                    window.open(`tel:${phone}`)
+                                                }}>
                                             {isMobile ? <FaPhone/> : "Позвонить"}
                                         </button>
                                         <button className="message-button"
