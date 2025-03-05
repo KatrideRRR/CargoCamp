@@ -20,7 +20,7 @@ const OrdersPage = () => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);  // Индекс текущего изображения
     const [currentImages, setCurrentImages] = useState([]);  // Массив изображений для отображения
     const [selectedSubcategory, setSelectedSubcategory] = useState('');
-    const [filteredOrders, setFilteredOrders] = useState([]);
+    const [setFilteredOrders] = useState([]);
     const [userLocation, setUserLocation] = useState(null);
     const [manualAddress, setManualAddress] = useState('');
     const [isGeolocationDenied, setIsGeolocationDenied] = useState(false);
