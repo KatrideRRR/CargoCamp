@@ -117,7 +117,7 @@ const OrdersPage = () => {
             console.log("📍 Отфильтрованные заказы:", filtered);
             setFilteredOrders(filtered);
         }
-    }, [userLocation, orders]);
+    }, [userLocation, orders, setFilteredOrders]);
 
     // Формула расчета расстояния между координатами (Haversine formula)
     const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {

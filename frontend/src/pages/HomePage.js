@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { YMaps, Map, Placemark } from '@pbe/react-yandex-maps';
 import axios from 'axios';
 import { io } from 'socket.io-client';
+import '../styles/HomePage.css';
 const apiUrl = process.env.REACT_APP_API_URL;
 
 const socket = io(process.env.REACT_APP_SOCKET_URL);
@@ -102,21 +103,25 @@ const HomePage = () => {
         <div>
             {/* Форма для ввода адреса вручную */}
             {isManualInput && (
-                <div>
-                    <h3>Введите ваш адрес:</h3>
+                <div className="address-container">
+                    <h3 className="address-title">Введите ваш адрес:</h3>
                     <input
+                        className="address-input"
                         type="text"
                         placeholder="Введите адрес"
                         value={address}
                         onChange={handleAddressChange}
                     />
-                    <button onClick={handleAddressSubmit}>Найти местоположение</button>
+                    <button className="address-button" onClick={handleAddressSubmit}>
+                        Найти местоположение
+                    </button>
                 </div>
+
             )}
 
 
-            <YMaps query={{ apikey: "bf97867b-5ffb-4fc4-9fd5-8997874b300e" }}>
-                <div style={{ width: '100%', height: '100vh' }}>
+            <YMaps query={{apikey: "bf97867b-5ffb-4fc4-9fd5-8997874b300e"}}>
+                <div style={{width: '100%', height: '100vh'}}>
                     <Map
                         defaultState={{
                             center: location ? [location.latitude, location.longitude] : [44.9572, 34.1108], // Центр карты по местоположению
