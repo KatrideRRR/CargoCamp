@@ -9,14 +9,16 @@
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     width: 100%;
     max-width: 600px;
-    margin: 0 auto;
+    margin-top: 35px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 /* Заголовок с уникальным классом */
 .address-title {
     font-size: 1.2rem;
     font-weight: bold;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
     color: #333;
 }
 
@@ -35,13 +37,13 @@
 
 /* Эффект фокуса на поле ввода */
 .address-input:focus {
-    border-color: #4CAF50;
+    border-color: #0056b3;
 }
 
 /* Кнопка с уникальным классом */
 .address-button {
     padding: 10px 20px;
-    background-color: #4CAF50;
+    background-color: #007bff;
     color: white;
     border: none;
     border-radius: 5px;
@@ -52,7 +54,7 @@
 
 /* Эффект при наведении на кнопку */
 .address-button:hover {
-    background-color: #45a049;
+    background-color: #0056b3;
 }
 
 /* Отключенная кнопка */
