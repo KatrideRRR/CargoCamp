@@ -9,8 +9,9 @@ const socket = io(process.env.REACT_APP_SOCKET_URL);
 const HomePage = () => {
     const [orders, setOrders] = useState([]); // Список заказов
     const [location, setLocation] = useState(null); // Местоположение пользователя
-    const [manualLocation, setManualLocation] = useState({ latitude: '', longitude: '' }); // Введенные вручную координаты
+    const [ setManualLocation] = useState({ latitude: '', longitude: '' }); // Введенные вручную координаты
     const [isManualInput, setIsManualInput] = useState(false); // Флаг для отображения формы ввода
+    const [address, setAddress] = useState(''); // Введённый адрес
 
     // Функция загрузки заказов
     const fetchOrders = async () => {
@@ -22,6 +23,32 @@ const HomePage = () => {
             setOrders(ordersWithCoordinates);
         } catch (error) {
             console.error('Ошибка загрузки заказов:', error);
+        }
+    };
+
+    // Функция геокодирования (получение координат по адресу)
+    const geocodeAddress = async (address) => {
+        try {
+            const response = await axios.get('https://geocode-maps.yandex.ru/1.x/', {
+                params: {
+                    geocode: address,
+                    format: 'json',
+                    apikey: 'bf97867b-5ffb-4fc4-9fd5-8997874b300e', // Вставьте свой API ключ от Яндекс
+                },
+            });
+
+            const geoObject = response.data.response.GeoObjectCollection.featureMember[0];
+            if (geoObject) {
+                const coordinates = geoObject.GeoObject.Point.pos.split(' ');
+                const latitude = parseFloat(coordinates[1]);
+                const longitude = parseFloat(coordinates[0]);
+                setManualLocation({ latitude, longitude });
+                setLocation({ latitude, longitude });
+            } else {
+                alert('Не удалось найти местоположение по этому адресу');
+            }
+        } catch (error) {
+            console.error('Ошибка геокодирования:', error);
         }
     };
 
@@ -55,52 +82,38 @@ const HomePage = () => {
         };
     }, []);
 
-    // Обработчик изменения координат, введенных вручную
-    const handleManualLocationChange = (e) => {
-        const { name, value } = e.target;
-        setManualLocation((prevLocation) => ({
-            ...prevLocation,
-            [name]: value,
-        }));
+    // Обработчик изменения введённого адреса
+    const handleAddressChange = (e) => {
+        setAddress(e.target.value);
     };
 
-    // Обработчик отправки формы
-    const handleManualLocationSubmit = () => {
-        const { latitude, longitude } = manualLocation;
-        if (latitude && longitude) {
-            setLocation({
-                latitude: parseFloat(latitude),
-                longitude: parseFloat(longitude),
-            });
-            setIsManualInput(false); // Скрываем форму ввода после отправки
+    // Обработчик отправки формы с адресом
+    const handleAddressSubmit = () => {
+        if (address) {
+            geocodeAddress(address); // Запускаем геокодирование по введённому адресу
+            setIsManualInput(false); // Скрываем форму после отправки
         } else {
-            alert('Пожалуйста, введите правильные координаты.');
+            alert('Пожалуйста, введите адрес');
         }
     };
 
+
     return (
         <div>
-            {/* Форма для ввода координат вручную */}
+            {/* Форма для ввода адреса вручную */}
             {isManualInput && (
                 <div>
-                    <h3>Введите ваше местоположение вручную:</h3>
+                    <h3>Введите ваш адрес:</h3>
                     <input
                         type="text"
-                        name="latitude"
-                        placeholder="Широта"
-                        value={manualLocation.latitude}
-                        onChange={handleManualLocationChange}
+                        placeholder="Введите адрес"
+                        value={address}
+                        onChange={handleAddressChange}
                     />
-                    <input
-                        type="text"
-                        name="longitude"
-                        placeholder="Долгота"
-                        value={manualLocation.longitude}
-                        onChange={handleManualLocationChange}
-                    />
-                    <button onClick={handleManualLocationSubmit}>Подтвердить</button>
+                    <button onClick={handleAddressSubmit}>Найти местоположение</button>
                 </div>
             )}
+
 
             <YMaps query={{ apikey: "bf97867b-5ffb-4fc4-9fd5-8997874b300e" }}>
                 <div style={{ width: '100%', height: '100vh' }}>
