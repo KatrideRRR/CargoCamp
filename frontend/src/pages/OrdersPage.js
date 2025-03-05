@@ -20,6 +20,11 @@ const OrdersPage = () => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);  // Индекс текущего изображения
     const [currentImages, setCurrentImages] = useState([]);  // Массив изображений для отображения
     const [selectedSubcategory, setSelectedSubcategory] = useState('');
+    const [filteredOrders, setFilteredOrders] = useState([]);
+    const [userLocation, setUserLocation] = useState(null);
+    const [manualAddress, setManualAddress] = useState('');
+    const [isGeolocationDenied, setIsGeolocationDenied] = useState(false);
+
     const paymentMethods = [
         { id: "cash", label: "Наличные", icon: "💵" },
         { id: "guarantee", label: "Гарантия", icon: "🛡️" },
@@ -28,6 +33,7 @@ const OrdersPage = () => {
 
     useEffect(() => {
         fetchCategories();
+        getUserLocation();
     }, []);
 
     // Функция для получения иконки по способу оплаты
@@ -56,6 +62,77 @@ const OrdersPage = () => {
         setCurrentImageIndex((prevIndex) => (prevIndex - 1 + currentImages.length) % currentImages.length);  // Переход к предыдущему изображению
     };
 
+    // Получение геолокации пользователя
+    const getUserLocation = () => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    console.log("📍 Геолокация получена:", latitude, longitude);
+                    setUserLocation({ latitude, longitude });
+                },
+                (error) => {
+                    console.warn("⚠ Ошибка геолокации:", error.message);
+                    setIsGeolocationDenied(true);
+                }
+            );
+        } else {
+            console.warn("⚠ Браузер не поддерживает геолокацию");
+            setIsGeolocationDenied(true);
+        }
+    };
+
+    // Геокодинг адреса через API (пример на Яндекс.Картах)
+    const geocodeAddress = async (address) => {
+        try {
+            const response = await fetch(
+                `https://geocode-maps.yandex.ru/1.x/?apikey=ВАШ_API_КЛЮЧ&geocode=${encodeURIComponent(address)}&format=json`
+            );
+            const data = await response.json();
+            const pos = data.response.GeoObjectCollection.featureMember[0]?.GeoObject?.Point?.pos;
+            if (!pos) throw new Error("Адрес не найден");
+
+            const [longitude, latitude] = pos.split(" ").map(Number);
+            console.log("📍 Координаты введенного адреса:", latitude, longitude);
+            setUserLocation({ latitude, longitude });
+        } catch (error) {
+            console.error("❌ Ошибка геокодинга:", error);
+            alert("Не удалось определить координаты по адресу");
+        }
+    };
+
+    // Фильтрация заказов по радиусу 50 км
+    useEffect(() => {
+        if (userLocation && orders.length > 0) {
+            const filtered = orders.filter((order) => {
+                if (!order.latitude || !order.longitude) return false;
+                const distance = getDistanceFromLatLonInKm(
+                    userLocation.latitude,
+                    userLocation.longitude,
+                    order.latitude,
+                    order.longitude
+                );
+                return distance <= 50;
+            });
+            console.log("📍 Отфильтрованные заказы:", filtered);
+            setFilteredOrders(filtered);
+        }
+    }, [userLocation, orders]);
+
+    // Формула расчета расстояния между координатами (Haversine formula)
+    const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
+        const R = 6371; // Радиус Земли в км
+        const dLat = (lat2 - lat1) * (Math.PI / 180);
+        const dLon = (lon2 - lon1) * (Math.PI / 180);
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * (Math.PI / 180)) *
+            Math.cos(lat2 * (Math.PI / 180)) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c; // Расстояние в км
+    };
 
 
     useEffect(() => {
@@ -203,6 +280,21 @@ const OrdersPage = () => {
                             <option key={subcategory.id} value={subcategory.id}>{subcategory.name}</option>
                         ))}
                     </select>
+                    <label>Ваше местоположение:</label>
+                    {isGeolocationDenied ? (
+                        <>
+                            <input
+                                type="text"
+                                value={manualAddress}
+                                onChange={(e) => setManualAddress(e.target.value)}
+                                placeholder="Введите ваш адрес"
+                            />
+                            <button onClick={() => geocodeAddress(manualAddress)}>Определить</button>
+                        </>
+                    ) : (
+                        <p>Геолокация включена</p>
+                    )}
+
                 </div>
 
 
