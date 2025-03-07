@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {Link, useParams} from 'react-router-dom';
+import {Link, useNavigate, useParams} from 'react-router-dom';
 import axiosInstance from '../utils/axiosInstance';
 import '../styles/OrdersPage.css';
 import io from 'socket.io-client';
@@ -9,6 +9,7 @@ const socket = io(process.env.REACT_APP_SOCKET_URL);
 const apiUrl = process.env.REACT_APP_API_URL;
 
 const UserOrdersPage = () => {
+    const navigate = useNavigate();
     const { userId: paramUserId } = useParams(); // Получаем ID пользователя из URL
     const [orders, setOrders] = useState([]);
     const [error, setError] = useState(null);
@@ -77,6 +78,11 @@ const UserOrdersPage = () => {
     }, [userId, paramUserId]);
 
     const handleRequestOrder = async (orderId) => {
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+            alert('Вы не авторизованы! Пожалуйста, войдите в систему.');
+            navigate('/login');
+        }
         try {
             await axiosInstance.post(`/orders/${orderId}/request`);
             alert("Запрос отправлен заказчику!");

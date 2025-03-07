@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import {useParams, Link, useNavigate} from 'react-router-dom';
 import axiosInstance from '../utils/axiosInstance';
 import '../styles/OrdersPage.css';
 import io from 'socket.io-client';
@@ -9,6 +9,7 @@ const apiUrl = process.env.REACT_APP_API_URL;
 const socket = io(process.env.REACT_APP_SOCKET_URL);
 
 const OrderPage = () => {
+    const navigate = useNavigate();
     const { id } = useParams();
     const [order, setOrder] = useState(null);
     const [creator, setCreator] = useState(null);
@@ -89,6 +90,11 @@ const OrderPage = () => {
     };
 
     const handleRequestOrder = async (orderId) => {
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+            alert('Вы не авторизованы! Пожалуйста, войдите в систему.');
+            navigate('/login');
+        }
         try {
             await axiosInstance.post(`/orders/${orderId}/request`);
             alert("Запрос отправлен заказчику!");

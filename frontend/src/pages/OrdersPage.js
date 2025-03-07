@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axiosInstance from '../utils/axiosInstance';
-import { Link } from 'react-router-dom';
+import {Link, useNavigate} from 'react-router-dom';
 import '../styles/OrdersPage.css';
 import io from 'socket.io-client';
 import Modal from 'react-modal';
@@ -24,6 +24,7 @@ const OrdersPage = () => {
     const [userLocation, setUserLocation] = useState(null);
     const [manualAddress, setManualAddress] = useState('');
     const [isGeolocationDenied, setIsGeolocationDenied] = useState(false);
+    const navigate = useNavigate();
 
     const paymentMethods = [
         { id: "cash", label: "Наличные", icon: "💵" },
@@ -248,6 +249,11 @@ const OrdersPage = () => {
     };
 
     const handleRequestOrder = async (orderId) => {
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+            alert('Вы не авторизованы! Пожалуйста, войдите в систему.');
+            navigate('/login');
+        }
         try {
             await axiosInstance.post(`/orders/${orderId}/request`);
             alert("Запрос отправлен заказчику!");
