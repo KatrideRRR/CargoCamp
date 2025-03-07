@@ -3,7 +3,7 @@ import axiosInstance from '../utils/axiosInstance';
 import { Link } from 'react-router-dom';
 import '../styles/OrdersPage.css';
 import io from 'socket.io-client';
-import Modal from 'react-modal';  // Импортируем модуль для модального окна
+import Modal from 'react-modal';
 const apiUrl = process.env.REACT_APP_API_URL;
 
 const socket = io(process.env.REACT_APP_SOCKET_URL);
@@ -262,6 +262,7 @@ const OrdersPage = () => {
     }
 
     return (
+
         <div className="orders-container">
             <div className="orders-wrapper">
                 <div className="filters">
@@ -304,6 +305,7 @@ const OrdersPage = () => {
                             const creator = creatorsInfo[order.creatorId] || {};
 
                             return (
+
                                 <li className="order-card" key={order.id}>
                                     <div className="order-content">
                                         <div className="order-header">
@@ -311,11 +313,24 @@ const OrdersPage = () => {
                                                 <strong>Заказ номер {order.id}</strong> от заказчика с
                                                 ID {order.creatorId}.
                                                 Создан {new Date(order.createdAt).toLocaleString()}
+                                                <p><strong>Имя создателя:</strong> {creator.username || "Неизвестно"}
+                                                </p>
+                                                <p><strong>Рейтинг
+                                                    создателя:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
+                                                </p>
+                                                {/* Кнопка для перехода на страницу жалоб для создателя */}
+                                                {creator.username && (
+                                                    <Link to={`/complaints/${order.creatorId}`} className="complaints-button">
+                                                        Жалобы на
+                                                        создателя: {creator.complaintsCount || 0}                                       </Link>
+                                                )}
                                             </p>
                                             {/* Иконка способа оплаты ниже заголовка */}
                                             <div className="payment-icon-container">
-                                                <span className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
-                                                <span className="payment-label">{paymentMethods.find(method => method.id === order.paymentType)?.label}</span>
+                                                <span
+                                                    className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
+                                                <span
+                                                    className="payment-label">{paymentMethods.find(method => method.id === order.paymentType)?.label}</span>
                                             </div>
                                         </div>
 
@@ -327,13 +342,9 @@ const OrdersPage = () => {
                                             <p>
                                                 <strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : 'Не указано'}
                                             </p>
-                                            <p><strong>Описание:</strong> {order.description}</p>
                                             <p><strong>Адрес:</strong> {order.address}</p>
                                             <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
-                                            <p><strong>Имя создателя:</strong> {creator.username || "Неизвестно"}</p>
-                                            <p><strong>Рейтинг
-                                                создателя:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
-                                            </p>
+
 
                                         </div>
 
@@ -352,20 +363,14 @@ const OrdersPage = () => {
                                                 );
                                             })
                                         ) : (
-                                            <p>Изображений нет</p>
-                                        )}
+                                        '')}
+                                        <p><strong>Описание:</strong> {order.description}</p>
 
 
                                     </div>
 
 
 
-                                    {/* Кнопка для перехода на страницу жалоб для создателя */}
-                                    {creator.username && (
-                                        <Link to={`/complaints/${order.creatorId}`} className="complaints-button">
-                                            Жалобы на
-                                            создателя: {creator.complaintsCount || 0}                                       </Link>
-                                    )}
 
                                     {userId !== order.creatorId && !order.executorId && order.status === 'pending' && (
                                         <button className="take-order-button"

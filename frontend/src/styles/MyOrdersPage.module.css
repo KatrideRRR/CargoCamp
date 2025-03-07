@@ -146,3 +146,19 @@
     margin-bottom: 12px;
 }
 
+.orderHeader {
+    display: flex;
+    flex-direction: column;
+    position: relative; /* Чтобы вложенные абсолютные элементы ориентировались на этот блок */
+}
+
+.payment-icon-container {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Отступ между иконкой и текстом */
+    margin-top: 5px; /* Добавляет отступ от заголовка */
+}
+
+.payment-icon {
+    font-size: 1.2rem;
+}

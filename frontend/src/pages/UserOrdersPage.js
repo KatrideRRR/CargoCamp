@@ -17,6 +17,11 @@ const UserOrdersPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentImages, setCurrentImages] = useState([]);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const paymentMethods = [
+        { id: "cash", label: "Наличные", icon: "💵" },
+        { id: "guarantee", label: "Гарантия", icon: "🛡️" },
+        { id: "installments", label: "Рассрочка", icon: "💳" },
+    ];
 
     useEffect(() => {
         const fetchUserOrders = async () => {
@@ -40,6 +45,7 @@ const UserOrdersPage = () => {
                 setError(err.response?.data?.message || 'Ошибка загрузки заказов');
             }
         };
+
 
         const fetchUserData = async () => {
             try {
@@ -108,6 +114,12 @@ const UserOrdersPage = () => {
         return <div className="loading-message">Загрузка...</div>;
     }
 
+    // Функция для получения иконки по способу оплаты
+    const getPaymentIcon = (paymentType) => {
+        const method = paymentMethods.find(method => method.id === paymentType);
+        return method ? method.icon : "";
+    };
+
     return (
         <div className="orders-container">
             <div className="orders-wrapper">
@@ -124,7 +136,26 @@ const UserOrdersPage = () => {
                                                 <strong>Заказ номер {order.id}</strong> от заказчика с
                                                 ID {order.creatorId}.
                                                 Создан {new Date(order.createdAt).toLocaleString()}
+                                                <p><strong>Имя создателя:</strong> {creator.username || "Неизвестно"}
+                                                </p>
+                                                <p><strong>Рейтинг
+                                                    создателя:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
+                                                </p>
+                                                {/* Кнопка для перехода на страницу жалоб для создателя */}
+                                                {creator.username && (
+                                                    <Link to={`/complaints/${order.creatorId}`}
+                                                          className="complaints-button">
+                                                        Жалобы на
+                                                        создателя: {creator.complaintsCount || 0}                                       </Link>
+                                                )}
                                             </p>
+                                            {/* Иконка способа оплаты ниже заголовка */}
+                                            <div className="payment-icon-container">
+                                                <span
+                                                    className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
+                                                <span
+                                                    className="payment-label">{paymentMethods.find(method => method.id === order.paymentType)?.label}</span>
+                                            </div>
                                         </div>
 
                                         <div className="order-left">
@@ -132,10 +163,7 @@ const UserOrdersPage = () => {
                                             <p><strong>Описание:</strong> {order.description}</p>
                                             <p><strong>Адрес:</strong> {order.address}</p>
                                             <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
-                                            <p><strong>Имя создателя:</strong> {creator.username || "Неизвестно"}</p>
-                                            <p><strong>Рейтинг
-                                                создателя:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
-                                            </p>
+
                                         </div>
 
                                         {Array.isArray(order.images) && order.images.length > 0 ? (
@@ -152,16 +180,12 @@ const UserOrdersPage = () => {
                                                 );
                                             })
                                         ) : (
-                                            <p>Изображений нет</p>
+                                           ''
                                         )}
 
                                     </div>
 
-                                    {/* Кнопка для перехода на страницу жалоб для создателя */}
-                                    {creator.username && (
-                                        <Link to={`/complaints/${order.creatorId}`} className="complaints-button">
-                                            Жалобы на создателя: {creator.complaintsCount || 0}                                       </Link>
-                                    )}
+
 
                                     {userId !== order.creatorId && !order.executorId && order.status === 'pending' && (
                                         <button className="take-order-button" onClick={() => handleRequestOrder(order.id)}>Запросить выполнение</button>

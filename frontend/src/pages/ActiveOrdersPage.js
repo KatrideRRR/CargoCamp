@@ -6,6 +6,8 @@ import {useAuth} from '../utils/authContext';
 import io from 'socket.io-client';
 import {useMediaQuery} from 'react-responsive';
 import {FaPhone, FaComments, FaRoute, FaExclamationTriangle, FaCheck, FaTrash} from 'react-icons/fa';
+import Modal from "react-modal";
+import axiosInstance from "../utils/axiosInstance";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -23,6 +25,15 @@ const ActiveOrdersPage = () => {
     const [selectedOrderId, setSelectedOrderId] = useState(null);
     const [complaintText, setComplaintText] = useState('');
     const isMobile = useMediaQuery({maxWidth: 768});
+    const [isModalOpen, setIsModalOpen] = useState(false);  // Состояние для модального окна
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);  // Индекс текущего изображения
+    const [currentImages, setCurrentImages] = useState([]);  // Массив изображений для отображения
+    const [creatorsInfo, setCreatorsInfo] = useState({}); // Данные о создателях заказов
+    const paymentMethods = [
+        { id: "cash", label: "Наличные", icon: "💵" },
+        { id: "guarantee", label: "Гарантия", icon: "🛡️" },
+        { id: "installments", label: "Рассрочка", icon: "💳" },
+    ];
 
     useEffect(() => {
         const token = localStorage.getItem('authToken');
@@ -31,11 +42,37 @@ const ActiveOrdersPage = () => {
             navigate('/login');
         }
 
+
         const fetchActiveOrders = async () => {
             try {
                 const response = await axios.get(`${apiUrl}/api/orders/active-orders`, {
                     headers: {Authorization: `Bearer ${token}`},
                 });
+                // Получаем уникальные ID создателей
+                const creatorIds = [...new Set(orders.map(order => order.creatorId))];
+
+                if (creatorIds.length > 0) {
+                    const creatorsData = {};
+                    const requests = creatorIds.map(id =>
+                        axiosInstance.get(`/auth/${id}`)
+                            .then(res => ({ id, data: res.data }))
+                            .catch(err => {
+                                console.error(`Ошибка загрузки данных пользователя ${id}`, err);
+                                return null;
+                            })
+                    );
+
+                    const results = await Promise.allSettled(requests);
+
+                    results.forEach(result => {
+                        if (result.status === 'fulfilled' && result.value) {
+                            creatorsData[result.value.id] = result.value.data;
+                        }
+                    });
+
+                    setCreatorsInfo(creatorsData);
+                }
+
                 setOrders(response.data);
             } catch (err) {
                 console.error('Ошибка при загрузке активных заказов:', err);
@@ -45,6 +82,8 @@ const ActiveOrdersPage = () => {
 
         fetchActiveOrders();
 
+
+
         // Подписываемся на обновления активных заказов
         socket.on('activeOrdersUpdated', fetchActiveOrders);
 
@@ -52,11 +91,37 @@ const ActiveOrdersPage = () => {
             socket.off('activeOrdersUpdated', fetchActiveOrders); // Очистка слушателя
         };
 
-    }, [navigate]);
+    }, [navigate, orders]);
 
     if (!user) {
         return <p>Загрузка...</p>;
     }
+
+    // Функция для получения иконки по способу оплаты
+    const getPaymentIcon = (paymentType) => {
+        const method = paymentMethods.find(method => method.id === paymentType);
+        return method ? method.icon : "";
+    };
+
+    const openModal = (images) => {
+        setCurrentImages(images);
+        setCurrentImageIndex(0);  // Начать с первого изображения
+        setIsModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setIsModalOpen(false);
+        setCurrentImageIndex(0);  // Сброс индекса при закрытии
+        setCurrentImages([]);
+    };
+
+    const nextImage = () => {
+        setCurrentImageIndex((prevIndex) => (prevIndex + 1) % currentImages.length);  // Переход к следующему изображению
+    };
+
+    const prevImage = () => {
+        setCurrentImageIndex((prevIndex) => (prevIndex - 1 + currentImages.length) % currentImages.length);  // Переход к предыдущему изображению
+    };
 
     const handleCompleteOrder = async (orderId) => {
         // Показываем модальное окно для оценки
@@ -174,6 +239,7 @@ const ActiveOrdersPage = () => {
                             const isWaitingForOther = Array.isArray(order.completedBy) && order.completedBy.length === 1;
                             const isExecutor = order.executorId === user.id;
                             const isCreator = order.creatorId === user.id;
+                            const creator = creatorsInfo[order.creatorId] || {};
 
                             return (
                                 <li
@@ -186,6 +252,13 @@ const ActiveOrdersPage = () => {
                                             {isCreator ? '. Вы являетесь заказчиком' : ` от заказчика с ID ${order.creatorId}`}.
                                             Создан {new Date(order.createdAt).toLocaleString()}
                                         </p>
+
+                                        <p><strong>Имя создателя:</strong> {creator.username || "Неизвестно"}
+                                        </p>
+                                        <p><strong>Рейтинг
+                                            создателя:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
+                                        </p>
+
                                         <p>
                                             {isExecutor ? (
                                                 <strong>Вы являетесь исполнителем</strong>
@@ -195,20 +268,40 @@ const ActiveOrdersPage = () => {
                                                 </>
                                             )}
                                         </p>
+
+                                        {/* Иконка способа оплаты ниже заголовка */}
+                                        <div className="payment-icon-container">
+                                                <span
+                                                    className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
+                                            <span
+                                                className="payment-label">{paymentMethods.find(method => method.id === order.paymentType)?.label}</span>
+                                        </div>
                                     </div>
                                     <p><strong>Название:</strong> {order.type}</p>
                                     <p>
                                         <strong>Категория:</strong> {order.category ? order.category.name : 'Не указано'}
                                     </p>
                                     <p>
-                                        <strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : 'Не указано'}
+                                    <strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : 'Не указано'}
                                     </p>
-                                    <p><strong>Описание:</strong> {order.description}</p>
                                     <p><strong>Адрес:</strong> {order.address}</p>
                                     <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
-                                    {order.photoUrl && (
-                                        <img src={`${apiUrl}${order.photoUrl}`} alt="Фото заказа" className="order-photo" />
-                                    )}
+                                    {Array.isArray(order.images) && order.images.length > 0 ? (
+                                        order.images.map((image, index) => {
+                                            const imageUrl = `${apiUrl}${image}`;
+                                            return (
+                                                <img
+                                                    key={index}
+                                                    src={imageUrl}
+                                                    alt={`Order pic ${index + 1}`}
+                                                    className="order-image"
+                                                    onClick={() => openModal(order.images)} // Открываем модальное окно при клике
+                                                />
+                                            );
+                                        })
+                                    ) : (
+                                        '')}
+                                    <p><strong>Описание:</strong> {order.description}</p>
 
                                     <div className="action-buttons">
                                         <button
@@ -257,6 +350,34 @@ const ActiveOrdersPage = () => {
                     <p className="no-orders">Нет активных заказов.</p>
                 )}
             </div>
+
+            <Modal
+                appElement={document.getElementById('root')}
+                isOpen={isModalOpen}
+                onRequestClose={closeModal}
+                contentLabel="Full Image Modal"
+                className="custom-modal"
+                overlayClassName="custom-modal-overlay"
+            >
+                <div className="custom-modal-content">
+                    {/* Кнопка закрытия */}
+                    <button onClick={closeModal} className="custom-close-button">✖</button>
+
+                    {/* Изображение */}
+                    <img
+                        src={`${apiUrl}${currentImages[currentImageIndex]}`}
+                        alt="Full-size view"
+                        className="custom-modal-image"
+                    />
+
+                    {/* Кнопки переключения */}
+                    <div className="custom-image-navigation">
+                        <button onClick={prevImage} className="custom-nav-button">◀</button>
+                        <button onClick={nextImage} className="custom-nav-button">▶</button>
+                    </div>
+                </div>
+            </Modal>
+
             {/* Модальное окно для оценки */}
             {showRatingModal && (
                 <div className="modal-overlay" onClick={() => setShowRatingModal(false)}>

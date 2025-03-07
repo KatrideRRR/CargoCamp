@@ -4,6 +4,7 @@ import axiosInstance from '../utils/axiosInstance';
 import io from 'socket.io-client';
 import styles from '../styles/MyOrdersPage.module.css';
 import {AuthContext} from "../utils/authContext";
+import Modal from "react-modal";
 const apiUrl = process.env.REACT_APP_API_URL;
 
 const socket = io(process.env.REACT_APP_SOCKET_URL);
@@ -15,6 +16,14 @@ const MyOrdersPage = () => {
     const [error, setError] = useState('');
     const { hasNewRequests, setHasNewRequests } = useContext(AuthContext);
     const navigate = useNavigate();
+    const [isModalOpen, setIsModalOpen] = useState(false);  // Состояние для модального окна
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);  // Индекс текущего изображения
+    const [currentImages, setCurrentImages] = useState([]);  // Массив изображений для отображения
+    const paymentMethods = [
+        { id: "cash", label: "Наличные", icon: "💵" },
+        { id: "guarantee", label: "Гарантия", icon: "🛡️" },
+        { id: "installments", label: "Рассрочка", icon: "💳" },
+    ];
 
     useEffect(() => {
         const fetchOrders = async () => {
@@ -57,6 +66,7 @@ const MyOrdersPage = () => {
                 setLoading(false);
             }
         };
+
 
 
         const checkAuthUser = async () => {
@@ -119,6 +129,31 @@ const MyOrdersPage = () => {
         }
     };
 
+    // Функция для получения иконки по способу оплаты
+    const getPaymentIcon = (paymentType) => {
+        const method = paymentMethods.find(method => method.id === paymentType);
+        return method ? method.icon : "";
+    };
+
+    const openModal = (images) => {
+        setCurrentImages(images);
+        setCurrentImageIndex(0);  // Начать с первого изображения
+        setIsModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setIsModalOpen(false);
+        setCurrentImageIndex(0);  // Сброс индекса при закрытии
+        setCurrentImages([]);
+    };
+
+    const nextImage = () => {
+        setCurrentImageIndex((prevIndex) => (prevIndex + 1) % currentImages.length);  // Переход к следующему изображению
+    };
+
+    const prevImage = () => {
+        setCurrentImageIndex((prevIndex) => (prevIndex - 1 + currentImages.length) % currentImages.length);  // Переход к предыдущему изображению
+    };
     return (
         <div className={styles.container}>
             <div className={styles.ordersWrapper}>
@@ -140,26 +175,44 @@ const MyOrdersPage = () => {
                                 <div className={styles.orderContent}>
                                     <div className={styles.orderHeader}>
                                         <p className={styles.orderTitle}>
-                                            <strong>Заказ №{order.id}</strong> .
+                                            <strong>Заказ №{order.id}</strong>.
                                             Создан {new Date(order.createdAt).toLocaleString()}
                                         </p>
+                                        {/* Иконка способа оплаты вынесена за пределы <p> */}
+                                        <div className={styles.paymentIconContainer}>
+                                            <span
+                                                className={styles.paymentIcon}>{getPaymentIcon(order.paymentType)}</span>
+                                            <span className={styles.paymentLabel}>
+            {paymentMethods.find(method => method.id === order.paymentType)?.label}
+        </span>
+                                        </div>
                                     </div>
+
 
                                     <div className={styles.orderLeft}>
                                         <p><strong>Название заказа:</strong> {order.type}</p>
                                         <p><strong>Категория:</strong> {order.category?.name || 'Не указано'}</p>
                                         <p><strong>Подкатегория:</strong> {order.subcategory?.name || 'Не указано'}</p>
-                                        <p><strong>Описание:</strong> {order.description}</p>
                                         <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
+
                                     </div>
 
                                     {Array.isArray(order.images) && order.images.length > 0 ? (
-                                        order.images.map((image, index) => (
-                                            <img key={index} src={`${apiUrl}${image}`} alt={`Order pic ${index + 1}`} className={styles.orderImage} />
-                                        ))
+                                        order.images.map((image, index) => {
+                                            const imageUrl = `${apiUrl}${image}`;
+                                            return (
+                                                <img
+                                                    key={index}
+                                                    src={imageUrl}
+                                                    alt={`Order pic ${index + 1}`}
+                                                    className="order-image"
+                                                    onClick={() => openModal(order.images)} // Открываем модальное окно при клике
+                                                />
+                                            );
+                                        })
                                     ) : (
-                                        <p>Изображений нет</p>
-                                    )}
+                                        '')}
+                                    <p><strong>Описание:</strong> {order.description}</p>
 
                                     {Array.isArray(order.requestedExecutors) && order.requestedExecutors.length > 0 ? (
                                         <div className="executors-list">
@@ -201,7 +254,35 @@ const MyOrdersPage = () => {
                                     ) : (
                                         <p>Нет запросов на выполнение</p>
                                     )}
+
+                                    <Modal
+                                        appElement={document.getElementById('root')}
+                                        isOpen={isModalOpen}
+                                        onRequestClose={closeModal}
+                                        contentLabel="Full Image Modal"
+                                        className="custom-modal"
+                                        overlayClassName="custom-modal-overlay"
+                                    >
+                                        <div className="custom-modal-content">
+                                            {/* Кнопка закрытия */}
+                                            <button onClick={closeModal} className="custom-close-button">✖</button>
+
+                                            {/* Изображение */}
+                                            <img
+                                                src={`${apiUrl}${currentImages[currentImageIndex]}`}
+                                                alt="Full-size view"
+                                                className="custom-modal-image"
+                                            />
+
+                                            {/* Кнопки переключения */}
+                                            <div className="custom-image-navigation">
+                                                <button onClick={prevImage} className="custom-nav-button">◀</button>
+                                                <button onClick={nextImage} className="custom-nav-button">▶</button>
+                                            </div>
+                                        </div>
+                                    </Modal>
                                 </div>
+
                             </li>
                         ))}
                     </ul>

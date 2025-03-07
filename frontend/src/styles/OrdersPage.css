@@ -98,13 +98,14 @@
 
 /* Карточка заказа */
 .order-card {
+    display: flex;
+    flex-direction: column; /* Основное содержимое сверху, кнопки внизу */
     background-color: #fff;
-    border-radius: 12px;
-    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.1);
-    padding: 18px;
-    margin-bottom: 20px;
-    border-left: 6px solid #007aff;
-    transition: transform 0.2s, box-shadow 0.2s;
+    border-radius: 10px;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+    padding: 14px;
+    margin-bottom: 14px;
+    border-left: 4px solid #007aff; /* Цвет по умолчанию */
 }
 
 .order-card:hover {
@@ -371,8 +372,8 @@
 
 .payment-icon-container {
     position: absolute;
-    top: 30px; /* Сдвигаем вниз, чтобы иконка была ниже заголовка */
-    right: 8px;
+    top: 60px; /* Сдвигаем вниз, чтобы иконка была ниже заголовка */
+    right: 18px;
     text-align: center;
 }
 
@@ -454,6 +455,4 @@
 .custom-nav-button:hover {
     opacity: 1;
 }
-
-
 

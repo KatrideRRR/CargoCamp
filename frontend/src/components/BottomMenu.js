@@ -51,7 +51,7 @@ const BottomMenu = () => {
                 {hasNewRequests ? (
                     <BellRing size={28} className="menu-icon-alert" />
                 ) : (
-                    <Briefcase size={28} className="menu-icon-normal" />
+                    <List size={28} className="menu-icon-normal" />
                 )}
             </button>
 
