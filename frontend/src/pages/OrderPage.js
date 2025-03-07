@@ -22,12 +22,15 @@ const OrderPage = () => {
         { id: "guarantee", label: "Гарантия", icon: "🛡️" },
         { id: "installments", label: "Рассрочка", icon: "💳" },
     ];
+    const [orders, setOrders] = useState([]);
+
 
     useEffect(() => {
         const fetchOrder = async () => {
             try {
                 const response = await axiosInstance.get(`/orders/${id}`);
                 setOrder(response.data);
+                console.log(response);
 
                 // Загружаем данные о создателе заказа
                 const userResponse = await axiosInstance.get(`/auth/${response.data.creatorId}`);
@@ -108,18 +111,25 @@ const OrderPage = () => {
     if (!order || !creator) {
         return <div className="loading">Загрузка...</div>;
     }
+    const isCreator = order.creatorId === userId;
 
     return (
+
         <div className="orders-container">
             <div className="orders-wrapper">
                 <ul className="orders-list">
-                    <li className="order-card">
+                    <li
+                        key={order.id}
+                        className={`order-card ${isCreator ? 'creator' : ''} `}
+                    >
                         <div className="order-content">
-                            <div className="order-header">
+                        <div className="order-header">
                                 <p className="order-title">
                                     <strong>Заказ №{order.id}</strong> от {creator.username || "Неизвестно"}.
                                     Создан {new Date(order.createdAt).toLocaleString()}.
-                                    <p><strong>Имя создателя:</strong> {creator.username || "Неизвестно"}</p>
+                                    <p><strong>ID заказчика:</strong> {order.creatorId || "Неизвестно"}</p>
+
+                                        <p><strong>Имя создателя:</strong> {creator.username || "Неизвестно"}</p>
                                     <p>
                                         <strong>Рейтинг:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
                                     </p>
@@ -140,7 +150,12 @@ const OrderPage = () => {
 
                             <div className="order-left">
                                 <p><strong>Тип заказа:</strong> {order.type}</p>
-                                <p><strong>Описание:</strong> {order.description}</p>
+                                <p>
+                                    <strong>Категория:</strong> {order.category ? order.category.name : 'Не указано'}
+                                </p>
+                                <p>
+                                    <strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : 'Не указано'}
+                                </p>
                                 <p><strong>Адрес:</strong> {order.address}</p>
                                 <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
                             </div>

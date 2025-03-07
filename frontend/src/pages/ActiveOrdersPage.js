@@ -240,35 +240,37 @@ const ActiveOrdersPage = () => {
                             const isExecutor = order.executorId === user.id;
                             const isCreator = order.creatorId === user.id;
                             const creator = creatorsInfo[order.creatorId] || {};
+                            const executor = creatorsInfo[order.executorId] || {};
 
                             return (
                                 <li
                                     key={order.id}
-                                    className={`order-card ${isCreator ? 'creator' : ''} ${isExecutor ? 'executor' : ''}`}
+                                    className={`order-card ${isCreator ? 'creator' : ''} `}
                                 >
                                     <div className="order-header">
                                         <p className="order-title">
                                             <strong>Заказ номер {order.id}</strong>
-                                            {isCreator ? '. Вы являетесь заказчиком' : ` от заказчика с ID ${order.creatorId}`}.
+                                            {isCreator ? '. Вы являетесь заказчиком' : `. Вы являетесь исполнителем`}.
                                             Создан {new Date(order.createdAt).toLocaleString()}
                                         </p>
 
-                                        <p><strong>Имя создателя:</strong> {creator.username || "Неизвестно"}
-                                        </p>
-                                        <p><strong>Рейтинг
-                                            создателя:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
-                                        </p>
+                                        {isExecutor ?
+                                            <>
+                                                <p><strong>ID заказчика:</strong> {order.creatorId || "Неизвестно"}
+                                                </p>
+                                                <p><strong>Имя заказчика:</strong> {creator.username || "Неизвестно"}
+                                                </p>
+                                                <p><strong>Рейтинг
+                                                    заказчика:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
+                                                </p>
+                                            </> :
+                                            <>
+                                                <p><strong>ID исполнителя:</strong> {order.executorId || "Неизвестно"}</p>
+                                                <p><strong>Имя исполнителя:</strong> {executor?.username || "Неизвестно"}</p>
+                                                <p><strong>Рейтинг исполнителя:</strong> {executor?.rating ? executor.rating.toFixed(1) : "Нет данных"}</p>
+                                            </>
 
-                                        <p>
-                                            {isExecutor ? (
-                                                <strong>Вы являетесь исполнителем</strong>
-                                            ) : (
-                                                <>
-                                                    <strong>ID Исполнителя:</strong> {order.executorId}
-                                                </>
-                                            )}
-                                        </p>
-
+                                        }
                                         {/* Иконка способа оплаты ниже заголовка */}
                                         <div className="payment-icon-container">
                                                 <span

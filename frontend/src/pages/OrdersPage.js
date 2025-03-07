@@ -303,24 +303,30 @@ const OrdersPage = () => {
                     <ul className="orders-list">
                         {orders.map((order) => {
                             const creator = creatorsInfo[order.creatorId] || {};
+                            const isCreator = order.creatorId === userId;
 
                             return (
 
-                                <li className="order-card" key={order.id}>
+                                <li
+                                    key={order.id}
+                                    className={`order-card ${isCreator ? 'creator' : ''} `}
+                                >
                                     <div className="order-content">
                                         <div className="order-header">
                                             <p className="order-title">
                                                 <strong>Заказ номер {order.id}</strong> от заказчика с
                                                 ID {order.creatorId}.
                                                 Создан {new Date(order.createdAt).toLocaleString()}
-                                                <p><strong>Имя создателя:</strong> {creator.username || "Неизвестно"}
+                                                <p><strong>ID заказчика:</strong> {order.creatorId || "Неизвестно"} </p>
+                                                    <p><strong>Имя создателя:</strong> {creator.username || "Неизвестно"}
                                                 </p>
                                                 <p><strong>Рейтинг
                                                     создателя:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
                                                 </p>
                                                 {/* Кнопка для перехода на страницу жалоб для создателя */}
                                                 {creator.username && (
-                                                    <Link to={`/complaints/${order.creatorId}`} className="complaints-button">
+                                                    <Link to={`/complaints/${order.creatorId}`}
+                                                          className="complaints-button">
                                                         Жалобы на
                                                         создателя: {creator.complaintsCount || 0}                                       </Link>
                                                 )}
@@ -363,13 +369,11 @@ const OrdersPage = () => {
                                                 );
                                             })
                                         ) : (
-                                        '')}
+                                            '')}
                                         <p><strong>Описание:</strong> {order.description}</p>
 
 
                                     </div>
-
-
 
 
                                     {userId !== order.creatorId && !order.executorId && order.status === 'pending' && (
