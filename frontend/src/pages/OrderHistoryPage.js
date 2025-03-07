@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axiosInstance from '../utils/axiosInstance';
-import '../styles/OrderHistotyPage.css'
+import '../styles/OrderHistotyPage.css';
 
 const OrderHistoryPage = () => {
     const { userId } = useParams(); // Получаем ID пользователя из URL
@@ -39,7 +39,7 @@ const OrderHistoryPage = () => {
 
     return (
         <div className="order-history-container">
-            <h1>История завершенных заказов</h1>
+            <h1>История завершенных заказов ({orders.length})</h1>
             {orders.length > 0 ? (
                 <ul className="order-list">
                     {orders.map((order) => (
@@ -50,6 +50,7 @@ const OrderHistoryPage = () => {
                             <p><strong>Адрес:</strong> {order.address}</p>
                             <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
                             <p><strong>ID создателя:</strong> {order.creatorId}</p>
+                            <p><strong>ID исполнителя:</strong> {order.executorId}</p>
                             <p><strong>Дата завершения:</strong> {order.completedAt}</p>
                         </li>
                     ))}

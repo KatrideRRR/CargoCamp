@@ -172,17 +172,29 @@ const ActiveOrdersPage = () => {
                         {orders.map((order) => {
                             const isCompletedByUser = Array.isArray(order.completedBy) && order.completedBy.includes(user.id);
                             const isWaitingForOther = Array.isArray(order.completedBy) && order.completedBy.length === 1;
+                            const isExecutor = order.executorId === user.id;
+                            const isCreator = order.creatorId === user.id;
 
                             return (
-                                <li key={order.id} className="order-card">
+                                <li
+                                    key={order.id}
+                                    className={`order-card ${isCreator ? 'creator' : ''} ${isExecutor ? 'executor' : ''}`}
+                                >
                                     <div className="order-header">
                                         <p className="order-title">
-                                            <strong>Заказ номер {order.id}</strong> от заказчика с
-                                            ID {order.creatorId}.
+                                            <strong>Заказ номер {order.id}</strong>
+                                            {isCreator ? '. Вы являетесь заказчиком' : ` от заказчика с ID ${order.creatorId}`}.
                                             Создан {new Date(order.createdAt).toLocaleString()}
                                         </p>
-                                        <p><strong>ID Исполнителя:</strong> {order.executorId} </p>
-
+                                        <p>
+                                            {isExecutor ? (
+                                                <strong>Вы являетесь исполнителем</strong>
+                                            ) : (
+                                                <>
+                                                    <strong>ID Исполнителя:</strong> {order.executorId}
+                                                </>
+                                            )}
+                                        </p>
                                     </div>
                                     <p><strong>Название:</strong> {order.type}</p>
                                     <p>
@@ -195,52 +207,50 @@ const ActiveOrdersPage = () => {
                                     <p><strong>Адрес:</strong> {order.address}</p>
                                     <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
                                     {order.photoUrl && (
-                                        <img src={`${apiUrl}${order.photoUrl}`} alt="Фото заказа"
-                                             className="order-photo"/>)}
+                                        <img src={`${apiUrl}${order.photoUrl}`} alt="Фото заказа" className="order-photo" />
+                                    )}
 
                                     <div className="action-buttons">
-
-                                        <button className="call-button"
-                                                onClick={async () => {
-                                                    const phone = user.id === order.creatorId ? await getUserPhone(order.executorId) : await getUserPhone(order.creatorId);
-                                                    window.open(`tel:${phone}`)
-                                                }}>
-                                            {isMobile ? <FaPhone/> : "Позвонить"}
+                                        <button
+                                            className="call-button"
+                                            onClick={async () => {
+                                                const phone = isCreator ? await getUserPhone(order.executorId) : await getUserPhone(order.creatorId);
+                                                window.open(`tel:${phone}`);
+                                            }}
+                                        >
+                                            {isMobile ? <FaPhone /> : "Позвонить"}
                                         </button>
-                                        <button className="message-button"
-                                                onClick={() => navigate(`/messages/${order.id}`)}>
-                                            {isMobile ? <FaComments/> : "Сообщение"}
+                                        <button className="message-button" onClick={() => navigate(`/messages/${order.id}`)}>
+                                            {isMobile ? <FaComments /> : "Сообщение"}
                                         </button>
                                         <button className="route-button">
-                                            {isMobile ? <FaRoute/> : "Маршрут"}
+                                            {isMobile ? <FaRoute /> : "Маршрут"}
                                         </button>
-                                        <button className="complain-button"
-                                                onClick={() => handleComplaint(order.id)}>
-                                            {isMobile ? <FaExclamationTriangle/> : "Пожаловаться"}
+                                        <button className="complain-button" onClick={() => handleComplaint(order.id)}>
+                                            {isMobile ? <FaExclamationTriangle /> : "Пожаловаться"}
                                         </button>
-
 
                                         {isCompletedByUser ? (
                                             isWaitingForOther ? (
-                                                <>
-                                                    <button className="remove-button"
-                                                            onClick={() => handleRemoveOrder(order.id)}>
-                                                        {isMobile ? <FaTrash/> : "Удалить"}
-                                                    </button>
-                                                </>
+                                                <button
+                                                    className="remove-button"
+                                                    onClick={() => handleRemoveOrder(order.id)}
+                                                >
+                                                    {isMobile ? <FaTrash /> : "Удалить"}
+                                                </button>
                                             ) : null
                                         ) : (
-                                            <button className="complete-button"
-                                                    onClick={() => handleCompleteOrder(order.id)}>
-                                                {isMobile ? <FaCheck/> : "Завершить"}
+                                            <button
+                                                className="complete-button"
+                                                onClick={() => handleCompleteOrder(order.id)}
+                                            >
+                                                {isMobile ? <FaCheck /> : "Завершить"}
                                             </button>
                                         )}
-
-
                                     </div>
-
                                 </li>
                             );
+
                         })}
                     </ul>
                 ) : (

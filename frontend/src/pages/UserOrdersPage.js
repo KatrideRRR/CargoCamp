@@ -3,6 +3,7 @@ import {Link, useParams} from 'react-router-dom';
 import axiosInstance from '../utils/axiosInstance';
 import '../styles/OrdersPage.css';
 import io from 'socket.io-client';
+import Modal from 'react-modal';
 
 const socket = io(process.env.REACT_APP_SOCKET_URL);
 const apiUrl = process.env.REACT_APP_API_URL;
@@ -13,6 +14,9 @@ const UserOrdersPage = () => {
     const [error, setError] = useState(null);
     const [creatorsInfo, setCreatorsInfo] = useState({}); // Данные о создателях заказов
     const [userId, setUserId] = useState(null); // Правильно задаем состояние
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [currentImages, setCurrentImages] = useState([]);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
     useEffect(() => {
         const fetchUserOrders = async () => {
@@ -76,6 +80,25 @@ const UserOrdersPage = () => {
         }
     };
 
+    const openModal = (images) => {
+        setCurrentImages(images);
+        setCurrentImageIndex(0);  // Начать с первого изображения
+        setIsModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setIsModalOpen(false);
+        setCurrentImageIndex(0);  // Сброс индекса при закрытии
+        setCurrentImages([]);
+    };
+
+    const nextImage = () => {
+        setCurrentImageIndex((prevIndex) => (prevIndex + 1) % currentImages.length);  // Переход к следующему изображению
+    };
+
+    const prevImage = () => {
+        setCurrentImageIndex((prevIndex) => (prevIndex - 1 + currentImages.length) % currentImages.length);  // Переход к предыдущему изображению
+    };
 
     if (error) {
         return <div className="error-message">Ошибка: {error}</div>;
@@ -118,12 +141,20 @@ const UserOrdersPage = () => {
                                         {Array.isArray(order.images) && order.images.length > 0 ? (
                                             order.images.map((image, index) => {
                                                 const imageUrl = `${apiUrl}${image}`;
-                                                return <img key={index} src={imageUrl} alt={`Order pic ${index + 1}`}
-                                                            className="order-image"/>;
+                                                return (
+                                                    <img
+                                                        key={index}
+                                                        src={imageUrl}
+                                                        alt={`Order pic ${index + 1}`}
+                                                        className="order-image"
+                                                        onClick={() => openModal(order.images)} // Открываем модальное окно при клике
+                                                    />
+                                                );
                                             })
                                         ) : (
                                             <p>Изображений нет</p>
                                         )}
+
                                     </div>
 
                                     {/* Кнопка для перехода на страницу жалоб для создателя */}
@@ -143,6 +174,35 @@ const UserOrdersPage = () => {
                     <p className="no-orders">Нет доступных заказов.</p>
                 )}
             </div>
+
+            {/* Модальное окно просмотра изображений */}
+            <Modal
+                appElement={document.getElementById('root')}
+                isOpen={isModalOpen}
+                onRequestClose={closeModal}
+                contentLabel="Full Image Modal"
+                className="custom-modal"
+                overlayClassName="custom-modal-overlay"
+            >
+                <div className="custom-modal-content">
+                    {/* Кнопка закрытия */}
+                    <button onClick={closeModal} className="custom-close-button">✖</button>
+
+                    {/* Изображение */}
+                    <img
+                        src={`${apiUrl}${currentImages[currentImageIndex]}`}
+                        alt="Full-size view"
+                        className="custom-modal-image"
+                    />
+
+                    {/* Кнопки переключения */}
+                    <div className="custom-image-navigation">
+                        <button onClick={prevImage} className="custom-nav-button">◀</button>
+                        <button onClick={nextImage} className="custom-nav-button">▶</button>
+                    </div>
+                </div>
+            </Modal>
+
         </div>
     );
 };
