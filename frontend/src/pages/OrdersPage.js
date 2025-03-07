@@ -384,19 +384,27 @@ const OrdersPage = () => {
                     isOpen={isModalOpen}
                     onRequestClose={closeModal}
                     contentLabel="Full Image Modal"
-                    className="modal"
-                    overlayClassName="modal-overlay"
+                    className="custom-modal"
+                    overlayClassName="custom-modal-overlay"
                 >
-                    <div className="modal-content">
-                        <div className="image-navigation">
-                            <button onClick={prevImage} className="prev-button">◀</button>
-                            <img src={`${apiUrl}${currentImages[currentImageIndex]}`} alt="Full-size view" className="modal-image" />
-                            <button onClick={nextImage} className="next-button">▶</button>
+                    <div className="custom-modal-content">
+                        {/* Кнопка закрытия */}
+                        <button onClick={closeModal} className="custom-close-button">✖</button>
+
+                        {/* Изображение */}
+                        <img
+                            src={`${apiUrl}${currentImages[currentImageIndex]}`}
+                            alt="Full-size view"
+                            className="custom-modal-image"
+                        />
+
+                        {/* Кнопки переключения */}
+                        <div className="custom-image-navigation">
+                            <button onClick={prevImage} className="custom-nav-button">◀</button>
+                            <button onClick={nextImage} className="custom-nav-button">▶</button>
                         </div>
                     </div>
                 </Modal>
-
-
 
             </div>
         </div>

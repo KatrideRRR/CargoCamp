@@ -158,9 +158,16 @@ const HomePage = () => {
                                         hintContent: `Заказ #${order.id}`, // Подсказка
                                         balloonContent: `
                       <div style="font-size: 14px;">
-                        <p><strong>Тип заказа:</strong> ${order.type || 'Не указан'}</p>
-                        <p><strong>Сумма:</strong> ${order.proposedSum || 'Не указана'} ₽</p>
-                      </div>
+                                            <p><strong>Тип заказа:</strong> ${order.type || 'Не указан'}</p>
+                                            <p><strong>Сумма:</strong> ${order.proposedSum || 'Не указана'} ₽</p>
+                                            <button 
+                                                onclick="window.location.href='/order/${order.id}'" 
+                                                style="background-color: #007AFF; color: white; border: none; padding: 5px 10px; cursor: pointer; margin-top: 5px;"
+                                            >
+                                                Перейти
+                                            </button>
+
+                                        </div>
                     `,
                                     }}
                                     options={{
