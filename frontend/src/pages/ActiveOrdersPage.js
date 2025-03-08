@@ -29,6 +29,7 @@ const ActiveOrdersPage = () => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);  // Индекс текущего изображения
     const [currentImages, setCurrentImages] = useState([]);  // Массив изображений для отображения
     const [creatorsInfo, setCreatorsInfo] = useState({}); // Данные о создателях заказов
+    const [executorsInfo, setExecutorsInfo] = useState({}); // Данные о создателях заказов
     const paymentMethods = [
         { id: "cash", label: "Наличные", icon: "💵" },
         { id: "guarantee", label: "Гарантия", icon: "🛡️" },
@@ -84,6 +85,32 @@ const ActiveOrdersPage = () => {
                     setCreatorsInfo(creatorsData);
                 }
 
+                // Получаем уникальные ID создателей
+                const executorIds = [...new Set(orders.map(order => order.executorId))];
+
+                if (executorIds.length > 0) {
+                    const executorsData = {};
+                    const requests = executorIds.map(executorId =>
+                        axiosInstance.get(`/auth/user/${executorId}`)
+                            .then(res => ({ executorId, data: res.data }))
+                            .catch(err => {
+                                console.error(`Ошибка загрузки данных пользователя ${executorId}`, err);
+                                return { executorId, data: null }; // Возвращаем объект с null в случае ошибки
+                            })
+                    );
+
+                    const results = await Promise.allSettled(requests);
+
+                    results.forEach(result => {
+                        if (result.status === 'fulfilled' && result.value && result.value.data !== null) {
+                            executorsData[result.value.executorId] = result.value.data;
+                        }
+                    });
+
+                    setExecutorsInfo(executorsData);
+                }
+
+
                 // Исключаем заказы, которые пользователь уже удалил с экрана
                 const filteredOrders = response.data.filter(order => !removedOrders.includes(order.id));
 
@@ -97,8 +124,6 @@ const ActiveOrdersPage = () => {
 
         fetchActiveOrders();
 
-
-
         // Подписываемся на обновления активных заказов
         socket.on('activeOrdersUpdated', fetchActiveOrders);
 
@@ -106,7 +131,7 @@ const ActiveOrdersPage = () => {
             socket.off('activeOrdersUpdated', fetchActiveOrders); // Очистка слушателя
         };
 
-    }, [navigate, orders]);
+    }, [navigate, orders, removedOrders]);
 
     if (!user) {
         return <p>Загрузка...</p>;
@@ -262,7 +287,7 @@ const ActiveOrdersPage = () => {
                             const isExecutor = order.executorId === user.id;
                             const isCreator = order.creatorId === user.id;
                             const creator = creatorsInfo[order.creatorId] || {};
-                            const executor = creatorsInfo[order.executorId] || {};
+                            const executor = executorsInfo[order.executorId] || {};
 
                             return (
                                 <li
@@ -278,13 +303,9 @@ const ActiveOrdersPage = () => {
 
                                         {isExecutor ?
                                             <>
-                                                <p><strong>ID заказчика:</strong> {order.creatorId || "Неизвестно"}
-                                                </p>
-                                                <p><strong>Имя заказчика:</strong> {creator.username || "Неизвестно"}
-                                                </p>
-                                                <p><strong>Рейтинг
-                                                    заказчика:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
-                                                </p>
+                                                <p><strong>ID заказчика:</strong> {order.creatorId || "Неизвестно"}</p>
+                                                <p><strong>Имя заказчика:</strong> {creator.username || "Неизвестно"}</p>
+                                                <p><strong>Рейтинг заказчика:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}</p>
                                             </> :
                                             <>
                                                 <p><strong>ID исполнителя:</strong> {order.executorId || "Неизвестно"}</p>

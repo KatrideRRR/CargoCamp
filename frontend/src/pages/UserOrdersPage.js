@@ -142,10 +142,11 @@ const UserOrdersPage = () => {
                                                 <strong>Заказ номер {order.id}</strong> от заказчика с
                                                 ID {order.creatorId}.
                                                 Создан {new Date(order.createdAt).toLocaleString()}
-                                                <p><strong>Имя создателя:</strong> {creator.username || "Неизвестно"}
+                                                <p><strong>ID заказчика:</strong> {order.creatorId || "Неизвестно"} </p>
+                                                <p><strong>Имя заказчика:</strong> {creator.username || "Неизвестно"}
                                                 </p>
                                                 <p><strong>Рейтинг
-                                                    создателя:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
+                                                    заказчика:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
                                                 </p>
                                                 {/* Кнопка для перехода на страницу жалоб для создателя */}
                                                 {creator.username && (
