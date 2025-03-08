@@ -23,8 +23,6 @@ const OrderPage = () => {
         { id: "guarantee", label: "Гарантия", icon: "🛡️" },
         { id: "installments", label: "Рассрочка", icon: "💳" },
     ];
-    const [orders, setOrders] = useState([]);
-
 
     useEffect(() => {
         const fetchOrder = async () => {

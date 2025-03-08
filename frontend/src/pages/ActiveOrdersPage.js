@@ -34,6 +34,17 @@ const ActiveOrdersPage = () => {
         { id: "guarantee", label: "Гарантия", icon: "🛡️" },
         { id: "installments", label: "Рассрочка", icon: "💳" },
     ];
+    const [removedOrders, setRemovedOrders] = useState(() => {
+        // Загружаем удалённые заказы из localStorage при загрузке страницы
+        const saved = localStorage.getItem("removedOrders");
+        return saved ? JSON.parse(saved) : [];
+    });
+
+    useEffect(() => {
+        // Сохраняем удалённые заказы в localStorage при каждом изменении
+        localStorage.setItem("removedOrders", JSON.stringify(removedOrders));
+    }, [removedOrders]);
+
 
     useEffect(() => {
         const token = localStorage.getItem('authToken');
@@ -73,7 +84,11 @@ const ActiveOrdersPage = () => {
                     setCreatorsInfo(creatorsData);
                 }
 
-                setOrders(response.data);
+                // Исключаем заказы, которые пользователь уже удалил с экрана
+                const filteredOrders = response.data.filter(order => !removedOrders.includes(order.id));
+
+                setOrders(filteredOrders);
+
             } catch (err) {
                 console.error('Ошибка при загрузке активных заказов:', err);
                 setError('Не удалось загрузить заказы.');
@@ -217,8 +232,15 @@ const ActiveOrdersPage = () => {
 
 
     const handleRemoveOrder = (orderId) => {
+        setRemovedOrders((prev) => {
+            const updated = [...prev, orderId];
+            localStorage.setItem("removedOrders", JSON.stringify(updated)); // Сразу сохраняем
+            return updated;
+        });
+
         setOrders((prevOrders) => prevOrders.filter((order) => order.id !== orderId));
     };
+
 
     // Проверка на наличие пользователя перед рендерингом
     if (!user || !user.id) {
