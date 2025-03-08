@@ -311,20 +311,24 @@ const ActiveOrdersPage = () => {
                                     <p><strong>Адрес:</strong> {order.address}</p>
                                     <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
                                     {Array.isArray(order.images) && order.images.length > 0 ? (
-                                        order.images.map((image, index) => {
-                                            const imageUrl = `${apiUrl}${image}`;
-                                            return (
-                                                <img
-                                                    key={index}
-                                                    src={imageUrl}
-                                                    alt={`Order pic ${index + 1}`}
-                                                    className="order-image"
-                                                    onClick={() => openModal(order.images)} // Открываем модальное окно при клике
-                                                />
-                                            );
-                                        })
-                                    ) : (
-                                        '')}
+                                        <div className="image-stack-container">
+                                            <div className="image-stack" onClick={() => openModal(order.images)}>
+                                                {order.images.map((image, index) => {
+                                                    const imageUrl = `${apiUrl}${image}`;
+                                                    return (
+                                                        <img
+                                                            key={index}
+                                                            src={imageUrl}
+                                                            alt={`Order pic ${index + 1}`}
+                                                            className="order-image"
+                                                            style={{ transform: `translateX(${index * 10}px)` }} // Смещение только вправо
+                                                        />
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ) : null}
+
                                     <p><strong>Описание:</strong> {order.description}</p>
 
                                     <div className="action-buttons">

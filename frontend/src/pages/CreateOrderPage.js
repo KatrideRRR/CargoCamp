@@ -5,6 +5,8 @@ import "react-datepicker/dist/react-datepicker.css";
 import { useNavigate } from "react-router-dom";
 import { YMaps, Map, Placemark } from "@pbe/react-yandex-maps";
 import "../styles/CreateOrderPage.css";
+import imageCompression from "browser-image-compression";
+
 const apiUrl = process.env.REACT_APP_API_URL;
 
 function CreateOrderPage() {
@@ -36,9 +38,26 @@ function CreateOrderPage() {
         { id: "guarantee", label: "Гарантия", icon: "🛡️" },
         { id: "installments", label: "Рассрочка", icon: "💳" },
     ];
-    const handleImageChange = (event) => {
+    const handleImageChange = async (event) => {
         const files = event.target.files;
-        setImages(prevImages => [...prevImages, ...Array.from(files)]);
+        const compressedImages = [];
+
+        for (const file of files) {
+            const options = {
+                maxSizeMB: 0.5, // Максимальный размер 0.5MB
+                maxWidthOrHeight: 1024, // Максимальная ширина/высота 1024px
+                useWebWorker: true,
+            };
+
+            try {
+                const compressedFile = await imageCompression(file, options);
+                compressedImages.push(compressedFile);
+            } catch (error) {
+                console.error("Ошибка сжатия изображения:", error);
+            }
+        }
+
+        setImages(prevImages => [...prevImages, ...compressedImages]);
     };
 
 
