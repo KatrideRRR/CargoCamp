@@ -30,6 +30,7 @@ function CreateOrderPage() {
     const [addressSuggestions, setAddressSuggestions] = useState([]); // Подсказки для адреса
     const [paymentType, setPaymentType] = useState("");
     const [selectedMethod, setSelectedMethod] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const paymentMethods = [
         { id: "cash", label: "Наличные", icon: "💵" },
         { id: "guarantee", label: "Гарантия", icon: "🛡️" },
@@ -156,6 +157,9 @@ function CreateOrderPage() {
             setError("Пожалуйста, выберите тип оплаты");
             return;
         }
+
+        if (isSubmitting) return; // Предотвращаем повторное нажатие
+        setIsSubmitting(true);
 
         const orderData = {
             categoryId: selectedCategory,
@@ -418,8 +422,8 @@ function CreateOrderPage() {
                                     </button>
                                 ))}
                             </div>
-                            <button type="submit" className="submit-button">
-                                Создать заказ
+                            <button type="submit" disabled={isSubmitting} className="submit-button">
+                                {isSubmitting ? "Создание..." : "Создать заказ"}
                             </button>
                         </form>
                     </div>
