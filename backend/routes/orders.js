@@ -172,7 +172,10 @@ module.exports = (io) => {
         try {
             // Ищем заказ по ID, включая данные о пользователе
             const order = await Order.findByPk(id, {
-                include: { model: db.User, as: 'users', attributes: ['id', 'username', 'phone'] },
+                include:[ { model: db.User, as: 'users', attributes: ['id', 'username', 'phone'] },
+                          { model: db.Category, as: 'category', attributes: ['id', 'name'] },
+                          { model: db.Subcategory, as: 'subcategory', attributes: ['id', 'name'] },
+        ],
             });
 
             // Если заказ не найден
