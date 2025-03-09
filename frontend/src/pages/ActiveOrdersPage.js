@@ -277,186 +277,201 @@ const ActiveOrdersPage = () => {
     }
 
     return (
-        <div className="orders-container">
-            <div className="orders-wrapper">
-                {orders.length > 0 ? (
-                    <ul className="orders-list">
-                        {orders.map((order) => {
-                            const isCompletedByUser = Array.isArray(order.completedBy) && order.completedBy.includes(user.id);
-                            const isWaitingForOther = Array.isArray(order.completedBy) && order.completedBy.length === 1;
-                            const isExecutor = order.executorId === user.id;
-                            const isCreator = order.creatorId === user.id;
-                            const creator = creatorsInfo[order.creatorId] || {};
-                            const executor = executorsInfo[order.executorId] || {};
+        <div className="active-orders-page">
 
-                            return (
-                                <li
-                                    key={order.id}
-                                    className={`order-card ${isCreator ? 'creator' : ''} `}
-                                >
-                                    <div className="order-header">
-                                        <p className="order-title">
-                                            <strong>Заказ номер {order.id}</strong>
-                                            {isCreator ? '. Вы являетесь заказчиком' : `. Вы являетесь исполнителем`}.
-                                            Создан {new Date(order.createdAt).toLocaleString()}
-                                        </p>
+            <div className="orders-container">
+                <div className="orders-wrapper">
+                    {orders.length > 0 ? (
+                        <ul className="orders-list">
+                            {orders.map((order) => {
+                                const isCompletedByUser = Array.isArray(order.completedBy) && order.completedBy.includes(user.id);
+                                const isWaitingForOther = Array.isArray(order.completedBy) && order.completedBy.length === 1;
+                                const isExecutor = order.executorId === user.id;
+                                const isCreator = order.creatorId === user.id;
+                                const creator = creatorsInfo[order.creatorId] || {};
+                                const executor = executorsInfo[order.executorId] || {};
 
-                                        {isExecutor ?
-                                            <>
-                                                <p><strong>ID заказчика:</strong> {order.creatorId || "Неизвестно"}</p>
-                                                <p><strong>Имя заказчика:</strong> {creator.username || "Неизвестно"}</p>
-                                                <p><strong>Рейтинг заказчика:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}</p>
-                                            </> :
-                                            <>
-                                                <p><strong>ID исполнителя:</strong> {order.executorId || "Неизвестно"}</p>
-                                                <p><strong>Имя исполнителя:</strong> {executor?.username || "Неизвестно"}</p>
-                                                <p><strong>Рейтинг исполнителя:</strong> {executor?.rating ? executor.rating.toFixed(1) : "Нет данных"}</p>
-                                            </>
+                                return (
+                                    <li
+                                        key={order.id}
+                                        className={`order-card ${isCreator ? 'creator' : ''} `}
+                                    >
+                                        <div className="order-header">
+                                            <p className="order-title">
+                                                <strong>Заказ номер {order.id}</strong>
+                                                {isCreator ? '. Вы являетесь заказчиком' : `. Вы являетесь исполнителем`}.
+                                                Создан {new Date(order.createdAt).toLocaleString()}
+                                            </p>
 
-                                        }
-                                        {/* Иконка способа оплаты ниже заголовка */}
-                                        <div className="payment-icon-container">
+                                            {isExecutor ?
+                                                <>
+                                                    <p><strong>ID заказчика:</strong> {order.creatorId || "Неизвестно"}
+                                                    </p>
+                                                    <p><strong>Имя
+                                                        заказчика:</strong> {creator.username || "Неизвестно"}</p>
+                                                    <p><strong>Рейтинг
+                                                        заказчика:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
+                                                    </p>
+                                                </> :
+                                                <>
+                                                    <p><strong>ID
+                                                        исполнителя:</strong> {order.executorId || "Неизвестно"}</p>
+                                                    <p><strong>Имя
+                                                        исполнителя:</strong> {executor?.username || "Неизвестно"}</p>
+                                                    <p><strong>Рейтинг
+                                                        исполнителя:</strong> {executor?.rating ? executor.rating.toFixed(1) : "Нет данных"}
+                                                    </p>
+                                                </>
+
+                                            }
+                                            {/* Иконка способа оплаты ниже заголовка */}
+                                            <div className="payment-icon-container">
                                                 <span
                                                     className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
-                                            <span
-                                                className="payment-label">{paymentMethods.find(method => method.id === order.paymentType)?.label}</span>
-                                        </div>
-                                    </div>
-                                    <p><strong>Название:</strong> {order.type}</p>
-                                    <p>
-                                        <strong>Категория:</strong> {order.category ? order.category.name : 'Не указано'}
-                                    </p>
-                                    <p>
-                                    <strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : 'Не указано'}
-                                    </p>
-                                    <p><strong>Адрес:</strong> {order.address}</p>
-                                    <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
-                                    {Array.isArray(order.images) && order.images.length > 0 ? (
-                                        <div className="image-stack-container">
-                                            <div className="image-stack" onClick={() => openModal(order.images)}>
-                                                {order.images.map((image, index) => {
-                                                    const imageUrl = `${apiUrl}${image}`;
-                                                    return (
-                                                        <img
-                                                            key={index}
-                                                            src={imageUrl}
-                                                            alt={`Order pic ${index + 1}`}
-                                                            className="order-image"
-                                                            style={{ transform: `translateX(${index * 10}px)` }} // Смещение только вправо
-                                                        />
-                                                    );
-                                                })}
+                                                <span
+                                                    className="payment-label">{paymentMethods.find(method => method.id === order.paymentType)?.label}</span>
                                             </div>
                                         </div>
-                                    ) : null}
+                                        <p><strong>Название:</strong> {order.type}</p>
+                                        <p>
+                                            <strong>Категория:</strong> {order.category ? order.category.name : 'Не указано'}
+                                        </p>
+                                        <p>
+                                            <strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : 'Не указано'}
+                                        </p>
+                                        <p><strong>Адрес:</strong> {order.address}</p>
+                                        <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
+                                        {Array.isArray(order.images) && order.images.length > 0 ? (
+                                            <div className="image-stack-container">
+                                                <div className="image-stack" onClick={() => openModal(order.images)}>
+                                                    {order.images.map((image, index) => {
+                                                        const imageUrl = `${apiUrl}${image}`;
+                                                        return (
+                                                            <img
+                                                                key={index}
+                                                                src={imageUrl}
+                                                                alt={`Order pic ${index + 1}`}
+                                                                className="order-image"
+                                                                style={{transform: `translateX(${index * 10}px)`}} // Смещение только вправо
+                                                            />
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ) : null}
 
-                                    <p><strong>Описание:</strong> {order.description}</p>
+                                        <p><strong>Описание:</strong> {order.description}</p>
 
-                                    <div className="action-buttons">
-                                        <button
-                                            className="call-button"
-                                            onClick={async () => {
-                                                const phone = isCreator ? await getUserPhone(order.executorId) : await getUserPhone(order.creatorId);
-                                                window.open(`tel:${phone}`);
-                                            }}
-                                        >
-                                            {isMobile ? <FaPhone /> : "Позвонить"}
-                                        </button>
-                                        <button className="message-button" onClick={() => navigate(`/messages/${order.id}`)}>
-                                            {isMobile ? <FaComments /> : "Сообщение"}
-                                        </button>
-                                        <button className="route-button">
-                                            {isMobile ? <FaRoute /> : "Маршрут"}
-                                        </button>
-                                        <button className="complain-button" onClick={() => handleComplaint(order.id)}>
-                                            {isMobile ? <FaExclamationTriangle /> : "Пожаловаться"}
-                                        </button>
-
-                                        {isCompletedByUser ? (
-                                            isWaitingForOther ? (
-                                                <button
-                                                    className="remove-button"
-                                                    onClick={() => handleRemoveOrder(order.id)}
-                                                >
-                                                    {isMobile ? <FaTrash /> : "Удалить"}
-                                                </button>
-                                            ) : null
-                                        ) : (
+                                        <div className="action-buttons">
                                             <button
-                                                className="complete-button"
-                                                onClick={() => handleCompleteOrder(order.id)}
+                                                className="call-button"
+                                                onClick={async () => {
+                                                    const phone = isCreator ? await getUserPhone(order.executorId) : await getUserPhone(order.creatorId);
+                                                    window.open(`tel:${phone}`);
+                                                }}
                                             >
-                                                {isMobile ? <FaCheck /> : "Завершить"}
+                                                {isMobile ? <FaPhone/> : "Позвонить"}
                                             </button>
-                                        )}
-                                    </div>
-                                </li>
-                            );
+                                            <button className="message-button"
+                                                    onClick={() => navigate(`/messages/${order.id}`)}>
+                                                {isMobile ? <FaComments/> : "Сообщение"}
+                                            </button>
+                                            <button className="route-button">
+                                                {isMobile ? <FaRoute/> : "Маршрут"}
+                                            </button>
+                                            <button className="complain-button"
+                                                    onClick={() => handleComplaint(order.id)}>
+                                                {isMobile ? <FaExclamationTriangle/> : "Пожаловаться"}
+                                            </button>
 
-                        })}
-                    </ul>
-                ) : (
-                    <p className="no-orders">Нет активных заказов.</p>
-                )}
-            </div>
+                                            {isCompletedByUser ? (
+                                                isWaitingForOther ? (
+                                                    <button
+                                                        className="remove-button"
+                                                        onClick={() => handleRemoveOrder(order.id)}
+                                                    >
+                                                        {isMobile ? <FaTrash/> : "Удалить"}
+                                                    </button>
+                                                ) : null
+                                            ) : (
+                                                <button
+                                                    className="complete-button"
+                                                    onClick={() => handleCompleteOrder(order.id)}
+                                                >
+                                                    {isMobile ? <FaCheck/> : "Завершить"}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </li>
+                                );
 
-            <Modal
-                appElement={document.getElementById('root')}
-                isOpen={isModalOpen}
-                onRequestClose={closeModal}
-                contentLabel="Full Image Modal"
-                className="custom-modal"
-                overlayClassName="custom-modal-overlay"
-            >
-                <div className="custom-modal-content">
-                    {/* Кнопка закрытия */}
-                    <button onClick={closeModal} className="custom-close-button">✖</button>
-
-                    {/* Изображение */}
-                    <img
-                        src={`${apiUrl}${currentImages[currentImageIndex]}`}
-                        alt="Full-size view"
-                        className="custom-modal-image"
-                    />
-
-                    {/* Кнопки переключения */}
-                    <div className="custom-image-navigation">
-                        <button onClick={prevImage} className="custom-nav-button">◀</button>
-                        <button onClick={nextImage} className="custom-nav-button">▶</button>
-                    </div>
+                            })}
+                        </ul>
+                    ) : (
+                        <p className="no-orders">Нет активных заказов.</p>
+                    )}
                 </div>
-            </Modal>
 
-            {/* Модальное окно для оценки */}
-            {showRatingModal && (
-                <div className="modal-overlay" onClick={() => setShowRatingModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <h2>Оцените участника</h2>
-                        <div className="stars">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                                <span key={star} className={star <= rating ? "star selected" : "star"}
-                                      onClick={() => setRating(star)}>★</span>
-                            ))}
+                <Modal
+                    appElement={document.getElementById('root')}
+                    isOpen={isModalOpen}
+                    onRequestClose={closeModal}
+                    contentLabel="Full Image Modal"
+                    className="custom-modal"
+                    overlayClassName="custom-modal-overlay"
+                >
+                    <div className="custom-modal-content">
+                        {/* Кнопка закрытия */}
+                        <button onClick={closeModal} className="custom-close-button">✖</button>
+
+                        {/* Изображение */}
+                        <img
+                            src={`${apiUrl}${currentImages[currentImageIndex]}`}
+                            alt="Full-size view"
+                            className="custom-modal-image"
+                        />
+
+                        {/* Кнопки переключения */}
+                        <div className="custom-image-navigation">
+                            <button onClick={prevImage} className="custom-nav-button">◀</button>
+                            <button onClick={nextImage} className="custom-nav-button">▶</button>
                         </div>
-                        <button onClick={submitRating} disabled={rating === 0}>Завершить заказ</button>
                     </div>
-                </div>
-            )}
+                </Modal>
 
-            {/* Модальное окно для жалобы */}
-            {showComplaintModal && (
-                <div className="modal-overlay" onClick={() => setShowComplaintModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <h2>Напишите жалобу:</h2>
-                        <textarea value={complaintText} onChange={(e) => setComplaintText(e.target.value)}
-                                  rows="5" placeholder="Введите текст жалобы" />
-                        <button onClick={handleSubmitComplaint}>Отправить</button>
+                {/* Модальное окно для оценки */}
+                {showRatingModal && (
+                    <div className="modal-overlay" onClick={() => setShowRatingModal(false)}>
+                        <div className="modal" onClick={(e) => e.stopPropagation()}>
+                            <h2>Оцените участника</h2>
+                            <div className="stars">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                    <span key={star} className={star <= rating ? "star selected" : "star"}
+                                          onClick={() => setRating(star)}>★</span>
+                                ))}
+                            </div>
+                            <button onClick={submitRating} disabled={rating === 0}>Завершить заказ</button>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
 
+                {/* Модальное окно для жалобы */}
+                {showComplaintModal && (
+                    <div className="modal-overlay" onClick={() => setShowComplaintModal(false)}>
+                        <div className="modal" onClick={(e) => e.stopPropagation()}>
+                            <h2>Напишите жалобу:</h2>
+                            <textarea value={complaintText} onChange={(e) => setComplaintText(e.target.value)}
+                                      rows="5" placeholder="Введите текст жалобы"/>
+                            <button onClick={handleSubmitComplaint}>Отправить</button>
+                        </div>
+                    </div>
+                )}
+
+            </div>
+            );
         </div>
-    );
+    )
+
 };
 
-export default ActiveOrdersPage;
+            export default ActiveOrdersPage;

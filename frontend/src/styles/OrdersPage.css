@@ -105,7 +105,11 @@
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
     padding: 14px;
     margin-bottom: 14px;
-    border-left: 4px solid #007aff; /* Цвет по умолчанию */
+    border-left: 4px solid #34c759; /* Цвет по умолчанию */
+}
+
+.order-card.creator {
+    border-left-color: #007aff; /* Цвет для заказчика */
 }
 
 .order-card:hover {

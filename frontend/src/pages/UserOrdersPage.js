@@ -88,7 +88,6 @@ const UserOrdersPage = () => {
             alert("Запрос отправлен заказчику!");
         } catch (error) {
             console.error("Ошибка при запросе на выполнение заказа:", error);
-            alert(error.response?.data?.message || "Не удалось отправить запрос");
         }
     };
 

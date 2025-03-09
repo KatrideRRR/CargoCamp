@@ -259,7 +259,6 @@ const OrdersPage = () => {
             alert("Запрос отправлен заказчику!");
         } catch (error) {
             console.error("Ошибка при запросе на выполнение заказа:", error);
-            alert(error.response?.data?.message || "Не удалось отправить запрос");
         }
     };
 
@@ -320,8 +319,7 @@ const OrdersPage = () => {
                                     <div className="order-content">
                                         <div className="order-header">
                                             <p className="order-title">
-                                                <strong>Заказ номер {order.id}</strong> от заказчика с
-                                                ID {order.creatorId}.
+                                                <strong>Заказ номер {order.id}. </strong>
                                                 Создан {new Date(order.createdAt).toLocaleString()}
                                                 <p><strong>ID заказчика:</strong> {order.creatorId || "Неизвестно"} </p>
                                                     <p><strong>Имя заказчика:</strong> {creator.username || "Неизвестно"}
