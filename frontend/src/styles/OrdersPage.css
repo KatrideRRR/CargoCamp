@@ -405,7 +405,7 @@
 }
 
 /* Затемненный фон */
-.orders-page .custom-modal-overlay {
+.custom-modal-overlay {
     background: rgba(0, 0, 0, 0.8);
     position: fixed;
     top: 0;
@@ -418,7 +418,7 @@
 }
 
 /* Контейнер модального окна */
-.orders-page .custom-modal-content {
+.custom-modal-content {
     position: relative;
     display: flex;
     flex-direction: column;
@@ -428,7 +428,7 @@
 }
 
 /* Кнопка закрытия (крестик) */
-.orders-page .custom-close-button {
+.custom-close-button {
     position: absolute;
     top: 10px;
     right: 10px;
@@ -440,26 +440,26 @@
     z-index: 10;
 }
 
-.orders-page .custom-close-button:hover {
+.custom-close-button:hover {
     color: red;
 }
 
 /* Изображение во всю ширину */
-.orders-page .custom-modal-image {
+.custom-modal-image {
     max-width: 100%;
     max-height: 90vh;
     object-fit: contain;
 }
 
 /* Контейнер кнопок навигации */
-.orders-page .custom-image-navigation {
+.custom-image-navigation {
     display: flex;
     gap: 15px;
     margin-top: 10px;
 }
 
 /* Кнопки переключения */
-.orders-page .custom-nav-button {
+.custom-nav-button {
     background: none;
     border: none;
     font-size: 20px;
@@ -468,7 +468,7 @@
     opacity: 0.7;
 }
 
-.orders-page .custom-nav-button:hover {
+.custom-nav-button:hover {
     opacity: 1;
 }
 

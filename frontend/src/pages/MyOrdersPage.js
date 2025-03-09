@@ -158,7 +158,7 @@ const MyOrdersPage = () => {
             <div className={styles.ordersWrapper}>
                 <Link
                     to="/create-order"
-                    className={`${styles.createButton} }`}
+                    className={`${styles.createButton} ${hasNewRequests ? styles.newRequest : ''}`}
                 >
                     Разместить заказ
                 </Link>

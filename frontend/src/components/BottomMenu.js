@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardList, List, BellRing, Briefcase } from 'lucide-react';
+import { ClipboardList, List, BellRing } from 'lucide-react';
 import '../styles/BottomMenu.css';
 import io from 'socket.io-client';
 import { AuthContext } from "../utils/authContext";
