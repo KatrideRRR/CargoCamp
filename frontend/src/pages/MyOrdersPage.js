@@ -110,7 +110,6 @@ const MyOrdersPage = () => {
         };
     }, [userId, navigate, setHasNewRequests]);
 
-
     const approveExecutor = async (orderId, executorId) => {
         try {
             await axiosInstance.post(`/orders/${orderId}/approve`, { executorId });
@@ -129,7 +128,6 @@ const MyOrdersPage = () => {
         }
     };
 
-    // Функция для получения иконки по способу оплаты
     const getPaymentIcon = (paymentType) => {
         const method = paymentMethods.find(method => method.id === paymentType);
         return method ? method.icon : "";
@@ -154,12 +152,13 @@ const MyOrdersPage = () => {
     const prevImage = () => {
         setCurrentImageIndex((prevIndex) => (prevIndex - 1 + currentImages.length) % currentImages.length);  // Переход к предыдущему изображению
     };
+
     return (
         <div className={styles.container}>
             <div className={styles.ordersWrapper}>
                 <Link
                     to="/create-order"
-                    className={`${styles.createButton} ${hasNewRequests ? styles.newRequest : ''}`}
+                    className={`${styles.createButton} }`}
                 >
                     Разместить заказ
                 </Link>
@@ -183,8 +182,8 @@ const MyOrdersPage = () => {
                                             <span
                                                 className={styles.paymentIcon}>{getPaymentIcon(order.paymentType)}</span>
                                             <span className={styles.paymentLabel}>
-            {paymentMethods.find(method => method.id === order.paymentType)?.label}
-        </span>
+                                                {paymentMethods.find(method => method.id === order.paymentType)?.label}
+                                                    </span>
                                         </div>
                                     </div>
 
@@ -291,7 +290,7 @@ const MyOrdersPage = () => {
                         ))}
                     </ul>
                 ) : (
-                    <p className={styles.noOrders}>Нет доступных заказов.</p>
+                    <p className={styles.noOrders}>Вы пока не размещали заказы.</p>
                 )}
             </div>
         </div>

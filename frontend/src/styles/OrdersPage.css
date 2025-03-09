@@ -1,5 +1,5 @@
 /* Общий контейнер страницы */
-.orders-container {
+.orders-page .orders-container {
     padding: calc(75px + env(safe-area-inset-top)) 15px calc(80px + env(safe-area-inset-bottom));
     font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     background-color: #f4f4f4;
@@ -11,7 +11,7 @@
 }
 
 /* Контейнер фильтров */
-.filters {
+.orders-page .filters {
     display: flex;
     flex-direction: column; /* Элементы идут друг за другом */
     flex-wrap: wrap;
@@ -25,14 +25,14 @@
 }
 
 /* Общие стили для label */
-.filters label {
+.orders-page .filters label {
     font-size: 16px;
     font-weight: 500;
     color: #004080; /* Темно-синий */
 }
 
 /* Стили для select */
-.filters select {
+.orders-page .filters select {
     width: 100%; /* Растягиваем на всю ширину контейнера */
     padding: 10px;
     font-size: 16px;
@@ -51,53 +51,40 @@
 }
 
 /* Селект при наведении */
-.filters select:hover {
+.orders-page .filters select:hover {
     border-color: #1e90ff; /* Ярко-синий */
 }
 
 /* Селект при фокусе */
-.filters select:focus {
+.orders-page .filters select:focus {
     border-color: #4169e1; /* Темно-голубой */
     box-shadow: 0 0 5px rgba(65, 105, 225, 0.5);
 }
 
 /* Отключенный селект */
-.filters select:disabled {
+.orders-page .filters select:disabled {
     background-color: #dcdcdc; /* Серый фон */
     color: #a9a9a9;
     border-color: #b0c4de;
     cursor: not-allowed;
 }
 
-/* Медиа-запрос для мобильных устройств */
-@media (max-width: 600px) {
-    .filters {
-        flex-direction: column;
-        gap: 10px;
-        margin-bottom: 20px;
-    }
-
-    .filters select {
-        width: 100%; /* Растягиваем на всю ширину */
-    }
-}
-
 /* Ограничение ширины контента */
-.orders-wrapper {
+.orders-page .orders-wrapper {
     width: 100%;
-    max-width: 600px; /* Ширина для лучшего отображения */
+    max-width: 500px; /* Ширина для лучшего отображения */
     padding: 15px;
 }
 
 /* Список заказов */
-.orders-list {
+.orders-page .orders-list {
     list-style-type: none;
     padding: 0;
     margin: 0;
 }
 
 /* Карточка заказа */
-.order-card {
+.orders-page .order-card {
     display: flex;
     flex-direction: column; /* Основное содержимое сверху, кнопки внизу */
     background-color: #fff;
@@ -106,27 +93,32 @@
     padding: 14px;
     margin-bottom: 14px;
     border-left: 4px solid #34c759; /* Цвет по умолчанию */
+    width: 100%; /* Растягиваем на всю ширину родительского контейнера */
+
 }
 
-.order-card.creator {
+.orders-page .order-card.creator {
     border-left-color: #007aff; /* Цвет для заказчика */
 }
 
-.order-card:hover {
+.orders-page .order-card:hover {
     transform: translateY(-3px);
     box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
 }
 
 /* Общий стиль для текста */
-.order-card p {
+.orders-page .order-card p {
     font-size: 16px;
     color: #333;
     margin: 8px 0;
     line-height: 1.5;
+    word-wrap: break-word; /* Разрыв длинных слов */
+    overflow-wrap: break-word; /* Перенос слов */
+    white-space: normal; /* Разрешаем перенос строк */
 }
 
 /* Заголовок для названия заказа */
-.order-card .order-left p strong {
+.orders-page .order-card .order-left p strong {
     font-weight: 700;
     color: #333;
 }
@@ -158,13 +150,13 @@
 }
 
 /* Увеличение при наведении */
-.image-stack:hover .order-image {
+.orders-page .image-stack:hover .order-image {
     transform: scale(1.1) !important;
     z-index: 5;
 }
 
 /* Модальное окно поверх всего */
-.modal {
+.orders-page .modal {
     position: fixed;
     top: 50%;
     left: 50%;
@@ -176,7 +168,7 @@
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
-.modal-overlay {
+.orders-page .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -188,7 +180,7 @@
 
 
 /* Кнопка для перехода на страницу жалоб для создателя */
-.complaints-button {
+.orders-page .complaints-button {
     display: block;
     padding: 12px;
     background-color: #f4f4f4;
@@ -202,7 +194,7 @@
     transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.create-button {
+.orders-page .create-button {
     position: fixed; /* Закрепляет кнопку */
     top: 80px; /* Прижимает к верхней части экрана */
     left: 50%; /* Центрирует кнопку */
@@ -223,40 +215,36 @@
     z-index: 1000; /* Поверх всего контента */
 }
 
-.create-button:hover {
+.orders-page .create-button:hover {
     background: linear-gradient(135deg, #005ecb, #0041a3); /* Темнее при наведении */
     transform: translateX(-50%) scale(1.05); /* Лёгкое увеличение */
 }
 
-.create-button:active {
+.orders-page .create-button:active {
     transform: translateX(-50%) scale(0.98); /* Эффект нажатия */
 }
-@media (max-width: 600px) {
-    .create-button {
-    max-width:300px ;
-    }
-}
-.executors-list {
+
+.orders-page .executors-list {
     background-color: #f9f9f9;
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-.executors-list strong {
+.orders-page .executors-list strong {
     display: block;
     font-size: 1.2em;
     margin-bottom: 15px;
     color: #333;
 }
 
-.executors-list ul {
+.orders-page .executors-list ul {
     list-style-type: none;
     padding: 0;
     margin: 0;
 }
 
-.executors-list li {
+.orders-page .executors-list li {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -264,11 +252,11 @@
     border-bottom: 1px solid #ddd;
 }
 
-.executors-list li:last-child {
+.orders-page .executors-list li:last-child {
     border-bottom: none;
 }
 
-.executors-list button {
+.orders-page .executors-list button {
     background-color: #4CAF50;
     color: white;
     border: none;
@@ -280,38 +268,38 @@
     margin-right: 10px;
 }
 
-.executors-list button:hover {
+.orders-page .executors-list button:hover {
     background-color: #45a049;
 }
 
-.executors-list li .executor-info {
+.orders-page .executors-list li .executor-info {
     font-size: 0.9em;
     color: #555;
 }
 
-.executors-list li .executor-info .rating {
+.orders-page .executors-list li .executor-info .rating {
     color: gold;
     margin-right: 5px;
 }
 
-.executors-list li .executor-info .count {
+.orders-page .executors-list li .executor-info .count {
     color: #777;
 }
 
-.executors-list p {
+.orders-page .executors-list p {
     font-style: italic;
     color: #777;
     margin-top: 20px;
 }
 
 
-.complaints-button:hover {
+.orders-page .complaints-button:hover {
     background-color: #007aff;
     color: white;
 }
 
 /* Кнопка "Запросить выполнение" */
-.take-order-button {
+.orders-page .take-order-button {
     width: 100%;
     padding: 14px;
     background-color: #007aff;
@@ -326,12 +314,12 @@
     margin-top: 12px;
 }
 
-.take-order-button:hover {
+.orders-page .take-order-button:hover {
     background-color: #005ecb;
 }
 
 /* Сообщения об ошибках и отсутствии заказов */
-.error-message, .no-orders {
+.orders-page .error-message, .no-orders {
     text-align: center;
     font-size: 18px;
     color: #ff3b30;
@@ -339,56 +327,27 @@
     margin-top: 20px;
 }
 
-/* Адаптация для мобильных устройств */
-@media (max-width: 480px) {
-    .orders-container {
-        padding: calc(65px + env(safe-area-inset-top)) 12px calc(70px + env(safe-area-inset-bottom));
-    }
-
-    .orders-wrapper {
-        max-width: 100%;
-    }
-
-    .order-card {
-        padding: 16px;
-    }
-
-    .order-card p {
-        font-size: 14px;
-    }
-
-    .take-order-button {
-        font-size: 14px;
-        padding: 12px;
-    }
-
-    .complaints-button {
-        font-size: 14px;
-        padding: 10px;
-    }
-}
-
 /* Дополнительные улучшения */
-.order-card .order-left p {
+.orders-page .order-card .order-left p {
     word-wrap: break-word;
     overflow-wrap: break-word;
     white-space: normal;
 }
 
-.order-card .order-left p strong {
+.orders-page .order-card .order-left p strong {
     font-size: 16px;
     font-weight: 700;
     color: #020000;
 }
 
 /* Заголовок заказа */
-.order-header {
+.orders-page .order-header {
     margin-bottom: 12px;
     padding-bottom: 10px;
     border-bottom: 2px solid #f0f0f0;
 }
 
-.order-title {
+.orders-page .order-title {
     font-size: 16px;
     font-weight: 600;
     color: #333;
@@ -397,17 +356,17 @@
 }
 
 /* Отображение даты */
-.order-title strong {
+.orders-page .order-title strong {
     color: #007aff;
 }
 
-.orders-list {
+.orders-page .orders-list {
     display: flex;
     flex-wrap: wrap;
     gap: 16px;
 }
 
-.order-card {
+.orders-page .order-card {
     position: relative;  /* Для позиционирования иконки */
     background: #f9f9f9;
     padding: 16px;
@@ -415,31 +374,38 @@
     box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
 }
 
-.order-card h3 {
+.orders-page .order-card h3 {
     font-size: 18px;
     margin-bottom: 8px;
 }
 
-.payment-icon-container {
+.orders-page .payment-icon-container {
     position: absolute;
     top: 60px; /* Сдвигаем вниз, чтобы иконка была ниже заголовка */
     right: 18px;
     text-align: center;
 }
-
+.payment-info {
+    display: flex;
+    align-items: center; /* Выравнивание элементов по центру */
+    gap: 8px; /* Отступ между иконкой и текстом */
+}
 .payment-icon {
+    font-size: 1.2rem;
+}
+
+.orders-page .payment-icon {
     font-size: 20px; /* Размер иконки */
     display: block;
 }
 
-.payment-label {
-    font-size: 12px;
+.orders-page .payment-label {
+    font-size: 15px;
     margin-top: 4px; /* Отступ между иконкой и подписью */
-    font-weight: bold;
 }
 
 /* Затемненный фон */
-.custom-modal-overlay {
+.orders-page .custom-modal-overlay {
     background: rgba(0, 0, 0, 0.8);
     position: fixed;
     top: 0;
@@ -452,7 +418,7 @@
 }
 
 /* Контейнер модального окна */
-.custom-modal-content {
+.orders-page .custom-modal-content {
     position: relative;
     display: flex;
     flex-direction: column;
@@ -462,7 +428,7 @@
 }
 
 /* Кнопка закрытия (крестик) */
-.custom-close-button {
+.orders-page .custom-close-button {
     position: absolute;
     top: 10px;
     right: 10px;
@@ -474,26 +440,26 @@
     z-index: 10;
 }
 
-.custom-close-button:hover {
+.orders-page .custom-close-button:hover {
     color: red;
 }
 
 /* Изображение во всю ширину */
-.custom-modal-image {
+.orders-page .custom-modal-image {
     max-width: 100%;
     max-height: 90vh;
     object-fit: contain;
 }
 
 /* Контейнер кнопок навигации */
-.custom-image-navigation {
+.orders-page .custom-image-navigation {
     display: flex;
     gap: 15px;
     margin-top: 10px;
 }
 
 /* Кнопки переключения */
-.custom-nav-button {
+.orders-page .custom-nav-button {
     background: none;
     border: none;
     font-size: 20px;
@@ -502,7 +468,52 @@
     opacity: 0.7;
 }
 
-.custom-nav-button:hover {
+.orders-page .custom-nav-button:hover {
     opacity: 1;
+}
+
+/* Адаптация для мобильных устройств */
+@media (max-width: 480px) {
+    .orders-page .orders-container {
+        padding: calc(65px + env(safe-area-inset-top)) 12px calc(70px + env(safe-area-inset-bottom));
+    }
+
+    .orders-page .orders-wrapper {
+        max-width: 100%;
+    }
+
+    .orders-page .order-card {
+        padding: 16px;
+    }
+
+    .orders-page .order-card p {
+        font-size: 14px;
+    }
+
+    .orders-page .take-order-button {
+        font-size: 14px;
+        padding: 12px;
+    }
+
+    .orders-page .complaints-button {
+        font-size: 14px;
+        padding: 10px;
+    }
+
+}
+/* Медиа-запрос для мобильных устройств */
+@media (max-width: 600px) {
+    .orders-page  .filters {
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    .orders-page .create-button {
+        max-width:300px ;
+    }
+
+    .orders-page .filters select {
+        width: 100%; /* Растягиваем на всю ширину */
+    }
 }
 

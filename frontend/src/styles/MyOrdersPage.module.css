@@ -116,27 +116,6 @@
     }
 }
 
-/* На мобильных устройствах кнопки идут внизу */
-@media (max-width: 768px) {
-    .executorCard {
-        align-items: center;
-        text-align: center;
-    }
-
-    .buttonsContainer {
-        flex-direction: column;
-        width: 80%;
-    }
-
-    .complaintButton, .approveButton {
-        width: 100%;
-    }
-
-    .verifiedBadge {
-        align-self: center;
-        margin-bottom: 5px;
-    }
-}
 .orderHeader {
     font-size: 18px;
     font-weight: bold;
@@ -216,4 +195,26 @@
     height: 100vh;
     background: rgba(0, 0, 0, 0.5);
     z-index: 999;
+}
+
+/* На мобильных устройствах кнопки идут внизу */
+@media (max-width: 768px) {
+    .executorCard {
+        align-items: center;
+        text-align: center;
+    }
+
+    .buttonsContainer {
+        flex-direction: column;
+        width: 80%;
+    }
+
+    .complaintButton, .approveButton {
+        width: 100%;
+    }
+
+    .verifiedBadge {
+        align-self: center;
+        margin-bottom: 5px;
+    }
 }

@@ -335,5 +335,14 @@
     background: rgba(0, 0, 0, 0.5);
     z-index: 999;
 }
+.payment-icon-container {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Отступ между иконкой и текстом */
+    margin-top: 5px; /* Добавляет отступ от заголовка */
+}
 
+.payment-icon {
+    font-size: 1.2rem;
+}
 
