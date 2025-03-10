@@ -11,36 +11,57 @@ const BottomMenu = () => {
     const navigate = useNavigate();
     const [hasNewRequests, setHasNewRequests] = useState(false);
     const { user } = useContext(AuthContext);
+    const [hasNewMessage, setHasNewMessage] = useState(false);
 
     useEffect(() => {
+        if (!user?.id) return;
+
+        // Подключаемся к WebSocket
         socket.connect();
 
-        if (user?.id) {
-            const eventName = `orderRequest:${user.id}`;
-            console.log(`🔍 Подписка на WebSocket-событие: ${eventName}`);
+        // Подписка на уведомления
+        console.log('Подписка на уведомления, userId:', user.id);
+        socket.emit('subscribeToNotifications', user.id);
 
-            socket.on(eventName, (data) => {
-                console.log("🔥 Получено уведомление о заказе:", data);
-                setHasNewRequests(true);
-            });
+        // Получение новых уведомлений
+        socket.on('new_notification', (count) => {
+            // Обновить состояние для кнопки "Активные"
+            console.log("Новые уведомления:", count);
+            setHasNewMessage(count > 0);  // Если уведомлений больше 0, показываем индикатор
+        });
 
-            return () => {
-                socket.off(eventName);
-                console.log(`❌ Отписка от события: ${eventName}`);
-            };
-        }
+        // Подписка на запросы на заказ
+        const eventName = `orderRequest:${user.id}`;
+        console.log(`🔍 Подписка на WebSocket-событие: ${eventName}`);
+
+        socket.on(eventName, (data) => {
+            console.log("🔥 Получено уведомление о заказе:", data);
+            setHasNewRequests(true);
+        });
+
+        // Очистка при размонтировании
+        return () => {
+            socket.off(eventName);
+            socket.off('new_notification');
+        };
     }, [user]);
-
 
     const handleMyOrdersClick = () => {
         navigate(`/my-orders/${user.id}`);
         setHasNewRequests(false); // Сбрасываем уведомление
     };
 
+    const handleOpenActive = () => {
+        // Отмечаем уведомления как прочитанные
+        socket.emit('markAsRead', { userId: user.id });
+        setHasNewMessage(false);  // Сбрасываем индикатор новых сообщений
+        navigate('/active-orders'); // Навигация на страницу активных заказов
+    };
+
     return (
         <div className="bottom-menu">
             <button className="menu-item menu-left" onClick={() => navigate('/orders')}>
-                <List size={20} className="menu-icon" />
+                <List size={20} className="menu-icon"/>
                 Заказы
             </button>
 
@@ -49,16 +70,22 @@ const BottomMenu = () => {
                 onClick={handleMyOrdersClick}
             >
                 {hasNewRequests ? (
-                    <BellRing size={28} className="menu-icon-alert" />
+                    <BellRing size={28} className="menu-icon-alert"/>
                 ) : (
-                    <List size={28} className="menu-icon-normal" />
+                    <List size={28} className="menu-icon-normal"/>
                 )}
             </button>
 
-            <button className="menu-item menu-right" onClick={() => navigate('/active-orders')}>
+            {/* Ваша кнопка с уведомлением и навигацией */}
+            <button
+                className={`menu-item menu-right ${hasNewMessage ? 'new-message' : ''}`}
+                onClick={handleOpenActive}
+            >
                 <ClipboardList size={20} className="menu-icon" />
-                Активные
+                Активные {hasNewMessage && <span className="dot"></span>}
             </button>
+
+
         </div>
     );
 };

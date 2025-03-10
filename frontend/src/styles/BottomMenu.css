@@ -18,6 +18,18 @@
     display: flex;
     align-items: center;
 }
+.new-message {
+    color: red;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    background-color: red;
+    border-radius: 50%;
+    display: inline-block;
+    margin-left: 5px;
+}
 
 .menu-left {
     margin-right: 120px;
