@@ -24,6 +24,15 @@ module.exports = (sequelize, DataTypes) => {
                 },
                 onDelete: 'CASCADE',
             },
+            orderId: {  // ✅ Добавляем поле orderId
+                type: DataTypes.INTEGER,
+                allowNull: false,
+                references: {
+                    model: 'orders',
+                    key: 'id',
+                },
+                onDelete: 'CASCADE',
+            },
             isRead: {
                 type: DataTypes.BOOLEAN,
                 defaultValue: false,
@@ -38,6 +47,7 @@ module.exports = (sequelize, DataTypes) => {
     Notification.associate = (models) => {
         Notification.belongsTo(models.User, { foreignKey: 'id' });
         Notification.belongsTo(models.Message, { foreignKey: 'id' });
+        Notification.belongsTo(models.Order, { foreignKey: 'orderId' }); // ✅ Добавляем связь с Order
     };
 
     return Notification;

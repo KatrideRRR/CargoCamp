@@ -11,8 +11,14 @@ router.post('/', authenticateToken, async (req, res) => {
         return res.status(400).json({message: 'Content and receiverId are required.'});
     }
 
+    const orderIdInt = parseInt(orderId, 10);
+    if (isNaN(orderIdInt)) {
+        return res.status(400).json({ message: 'Invalid orderId' });
+    }
+
+
     try {
-        const message = await Message.create({content, senderId: req.user.id, receiverId, orderId});
+        const message = await Message.create({content, senderId: req.user.id, receiverId, orderId: orderIdInt});
 
         // Уведомляем получателя
 

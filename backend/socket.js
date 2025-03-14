@@ -1,5 +1,6 @@
 const socketIo = require('socket.io');
 const { Notification } = require('./models');
+const { Message } = require('./models'); // Добавляем импорт модели Message
 
 let io;
 let users = {}; // Храним пользователей, подключившихся к WebSocket
@@ -40,6 +41,16 @@ function initializeSocket(server) {
                 io.to(users[message.receiverId]).emit('receiveMessage', message);
             }
 
+            // 🔹 Получаем сообщение из базы, чтобы достать `orderId`
+            const fullMessage = await Message.findOne({
+                where: { id: message.id }
+            });
+
+            if (!fullMessage) {
+                console.error("Ошибка: сообщение не найдено в базе!");
+                return;
+            }
+
             // Проверяем, существует ли уже уведомление для этого сообщения
             const existingNotification = await Notification.findOne({
                 where: {
@@ -48,13 +59,15 @@ function initializeSocket(server) {
                 }
             });
 
+
             // Если уведомления еще нет, создаем новое
             if (!existingNotification) {
                 await Notification.create({
                     userId: message.receiverId,
                     type: 'new_message',
                     messageId: message.id,
-                    isRead: false
+                    isRead: false,
+                    orderId: fullMessage.orderId, // ✅ Теперь orderId гарантированно есть!
                 });
             }
 
