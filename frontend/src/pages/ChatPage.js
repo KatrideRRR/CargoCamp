@@ -29,14 +29,17 @@ const ChatPage = () => {
             socket.current.emit('joinChat', { userId: currentUser.id });
 
             socket.current.on('receiveMessage', (message) => {
-                setMessages((prev) => [...prev, message]);
+                if (String(message.orderId) === String(orderId)) { // Приводим оба к строке
+                    setMessages((prev) => [...prev, message]);
+                }
             });
+
         }
 
         return () => {
             socket.current.disconnect();
         };
-    }, [currentUser]);
+    }, [currentUser, orderId]);
 
     // Функция прокрутки вниз
     const scrollToBottom = () => {
