@@ -41,6 +41,7 @@ const ActiveOrdersPage = () => {
         return saved ? JSON.parse(saved) : [];
     });
     const [expandedOrders, setExpandedOrders] = useState({});
+    const [unreadOrders, setUnreadOrders] = useState({});
 
     useEffect(() => {
         // Сохраняем удалённые заказы в localStorage при каждом изменении
@@ -54,7 +55,14 @@ const ActiveOrdersPage = () => {
             alert('Вы не авторизованы! Пожалуйста, войдите в систему.');
             navigate('/login');
         }
+        if (!user?.id) return;
 
+        // Подключаемся к WebSocket
+        socket.connect();
+
+        // Подписка на уведомления
+        console.log("📡 Подписка на уведомления, userId:", user.id);
+        socket.emit("subscribeToNotifications", user.id);
 
         const fetchActiveOrders = async () => {
             try {
@@ -127,16 +135,61 @@ const ActiveOrdersPage = () => {
 
         // Подписываемся на обновления активных заказов
         socket.on('activeOrdersUpdated', fetchActiveOrders);
+        // Получение новых уведомлений о заказах
+        socket.on("new_notification", (data) => {
+            console.log("📩 Получено уведомление:", data);
+            // Если это массив уведомлений
+            if (Array.isArray(data)) {
+                data.forEach((notification) => {
+                    console.log("🔹 Уведомление:", notification);
+                    if (notification.orderId) {
+                        setUnreadOrders((prev) => {
+                            const updated = { ...prev, [notification.orderId]: true };
+                            console.log("🆕 Обновлённый `unreadOrders`:", updated);
+                            return updated;
+                        });
+                    } else {
+                        console.warn("⚠️ Нет orderId в уведомлении:", notification);
+                    }
+                });
+            }
+
+
+
+                    setUnreadOrders((prev) => {
+                const updated = { ...prev };
+                // Логируем обновление, чтобы точно увидеть, что происходит
+                updated[data.orderId] = true;
+                console.log("🆕 Обновлённый `unreadOrders`:", updated);
+                return updated;
+
+            });
+
+        });
 
         return () => {
             socket.off('activeOrdersUpdated', fetchActiveOrders); // Очистка слушателя
+            socket.off("new_notification");
+
         };
 
-    }, [navigate, orders, removedOrders]);
+    }, [navigate, orders, removedOrders, user]);
 
     if (!user) {
         return <p>Загрузка...</p>;
     }
+
+    const markAsRead = (orderId) => {
+        console.log("✅ Отмечаем заказ прочитанным:", orderId);
+
+        socket.emit("markAsRead", { userId: user.id, orderId });
+
+        setUnreadOrders((prev) => {
+            const updated = { ...prev };
+            delete updated[orderId]; // Удаляем уведомление для этого заказа
+            return updated;
+        });
+    };
 
     // Функция для получения иконки по способу оплаты
     const getPaymentIcon = (paymentType) => {
@@ -310,6 +363,8 @@ const ActiveOrdersPage = () => {
                                                 {isCreator ? '. Вы являетесь заказчиком' : `. Вы являетесь исполнителем`}.
                                                 Создан {new Date(order.createdAt).toLocaleString()}
                                             </p>
+
+                                            {unreadOrders[order.id] && <span className="dot">🔴</span>}
 
                                             {isExecutor ?
                                                 <>

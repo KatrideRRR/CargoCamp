@@ -25,7 +25,6 @@ function initializeSocket(server) {
         // Подписка на уведомления
         socket.on('subscribeToNotifications', (userId) => {
             socket.join(`notifications_${userId}`);
-            console.log(`Пользователь ${userId} подписался на уведомления`);
         });
 
         // Прочие события, например, для чатов
@@ -63,6 +62,8 @@ function initializeSocket(server) {
 
             // Если уведомления еще нет, создаем новое для BottomMenu
             if (!existingNotification) {
+                console.log(`✅ Создаем уведомление: userId=${message.receiverId}, orderId=${fullMessage.orderId}`);
+
                 await Notification.create({
                     userId: message.receiverId,
                     type: 'new_message',
@@ -70,22 +71,13 @@ function initializeSocket(server) {
                     isRead: false,
                     orderId: fullMessage.orderId, // ✅ orderId гарантированно есть
                 });
+                console.log("📤 Отправка уведомления:", { orderId: fullMessage.orderId, userId: message.receiverId });
+
 
                 // Отправляем уведомление в BottomMenu
                 await sendNotifications(message.receiverId);
             }
 
-            // ✅ Теперь создаем ОТДЕЛЬНОЕ уведомление для карточки заказа
-            await Notification.create({
-                userId: message.receiverId,
-                type: 'new_order_notification',  // Новый тип уведомления
-                orderId: fullMessage.orderId,
-                messageId: message.id,
-                isRead: false
-            });
-
-            // Оповещаем через WebSocket, что в карточке заказа есть новое уведомление
-            sendOrderNotification(message.receiverId, fullMessage.orderId);
         });
 
 
@@ -115,16 +107,14 @@ function initializeSocket(server) {
 
 // Функция отправки уведомлений через WebSocket
 async function sendNotifications(userId) {
-    const count = await Notification.count({ where: { userId, isRead: false } });
-    console.log(`📩 Отправка уведомления для user_${userId}: ${count} непрочитанных`);
-    io.to(`notifications_${userId}`).emit('new_notification', count);
-}
+    const unreadNotifications = await Notification.findAll({
+        where: { userId, isRead: false },
+        attributes: ['id', 'type', 'orderId'], // Берем нужные поля
+    });
 
-function sendOrderNotification(userId, orderId) {
-    if (io) {
-        io.to(`user_${userId}`).emit('new_order_notification', { orderId });
-        console.log(`📦 Уведомление о заказе ${orderId} отправлено пользователю ${userId}`);
-    }
+    console.log(`📩 Отправка уведомлений для user_${userId}:`, unreadNotifications);
+
+    io.to(`notifications_${userId}`).emit('new_notification', unreadNotifications);
 }
 
 // Функция для отправки уведомлений заказчику и исполнителю
