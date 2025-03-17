@@ -23,12 +23,17 @@ const BottomMenu = () => {
         console.log('Подписка на уведомления, userId:', user.id);
         socket.emit('subscribeToNotifications', user.id);
 
-        // Получение новых уведомлений
-        socket.on('new_notification', (count) => {
-            // Обновить состояние для кнопки "Активные"
-            console.log("Новые уведомления:", count);
-            setHasNewMessage(count > 0);  // Если уведомлений больше 0, показываем индикатор
+        socket.on(`notifications_${user.id}`, (notifications) => {
+            console.log("🔔 Уведомления через комнату:", notifications);
+            setHasNewMessage(notifications.length > 0);
         });
+
+        // Получение новых уведомлений
+        socket.on('new_notification', (notifications) => {
+            console.log("Новые уведомления:", notifications);
+            setHasNewMessage(notifications.length > 0);  // Проверяем длину массива
+        });
+
 
         // Подписка на запросы на заказ
         const eventName = `orderRequest:${user.id}`;

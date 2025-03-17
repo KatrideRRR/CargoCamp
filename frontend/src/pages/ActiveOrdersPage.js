@@ -141,11 +141,9 @@ const ActiveOrdersPage = () => {
             // Если это массив уведомлений
             if (Array.isArray(data)) {
                 data.forEach((notification) => {
-                    console.log("🔹 Уведомление:", notification);
                     if (notification.orderId) {
                         setUnreadOrders((prev) => {
                             const updated = { ...prev, [notification.orderId]: true };
-                            console.log("🆕 Обновлённый `unreadOrders`:", updated);
                             return updated;
                         });
                     } else {

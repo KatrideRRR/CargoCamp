@@ -81,6 +81,23 @@
 .modal button:last-of-type:hover {
     background: #1976D2;
 }
+.stars {
+    display: flex;
+    gap: 5px;
+    justify-content: center;
+}
+
+.star {
+    font-size: 24px;
+    cursor: pointer;
+    color: gray;
+    transition: color 0.2s ease-in-out;
+}
+
+.star.selected {
+    color: gold;
+}
+
 
 /* Адаптация для мобильных устройств */
 @media (max-width: 480px) {

@@ -8,7 +8,7 @@ let users = {}; // Храним пользователей, подключивш
 function initializeSocket(server) {
     io = socketIo(server, {
         cors: {
-            origin: "*",
+            origin: "http://localhost:3000",
             methods: ["GET", "POST"]
         }
     });
