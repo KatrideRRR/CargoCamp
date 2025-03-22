@@ -24,6 +24,4 @@ Object.values(db).forEach(model => {
     }
 });
 
-console.log("Загруженные модели:", Object.keys(db));
-
 module.exports = db;

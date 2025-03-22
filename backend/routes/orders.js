@@ -143,27 +143,46 @@ module.exports = (io) => {
         }
     });
 
-    // Get active orders
     router.get('/active-orders', authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const activeOrders = await Order.findAll({
-            where: {
-                status: 'active',
-                [Op.or]: [{ creatorId: userId }, { executorId: userId }],
-            },
-            include: [
-                { model: db.Category, as: 'category', attributes: ['id', 'name'] },
-                { model: db.Subcategory, as: 'subcategory', attributes: ['id', 'name'] }
-            ]
+        try {
+            const userId = req.user.id;
 
-        });
-        res.json(activeOrders);
-    } catch (error) {
-        console.error('Ошибка при получении активных заказов:', error);
-        res.status(500).json({ message: 'Ошибка сервера' });
-    }
-});
+            const activeOrders = await Order.findAll({
+                where: {
+                    status: 'active',
+                    [Op.or]: [{ creatorId: userId }, { executorId: userId }],
+                },
+                include: [
+                    { model: db.Category, as: 'category', attributes: ['id', 'name'] },
+                    { model: db.Subcategory, as: 'subcategory', attributes: ['id', 'name'] }
+                ]
+            });
+
+            if (!activeOrders.length) {
+                return res.json({ orders: activeOrders, notifications: [] });
+            }
+
+            const orderIds = activeOrders.map(order => order.id);
+            console.log("🛠️ Найденные orderIds:", orderIds); // Логируем orderIds
+
+            const notifications = await db.Notification.findAll({
+                where: {
+                    orderId: { [Op.in]: orderIds }, // Используем Op.in для поиска по массиву
+                    userId: userId, // Только для текущего пользователя
+                    isRead: false,  // Только непрочитанные
+                }
+            });
+
+            console.log("📩 Найденные уведомления:", notifications);
+
+            res.json({ orders: activeOrders, notifications });
+
+
+        } catch (error) {
+            console.error('Ошибка при получении активных заказов:', error);
+            res.status(500).json({ message: 'Ошибка сервера' });
+        }
+    });
 
     // Get order by ID
     router.get('/:id', async (req, res) => {

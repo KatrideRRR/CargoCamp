@@ -58,7 +58,6 @@ const BottomMenu = () => {
 
     const handleOpenActive = () => {
         // Отмечаем уведомления как прочитанные
-        socket.emit('markAsRead', { userId: user.id });
         setHasNewMessage(false);  // Сбрасываем индикатор новых сообщений
         navigate('/active-orders'); // Навигация на страницу активных заказов
     };

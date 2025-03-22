@@ -86,11 +86,26 @@ function initializeSocket(server) {
             io.emit("orderRequest"); // Оповещаем всех клиентов
         });
 
-        socket.on('markAsRead', async ({ userId }) => {
-            console.log("Updating notifications for userId:", userId);
-            await Notification.update({ isRead: true }, { where: { userId } });
-            await sendNotifications(userId);
+        // Обработчик для события markAsRead
+        socket.on('markAsRead', async ({ userId, orderId }) => {
+            console.log("✅ Обрабатываем 'markAsRead' для userId:", userId, "orderId:", orderId);
+
+            try {
+                await Notification.update({ isRead: true }, {
+                    where: { userId, orderId, isRead: false }
+                });
+
+                console.log(`✅ Уведомления для заказа ${orderId} обновлены`);
+
+                // Отправляем обновлённые уведомления
+                sendNotifications(userId);
+            } catch (error) {
+                console.error("Ошибка при обновлении уведомлений:", error);
+            }
         });
+
+
+
 
         socket.on('disconnect', () => {
             console.log(`🔴 Отключение: ${socket.id}`);
@@ -105,7 +120,7 @@ function initializeSocket(server) {
     return io;
 }
 
-// Функция отправки уведомлений через WebSocket
+// Обновленный код отправки уведомлений для пользователя
 async function sendNotifications(userId) {
     const unreadNotifications = await Notification.findAll({
         where: { userId, isRead: false },
@@ -116,6 +131,7 @@ async function sendNotifications(userId) {
 
     io.to(`notifications_${userId}`).emit('new_notification', unreadNotifications);
 }
+
 
 // Функция для отправки уведомлений заказчику и исполнителю
 function sendNotification(userId, event, data) {

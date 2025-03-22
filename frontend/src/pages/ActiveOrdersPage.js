@@ -42,6 +42,7 @@ const ActiveOrdersPage = () => {
     });
     const [expandedOrders, setExpandedOrders] = useState({});
     const [unreadOrders, setUnreadOrders] = useState({});
+    const [notifications, setNotifications] = useState([]);
 
     useEffect(() => {
         // Сохраняем удалённые заказы в localStorage при каждом изменении
@@ -57,73 +58,76 @@ const ActiveOrdersPage = () => {
         }
         if (!user?.id) return;
 
-        // Подключаемся к WebSocket
-        socket.connect();
+        console.log("📢 Ререндер компонента! Текущее `unreadOrders`:", unreadOrders);
 
-        // Подписка на уведомления
+        // Подключаем WebSocket
+        socket.connect();
         console.log("📡 Подписка на уведомления, userId:", user.id);
         socket.emit("subscribeToNotifications", user.id);
 
         const fetchActiveOrders = async () => {
             try {
                 const response = await axios.get(`${apiUrl}/api/orders/active-orders`, {
-                    headers: {Authorization: `Bearer ${token}`},
+                    headers: { Authorization: `Bearer ${token}` },
                 });
-                // Получаем уникальные ID создателей
-                const creatorIds = [...new Set(orders.map(order => order.creatorId))];
 
+                console.log("📦 Ответ от сервера:", response.data);
+                const { orders: activeOrders, notifications } = response.data; // Явно деструктурируем
+
+                // Проверяем, что `orders` - это массив
+                if (!Array.isArray(response.data.orders)) {
+                    console.error("❌ Ошибка: `orders` не массив!", response.data);
+                    return;
+                }
+
+                // Получаем данные создателей заказов
+                const creatorIds = [...new Set(response.data.orders.map(order => order.creatorId))];
+                const creatorsData = {};
                 if (creatorIds.length > 0) {
-                    const creatorsData = {};
-                    const requests = creatorIds.map(id =>
-                        axiosInstance.get(`/auth/${id}`)
-                            .then(res => ({ id, data: res.data }))
-                            .catch(err => {
-                                console.error(`Ошибка загрузки данных пользователя ${id}`, err);
-                                return null;
-                            })
+                    const creatorRequests = creatorIds.map(id =>
+                        axiosInstance.get(`/auth/${id}`).then(res => ({ id, data: res.data }))
                     );
-
-                    const results = await Promise.allSettled(requests);
-
-                    results.forEach(result => {
+                    const creatorResults = await Promise.allSettled(creatorRequests);
+                    creatorResults.forEach(result => {
                         if (result.status === 'fulfilled' && result.value) {
                             creatorsData[result.value.id] = result.value.data;
                         }
                     });
-
-                    setCreatorsInfo(creatorsData);
                 }
+                setCreatorsInfo(creatorsData);
 
-                // Получаем уникальные ID создателей
-                const executorIds = [...new Set(orders.map(order => order.executorId))];
-
+                // Получаем данные исполнителей заказов
+                const executorIds = [...new Set(response.data.orders.map(order => order.executorId))];
+                const executorsData = {};
                 if (executorIds.length > 0) {
-                    const executorsData = {};
-                    const requests = executorIds.map(executorId =>
-                        axiosInstance.get(`/auth/user/${executorId}`)
-                            .then(res => ({ executorId, data: res.data }))
-                            .catch(err => {
-                                console.error(`Ошибка загрузки данных пользователя ${executorId}`, err);
-                                return { executorId, data: null }; // Возвращаем объект с null в случае ошибки
-                            })
+                    const executorRequests = executorIds.map(id =>
+                        axiosInstance.get(`/auth/user/${id}`).then(res => ({ id, data: res.data }))
                     );
-
-                    const results = await Promise.allSettled(requests);
-
-                    results.forEach(result => {
-                        if (result.status === 'fulfilled' && result.value && result.value.data !== null) {
-                            executorsData[result.value.executorId] = result.value.data;
+                    const executorResults = await Promise.allSettled(executorRequests);
+                    executorResults.forEach(result => {
+                        if (result.status === 'fulfilled' && result.value) {
+                            executorsData[result.value.id] = result.value.data;
                         }
                     });
-
-                    setExecutorsInfo(executorsData);
                 }
+                setExecutorsInfo(executorsData);
 
-
-                // Исключаем заказы, которые пользователь уже удалил с экрана
-                const filteredOrders = response.data.filter(order => !removedOrders.includes(order.id));
-
+                // Фильтруем удалённые заказы
+                const filteredOrders = response.data.orders.filter(order => !removedOrders.includes(order.id));
                 setOrders(filteredOrders);
+                console.log("📦 Ответ сервера (notifications):", response.data.notifications);
+                console.log("📋 `unreadOrders` перед обновлением:", unreadOrders);
+
+                // Обновляем непрочитанные уведомления
+                setUnreadOrders((prev) => {
+                    const updated = { ...prev };
+                    response.data.notifications.forEach(notification => {
+                        updated[notification.orderId] = true;
+                    });
+                    console.log("✅ Обновленный `unreadOrders`:", updated);
+                    return updated;
+                });
+
 
             } catch (err) {
                 console.error('Ошибка при загрузке активных заказов:', err);
@@ -133,60 +137,54 @@ const ActiveOrdersPage = () => {
 
         fetchActiveOrders();
 
-        // Подписываемся на обновления активных заказов
+        // Подписываемся на обновления
         socket.on('activeOrdersUpdated', fetchActiveOrders);
-        // Получение новых уведомлений о заказах
         socket.on("new_notification", (data) => {
             console.log("📩 Получено уведомление:", data);
-            // Если это массив уведомлений
-            if (Array.isArray(data)) {
-                data.forEach((notification) => {
-                    if (notification.orderId) {
-                        setUnreadOrders((prev) => {
-                            const updated = { ...prev, [notification.orderId]: true };
-                            return updated;
-                        });
-                    } else {
-                        console.warn("⚠️ Нет orderId в уведомлении:", notification);
-                    }
+            console.log("🔴 Текущее `unreadOrders` перед обновлением:", unreadOrders);
+            if (data && data.length) {
+                setUnreadOrders((prev) => {
+                    const updated = { ...prev };
+                    data.forEach(notification => {
+                        if (notification.orderId) {
+                            updated[notification.orderId] = true;
+                        }
+                    });
+                    console.log("🆕 Обновлённый `unreadOrders`:", updated);
+                    return updated;
                 });
             }
-
-
-
-                    setUnreadOrders((prev) => {
-                const updated = { ...prev };
-                // Логируем обновление, чтобы точно увидеть, что происходит
-                updated[data.orderId] = true;
-                console.log("🆕 Обновлённый `unreadOrders`:", updated);
-                return updated;
-
-            });
-
         });
 
+
+
         return () => {
-            socket.off('activeOrdersUpdated', fetchActiveOrders); // Очистка слушателя
+            socket.off('activeOrdersUpdated', fetchActiveOrders);
             socket.off("new_notification");
-
         };
-
-    }, [navigate, orders, removedOrders, user]);
+    }, [navigate, removedOrders, user]);
 
     if (!user) {
         return <p>Загрузка...</p>;
     }
 
-    const markAsRead = (orderId) => {
-        console.log("✅ Отмечаем заказ прочитанным:", orderId);
+    const handleOpenChat = (orderId) => {
+        console.log(`📨 Открываем чат для заказа ${orderId}`);
 
+        // Отправляем серверу запрос на пометку уведомления прочитанным
         socket.emit("markAsRead", { userId: user.id, orderId });
 
-        setUnreadOrders((prev) => {
-            const updated = { ...prev };
-            delete updated[orderId]; // Удаляем уведомление для этого заказа
-            return updated;
+        // Убираем уведомление только после подтверждения сервера
+        socket.on("new_notification", (updatedNotifications) => {
+            console.log("🔔 Получены обновленные уведомления:", updatedNotifications);
+            setUnreadOrders((prev) => {
+                const updated = { ...prev };
+                delete updated[orderId]; // Удаляем уведомление у конкретного заказа
+                return updated;
+            });
         });
+
+        navigate(`/messages/${orderId}`);
     };
 
     // Функция для получения иконки по способу оплаты
@@ -403,10 +401,14 @@ const ActiveOrdersPage = () => {
                                                 >
                                                     {isMobile ? <FaPhone/> : "Позвонить"}
                                                 </button>
-                                                <button className="message-button"
-                                                        onClick={() => navigate(`/messages/${order.id}`)}>
+                                                <button
+                                                    className="message-button"
+                                                    onClick={() => handleOpenChat(order.id)}  // Если orderId внутри объекта order
+                                                >
                                                     {isMobile ? <FaComments/> : "Сообщение"}
                                                 </button>
+
+
                                                 <button className="route-button">
                                                     {isMobile ? <FaRoute/> : "Маршрут"}
                                                 </button>
