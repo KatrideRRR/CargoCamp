@@ -1,45 +1,27 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../utils/authContext";
 import axios from "axios";
-import '../styles/ProfilePage.css';  // Импортируем CSS файл
+import "../styles/ProfilePage.css"; // Импортируем CSS файл
 const apiUrl = process.env.REACT_APP_API_URL;
 
 const ProfilePage = () => {
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [rebillId, setRebillId] = useState(null); // Сохраняем ID привязанной карты
     const navigate = useNavigate();
     const { logout, isAuthenticated } = useAuth();
-
-    const handleUploadDocuments = async (files) => {
-        if (!files) return;
-        const token = localStorage.getItem('authToken');
-
-        const formData = new FormData();
-        for (let file of files) {
-            formData.append('documents', file);
-        }
-
-        const response = await fetch(`${apiUrl}/api/auth/upload-documents`, {
-            method: 'POST',
-            body: formData,
-            headers: { Authorization: `Bearer ${token}` },
-        });
-
-        const data = await response.json();
-        alert(data.message);
-    };
 
     useEffect(() => {
         let isMounted = true;
 
         const fetchProfileData = async () => {
-            const token = localStorage.getItem('authToken');
-            console.log('Токен на странице профиля:', token);
+            const token = localStorage.getItem("authToken");
+            console.log("Токен на странице профиля:", token);
 
             if (!token) {
-                navigate('/login');
+                navigate("/login");
                 return;
             }
 
@@ -48,18 +30,19 @@ const ProfilePage = () => {
                     headers: { Authorization: `Bearer ${token}` },
                 });
 
-                console.log('Данные профиля:', response.data);
+                console.log("Данные профиля:", response.data);
 
                 if (isMounted) {
                     setProfile(response.data);
+                    setRebillId(response.data.rebillId || null); // Загружаем ID карты, если есть
                     setLoading(false);
                 }
             } catch (err) {
-                console.error('Ошибка:', err.response?.status, err.message);
+                console.error("Ошибка:", err.response?.status, err.message);
                 if (isMounted) {
-                    setError('Не удалось загрузить данные профиля.');
+                    setError("Не удалось загрузить данные профиля.");
                     setLoading(false);
-                    navigate('/login');
+                    navigate("/login");
                 }
             }
         };
@@ -71,9 +54,55 @@ const ProfilePage = () => {
         };
     }, [isAuthenticated, navigate]);
 
+    // 🔹 Функция привязки карты
+    const handleBindCard = async () => {
+        console.log("🔹 API URL:", apiUrl); // Проверяем, что apiUrl корректный
+
+        try {
+            const response = await axios.post(`${apiUrl}/api/payment/bind_card`, { userId: profile.id });
+            console.log("🔹 Ответ сервера:", response.data);
+
+            if (response.data.Success) {
+                window.location.href = response.data.PaymentURL; // Открываем страницу привязки
+
+            } else {
+                alert("Ошибка привязки карты");
+            }
+        } catch (error) {
+            console.error("Ошибка привязки карты:", error);
+            alert("Ошибка привязки карты");
+        }
+    };
+
+    // 🔹 Функция автосписания 100 рублей (пример)
+    const handleCharge = async () => {
+        if (!rebillId) {
+            alert("Карта не привязана!");
+            return;
+        }
+
+        try {
+            const response = await axios.post(`${apiUrl}/api/payment/charge_card`, {
+                userId: profile.id,
+                rebillId: rebillId,
+                amount: 100, // 100 рублей
+                description: "Тестовое списание 100 руб."
+            });
+
+            if (response.data.Success) {
+                alert("Списание успешно!");
+            } else {
+                alert("Ошибка списания: " + response.data.Message);
+            }
+        } catch (error) {
+            console.error("Ошибка списания:", error);
+            alert("Ошибка списания");
+        }
+    };
+
     const handleLogout = () => {
         logout();
-        navigate('/login');
+        navigate("/login");
     };
 
     const handleMyComplaints = () => {
@@ -81,6 +110,7 @@ const ProfilePage = () => {
             navigate(`/complaints/${profile.id}`);
         }
     };
+
     const handleOrderHistory = () => {
         if (profile) {
             navigate(`/orders-history/${profile.id}`);
@@ -90,8 +120,8 @@ const ProfilePage = () => {
     // Функция рендера звездочек
     const renderStars = (rating) => {
         const maxStars = 5;
-        const fullStar = '★';
-        const emptyStar = '☆';
+        const fullStar = "★";
+        const emptyStar = "☆";
         return fullStar.repeat(Math.round(rating)) + emptyStar.repeat(maxStars - Math.round(rating));
     };
 
@@ -106,7 +136,6 @@ const ProfilePage = () => {
             </div>
         );
     }
-    console.log('isVerified:', profile.isVerified);
 
     return (
         <div className="container">
@@ -123,43 +152,43 @@ const ProfilePage = () => {
                         </div>
                         <div className="section">
                             <h2 className="subtitle">Рейтинг:</h2>
-                            <p className="info rating">{profile.rating ? renderStars(profile.rating) : 'Нет рейтинга'}</p>
+                            <p className="info rating">{profile.rating ? renderStars(profile.rating) : "Нет рейтинга"}</p>
                         </div>
 
-                        {/* Верификация */}
+                        {/* Привязка карты */}
                         <div className="section">
-                            <h2 className="subtitle">Верификация:</h2>
-                            <p className={`info verification-status ${profile.isVerified ? 'verified' : 'not-verified'}`}>
-                                {profile.isVerified ? 'Пройдена' : 'Не пройдена'}
-                            </p>
-                            {!profile.isVerified && (
-                                <button
-                                    onClick={() => {
-                                        const input = document.createElement('input');
-                                        input.type = 'file';
-                                        input.multiple = true;
-                                        input.onchange = async (e) => {
-                                            const files = e.target.files;
-                                            await handleUploadDocuments(files);
-                                        };
-                                        input.click();
-                                    }}
-                                    className="upload-button"
-                                >
-                                    Выбрать файлы и загрузить
+                            <h2 className="subtitle">Привязка карты:</h2>
+                            {rebillId ? (
+                                <p className="info verified">Карта привязана ✅</p>
+                            ) : (
+                                <button onClick={handleBindCard} className="bind-card-button">
+                                    Привязать карту
                                 </button>
                             )}
                         </div>
 
-                        {/* Кнопка "Мои жалобы" */}
+                        {/* Кнопка автосписания для теста */}
+                        {rebillId && (
+                            <button onClick={handleCharge} className="charge-button">
+                                Списать 100 рублей
+                            </button>
+                        )}
+
+                        {/* Верификация */}
+                        <div className="section">
+                            <h2 className="subtitle">Верификация:</h2>
+                            <p className={`info verification-status ${profile.isVerified ? "verified" : "not-verified"}`}>
+                                {profile.isVerified ? "Пройдена" : "Не пройдена"}
+                            </p>
+                        </div>
+
+                        {/* Кнопки навигации */}
                         <button onClick={handleMyComplaints} className="complaints-button">
                             Мои жалобы
                         </button>
-                        {/* Кнопка "История заказов" */}
                         <button onClick={handleOrderHistory} className="history-button">
                             История заказов
                         </button>
-
                         <button onClick={handleLogout} className="logout-button">
                             Выйти
                         </button>

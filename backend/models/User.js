@@ -61,6 +61,10 @@ module.exports = (sequelize) => {
                 type: Sequelize.BOOLEAN,
                 defaultValue: false,
             },
+            cardNumber: {
+                type: DataTypes.STRING,
+                allowNull: true, // Пользователь может не привязывать карту
+            },
 
         },
         {
