@@ -1,5 +1,5 @@
 module.exports = (sequelize, DataTypes) => {
-    const Subcategory = sequelize.define('Subcategory', {
+    const Subcategory = sequelize.define('subcategory', {
         id: {
             type: DataTypes.INTEGER,
             primaryKey: true,
@@ -14,7 +14,7 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.INTEGER,
             allowNull: false,
             references: {
-                model: 'Category',
+                model: 'category',
                 key: 'id'
             },
             onDelete: 'CASCADE'
