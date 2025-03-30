@@ -8,13 +8,20 @@ const API_URL = "https://securepay.tinkoff.ru/v2";
 const PASSWORD = "Kg%Vww7PG6fYoWM5"; // Пароль из Тинькофф
 
 const generateToken = (params, password) => {
-    const filteredParams = Object.keys(params)
-        .filter((key) => key !== "Token" && params[key] !== undefined && params[key] !== null)
-        .sort()
-        .reduce((acc, key) => acc + params[key], "");
+    // Правильный порядок параметров для токена
+    const orderedValues = [
+        params.Amount,        // "100"
+        params.OrderId,       // "user_38"
+        params.Description,   // "Привязка карты"
+        params.CustomerKey,   // "user_38"
+        password,             // "Kg%Vww7PG6fYoWM5"
+        params.TerminalKey    // "1741722031269DEMO"
+    ].join(""); // Объединяем без разделителей
 
-    return crypto.createHash("sha256").update(filteredParams + password).digest("hex").toLowerCase();
+    return crypto.createHash("sha256").update(orderedValues).digest("hex").toLowerCase();
 };
+
+
 
 // 💳 1. Привязка карты
 router.post("/bind_card", async (req, res) => {
@@ -24,14 +31,15 @@ router.post("/bind_card", async (req, res) => {
     // Данные запроса
     const requestData = {
         TerminalKey: TERMINAL_KEY,
+        Amount: "100",
         OrderId: `user_${userId}`,
-        CustomerKey: `user_${userId}`,
-        Amount: "100", // Приводим к строке, так как API требует строковые значения
         Description: "Привязка карты",
+        CustomerKey: `user_${userId}`,
     };
+
     console.log("🔹 Данные запроса в Тинькофф:", requestData);
 
-    // Генерируем Token
+    // Генерируем Token с правильным порядком параметров
     requestData.Token = generateToken(requestData, PASSWORD);
     console.log("🔹 Token:", requestData.Token);
 
@@ -49,6 +57,7 @@ router.post("/bind_card", async (req, res) => {
         res.status(500).json({ error: "Ошибка привязки карты", details: error?.response?.data });
     }
 });
+
 
 // 💰 2. Автосписание
 router.post("/charge_card", async (req, res) => {
