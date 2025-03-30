@@ -7,56 +7,63 @@ const TERMINAL_KEY = "1741722031269DEMO"; // Подставь свой ключ
 const API_URL = "https://securepay.tinkoff.ru/v2";
 const PASSWORD = "Kg%Vww7PG6fYoWM5"; // Пароль из Тинькофф
 
-const generateToken = (params, password) => {
-    // Правильный порядок параметров для токена
-    const orderedValues = [
-        params.Amount,        // "100"
-        params.OrderId,       // "user_38"
-        params.Description,   // "Привязка карты"
-        params.CustomerKey,   // "user_38"
-        password,             // "Kg%Vww7PG6fYoWM5"
-        params.TerminalKey    // "1741722031269DEMO"
-    ].join(""); // Объединяем без разделителей
+// 🔹 Функция для генерации Token
+function generateToken(params) {
+    // Добавляем параметр Password
+    params.Password = PASSWORD;
 
-    return crypto.createHash("sha256").update(orderedValues).digest("hex").toLowerCase();
-};
+    // Сортируем ключи параметров в алфавитном порядке
+    const sortedKeys = Object.keys(params).sort();
 
+    // Объединяем значения параметров в одну строку
+    const dataString = sortedKeys.map(key => params[key]).join('');
 
+    // Вычисляем SHA-256 хеш
+    const hash = crypto.createHash('sha256').update(dataString).digest('hex');
 
-// 💳 1. Привязка карты
+    // Удаляем параметр Password из исходных параметров
+    delete params.Password;
+
+    return hash;
+}
+
+// 🔹 Маршрут для создания тестового платежа
 router.post("/bind_card", async (req, res) => {
     const { userId } = req.body;
-    console.log("🔹 Запрос на привязку карты:", req.body);
 
-    // Данные запроса
-    const requestData = {
-        TerminalKey: TERMINAL_KEY,
-        Amount: "100",
-        OrderId: `user_${userId}`,
-        Description: "Привязка карты",
-        CustomerKey: `user_${userId}`,
+    console.log("🔹 Запрос на тестовый платеж:", req.body);
+
+    // Данные для платежа
+    const params = {
+        TerminalKey: '1741722031269DEMO',
+        Amount: '10000',
+        OrderId: 'test_order_39',
+        Description: 'Тестовый платеж',
+        CustomerKey: 'test_user_38',
     };
 
-    console.log("🔹 Данные запроса в Тинькофф:", requestData);
+    // Генерируем Token
+    params.Token = generateToken(params);
+    console.log('Сгенерированный токен:', params.Token);
 
-    // Генерируем Token с правильным порядком параметров
-    requestData.Token = generateToken(requestData, PASSWORD);
-    console.log("🔹 Token:", requestData.Token);
+    console.log("🔹 Данные запроса в Тинькофф:", params);
 
     try {
-        const response = await axios.post(`${API_URL}/Init`, {
-            ...requestData,
-            SuccessURL: "https://your-site.com/success",
-            FailURL: "https://your-site.com/fail"
-        });
+        const response = await axios.post(`${API_URL}/Init`, params);
 
         console.log("🔹 Ответ Тинькофф:", response.data);
-        res.json(response.data);
+
+        if (response.data.Success) {
+            res.json({ success: true, PaymentURL: response.data.PaymentURL });
+        } else {
+            res.status(400).json({ success: false, error: response.data.Message });
+        }
     } catch (error) {
-        console.error("Ошибка привязки карты:", error?.response?.data || error.message);
-        res.status(500).json({ error: "Ошибка привязки карты", details: error?.response?.data });
+        console.error("Ошибка создания платежа:", error?.response?.data || error.message);
+        res.status(500).json({ success: false, error: "Ошибка создания платежа" });
     }
 });
+
 
 
 // 💰 2. Автосписание
