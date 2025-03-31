@@ -47,7 +47,7 @@ router.post("/bind_card", async (req, res) => {
     const params = {
         TerminalKey: TERMINAL_KEY,
         Amount: 10000,
-        OrderId: `${userId}`,
+        OrderId: `test_22`,
         Description: "Тестовый платеж",
         CustomerKey: `test_user_${userId}`,
         NotificationURL: "https://http://18.184.43.44:5000/api/payment/callback"  // 🚀 Важно!
