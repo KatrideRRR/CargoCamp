@@ -15,6 +15,7 @@ export const ModalProvider = ({ children }) => {
     const [showRatingModal, setShowRatingModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [rating, setRating] = useState(0);
+    const [paymentUrl, setPaymentUrl] = useState(null); // Ссылка на оплату
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -34,7 +35,7 @@ export const ModalProvider = ({ children }) => {
 
 
             // Слушаем уведомления для исполнителя
-            socket.on('orderApproved', (data) => {
+            socket.on('orderApproved', async (data) => {
                 console.log("🔔 Заказ одобрен:", data);
                 if (data.message.includes("Ваш запрос")) {
                     setNotificationData({
@@ -42,6 +43,18 @@ export const ModalProvider = ({ children }) => {
                         description: `Заказ номер ${data.orderId}: ${data.message}`,
                         onClose: () => setNotificationData(null),
                     });
+
+                    try {
+                        const response = await axiosInstance.post('/payment/bind_card', {userId});
+                        if (response.data.success) {
+                            setPaymentUrl(response.data.PaymentURL);
+                        } else {
+                            console.error("❌ Ошибка получения ссылки на оплату:", response.data.error);
+                        }
+                    } catch (error) {
+                        console.error("❌ Ошибка запроса на оплату:", error);
+                    }
+
                 }
             });
 
@@ -140,8 +153,16 @@ export const ModalProvider = ({ children }) => {
                             <div className="modal">
                                 <h2>{notificationData.title}</h2>
                                 <p>{notificationData.description}</p>
+                                {paymentUrl ? (
+                                    <button onClick={() => window.open(paymentUrl, "_blank")}>
+                                        Оплатить комиссию
+                                    </button>
+                                ) : (
+                                    <p>Загрузка ссылки на оплату...</p>
+                                )}
                                 <button onClick={notificationData.onClose}>Закрыть</button>
                             </div>
+
                         </div>
 
                     )}
