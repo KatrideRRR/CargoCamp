@@ -49,7 +49,8 @@ router.post("/bind_card", async (req, res) => {
         Amount: 10000,
         OrderId: `${userId}`,
         Description: "Тестовый платеж",
-        CustomerKey: `test_user_${userId}`
+        CustomerKey: `test_user_${userId}`,
+        NotificationURL: "https://http://18.184.43.44:5000/api/payment/callback"  // 🚀 Важно!
     };
 
     // 🔸 2. Генерируем `Token` (БЕЗ Receipt)
