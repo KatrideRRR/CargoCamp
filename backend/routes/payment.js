@@ -1,11 +1,21 @@
 const express = require("express");
 const axios = require("axios");
-const router = express.Router();
 const crypto = require("crypto");
+const router = express.Router();
+const { User } = require("../models"); // Подключаем модель пользователя
 
-const TERMINAL_KEY = "1741722031269DEMO"; // Подставь свой ключ
+const TERMINAL_KEY = "1741722031308";
+const PASSWORD = "5A_zMtY9nIkIeO^r";
 const API_URL = "https://securepay.tinkoff.ru/v2";
-const PASSWORD = "Kg%Vww7PG6fYoWM5"; // Пароль из Тинькофф
+
+async function saveRebillIdToDB(userId, rebillId) {
+    try {
+        await User.update({ cardNumber: rebillId }, { where: { id: userId } });
+        console.log(`✅ RebillId сохранён для userId: ${userId}`);
+    } catch (error) {
+        console.error(`❌ Ошибка сохранения RebillId для userId: ${userId}`, error);
+    }
+}
 
 // 🔹 Функция генерации Token (БЕЗ Receipt!)
 function generateToken(params) {
@@ -26,17 +36,18 @@ function generateToken(params) {
     return hash;
 }
 
-// 🔹 Маршрут для тестового платежа
+// 🔹 Запрос на привязку карты
 router.post("/bind_card", async (req, res) => {
     const { userId } = req.body;
-
-    console.log("🔹 Запрос на тестовый платеж:", req.body);
+    if (!userId) {
+        return res.status(400).json({ success: false, error: "userId обязателен" });
+    }
 
     // 🔸 1. Формируем параметры платежа
     const params = {
         TerminalKey: TERMINAL_KEY,
         Amount: 10000,
-        OrderId: `test_order_19`,
+        OrderId: `${userId}`,
         Description: "Тестовый платеж",
         CustomerKey: `test_user_${userId}`
     };
@@ -64,43 +75,37 @@ router.post("/bind_card", async (req, res) => {
 
     console.log("🔹 Данные запроса в Тинькофф:", JSON.stringify(params, null, 2));
 
-    // 🔸 4. Отправляем запрос в Тинькофф
+    console.log("🔹 Данные, отправляемые в Тинькофф:", params);
+    const response = await axios.post(`${API_URL}/Init`, params);
+    console.log("🔹 Ответ Тинькофф:", response.data);
+
     try {
         const response = await axios.post(`${API_URL}/Init`, params);
-
-        console.log("🔹 Ответ Тинькофф:", response.data);
-
         if (response.data.Success) {
             res.json({ success: true, PaymentURL: response.data.PaymentURL });
         } else {
             res.status(400).json({ success: false, error: response.data.Message });
         }
     } catch (error) {
-        console.error("Ошибка создания платежа:", error?.response?.data || error.message);
-        res.status(500).json({ success: false, error: "Ошибка создания платежа" });
+        res.status(500).json({ success: false, error: "Ошибка привязки карты" });
     }
 });
 
+// 🔹 Обработка уведомления от Тинькофф (коллбек)
+router.post("/callback", async (req, res) => {
+    const { Success, Status, PaymentId, RebillId, OrderId, CustomerKey } = req.body;
 
+    if (Success && Status === "CONFIRMED" && RebillId) {
+        const userId = CustomerKey.replace("user_", "");
+        console.log(`✅ Карта привязана для userId: ${userId}, RebillId: ${RebillId}`);
 
+        // Сохраняем RebillId в базу
+        await saveRebillIdToDB(userId, RebillId);
 
-// 💰 2. Автосписание
-router.post("/charge_card", async (req, res) => {
-    const { userId, rebillId, amount, description } = req.body;
-
-    try {
-        const response = await axios.post(`${API_URL}/Charge`, {
-            TerminalKey: TERMINAL_KEY,
-            Amount: amount * 100,  // В копейках (100 рублей = 10000)
-            OrderId: `charge_${userId}`,
-            RebillId: rebillId,
-            CustomerKey: `user_${userId}`,
-            Description: description
-        });
-
-        res.json(response.data);  // Ответ Тинькофф
-    } catch (error) {
-        res.status(500).json({ error: "Ошибка автосписания" });
+        res.json({ success: true });
+    } else {
+        console.log("⚠ Ошибка привязки карты:", req.body);
+        res.status(400).json({ success: false });
     }
 });
 
