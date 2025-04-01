@@ -37,6 +37,7 @@ export const ModalProvider = ({ children }) => {
             // Слушаем уведомления для исполнителя
             socket.on('orderApproved', async (data) => {
                 console.log("🔔 Заказ одобрен:", data);
+
                 if (data.message.includes("Ваш запрос")) {
                     setNotificationData({
                         title: "Ваш запрос одобрен!",
@@ -45,7 +46,11 @@ export const ModalProvider = ({ children }) => {
                     });
 
                     try {
-                        const response = await axiosInstance.post('/payment/bind_card', {userId});
+                        const response = await axiosInstance.post('/payment/pay_commission', {
+                            userId,
+                            orderId: data.orderId
+                        });
+
                         if (response.data.success) {
                             setPaymentUrl(response.data.PaymentURL);
                         } else {
@@ -54,9 +59,9 @@ export const ModalProvider = ({ children }) => {
                     } catch (error) {
                         console.error("❌ Ошибка запроса на оплату:", error);
                     }
-
                 }
             });
+
 
             // Слушаем уведомления о завершении заказа
             socket.on('orderCompleted', (data) => {

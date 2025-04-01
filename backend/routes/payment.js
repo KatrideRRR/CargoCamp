@@ -2,93 +2,105 @@ const express = require("express");
 const axios = require("axios");
 const crypto = require("crypto");
 const router = express.Router();
-const { User } = require("../models"); // Подключаем модель пользователя
+const { Order } = require("../models");
 
 const TERMINAL_KEY = "1741722031308";
 const PASSWORD = "5A_zMtY9nIkIeO^r";
 const API_URL = "https://securepay.tinkoff.ru/v2";
 
-async function saveRebillIdToDB(userId, rebillId) {
-    try {
-        await User.update({ cardNumber: rebillId }, { where: { id: userId } });
-        console.log(`✅ RebillId сохранён для userId: ${userId}`);
-    } catch (error) {
-        console.error(`❌ Ошибка сохранения RebillId для userId: ${userId}`, error);
-    }
-}
-
 // 🔹 Функция генерации Token (БЕЗ Receipt!)
 function generateToken(params) {
-    delete params.Token; // Убираем старый токен
-    params.Password = PASSWORD; // Добавляем SecretKey
+    delete params.Token;
+    params.Password = PASSWORD;
 
-    // 🔸 Сортируем ключи параметров в алфавитном порядке (без Receipt)
     const sortedKeys = Object.keys(params).filter(k => k !== "Receipt").sort();
-
-    // 🔸 Объединяем значения параметров в строку
     const dataString = sortedKeys.map(key => params[key]).join('');
-
-    // 🔸 Вычисляем SHA-256 хеш
     const hash = crypto.createHash('sha256').update(dataString).digest('hex');
 
-    delete params.Password; // ⚠️ Удаляем перед отправкой
-
+    delete params.Password;
     return hash;
 }
 
-// 🔹 Запрос на привязку карты
-router.post("/bind_card", async (req, res) => {
-    const { userId } = req.body;
-    if (!userId) {
-        return res.status(400).json({ success: false, error: "userId обязателен" });
+// 🔹 Оплата комиссии
+router.post("/pay_commission", async (req, res) => {
+    const { userId, orderId } = req.body;
+    const axiosInstance = axios.create({
+        timeout: 20000, // Увеличиваем до 20 секунд
+    });
+    console.log("🔹 Полученные данные:", req.body);
+
+    if (!userId || !orderId) {
+        return res.status(400).json({ success: false, error: "userId и orderId обязательны" });
     }
 
-    // 🔸 1. Формируем параметры платежа
-    const params = {
-        TerminalKey: TERMINAL_KEY,
-        Amount: 10000,
-        OrderId: `test_23`,
-        Description: "Тестовый платеж",
-        CustomerKey: `test_user_${userId}`,
-        NotificationURL: "https://http://18.184.43.44:5000/api/payment/callback"  // 🚀 Важно!
-    };
-
-    // 🔸 2. Генерируем `Token` (БЕЗ Receipt)
-    params.Token = generateToken(params);
-
-    // 🔸 3. Добавляем `Receipt` (НЕ включаем в Token)
-    params.Receipt = {
-        Email: "test@example.com",
-        Phone: "+79001234567",
-        Taxation: "osn",
-        Items: [
-            {
-                Name: "Тестовый товар",
-                Price: 10000,
-                Quantity: 1,
-                Amount: 10000,
-                Tax: "vat10",
-                PaymentMethod: "full_payment",
-                PaymentObject: "commodity"
-            }
-        ]
-    };
-
-    console.log("🔹 Данные запроса в Тинькофф:", JSON.stringify(params, null, 2));
-
-    console.log("🔹 Данные, отправляемые в Тинькофф:", params);
-    const response = await axios.post(`${API_URL}/Init`, params);
-    console.log("🔹 Ответ Тинькофф:", response.data);
-
     try {
+        // Получаем заказ из БД
+        const order = await Order.findByPk(orderId);
+        if (!order) {
+            return res.status(404).json({ success: false, error: "Заказ не найден" });
+        }
+
+        // Определяем комиссию
+        let commission = 0;
+        if (order.paymentType === "cash") {
+            commission = 200 * 100; // 200 рублей (в копейках)
+        } else if (order.paymentType === "guarantee") {
+            commission = Math.round(order.proposedSum * 0.15) * 100; // 15% от суммы
+        } else if (order.paymentType === "installments") {
+            commission = Math.round(order.proposedSum * 0.20) * 100; // 20% от суммы
+        }
+
+        if (commission <= 0) {
+            return res.status(400).json({ success: false, error: "Некорректная комиссия" });
+        }
+
+        // 🔸 1. Формируем параметры платежа
+        const params = {
+            TerminalKey: TERMINAL_KEY,
+            Amount: commission,
+            OrderId: `commission_${orderId}`,
+            Description: `Комиссия за заказ #${orderId}`,
+            CustomerKey: `user_${userId}`,
+            NotificationURL: "https://localhost:5000/api/payment/callback"
+        };
+
+        await axiosInstance.post(`${API_URL}/Init`, params);
+
+        // 🔸 2. Генерируем `Token`
+        params.Token = generateToken(params);
+
+        // 🔸 3. Добавляем `Receipt`
+        params.Receipt = {
+            Email: "test@example.com",
+            Phone: "+79001234567",
+            Taxation: "osn",
+            Items: [
+                {
+                    Name: `Комиссия за заказ #${orderId}`,
+                    Price: commission,
+                    Quantity: 1,
+                    Amount: commission,
+                    Tax: "vat10",
+                    PaymentMethod: "full_payment",
+                    PaymentObject: "service"
+                }
+            ]
+        };
+
+        console.log("🔹 Запрос в Тинькофф:", params);
+
+        // 🔹 4. Отправляем запрос в Тинькофф
         const response = await axios.post(`${API_URL}/Init`, params);
+        console.log("🔹 Ответ Тинькофф:", response.data);
+
         if (response.data.Success) {
             res.json({ success: true, PaymentURL: response.data.PaymentURL });
         } else {
             res.status(400).json({ success: false, error: response.data.Message });
         }
     } catch (error) {
-        res.status(500).json({ success: false, error: "Ошибка привязки карты" });
+        console.error("❌ Ошибка оплаты комиссии:", error);
+        res.status(500).json({ success: false, error: "Ошибка оплаты комиссии" });
     }
 });
 
