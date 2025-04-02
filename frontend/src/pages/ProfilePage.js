@@ -1,3 +1,5 @@
+import BindCardModal from "../components/BindCardModal"; // Импортируем модальное окно
+
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../utils/authContext";
@@ -12,6 +14,8 @@ const ProfilePage = () => {
     const [rebillId, setRebillId] = useState(null); // Сохраняем ID привязанной карты
     const navigate = useNavigate();
     const { logout, isAuthenticated } = useAuth();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isChecked, setIsChecked] = useState(false);
 
     useEffect(() => {
         let isMounted = true;
@@ -54,22 +58,28 @@ const ProfilePage = () => {
         };
     }, [isAuthenticated, navigate]);
 
-    // 🔹 Функция привязки карты
-    const handleBindCard = async () => {
-        console.log("🔹 API URL:", apiUrl); // Проверяем, что apiUrl корректный
+    // Открытие модального окна
+    const handleOpenModal = () => {
+        setIsModalOpen(true);
+    };
 
+    // Закрытие модального окна
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setIsChecked(false);
+    };
+
+    // Привязка карты после подтверждения
+    const handleConfirmBindCard = async () => {
+        handleCloseModal();
         try {
             const response = await axios.post(`${apiUrl}/api/payment/bind_card`, { userId: profile.id });
-            console.log("🔹 Ответ сервера:", response.data);
-
             if (response.data.Success) {
-                window.location.href = response.data.PaymentURL; // Открываем страницу привязки
-
+                window.location.href = response.data.PaymentURL;
             } else {
                 alert("Ошибка привязки карты");
             }
         } catch (error) {
-            console.error("Ошибка привязки карты:", error);
             alert("Ошибка привязки карты");
         }
     };
@@ -155,13 +165,12 @@ const ProfilePage = () => {
                             <p className="info rating">{profile.rating ? renderStars(profile.rating) : "Нет рейтинга"}</p>
                         </div>
 
-                        {/* Привязка карты */}
                         <div className="section">
                             <h2 className="subtitle">Привязка карты:</h2>
                             {rebillId ? (
                                 <p className="info verified">Карта привязана ✅</p>
                             ) : (
-                                <button onClick={handleBindCard} className="bind-card-button">
+                                <button onClick={handleOpenModal} className="bind-card-button">
                                     Привязать карту
                                 </button>
                             )}
@@ -197,6 +206,14 @@ const ProfilePage = () => {
                     <p className="info">Загрузка данных профиля...</p>
                 )}
             </div>
+            {/* Модальное окно */}
+            <BindCardModal
+                isOpen={isModalOpen}
+                onClose={handleCloseModal}
+                onConfirm={handleConfirmBindCard}
+                isChecked={isChecked}
+                setChecked={setIsChecked}
+            />
         </div>
     );
 };
