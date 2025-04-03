@@ -3,6 +3,10 @@ const axios = require("axios");
 const crypto = require("crypto");
 const router = express.Router();
 const { Order } = require("../models");
+const { User } = require("../models");
+const { processPayment, refundPayment } = require("../paymentService");
+const { encryptCard, decryptCard } = require("../encryption");
+const authenticateToken = require("../middlewares/authenticateToken");
 
 const TERMINAL_KEY = "1741722031308";
 const PASSWORD = "5A_zMtY9nIkIeO^r";
@@ -20,6 +24,43 @@ function generateToken(params) {
     delete params.Password;
     return hash;
 }
+
+router.post("/bind-card", authenticateToken, async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+
+    const { id } = req.user;
+    console.log("userId:", id); // Проверяем, какой userId передаётся
+    const { cardNumber, expiry, cvv } = req.body;
+
+    if (!cardNumber || !expiry || !cvv) {
+        return res.status(400).json({ message: "Некорректные данные карты" });
+    }
+
+    try {
+        // 1. Проведение тестового платежа
+        const paymentResult = await processPayment(id, 1);
+        if (!paymentResult.success) {
+            return res.status(400).json({ message: "Ошибка платежа" });
+        }
+
+        // 2. Возврат платежа
+        await refundPayment(paymentResult.transactionId);
+
+        // 3. Шифрование и сохранение карты в БД
+        const encryptedCard = encryptCard(cardNumber);
+        if (!id) {
+            return res.status(400).json({ success: false, message: "Ошибка: userId не указан" });
+        }
+
+        await User.update({ cardNumber: encryptedCard }, { where: { id: id } });
+
+        return res.json({ message: "Карта успешно привязана" });
+    } catch (error) {
+        console.error("Ошибка привязки карты:", error);
+        return res.status(500).json({ message: "Ошибка сервера" });
+    }
+});
 
 // 🔹 Оплата комиссии
 router.post("/pay_commission", async (req, res) => {
