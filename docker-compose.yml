@@ -22,7 +22,7 @@ services:
     depends_on:
       - db
     env_file:
-      - ./backend/.env
+      - ./backend/.env.local
     environment:
       DB_HOST: db
     command: ["/wait-for-it.sh", "db:3306", "--", "npm", "start"]
@@ -36,7 +36,7 @@ services:
     depends_on:
       - backend
     env_file:
-      - ./frontend/.env
+      - ./frontend/.env.local
     environment:
       REACT_APP_API_URL: backend:5001
       REACT_APP_SOCKET_URL: backend:5001
