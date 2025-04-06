@@ -33,12 +33,9 @@ app.use("/api/payment", payment);
 
 // Database connection
 const Sequelize = require('sequelize');
-const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
-    host: 'localhost',
-    dialect: 'mysql', // Указываем диалект, например, mysql
-
-    logging: false,
-});
+const sequelize = require('./config/database');
+db.Sequelize = sequelize.constructor;
+db.sequelize = sequelize;
 
 app.post('/api/token', (req, res) => {
     const { token } = req.body;
@@ -64,6 +61,6 @@ sequelize.sync()
     .then(() => console.log('Database synchronized.'))
     .catch(err => console.error('Error synchronizing database:', err));
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT;
 
 server.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));

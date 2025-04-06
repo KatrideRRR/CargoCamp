@@ -1,24 +1,15 @@
 const { Sequelize } = require('sequelize');
 
 const sequelize = new Sequelize(
-    process.env.DB_NAME,       // Имя базы данных
-    process.env.DB_USER,       // Пользователь
-    process.env.DB_PASSWORD,   // Пароль
+    process.env.DB_NAME,
+    process.env.DB_USER,
+    process.env.DB_PASSWORD,
     {
-        host: process.env.DB_HOST,  // Хост (обычно 'localhost')
-        dialect: process.env.DB_DIALECT, // 'mysql'
-        logging: console.log,       // Включить логирование запросов
-
-            development: {
-                dialect: "sqlite",
-                storage: "./database.sqlite",
-                logging: console.log, // Логирование запросов
-            },
+        host: process.env.DB_HOST,
+        port: process.env.DB_PORT,
+        dialect: process.env.DB_DIALECT,
+        logging: console.log,
     }
-
-
 );
-
-
 
 module.exports = sequelize;

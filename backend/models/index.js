@@ -1,21 +1,15 @@
 require('dotenv').config(); // Загружаем переменные окружения
 
-const { Sequelize, DataTypes } = require('sequelize');
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
 
-if (!process.env.DB_NAME || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_HOST) {
+if (!process.env.DB_NAME || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_HOST || !process.env.DB_PORT) {
     console.error("❌ Ошибка: Отсутствуют переменные окружения для БД!");
     process.exit(1);
 }
 
-const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
-    host: process.env.DB_HOST,
-    dialect: process.env.DB_DIALECT || 'mysql', // Принудительно ставим MySQL, если переменная пуста
-    logging: false,
-});
-
 const db = {};
-
-db.Sequelize = Sequelize;
+db.Sequelize = sequelize.constructor;
 db.sequelize = sequelize;
 
 db.User = require('./User')(sequelize, DataTypes);
