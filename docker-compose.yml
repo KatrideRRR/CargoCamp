@@ -49,6 +49,11 @@ services:
       - "8080:8080"
     depends_on:
       - backend
+    env_file:
+      - ./admin-panel/.env.local
+    environment:
+      REACT_APP_API_URL: backend:5001
+      REACT_APP_SOCKET_URL: backend:5001
 
 volumes:
   mysql_data:

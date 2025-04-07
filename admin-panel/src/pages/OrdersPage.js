@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "../styles/UserOrdersPage.css"; // Подключаем стили
 
+const apiUrl = process.env.REACT_APP_API_URL;
+
 function OrdersPage() {
     const [orders, setOrders] = useState([]);
     const [filteredOrders, setFilteredOrders] = useState([]);
@@ -13,7 +15,7 @@ function OrdersPage() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        axios.get("http://localhost:5000/api/admin/orders", {
+        axios.get(`${apiUrl}/api/admin/orders`, {
             headers: { Authorization: `Bearer ${token}` },
         })
             .then((response) => {

@@ -3,6 +3,8 @@ import {useNavigate, useParams} from "react-router-dom";
 import axios from "axios";
 import '../styles/OrderDetailsPage.css';
 
+const apiUrl = process.env.REACT_APP_API_URL;
+
 function OrderDetailsPage() {
     const { id } = useParams();
     const [order, setOrder] = useState(null);
@@ -14,7 +16,7 @@ function OrderDetailsPage() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        axios.get(`http://localhost:5000/api/admin/orders/${id}`)
+        axios.get(`${apiUrl}/api/admin/orders/${id}`)
             .then(response => {
                 setOrder(response.data);
                 setLoading(false);
@@ -27,7 +29,7 @@ function OrderDetailsPage() {
 
     const deleteOrder = async (id) => {
         try {
-            await axios.delete(`http://localhost:5000/api/admin/orders/${id}`, {
+            await axios.delete(`${apiUrl}/api/admin/orders/${id}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setOrders(orders.filter(order => order.id !== id));

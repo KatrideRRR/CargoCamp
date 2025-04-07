@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
+const apiUrl = process.env.REACT_APP_API_URL;
+
 function CreateUserPage() {
     const [username, setUsername] = useState("");
     const [phone, setPhone] = useState("");
@@ -20,7 +22,7 @@ function CreateUserPage() {
 
         try {
             const response = await axios.post(
-                "http://localhost:5000/api/admin/create-user",
+                `${apiUrl}/api/admin/create-user`,
                 { username, phone, password },
                 {
                     headers: {

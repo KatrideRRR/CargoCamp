@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom"; // Добавляем useNavigate
+import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import "../styles/UserOrdersPage.css"; // Подключаем стили
+
+const apiUrl = process.env.REACT_APP_API_URL;
 
 function UserOrdersPage() {
     const { userId } = useParams(); // Получаем ID пользователя из URL
@@ -14,7 +16,7 @@ function UserOrdersPage() {
     const navigate = useNavigate(); // Для перехода на другую страницу
 
     useEffect(() => {
-        axios.get(`http://localhost:5000/api/admin/users/${userId}/orders`, {
+        axios.get(`${apiUrl}/api/admin/users/${userId}/orders`, {
             headers: { Authorization: `Bearer ${token}` },
         })
             .then((response) => {

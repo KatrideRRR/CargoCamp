@@ -5,6 +5,8 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import '../styles/AdminCreateOrderPage.css';
 
+const apiUrl = process.env.REACT_APP_API_URL;
+
 function AdminCreateOrderPage() {
     const { userId } = useParams(); // Получаем ID пользователя из URL
     const [formData, setFormData] = useState({
@@ -27,7 +29,7 @@ function AdminCreateOrderPage() {
 
     useEffect(() => {
         // Получение списка категорий при загрузке компонента
-        axios.get('http://localhost:5000/api/category')
+        axios.get(`${apiUrl}/api/category`)
             .then(response => {
                 setCategory(response.data);
             })
@@ -41,7 +43,7 @@ function AdminCreateOrderPage() {
         setSelectedCategory(categoryId);
 
         // Получение подкатегорий для выбранной категории
-        axios.get(`http://localhost:5000/api/category/subcategory/${categoryId}`)
+        axios.get(`${apiUrl}/api/category/subcategory/${categoryId}`)
             .then(response => {
                 setSubcategory(response.data);
             })
@@ -88,7 +90,7 @@ function AdminCreateOrderPage() {
         try {
             const token = localStorage.getItem("authToken");
 
-            await axios.post(`http://localhost:5000/api/admin/create-order`, orderData, {
+            await axios.post(`${apiUrl}/api/admin/create-order`, orderData, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'application/json', // Указываем тип контента как JSON

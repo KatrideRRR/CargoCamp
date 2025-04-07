@@ -3,6 +3,8 @@ import { useParams } from "react-router-dom";
 import axios from "axios";
 import "../styles/UserComplaintsPage.css"; // Подключаем стили
 
+const apiUrl = process.env.REACT_APP_API_URL;
+
 function UserComplaintsPage() {
     const { userId } = useParams(); // Получаем ID пользователя из URL
     const [complaints, setComplaints] = useState([]);
@@ -12,7 +14,7 @@ function UserComplaintsPage() {
     const token = localStorage.getItem("authToken");
 
     useEffect(() => {
-        axios.get(`http://localhost:5000/api/admin/users/${userId}/complaints`, {
+        axios.get(`${apiUrl}/api/admin/users/${userId}/complaints`, {
             headers: { Authorization: `Bearer ${token}` },
         })
             .then((response) => {

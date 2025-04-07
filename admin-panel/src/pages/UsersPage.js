@@ -3,6 +3,8 @@ import axios from "axios";
 import "../styles/UsersPage.css"; // Импорт стилей
 import { useNavigate } from "react-router-dom";
 
+const apiUrl = process.env.REACT_APP_API_URL;
+
 function UsersPage() {
     const [users, setUsers] = useState([]);
     const [searchQuery, setSearchQuery] = useState("");
@@ -14,7 +16,7 @@ function UsersPage() {
     const [ordersCount, setOrdersCount] = useState({});
 
     useEffect(() => {
-        axios.get("http://localhost:5000/api/admin/users", {
+        axios.get(`${apiUrl}/api/admin/users`, {
             headers: { Authorization: `Bearer ${token}` },
         })
             .then((response) => {
@@ -33,7 +35,7 @@ function UsersPage() {
             for (const user of users) {
                 try {
                     // Документы
-                    const docResponse = await axios.get(`http://localhost:5000/api/admin/user-documents/${user.id}`, {
+                    const docResponse = await axios.get(`${apiUrl}/api/admin/user-documents/${user.id}`, {
                         headers: { Authorization: `Bearer ${token}` },
                     });
                     docCounts[user.id] = docResponse.data.documents.length;
@@ -44,7 +46,7 @@ function UsersPage() {
 
                 try {
                     // Жалобы
-                    const complaintResponse = await axios.get(`http://localhost:5000/api/admin/users/${user.id}/complaints`, {
+                    const complaintResponse = await axios.get(`${apiUrl}/api/admin/users/${user.id}/complaints`, {
                         headers: { Authorization: `Bearer ${token}` },
                     });
                     complaintCounts[user.id] = complaintResponse.data.complaints.length;
@@ -55,7 +57,7 @@ function UsersPage() {
 
                 try {
                     // Заказы
-                    const orderResponse = await axios.get(`http://localhost:5000/api/admin/users/${user.id}/orders`, {
+                    const orderResponse = await axios.get(`${apiUrl}/api/admin/users/${user.id}/orders`, {
                         headers: { Authorization: `Bearer ${token}` },
                     });
                     orderCounts[user.id] = orderResponse.data.orders.length;
@@ -79,7 +81,7 @@ function UsersPage() {
     // Функция блокировки пользователя
     const blockUser = async (id) => {
         try {
-            await axios.put(`http://localhost:5000/api/admin/users/${id}/block`, {}, {
+            await axios.put(`${apiUrl}/api/admin/users/${id}/block`, {}, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setUsers(users.map(user => user.id === id ? { ...user, role: "banned" } : user));
@@ -92,7 +94,7 @@ function UsersPage() {
     // Функция разблокировки пользователя
     const unblockUser = async (id) => {
         try {
-            await axios.put(`http://localhost:5000/api/admin/users/${id}/unblock`, {}, {
+            await axios.put(`${apiUrl}/api/admin/users/${id}/unblock`, {}, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setUsers(users.map(user => user.id === id ? { ...user, role: "user" } : user));
@@ -118,7 +120,7 @@ function UsersPage() {
     const toggleVerification = async (id, currentStatus) => {
         try {
             const newStatus = !currentStatus; // Меняем на противоположное значение
-            await axios.put(`http://localhost:5000/api/admin/users/${id}/verify`, { isVerified: newStatus }, {
+            await axios.put(`${apiUrl}/api/admin/users/${id}/verify`, { isVerified: newStatus }, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setUsers(users.map(user => user.id === id ? { ...user, isVerified: newStatus } : user));

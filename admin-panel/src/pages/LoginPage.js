@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "../styles/LoginPage.css"; // Подключаем стили
 
+const apiUrl = process.env.REACT_APP_API_URL;
+
 function LoginPage() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
@@ -12,7 +14,7 @@ function LoginPage() {
     const handleLogin = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post("http://localhost:5000/api/admin/login", {
+            const response = await axios.post(`${apiUrl}/api/admin/login`, {
                 phone,
                 password,
             });

@@ -3,6 +3,8 @@ import { useParams } from "react-router-dom";
 import axios from "axios";
 import "../styles/AdminUserDocumentsPage.css"; // Подключаем стили
 
+const apiUrl = process.env.REACT_APP_API_URL;
+
 function AdminUserDocumentsPage() {
     const { userId } = useParams();
     const [documents, setDocuments] = useState([]);
@@ -12,7 +14,7 @@ function AdminUserDocumentsPage() {
         const fetchDocuments = async () => {
             try {
                 const token = localStorage.getItem("authToken");
-                const response = await axios.get(`http://localhost:5000/api/admin/user-documents/${userId}`, {
+                const response = await axios.get(`${apiUrl}/api/admin/user-documents/${userId}`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 setDocuments(response.data.documents);
@@ -33,7 +35,7 @@ function AdminUserDocumentsPage() {
                 <div className="documents-list">
                     {documents.map((doc, index) => (
                         <div key={index} className="document-item">
-                            <img src={`http://localhost:5000/uploads/upload-document/${doc}`} alt={`Документ ${index + 1}`} />
+                            <img src={`${apiUrl}/uploads/upload-document/${doc}`} alt={`Документ ${index + 1}`} />
                         </div>
                     ))}
                 </div>

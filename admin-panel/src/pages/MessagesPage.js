@@ -3,13 +3,15 @@ import axios from "axios";
 import { useParams } from "react-router-dom";
 import '../styles/MessagesPage.css';
 
+const apiUrl = process.env.REACT_APP_API_URL;
+
 function MessagesPage() {
     const { orderId } = useParams(); // Получаем ID заказа из URL
     const [messages, setMessages] = useState([]);
 
     useEffect(() => {
         // Запрос на сервер для получения сообщений для конкретного заказа
-        axios.get(`http://localhost:5000/api/admin/${orderId}/messages`)
+        axios.get(`${apiUrl}/api/admin/${orderId}/messages`)
             .then(response => setMessages(response.data))
             .catch(error => console.error("Ошибка загрузки сообщений:", error));
     }, [orderId]); // Загрузка сообщений при изменении orderId
