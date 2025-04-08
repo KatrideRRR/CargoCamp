@@ -4,9 +4,12 @@ import axiosInstance from '../utils/axiosInstance';
 import '../styles/OrdersPage.css';
 import io from 'socket.io-client';
 import Modal from "react-modal";
-const apiUrl = process.env.REACT_APP_API_URL;
 
-const socket = io(process.env.REACT_APP_SOCKET_URL);
+const apiUrl = process.env.REACT_APP_API_URL;
+const socket = io(process.env.REACT_APP_SOCKET_URL, {
+    transports: ['websocket'],
+    withCredentials: true
+});
 
 const OrderPage = () => {
     const navigate = useNavigate();

@@ -5,7 +5,10 @@ import '../styles/BottomMenu.css';
 import io from 'socket.io-client';
 import { AuthContext } from "../utils/authContext";
 
-const socket = io(process.env.REACT_APP_SOCKET_URL);
+const socket = io(process.env.REACT_APP_SOCKET_URL, {
+    transports: ['websocket'],
+    withCredentials: true
+});
 
 const BottomMenu = () => {
     const navigate = useNavigate();

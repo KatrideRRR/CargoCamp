@@ -23,7 +23,10 @@ const ChatPage = () => {
 
     useEffect(() => {
 
-        socket.current = io(process.env.REACT_APP_SOCKET_URL);
+        socket.current = io(process.env.REACT_APP_SOCKET_URL, {
+            transports: ['websocket'],
+            withCredentials: true
+        });
 
         if (currentUser) {
             socket.current.emit('joinChat', { userId: currentUser.id });

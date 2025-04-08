@@ -32,7 +32,6 @@ app.use('/api/admin', adminRoutes);
 app.use("/api/payment", payment);
 
 // Database connection
-const Sequelize = require('sequelize');
 const sequelize = require('./config/database');
 db.Sequelize = sequelize.constructor;
 db.sequelize = sequelize;

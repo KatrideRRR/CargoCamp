@@ -10,7 +10,6 @@ const path = require('path');
 const axios = require("axios");
 const SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
 
-// Настройка хранения файлов (загружаем в папку uploads/)
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, 'uploads/upload-document');
@@ -35,18 +34,14 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// Функция для генерации нового пароля
 const generateTemporaryPassword = () => {
     return Math.random().toString(36).slice(-8); // Генерируем случайный 8-значный пароль
 };
 
-// Генерация случайного 6-значного кода
 const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 
-// Хранилище кодов в памяти (можно заменить на Redis)
 const smsCodes = new Map();
 
-// Отправка кода подтверждения
 router.post("/send-sms", async (req, res) => {
     const { phone } = req.body;
     if (!phone) return res.status(400).json({ message: "Введите номер телефона" });
@@ -75,7 +70,6 @@ router.post("/send-sms", async (req, res) => {
     }
 });
 
-// Маршрут для загрузки изображения
 router.post('/upload-documents',authenticateToken, upload.array('documents', 5), async (req, res) => {
     try {
         const userId = req.user.id; // Получаем ID пользователя из токена или сессии
@@ -102,7 +96,6 @@ router.post('/upload-documents',authenticateToken, upload.array('documents', 5),
     }
 });
 
-// Регистрация пользователя
 router.post('/register', async (req, res) => {
     const { username, phone, password, captchaToken, smsCode } = req.body;
 
@@ -160,7 +153,6 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// Вход пользователя
 router.post('/login', async (req, res) => {
     const { phone, password } = req.body;
     try {
@@ -186,7 +178,6 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// Получение профиля пользователя
 router.get('/profile', authenticateToken, async (req, res) => {
     try {
         const user = await User.findByPk(req.user.id, {
@@ -204,7 +195,6 @@ router.get('/profile', authenticateToken, async (req, res) => {
     }
 });
 
-// Обновление профиля пользователя
 router.put('/profile', authenticateToken, async (req, res) => {
     const { username, phone } = req.body;
 
@@ -279,7 +269,6 @@ router.post("/rate", authenticateToken,async (req, res) => {
     }
 });
 
-// Восстановление пароля через SMS
 router.post("/recover-password", async (req, res) => {
     const { phone } = req.body;
 

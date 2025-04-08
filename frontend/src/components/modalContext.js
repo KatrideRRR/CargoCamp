@@ -4,11 +4,13 @@ import axiosInstance from '../utils/axiosInstance';
 import '../styles/modalContext.css'
 
 export const ModalContext = createContext();
-
-const socket = io(process.env.REACT_APP_SOCKET_URL); // Подключаем WebSocket
+const socket = io(process.env.REACT_APP_SOCKET_URL, {
+    transports: ['websocket'],
+    withCredentials: true
+});
 
 export const ModalProvider = ({ children }) => {
-    const [setModalData] = useState(null);
+    const [modalData, setModalData] = useState(null);
     const [userId, setUserId] = useState(null);
     const [notificationData, setNotificationData] = useState(null); // Для уведомлений исполнителю
     const [completionNotificationData, setCompletionNotificationData] = useState(null); // Уведомление по завершению заказа
@@ -29,6 +31,9 @@ export const ModalProvider = ({ children }) => {
         };
 
         fetchUserData();
+    }, []);
+
+    useEffect(() => {
 
         if (userId) {
             console.log("🔄 Подключаем WebSocket для пользователя:", userId);
@@ -152,7 +157,7 @@ export const ModalProvider = ({ children }) => {
             {children}
 
                     {/* Уведомление для исполнителя в виде модала */}
-                    {notificationData && (
+            {notificationData && (
                         <div className="modal-overlay">
 
                             <div className="modal">
@@ -170,20 +175,7 @@ export const ModalProvider = ({ children }) => {
 
                         </div>
 
-                    )}
-
-                            {/* Уведомление о завершении заказа */}
-                            {completionNotificationData && (
-                                <div className="modal-overlay">
-
-                                    <div className="modal">
-                                        <h2>{completionNotificationData.title}</h2>
-                                        <p>{completionNotificationData.description}</p>
-                                        <button onClick={completionNotificationData.onClose}>Завершить</button>
-                                    </div>
-                                </div>
-
-                            )}
+            )}
 
             {/* Окно завершения заказа */}
             {completionNotificationData && (
@@ -227,5 +219,5 @@ export const ModalProvider = ({ children }) => {
             )}
 
         </ModalContext.Provider>
-                    );
-                    };
+    );
+};

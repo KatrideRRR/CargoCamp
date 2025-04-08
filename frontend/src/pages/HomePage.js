@@ -3,9 +3,12 @@ import { YMaps, Map, Placemark } from '@pbe/react-yandex-maps';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import '../styles/HomePage.css';
-const apiUrl = process.env.REACT_APP_API_URL;
 
-const socket = io(process.env.REACT_APP_SOCKET_URL);
+const apiUrl = process.env.REACT_APP_API_URL;
+const socket = io(process.env.REACT_APP_SOCKET_URL, {
+    transports: ['websocket'],
+    withCredentials: true
+});
 
 const HomePage = () => {
     const [orders, setOrders] = useState([]); // Список заказов

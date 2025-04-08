@@ -10,8 +10,10 @@ import Modal from "react-modal";
 import axiosInstance from "../utils/axiosInstance";
 
 const apiUrl = process.env.REACT_APP_API_URL;
-
-const socket = io(process.env.REACT_APP_SOCKET_URL); // Подключение к WebSocket
+const socket = io(process.env.REACT_APP_SOCKET_URL, {
+    transports: ['websocket'],
+    withCredentials: true
+});
 
 const ActiveOrdersPage = () => {
     const [orders, setOrders] = useState([]);
