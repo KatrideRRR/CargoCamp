@@ -65,6 +65,18 @@ module.exports = (sequelize) => {
                 type: DataTypes.STRING,
                 allowNull: true, // Пользователь может не привязывать карту
             },
+            cardLastFour: {
+                type: DataTypes.STRING(4),
+                allowNull: true,
+            },
+            cardType: {
+                type: DataTypes.STRING,
+                allowNull: true,
+            },
+            RebillId: {
+                type: DataTypes.STRING,
+                allowNull: true
+            }
 
         },
         {

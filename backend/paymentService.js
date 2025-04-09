@@ -1,13 +1,10 @@
 const crypto = require("crypto");
 const axios = require("axios");
 
-const TERMINAL_KEY = "1741722031308";
-const PASSWORD = "5A_zMtY9nIkIeO^r";
+const TERMINAL_KEY = process.env.TERMINAL_KEY;
+const PASSWORD = process.env.TINKOFF_PASSWORD;
 const API_URL = "https://securepay.tinkoff.ru/v2";
 
-/**
- * Генерация Token (БЕЗ Receipt).
- */
 function generateToken(params) {
     delete params.Token;
     const { Receipt, ...paramsWithoutReceipt } = params;
@@ -21,11 +18,6 @@ function generateToken(params) {
     return hash;
 }
 
-/**
- * Создание тестового платежа.
- * @param {number} userId - ID пользователя.
- * @param {number} amount - Сумма в копейках.
- */
 async function processPayment(userId, amount) {
     try {
         const params = {
@@ -33,6 +25,9 @@ async function processPayment(userId, amount) {
             Amount: amount * 100, // В копейках
             OrderId: `test_${userId}_${Date.now()}`,
             Description: "Привязка карты",
+            CustomerKey: `user_${userId}`,
+            Recurrent: "Y",
+            NotificationURL: `https://18.184.43.44:5001/api/payment/callback`, // важен!
             Receipt: {
                 Email: "test@example.com",
                 Taxation: "usn_income", // Упрощенная система налогообложения (доход)
@@ -64,10 +59,7 @@ async function processPayment(userId, amount) {
         return { success: false, message: "Ошибка сервера" };
     }
 }
-/**
- * Возврат платежа.
- * @param {string} transactionId - ID платежа.
- */
+
 async function refundPayment(transactionId) {
     try {
         const response = await axios.post(`${API_URL}/Cancel`, {

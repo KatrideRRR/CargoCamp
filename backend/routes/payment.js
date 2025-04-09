@@ -8,11 +8,10 @@ const { processPayment, refundPayment } = require("../paymentService");
 const { encryptCard, decryptCard } = require("../encryption");
 const authenticateToken = require("../middlewares/authenticateToken");
 
-const TERMINAL_KEY = "1741722031308";
-const PASSWORD = "5A_zMtY9nIkIeO^r";
+const TERMINAL_KEY = process.env.TERMINAL_KEY;
+const PASSWORD = process.env.TINKOFF_PASSWORD;
 const API_URL = "https://securepay.tinkoff.ru/v2";
 
-// 🔹 Функция генерации Token (БЕЗ Receipt!)
 function generateToken(params) {
     delete params.Token;
     params.Password = PASSWORD;
@@ -25,35 +24,71 @@ function generateToken(params) {
     return hash;
 }
 
+function getCardType(cardNumber) {
+    const bin = cardNumber.slice(0, 6);
+
+    const visaRegex = /^4/;
+    const masterRegex = /^5[1-5]/;
+    const mirRegex = /^220[0-4]/;
+    const amexRegex = /^3[47]/;
+    const discoverRegex = /^6(?:011|5)/;
+
+    if (visaRegex.test(cardNumber)) return 'Visa';
+    if (masterRegex.test(cardNumber)) return 'MasterCard';
+    if (mirRegex.test(cardNumber)) return 'MIR';
+    if (amexRegex.test(cardNumber)) return 'American Express';
+    if (discoverRegex.test(cardNumber)) return 'Discover';
+
+    return 'Unknown';
+}
+
 router.post("/bind-card", authenticateToken, async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
     res.setHeader("Access-Control-Allow-Credentials", "true");
 
     const { id } = req.user;
-    console.log("userId:", id); // Проверяем, какой userId передаётся
     const { cardNumber, expiry, cvv } = req.body;
+
+    if (!id) {
+        return res.status(400).json({ message: "Ошибка: userId не указан" });
+    }
 
     if (!cardNumber || !expiry || !cvv) {
         return res.status(400).json({ message: "Некорректные данные карты" });
     }
 
     try {
-        // 1. Проведение тестового платежа
         const paymentResult = await processPayment(id, 1);
         if (!paymentResult.success) {
-            return res.status(400).json({ message: "Ошибка платежа" });
+            return {
+                success: false,
+                error: "Ошибка инициализации"
+            }
         }
 
-        // 2. Возврат платежа
         await refundPayment(paymentResult.transactionId);
 
-        // 3. Шифрование и сохранение карты в БД
         const encryptedCard = encryptCard(cardNumber);
+
+        const last4 = cardNumber.slice(-4);  // последние 4 цифры
+        const cardType = getCardType(cardNumber);  // Функция, которая определяет тип карты (например, Visa, MasterCard)
+
+        console.log("Card type detected:", cardType);
+
         if (!id) {
             return res.status(400).json({ success: false, message: "Ошибка: userId не указан" });
         }
 
-        await User.update({ cardNumber: encryptedCard }, { where: { id: id } });
+        // Сохраняем все данные в БД
+        await User.update(
+            {
+                cardNumber: encryptedCard,
+                cardLastFour: last4,  // Сохраняем последние 4 цифры
+                cardType: cardType    // Сохраняем тип карты
+            },
+            { where: { id: id } }
+        );
+
 
         return res.json({ message: "Карта успешно привязана" });
     } catch (error) {
@@ -62,7 +97,6 @@ router.post("/bind-card", authenticateToken, async (req, res) => {
     }
 });
 
-// 🔹 Оплата комиссии
 router.post("/pay_commission", async (req, res) => {
     const { userId, orderId } = req.body;
     const axiosInstance = axios.create({
@@ -86,16 +120,15 @@ router.post("/pay_commission", async (req, res) => {
         if (order.paymentType === "cash") {
             commission = 200 * 100; // 200 рублей (в копейках)
         } else if (order.paymentType === "guarantee") {
-            commission = Math.round(order.proposedSum * 0.15) * 100; // 15% от суммы
+            commission = Math.round(order.proposedSum * 100 * 0.15);
         } else if (order.paymentType === "installments") {
-            commission = Math.round(order.proposedSum * 0.20) * 100; // 20% от суммы
+            commission = Math.round(order.proposedSum * 100 * 0.20);
         }
 
         if (commission <= 0) {
             return res.status(400).json({ success: false, error: "Некорректная комиссия" });
         }
 
-        // 🔸 1. Формируем параметры платежа
         const params = {
             TerminalKey: TERMINAL_KEY,
             Amount: commission,
@@ -105,12 +138,8 @@ router.post("/pay_commission", async (req, res) => {
             NotificationURL: "https://localhost:5000/api/payment/callback"
         };
 
-        await axiosInstance.post(`${API_URL}/Init`, params);
-
-        // 🔸 2. Генерируем `Token`
         params.Token = generateToken(params);
 
-        // 🔸 3. Добавляем `Receipt`
         params.Receipt = {
             Email: "test@example.com",
             Phone: "+79001234567",
@@ -130,7 +159,6 @@ router.post("/pay_commission", async (req, res) => {
 
         console.log("🔹 Запрос в Тинькофф:", params);
 
-        // 🔹 4. Отправляем запрос в Тинькофф
         const response = await axios.post(`${API_URL}/Init`, params);
         console.log("🔹 Ответ Тинькофф:", response.data);
 
@@ -145,7 +173,6 @@ router.post("/pay_commission", async (req, res) => {
     }
 });
 
-// 🔹 Обработка уведомления от Тинькофф (коллбек)
 router.post("/callback", async (req, res) => {
     const { Success, Status, PaymentId, RebillId, OrderId, CustomerKey } = req.body;
 
@@ -153,8 +180,10 @@ router.post("/callback", async (req, res) => {
         const userId = CustomerKey.replace("user_", "");
         console.log(`✅ Карта привязана для userId: ${userId}, RebillId: ${RebillId}`);
 
-        // Сохраняем RebillId в базу
-        await saveRebillIdToDB(userId, RebillId);
+        await User.update(
+            { RebillId: RebillId },
+            { where: { id: userId } }
+        );
 
         res.json({ success: true });
     } else {

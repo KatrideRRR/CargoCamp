@@ -51,7 +51,13 @@ const ProfilePage = () => {
             }
         };
 
-        fetchProfileData();
+        const urlParams = new URLSearchParams(window.location.search);
+        const isReturnedFromPayment = urlParams.get("paymentSuccess");
+
+        // если вернулись с привязки карты, перезапрашиваем профиль
+        if (isReturnedFromPayment || !profile) {
+            fetchProfileData();
+        }
 
         return () => {
             isMounted = false;
@@ -69,20 +75,22 @@ const ProfilePage = () => {
         setIsChecked(false);
     };
 
-    // Привязка карты после подтверждения
     const handleConfirmBindCard = async () => {
         handleCloseModal();
         try {
             const response = await axios.post(`${apiUrl}/api/payment/bind_card`, { userId: profile.id });
             if (response.data.Success) {
+                localStorage.setItem("requestKey", response.data.RequestKey);
                 window.location.href = response.data.PaymentURL;
             } else {
-                alert("Ошибка привязки карты");
+                alert("Ошибка привязки карты: " + response.data.Message);
             }
         } catch (error) {
             alert("Ошибка привязки карты");
         }
     };
+
+
 
     // 🔹 Функция автосписания 100 рублей (пример)
     const handleCharge = async () => {
@@ -168,13 +176,20 @@ const ProfilePage = () => {
                         <div className="section">
                             <h2 className="subtitle">Привязка карты:</h2>
                             {rebillId ? (
-                                <p className="info verified">Карта привязана ✅</p>
+                                <div>
+                                    <p className="info verified">Карта привязана ✅</p>
+                                    {profile.cardLastFour && (
+                                        <p className="info">Карта: **** ****
+                                            **** {profile.cardLastFour} ({profile.cardType})</p>
+                                    )}
+                                </div>
                             ) : (
                                 <button onClick={handleOpenModal} className="bind-card-button">
                                     Привязать карту
                                 </button>
                             )}
                         </div>
+
 
                         {/* Кнопка автосписания для теста */}
                         {rebillId && (
