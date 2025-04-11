@@ -4,6 +4,7 @@ import {Link, useNavigate} from 'react-router-dom';
 import '../styles/OrdersPage.css';
 import io from 'socket.io-client';
 import Modal from 'react-modal';
+import SwipeableMap from "../components/SwipeableMap.tsx";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 const socket = io(process.env.REACT_APP_SOCKET_URL, {
@@ -28,6 +29,7 @@ const OrdersPage = () => {
     const [manualAddress, setManualAddress] = useState('');
     const [isGeolocationDenied, setIsGeolocationDenied] = useState(false);
     const navigate = useNavigate();
+    const [filteredByCategory, setFilteredByCategory] = useState([]); // заказы после фильтра по категории
 
     const paymentMethods = [
         { id: "cash", label: "Наличные", icon: "💵" },
@@ -105,10 +107,9 @@ const OrdersPage = () => {
         }
     };
 
-    // Фильтрация заказов по радиусу 50 км
     useEffect(() => {
-        if (userLocation && orders.length > 0) {
-            const filtered = orders.filter((order) => {
+        if (userLocation && filteredByCategory.length > 0) {
+            const filtered = filteredByCategory.filter((order) => {
                 if (!order.latitude || !order.longitude) return false;
                 const distance = getDistanceFromLatLonInKm(
                     userLocation.latitude,
@@ -118,10 +119,10 @@ const OrdersPage = () => {
                 );
                 return distance <= 50;
             });
-            console.log("📍 Отфильтрованные заказы:", filtered);
             setFilteredOrders(filtered);
         }
-    }, [userLocation, orders, setFilteredOrders]);
+    }, [userLocation, filteredByCategory]);
+
 
     // Формула расчета расстояния между координатами (Haversine formula)
     const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
@@ -234,8 +235,6 @@ const OrdersPage = () => {
 
 
     const applyFilters = async (categoryId, subcategoryId) => {
-        console.log("🔍 Фильтрация: категория =", categoryId, "подкатегория =", subcategoryId);
-
         try {
             const response = await axiosInstance.get('/orders/all', {
                 params: {
@@ -244,12 +243,32 @@ const OrdersPage = () => {
                 }
             });
 
-            console.log("📦 Отфильтрованные заказы после фильтрации:", response.data);
-            setOrders(response.data);
+            const categoryFiltered = response.data;
+            setOrders(categoryFiltered); // сохраняем оригинал
+            setFilteredByCategory(categoryFiltered); // фильтр по категории
+
+            // если геолокация есть — фильтруем сразу
+            if (userLocation) {
+                const geoFiltered = categoryFiltered.filter(order => {
+                    if (!order.latitude || !order.longitude) return false;
+                    const distance = getDistanceFromLatLonInKm(
+                        userLocation.latitude,
+                        userLocation.longitude,
+                        order.latitude,
+                        order.longitude
+                    );
+                    return distance <= 50;
+                });
+                setFilteredOrders(geoFiltered);
+            } else {
+                setFilteredOrders(categoryFiltered);
+            }
+
         } catch (error) {
             console.error("❌ Ошибка фильтрации заказов:", error);
         }
     };
+
 
     const handleRequestOrder = async (orderId) => {
         const token = localStorage.getItem('authToken');
@@ -272,7 +291,11 @@ const OrdersPage = () => {
     return (
         <div className="orders-page">
 
-            <div className="orders-container">
+            <div className="map-containern">
+                <SwipeableMap orders={filteredOrders} />
+                <div className="flex-1 overflow-auto">
+
+                <div className="orders-container">
                 <div className="orders-wrapper">
                     <div className="filters">
                         <label>Категория:</label>
@@ -344,7 +367,7 @@ const OrdersPage = () => {
                                                             className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
                                                         <span className="payment-label">
                 {paymentMethods.find(method => method.id === order.paymentType)?.label}
-            </span>
+                </span>
                                                     </div>
                                                     {/* Кнопка для перехода на страницу жалоб */}
                                                     {creator.username && (
@@ -410,7 +433,12 @@ const OrdersPage = () => {
                         </ul>
                     ) : (
                         <p className="no-orders">Нет доступных заказов.</p>
+
                     )}
+                </div>
+                </div>
+                </div>
+                </div>
                     <Modal
                         appElement={document.getElementById('root')}
                         isOpen={isModalOpen}
@@ -438,11 +466,10 @@ const OrdersPage = () => {
                         </div>
                     </Modal>
 
-                </div>
-            </div>
+
             );
         </div>
     )
 };
 
-            export default OrdersPage;
+export default OrdersPage;

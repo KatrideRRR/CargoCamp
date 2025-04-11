@@ -1,12 +1,11 @@
 /* Общий контейнер страницы */
 .orders-page .orders-container {
-    padding: calc(75px + env(safe-area-inset-top)) 15px calc(80px + env(safe-area-inset-bottom));
+    padding: calc(85px + env(safe-area-inset-top)) 15px calc(80px + env(safe-area-inset-bottom));
     font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     background-color: #f4f4f4;
     min-height: 100vh;
     display: flex;
     justify-content: center;
-    align-items: center;
     box-sizing: border-box;
 }
 
