@@ -29,6 +29,53 @@
     font-weight: 500;
     color: #004080; /* Темно-синий */
 }
+.toggle-map-button {
+    position: fixed;
+    bottom: 100px;  /* Перемещаем кнопку вниз */
+    left: 50%;
+    transform: translateX(-50%);  /* Центрируем кнопку по горизонтали */
+    background-color: rgba(0, 0, 0, 0.5);  /* Полупрозрачный фон */
+    color: white;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 50%;
+    z-index: 10;  /* Убедитесь, что кнопка будет поверх других элементов */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.toggle-map-button:hover {
+    background-color: rgba(0, 0, 0, 0.7);  /* Более темный фон при наведении */
+}
+
+
+/* Стиль для карты */
+.map-container {
+    position: relative;
+    transition: height 0.3s ease;
+}
+
+.map-container.hidden {
+    height: 0; /* Карта скрыта */
+}
+
+.map-container.visible {
+    height: 400px; /* Примерная высота карты, можешь изменить */
+}
+.map-container {
+    position: relative;
+    transition: height 0.3s ease;
+}
+
+.map-container.hidden {
+    height: 0; /* Карта скрыта */
+}
+
+.map-container.visible {
+    height: 400px; /* Примерная высота карты */
+}
 
 /* Стили для select */
 .orders-page .filters select {

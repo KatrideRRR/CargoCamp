@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { YMaps, Map, Placemark } from '@pbe/react-yandex-maps';
 import axios from 'axios';
 import { io } from 'socket.io-client';
-import '../styles/HomePage.css'; // Можно переименовать, если хочешь
 import { motion } from 'framer-motion';
 
 const apiUrl = process.env.REACT_APP_API_URL;
@@ -13,16 +12,18 @@ const socket = io(process.env.REACT_APP_SOCKET_URL, {
 
 const SwipeableMap = () => {
     const [orders, setOrders] = useState([]);
-    const [location, setLocation] = useState(null);
+    const [location, setLocation] = useState({ latitude: 44.9572, longitude: 34.1108 });
     const [setManualLocation] = useState({ latitude: '', longitude: '' });
     const [isManualInput, setIsManualInput] = useState(false);
     const [address, setAddress] = useState('');
 
     // Загрузка заказов
-    const fetchOrders = async () => {
+    const fetchOrders = async (filter) => {
         try {
             const response = await axios.get(`${apiUrl}/api/orders/all`, {
-                params: { status: 'pending' },
+                params: { status: 'pending',
+                    ...filter, // сюда попадают категории, тип и т.д.
+                },
             });
             const ordersWithCoordinates = response.data.filter(order => order.coordinates);
             setOrders(ordersWithCoordinates);

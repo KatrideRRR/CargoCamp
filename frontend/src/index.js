@@ -20,6 +20,7 @@ import OrderHistoryPage from "./pages/OrderHistoryPage";
 import OrderPage from './pages/OrderPage';
 import UserOrdersPage from './pages/UserOrdersPage';
 import MyOrdersPage from './pages/MyOrdersPage';
+import StartPage from './pages/StartPage';
 
 const App = () => {
     return (
@@ -29,13 +30,14 @@ const App = () => {
             <UserProvider>
                         <Navbar />
                         <Routes>
-                            <Route path="/" element={<HomePage />} />
-                            <Route path="/login" element={<LoginPage />} />
+                            <Route path="/" element={<StartPage />} />
+                            <Route path="/home" element={<HomePage />} />
                             <Route path="/register" element={<RegisterPage />} />
+                            <Route path="/login" element={<LoginPage />} />
                             <Route path="/profile" element={<ProfilePage />}/>
-                            <Route path="/complaints/:userId" element={<UserComplaintsPage />} />
-                            <Route path="/active-orders" element={<ActiveOrdersPage />}/>
                             <Route path="/orders" element={<OrdersPage />} />
+                            <Route path="/active-orders" element={<ActiveOrdersPage />}/>
+                            <Route path="/complaints/:userId" element={<UserComplaintsPage />} />
                             <Route path="/orders-history/:userId" element={<OrderHistoryPage />} />
                             <Route path="/create-order" element={<CreateOrderPage />} />
                             <Route path="/messages/:orderId" element={<ChatPage/>} />

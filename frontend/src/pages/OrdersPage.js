@@ -4,7 +4,7 @@ import {Link, useNavigate} from 'react-router-dom';
 import '../styles/OrdersPage.css';
 import io from 'socket.io-client';
 import Modal from 'react-modal';
-import SwipeableMap from "../components/SwipeableMap.tsx";
+import SwipeableMap from "../components/SwipeableMap.js";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 const socket = io(process.env.REACT_APP_SOCKET_URL, {
@@ -30,12 +30,16 @@ const OrdersPage = () => {
     const [isGeolocationDenied, setIsGeolocationDenied] = useState(false);
     const navigate = useNavigate();
     const [filteredByCategory, setFilteredByCategory] = useState([]); // заказы после фильтра по категории
+    const [isMapVisible, setIsMapVisible] = useState(true); // Состояние для контроля видимости карты
 
     const paymentMethods = [
         { id: "cash", label: "Наличные", icon: "💵" },
         { id: "guarantee", label: "Гарантия", icon: "🛡️" },
         { id: "installments", label: "Рассрочка", icon: "💳" },
     ];
+    const toggleMapVisibility = () => {
+        setIsMapVisible(prev => !prev); // Переключить состояние карты
+    };
 
     useEffect(() => {
         fetchCategories();
@@ -292,159 +296,169 @@ const OrdersPage = () => {
         <div className="orders-page">
 
             <div className="map-containern">
-                <SwipeableMap orders={filteredOrders} />
+                {isMapVisible && <SwipeableMap orders={filteredOrders} userLocation={userLocation}  />}
                 <div className="flex-1 overflow-auto">
-
-                <div className="orders-container">
-                <div className="orders-wrapper">
-                    <div className="filters">
-                        <label>Категория:</label>
-                        <select value={selectedCategory} onChange={handleCategoryChange}>
-                            <option value="">Все категории</option>
-                            {categories.map(category => (
-                                <option key={category.id} value={category.id}>{category.name}</option>
-                            ))}
-                        </select>
-
-                        <label>Подкатегория:</label>
-                        <select value={selectedSubcategory} onChange={handleSubcategoryChange}
-                                disabled={!selectedCategory}>
-                            <option value="">Все подкатегории</option>
-                            {subcategories.map(subcategory => (
-                                <option key={subcategory.id} value={subcategory.id}>{subcategory.name}</option>
-                            ))}
-                        </select>
-                        <label>Ваше местоположение:</label>
-                        {isGeolocationDenied ? (
-                            <>
-                                <input
-                                    type="text"
-                                    value={manualAddress}
-                                    onChange={(e) => setManualAddress(e.target.value)}
-                                    placeholder="Введите ваш адрес"
-                                />
-                                <button onClick={() => geocodeAddress(manualAddress)}>Определить</button>
-                            </>
-                        ) : (
-                            <p>Геолокация включена</p>
-                        )}
-
-                    </div>
+                    <button
+                        className="toggle-map-button"
+                        onClick={toggleMapVisibility}
+                    >
+                        {/* В зависимости от состояния показываем либо стрелочку вниз, либо вверх */}
+                        {isMapVisible ? <span>Скрыть карту</span> : <span>Показать карту</span>}
+                    </button>
 
 
-                    {orders.length > 0 ? (
-                        <ul className="orders-list">
-                            {orders.map((order) => {
-                                const creator = creatorsInfo[order.creatorId] || {};
-                                const isCreator = order.creatorId === userId;
+                    <div className="orders-container">
+                        <div className="orders-wrapper">
+                            <div className="filters">
+                                <label>Категория:</label>
+                                <select value={selectedCategory} onChange={handleCategoryChange}>
+                                    <option value="">Все категории</option>
+                                    {categories.map(category => (
+                                        <option key={category.id} value={category.id}>{category.name}</option>
+                                    ))}
+                                </select>
 
-                                return (
+                                <label>Подкатегория:</label>
+                                <select value={selectedSubcategory} onChange={handleSubcategoryChange}
+                                        disabled={!selectedCategory}>
+                                    <option value="">Все подкатегории</option>
+                                    {subcategories.map(subcategory => (
+                                        <option key={subcategory.id} value={subcategory.id}>{subcategory.name}</option>
+                                    ))}
+                                </select>
+                                <label>Ваше местоположение:</label>
+                                {isGeolocationDenied ? (
+                                    <>
+                                        <input
+                                            type="text"
+                                            value={manualAddress}
+                                            onChange={(e) => setManualAddress(e.target.value)}
+                                            placeholder="Введите ваш адрес"
+                                        />
+                                        <button onClick={() => geocodeAddress(manualAddress)}>Определить</button>
+                                    </>
+                                ) : (
+                                    <p>Геолокация включена</p>
+                                )}
 
-                                    <li
-                                        key={order.id}
-                                        className={`order-card ${isCreator ? 'creator' : ''} `}
-                                    >
-                                        <div className="order-content">
-                                            <div className="order-header">
-                                                <div className="order-info">
-                                                    <p className="order-title">
-                                                        <strong>Заказ
-                                                            №{order.id}</strong> от {creator.username || "Неизвестно"}.
-                                                        Создан {new Date(order.createdAt).toLocaleString()}.
-                                                    </p>
+                            </div>
 
-                                                    <p><strong>ID заказчика:</strong> {order.creatorId || "Неизвестно"}
-                                                    </p>
-                                                    <p><strong>Имя
-                                                        заказчика:</strong> {creator.username || "Неизвестно"}</p>
-                                                    <p>
-                                                        <strong>Рейтинг
-                                                            заказчика:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
-                                                    </p>
-                                                    {/* Иконка способа оплаты */}
-                                                    <div className="payment-info">
+
+                            {orders.length > 0 ? (
+                                <ul className="orders-list">
+                                    {orders.map((order) => {
+                                        const creator = creatorsInfo[order.creatorId] || {};
+                                        const isCreator = order.creatorId === userId;
+
+                                        return (
+
+                                            <li
+                                                key={order.id}
+                                                className={`order-card ${isCreator ? 'creator' : ''} `}
+                                            >
+                                                <div className="order-content">
+                                                    <div className="order-header">
+                                                        <div className="order-info">
+                                                            <p className="order-title">
+                                                                <strong>Заказ
+                                                                    №{order.id}</strong> от {creator.username || "Неизвестно"}.
+                                                                Создан {new Date(order.createdAt).toLocaleString()}.
+                                                            </p>
+
+                                                            <p><strong>ID
+                                                                заказчика:</strong> {order.creatorId || "Неизвестно"}
+                                                            </p>
+                                                            <p><strong>Имя
+                                                                заказчика:</strong> {creator.username || "Неизвестно"}
+                                                            </p>
+                                                            <p>
+                                                                <strong>Рейтинг
+                                                                    заказчика:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
+                                                            </p>
+                                                            {/* Иконка способа оплаты */}
+                                                            <div className="payment-info">
                                                         <span
                                                             className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
-                                                        <span className="payment-label">
+                                                                <span className="payment-label">
                 {paymentMethods.find(method => method.id === order.paymentType)?.label}
                 </span>
+                                                            </div>
+                                                            {/* Кнопка для перехода на страницу жалоб */}
+                                                            {creator.username && (
+                                                                <Link to={`/complaints/${order.creatorId}`}
+                                                                      className="complaints-button">
+                                                                    Жалобы на создателя: {creator.complaintsCount || 0}
+                                                                </Link>
+                                                            )}
+
+
+                                                        </div>
                                                     </div>
-                                                    {/* Кнопка для перехода на страницу жалоб */}
-                                                    {creator.username && (
-                                                        <Link to={`/complaints/${order.creatorId}`}
-                                                              className="complaints-button">
-                                                            Жалобы на создателя: {creator.complaintsCount || 0}
-                                                        </Link>
-                                                    )}
+
+                                                    <div className="order-left">
+                                                        <p><strong>Название заказа:</strong> {order.type}</p>
+                                                        <p>
+                                                            <strong>Категория:</strong> {order.category ? order.category.name : 'Не указано'}
+                                                        </p>
+                                                        <p>
+                                                            <strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : 'Не указано'}
+                                                        </p>
+                                                        <p><strong>Адрес:</strong> {order.address}</p>
+                                                        <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
+
+
+                                                    </div>
+
+
+                                                    {Array.isArray(order.images) && order.images.length > 0 ? (
+                                                        <div className="image-stack-container">
+                                                            <div className="image-stack"
+                                                                 onClick={() => openModal(order.images)}>
+                                                                {order.images.map((image, index) => {
+                                                                    const imageUrl = `${apiUrl}${image}`;
+                                                                    return (
+                                                                        <img
+                                                                            key={index}
+                                                                            src={imageUrl}
+                                                                            alt={`Order pic ${index + 1}`}
+                                                                            className="order-image"
+                                                                            style={{transform: `translateX(${index * 10}px)`}} // Смещение только вправо
+                                                                        />
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    ) : null}
+
+                                                    <p><strong>Описание:</strong> {order.description}</p>
 
 
                                                 </div>
-                                            </div>
-
-                                            <div className="order-left">
-                                                <p><strong>Название заказа:</strong> {order.type}</p>
-                                                <p>
-                                                    <strong>Категория:</strong> {order.category ? order.category.name : 'Не указано'}
-                                                </p>
-                                                <p>
-                                                    <strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : 'Не указано'}
-                                                </p>
-                                                <p><strong>Адрес:</strong> {order.address}</p>
-                                                <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
 
 
-                                            </div>
+                                                {userId !== order.creatorId && !order.executorId && order.status === 'pending' && (
+                                                    <button className="take-order-button"
+                                                            onClick={() => handleRequestOrder(order.id)}>Запросить
+                                                        выполнение</button>
+                                                )}
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            ) : (
+                                <p className="no-orders">Нет доступных заказов.</p>
 
-
-                                            {Array.isArray(order.images) && order.images.length > 0 ? (
-                                                <div className="image-stack-container">
-                                                    <div className="image-stack"
-                                                         onClick={() => openModal(order.images)}>
-                                                        {order.images.map((image, index) => {
-                                                            const imageUrl = `${apiUrl}${image}`;
-                                                            return (
-                                                                <img
-                                                                    key={index}
-                                                                    src={imageUrl}
-                                                                    alt={`Order pic ${index + 1}`}
-                                                                    className="order-image"
-                                                                    style={{transform: `translateX(${index * 10}px)`}} // Смещение только вправо
-                                                                />
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            ) : null}
-
-                                            <p><strong>Описание:</strong> {order.description}</p>
-
-
-                                        </div>
-
-
-                                        {userId !== order.creatorId && !order.executorId && order.status === 'pending' && (
-                                            <button className="take-order-button"
-                                                    onClick={() => handleRequestOrder(order.id)}>Запросить
-                                                выполнение</button>
-                                        )}
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    ) : (
-                        <p className="no-orders">Нет доступных заказов.</p>
-
-                    )}
+                            )}
+                        </div>
+                    </div>
                 </div>
-                </div>
-                </div>
-                </div>
-                    <Modal
-                        appElement={document.getElementById('root')}
-                        isOpen={isModalOpen}
-                        onRequestClose={closeModal}
-                        contentLabel="Full Image Modal"
-                        className="custom-modal"
+            </div>
+            <Modal
+                appElement={document.getElementById('root')}
+                isOpen={isModalOpen}
+                onRequestClose={closeModal}
+                contentLabel="Full Image Modal"
+                className="custom-modal"
                         overlayClassName="custom-modal-overlay"
                     >
                         <div className="custom-modal-content">
