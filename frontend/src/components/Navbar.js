@@ -31,7 +31,7 @@ const Navbar = () => {
                     className="navbar-item navbar-home"
                     onClick={() => navigate('/')}
                 >
-                    Карта
+                    Старт
                 </button>
             </div>
                 <div className="navbar-title">{getPageTitle()}</div>

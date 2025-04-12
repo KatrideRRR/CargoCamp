@@ -9,3 +9,15 @@
 /backend/package-lock.json
 .env.local
 .env
+/frontend/build/asset-manifest.json
+/frontend/build/favicon.ico
+/frontend/build/index.html
+/frontend/build/logo192.png
+/frontend/build/logo512.png
+/frontend/build/static/js/main.752b2685.js
+/frontend/build/static/js/main.752b2685.js.LICENSE.txt
+/frontend/build/static/js/main.752b2685.js.map
+/frontend/build/static/css/main.a5100415.css
+/frontend/build/static/css/main.a5100415.css.map
+/frontend/build/manifest.json
+/frontend/build/robots.txt
