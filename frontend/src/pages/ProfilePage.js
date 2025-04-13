@@ -1,5 +1,4 @@
-import BindCardModal from "../components/BindCardModal"; // Импортируем модальное окно
-
+import { toast } from "react-toastify";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../utils/authContext";
@@ -14,8 +13,7 @@ const ProfilePage = () => {
     const [rebillId, setRebillId] = useState(null); // Сохраняем ID привязанной карты
     const navigate = useNavigate();
     const { logout, isAuthenticated } = useAuth();
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isChecked, setIsChecked] = useState(false);
+    const [cardInfo, setCardInfo] = useState();
 
     useEffect(() => {
         let isMounted = true;
@@ -51,70 +49,55 @@ const ProfilePage = () => {
             }
         };
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const isReturnedFromPayment = urlParams.get("paymentSuccess");
+        fetchProfileData();
 
-        // если вернулись с привязки карты, перезапрашиваем профиль
-        if (isReturnedFromPayment || !profile) {
-            fetchProfileData();
-        }
 
         return () => {
             isMounted = false;
         };
     }, [isAuthenticated, navigate]);
 
-    // Открытие модального окна
-    const handleOpenModal = () => {
-        setIsModalOpen(true);
-    };
-
-    // Закрытие модального окна
-    const handleCloseModal = () => {
-        setIsModalOpen(false);
-        setIsChecked(false);
-    };
-
-    const handleConfirmBindCard = async () => {
-        handleCloseModal();
+    const handleBindCard = async () => {
+        const token = localStorage.getItem("authToken");
         try {
-            const response = await axios.post(`${apiUrl}/api/payment/bind_card`, { userId: profile.id });
-            if (response.data.Success) {
-                localStorage.setItem("requestKey", response.data.RequestKey);
-                window.location.href = response.data.PaymentURL;
+            const response = await axios.post(`${apiUrl}/api/payment/bind-card`, {},{
+                headers: { Authorization: `Bearer ${token}` },
+            } );
+
+            if (response.data.paymentUrl) {
+                window.location.href = response.data.paymentUrl;
             } else {
-                alert("Ошибка привязки карты: " + response.data.Message);
+                toast.error("Ошибка при получении ссылки для привязки карты");
             }
         } catch (error) {
-            alert("Ошибка привязки карты");
+            toast.error("Ошибка при привязке карты");
+            console.error("Ошибка при привязке карты:", error);
         }
     };
 
-
-
-    // 🔹 Функция автосписания 100 рублей (пример)
-    const handleCharge = async () => {
-        if (!rebillId) {
-            alert("Карта не привязана!");
-            return;
-        }
-
+    const handleUnbindCard = async () => {
+        const token = localStorage.getItem("authToken");
         try {
-            const response = await axios.post(`${apiUrl}/api/payment/charge_card`, {
-                userId: profile.id,
-                rebillId: rebillId,
-                amount: 100, // 100 рублей
-                description: "Тестовое списание 100 руб."
+            const response = await fetch(`${apiUrl}/api/payment/unbind-card`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
             });
 
-            if (response.data.Success) {
-                alert("Списание успешно!");
+            const result = await response.json();
+
+            if (response.ok) {
+                toast.success("Карта успешно удалена");
+                setRebillId(null);
+                setCardInfo(null);
             } else {
-                alert("Ошибка списания: " + response.data.Message);
+                toast.error(result.message || "Ошибка при удалении карты");
             }
         } catch (error) {
-            console.error("Ошибка списания:", error);
-            alert("Ошибка списания");
+            console.error("Ошибка при удалении карты:", error);
+            toast.error("Сервер не отвечает");
         }
     };
 
@@ -135,7 +118,6 @@ const ProfilePage = () => {
         }
     };
 
-    // Функция рендера звездочек
     const renderStars = (rating) => {
         const maxStars = 5;
         const fullStar = "★";
@@ -170,41 +152,38 @@ const ProfilePage = () => {
                         </div>
                         <div className="section">
                             <h2 className="subtitle">Рейтинг:</h2>
-                            <p className="info rating">{profile.rating ? renderStars(profile.rating) : "Нет рейтинга"}</p>
+                            <p className="info rating">
+                                {profile.rating ? renderStars(profile.rating) : "Нет рейтинга"}
+                            </p>
                         </div>
 
-                        <div className="section">
-                            <h2 className="subtitle">Привязка карты:</h2>
+                        <div className="section1">
+                            <h2 className="subtitle">Ваша карта:</h2>
+
                             {rebillId ? (
                                 <div>
-                                    <p className="info verified">Карта привязана ✅</p>
-                                    {profile.cardLastFour && (
-                                        <p className="info">Карта: **** ****
-                                            **** {profile.cardLastFour} ({profile.cardType})</p>
-                                    )}
+                                    <p className="info verified">Карта
+                                        привязана: {profile.cardType} •••• {profile.cardLastFour}</p>
+                                    <button className="unbind-button" onClick={handleUnbindCard}>
+                                        Удалить карту
+                                    </button>
                                 </div>
                             ) : (
-                                <button onClick={handleOpenModal} className="bind-card-button">
+                                <button className="bind-card-button" onClick={handleBindCard}>
                                     Привязать карту
                                 </button>
                             )}
+
                         </div>
 
 
-                        {/* Кнопка автосписания для теста */}
-                        {rebillId && (
-                            <button onClick={handleCharge} className="charge-button">
-                                Списать 100 рублей
-                            </button>
-                        )}
-
-                        {/* Верификация */}
-                        <div className="section">
+                        <div className="section verification-row">
                             <h2 className="subtitle">Верификация:</h2>
                             <p className={`info verification-status ${profile.isVerified ? "verified" : "not-verified"}`}>
                                 {profile.isVerified ? "Пройдена" : "Не пройдена"}
                             </p>
                         </div>
+
 
                         {/* Кнопки навигации */}
                         <button onClick={handleMyComplaints} className="complaints-button">
@@ -221,14 +200,6 @@ const ProfilePage = () => {
                     <p className="info">Загрузка данных профиля...</p>
                 )}
             </div>
-            {/* Модальное окно */}
-            <BindCardModal
-                isOpen={isModalOpen}
-                onClose={handleCloseModal}
-                onConfirm={handleConfirmBindCard}
-                isChecked={isChecked}
-                setChecked={setIsChecked}
-            />
         </div>
     );
 };

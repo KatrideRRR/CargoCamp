@@ -13,28 +13,18 @@ module.exports = async function authenticateToken(req, res, next) {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
 
-        // Загружаем пользователя из базы
         const user = await User.findByPk(decoded.id);
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
 
-        // ⛔ Если пользователь заблокирован, удаляем токен и запрещаем доступ
         if (user.role === "banned") {
             return res.status(403).json({ message: "Your account has been banned. Please contact support." });
         }
 
+        req.user = decoded;
+        next();
 
-        jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-            if (err) {
-                if (err.name === 'TokenExpiredError') {
-                    return res.status(403).json({ message: 'Срок действия токена истёк. Авторизуйтесь заново.' });
-                }
-                return res.status(403).json({ message: 'Неверный токен' });
-            }
-            req.user = user;
-            next();
-        });
     } catch (error) {
         console.error("Token verification error:", error);
         res.status(403).json({ message: "Invalid token" });

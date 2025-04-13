@@ -1,9 +1,11 @@
-import { useNavigate } from 'react-router-dom';
+import {useNavigate} from 'react-router-dom';
 import '../styles/StartPage.css';
+import {AuthContext} from "../utils/authContext";
+import {useContext} from "react";
 
 export default function StartPage() {
+    const { user } = useContext(AuthContext);
     const navigate = useNavigate();
-
     return (
         <div className="start-page-container">
             <div className="start-page-content animate-in">
@@ -12,7 +14,7 @@ export default function StartPage() {
 
                 <div className="button-group">
                     <button
-                        onClick={() => navigate('/create-order')}
+                        onClick={() => navigate(`/my-orders/${user.id}`)}
                         className="role-button glassy"
                     >
                         <div className="emoji">🧑‍💼</div>

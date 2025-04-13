@@ -25,21 +25,14 @@ function generateToken(params) {
 }
 
 function getCardType(cardNumber) {
-    const bin = cardNumber.slice(0, 6);
-
-    const visaRegex = /^4/;
-    const masterRegex = /^5[1-5]/;
-    const mirRegex = /^220[0-4]/;
-    const amexRegex = /^3[47]/;
-    const discoverRegex = /^6(?:011|5)/;
-
-    if (visaRegex.test(cardNumber)) return 'Visa';
-    if (masterRegex.test(cardNumber)) return 'MasterCard';
-    if (mirRegex.test(cardNumber)) return 'MIR';
-    if (amexRegex.test(cardNumber)) return 'American Express';
-    if (discoverRegex.test(cardNumber)) return 'Discover';
-
-    return 'Unknown';
+    if (!cardNumber) return "Unknown";
+    const firstDigit = cardNumber[0];
+    switch (firstDigit) {
+        case '4': return 'Visa';
+        case '5': return 'MasterCard';
+        case '2': return 'МИР';
+        default: return 'Unknown';
+    }
 }
 
 router.post("/bind-card", authenticateToken, async (req, res) => {
@@ -47,50 +40,19 @@ router.post("/bind-card", authenticateToken, async (req, res) => {
     res.setHeader("Access-Control-Allow-Credentials", "true");
 
     const { id } = req.user;
-    const { cardNumber, expiry, cvv } = req.body;
 
     if (!id) {
         return res.status(400).json({ message: "Ошибка: userId не указан" });
     }
 
-    if (!cardNumber || !expiry || !cvv) {
-        return res.status(400).json({ message: "Некорректные данные карты" });
-    }
-
     try {
-        const paymentResult = await processPayment(id, 1);
+        const paymentResult = await processPayment(id, 1); // 1 рубль
+
         if (!paymentResult.success) {
-            return {
-                success: false,
-                error: "Ошибка инициализации"
-            }
+            return res.status(500).json({ message: "Ошибка инициализации", error: paymentResult.message });
         }
 
-        await refundPayment(paymentResult.transactionId);
-
-        const encryptedCard = encryptCard(cardNumber);
-
-        const last4 = cardNumber.slice(-4);  // последние 4 цифры
-        const cardType = getCardType(cardNumber);  // Функция, которая определяет тип карты (например, Visa, MasterCard)
-
-        console.log("Card type detected:", cardType);
-
-        if (!id) {
-            return res.status(400).json({ success: false, message: "Ошибка: userId не указан" });
-        }
-
-        // Сохраняем все данные в БД
-        await User.update(
-            {
-                cardNumber: encryptedCard,
-                cardLastFour: last4,  // Сохраняем последние 4 цифры
-                cardType: cardType    // Сохраняем тип карты
-            },
-            { where: { id: id } }
-        );
-
-
-        return res.json({ message: "Карта успешно привязана" });
+        return res.json({ message: "Перейдите по ссылке для привязки карты", paymentUrl: paymentResult.paymentUrl });
     } catch (error) {
         console.error("Ошибка привязки карты:", error);
         return res.status(500).json({ message: "Ошибка сервера" });
@@ -174,21 +136,62 @@ router.post("/pay_commission", async (req, res) => {
 });
 
 router.post("/callback", async (req, res) => {
-    const { Success, Status, PaymentId, RebillId, OrderId, CustomerKey } = req.body;
+    const { Success, Status, RebillId, CustomerKey, CardPan } = req.body;
 
     if (Success && Status === "CONFIRMED" && RebillId) {
         const userId = CustomerKey.replace("user_", "");
-        console.log(`✅ Карта привязана для userId: ${userId}, RebillId: ${RebillId}`);
 
-        await User.update(
-            { RebillId: RebillId },
-            { where: { id: userId } }
-        );
+        const last4 = CardPan?.slice(-4);
+        const cardType = getCardType(CardPan);
 
-        res.json({ success: true });
+        console.log(`✅ Карта привязана: userId: ${userId}, last4: ${last4}, type: ${cardType}, RebillId: ${RebillId}`);
+
+        try {
+            // Возврат 1 рубля
+            await refundPayment(req.body.PaymentId);
+
+            await User.update(
+                {
+                    cardLastFour: last4,
+                    cardType,
+                    RebillId,
+                },
+                { where: { id: userId } }
+            );
+
+            return res.json({ success: true });
+        } catch (err) {
+            console.error("❌ Ошибка сохранения карты:", err);
+            return res.status(500).json({ success: false });
+        }
     } else {
         console.log("⚠ Ошибка привязки карты:", req.body);
-        res.status(400).json({ success: false });
+        return res.status(400).json({ success: false });
+    }
+});
+
+router.post("/unbind-card", authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.user;
+
+        if (!id) {
+            return res.status(400).json({ message: "Не удалось определить пользователя" });
+        }
+
+        await User.update(
+            {
+                cardNumber: null,
+                cardLastFour: null,
+                cardType: null,
+                rebillId: null
+            },
+            { where: { id } }
+        );
+
+        return res.json({ message: "Карта успешно удалена" });
+    } catch (error) {
+        console.error("Ошибка при удалении карты:", error);
+        return res.status(500).json({ message: "Ошибка сервера при удалении карты" });
     }
 });
 

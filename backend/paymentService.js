@@ -25,7 +25,7 @@ async function processPayment(userId, amount) {
             Amount: amount * 100, // В копейках
             OrderId: `test_${userId}_${Date.now()}`,
             Description: "Привязка карты",
-            CustomerKey: `user_${userId}`,
+            CustomerKey: crypto.createHash('sha256').update(`user_${userId}`).digest('hex'),
             Recurrent: "Y",
             NotificationURL: `https://18.184.43.44:5001/api/payment/callback`, // важен!
             Receipt: {
@@ -51,12 +51,21 @@ async function processPayment(userId, amount) {
         console.log("Ответ Тинькофф:", response.data);
 
         if (response.data.Success) {
-            return { success: true, transactionId: response.data.PaymentId };
+            return {
+                success: true,
+                transactionId: response.data.PaymentId,
+                RebillId: response.data.RebillId,
+                paymentUrl: response.data.PaymentURL // Добавим сюда!
+            };
         }
+
         return { success: false, message: response.data.Message };
     } catch (error) {
         console.error("Ошибка платежа:", error?.response?.data || error.message);
-        return { success: false, message: "Ошибка сервера" };
+        return {
+            success: false,
+            message: error?.response?.data?.Details || error?.response?.data?.Message || "Ошибка сервера",
+        };
     }
 }
 

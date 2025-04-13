@@ -1,210 +1,71 @@
+/* ProfilePage.css */
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(145deg, #f1f4f9, #e3eaf4);
+    color: #333;
+}
+
 .container {
     display: flex;
     justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    background-color: #f8f9fa;
-    padding: 20px;
-}
-.charge-button {
-    margin-top: 10px;
-    background-color: #2e7d32;
-    color: white;
-    padding: 10px 16px;
-    border-radius: 8px;
-    border: none;
-    cursor: pointer;
+    padding: 40px 20px;
 }
 
 .profile-container {
-    background: #ffffff;
-    padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.2);
+    border-radius: 20px;
+    padding: 30px;
+    max-width: 500px;
     width: 100%;
-    max-width: 450px;
-    text-align: center;
+    animation: fadeInUp 0.8s ease;
 }
 
-.title {
-    font-size: 24px;
-    font-weight: bold;
-    color: #333;
-    margin-bottom: 15px;
+/* Секция */
+.section {
+    display: flex;
+    align-items: center;  /* Вертикальное выравнивание элементов */
 }
 
+/* Заголовок блока (например, имя пользователя) */
 .subtitle {
     font-size: 18px;
     font-weight: 600;
-    color: #444;
-    margin-bottom: 8px;
+    color: #333;
+    margin-right: 10px;  /* Отступ между заголовком и значением */
+    white-space: nowrap; /* Чтобы заголовок не переносился на новую строку */
+    font-family: 'Segoe UI', sans-serif;
 }
 
-.section {
-    margin-bottom: 20px;
-    padding: 12px;
-    background: #f1f3f5;
-    border-radius: 8px;
-}
-
+/* Текст информации */
 .info {
-    font-size: 16px;
-    font-weight: 500;
-    color: #555;
+    font-size: 18px;
+    color: #444;
+    word-break: break-word; /* Разрыв слов, если текст длинный */
+    font-family: 'Segoe UI', sans-serif;
+    margin-top: -8px;
+
 }
 
-/* Стили для звездочек */
+/* Рейтинг */
 .rating {
-    font-size: 22px;
-    color: #FFD700; /* Золотой цвет */
-    font-weight: bold;
-    letter-spacing: 2px;
+    font-size: 20px;
+    color: #ffa500;
 }
 
-/* Ограничиваем стили кнопок только внутри .profile-container */
-.profile-container button {
-    display: block;
-    width: 100%;
-    padding: 12px;
-    margin-top: 12px;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: 0.3s;
-    border: none;
-}
-
-.profile-container .upload-button {
-    background: #007bff;
-    color: white;
-}
-
-.profile-container .upload-button:hover {
-    background: #0056b3;
-}
-
-.profile-container .logout-button {
-    background: #ff4d4f;
-    color: white;
-}
-
-.profile-container .logout-button:hover {
-    background: #cc0000;
-}
-
-.profile-container .complaints-button,
-.profile-container .history-button {
-    background: #28a745;
-    color: white;
-}
-
-.profile-container .complaints-button:hover,
-.profile-container .history-button:hover {
-    background: #1e7e34;
-}
-
-/* Стили для верификации */
-.verification-status {
-    font-weight: bold;
-    font-size: 16px;
-    padding: 5px 10px;
-    border-radius: 5px;
-    display: inline-block;
-    width: fit-content;
-}
-
-.verified {
-    color: #fff;
-    background-color: #28a745; /* Зелёный */
-}
-
-.not-verified {
-    color: #fff;
-    background-color: #dc3545; /* Красный */
-}
-
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-
-.modal-content {
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    width: 400px;
-    text-align: center;
-}
-
-.checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: 10px;
-}
-
-.modal-buttons {
-    margin-top: 20px;
-    display: flex;
-    justify-content: space-between;
-}
-
-.cancel-button {
-    background: red;
-    color: white;
-    padding: 10px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-.confirm-button {
-    background: green;
-    color: white;
-    padding: 10px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-.confirm-button:disabled {
-    background: gray;
-    cursor: not-allowed;
-}
-
-
-/* Адаптивный дизайн */
-@media (max-width: 480px) {
-    .profile-container {
-        padding: 20px;
-        width: 90%;
-        margin-top: 20px;
-        margin-bottom: 10px;
-    }
-    .container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 100vh;
-        background-color: #f8f9fa;
-        padding-top: 80px;
-        padding-bottom: 90px;
-    }
-    .title {
-        font-size: 22px;
+/* Адаптивность */
+@media (max-width: 768px) {
+    .section {
+        margin-bottom: 15px;
     }
 
     .subtitle {
         font-size: 16px;
+        margin-right: 8px;
     }
 
     .info {
@@ -214,9 +75,126 @@
     .rating {
         font-size: 18px;
     }
+}
 
-    .profile-container button {
-        font-size: 14px;
-        padding: 10px;
+.verified {
+    color: #2ecc71;
+    font-size: 18px;
+}
+
+.not-verified {
+    color: #e74c3c;
+    font-size: 18px;
+}
+
+button {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    margin-top: 15px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.bind-card-button {
+    background: linear-gradient(to right, #6dd5ed, #2193b0);
+    color: white;
+}
+
+.bind-card-button:hover {
+    background: linear-gradient(to right, #5bc0de, #1a7ca8);
+}
+
+.charge-button {
+    background: linear-gradient(to right, #f7797d, #FBD786, #C6FFDD);
+    color: #2c3e50;
+}
+
+.charge-button:hover {
+    background: linear-gradient(to right, #f5576c, #f093fb, #c9ffbf);
+}
+
+.complaints-button,
+.history-button,
+.logout-button {
+    background: linear-gradient(to right, #fdfbfb, #ebedee);
+    color: #2c3e50;
+    border: 1px solid #dcdde1;
+}
+
+.complaints-button:hover,
+.history-button:hover,
+.logout-button:hover {
+    background: linear-gradient(to right, #e1e8ed, #d8dde2);
+}
+.card-info-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.unbind-card-button {
+    background-color: transparent;
+    color: #999; /* серый крестик */
+    font-size: 1rem;
+    padding: 0.1rem 0.4rem;
+    border: none;
+    cursor: pointer;
+    transition: color 0.3s ease;
+    width: 10%;
+}
+
+.unbind-card-button:hover {
+    color: #555;
+}
+
+.unbind-card-button:hover {
+    background: linear-gradient(to right, #e1e8ed, #d8dde2);
+}
+
+.verification-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.verification-status {
+    margin-top: -8px;
+}
+
+.loading-container,
+.error-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.error-text {
+    color: #e74c3c;
+    font-size: 18px;
+}
+
+@media (max-width: 768px) {
+    .container {
+        margin-top: 25vh;
+        margin-bottom: 25vh;
+    }
+}
+
+/* Анимация появления */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }
