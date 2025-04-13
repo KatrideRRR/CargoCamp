@@ -44,12 +44,15 @@ const ChatPage = () => {
         };
     }, [currentUser, orderId]);
 
-    // Функция прокрутки вниз
     const scrollToBottom = () => {
         if (messagesContainerRef.current) {
-            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+            messagesContainerRef.current.scrollTo({
+                top: messagesContainerRef.current.scrollHeight,
+                behavior: 'smooth',
+            });
         }
     };
+
 
     useEffect(() => {
         scrollToBottom();
@@ -116,6 +119,13 @@ const ChatPage = () => {
         setNewMessage(e.target.value);
     };
 
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSendMessage();
+        }
+    };
+
     // Авто-прокрутка вверх при изменении высоты поля ввода
     useEffect(() => {
         if (messagesContainerRef.current) {
@@ -163,6 +173,7 @@ const ChatPage = () => {
                         ref={textareaRef}
                         value={newMessage}
                         onChange={handleInputChange}
+                        onKeyDown={handleKeyDown}
                         placeholder="Введите сообщение..."
                         className="chat-input"
                         rows="1"
