@@ -2,7 +2,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
-import HomePage from './pages/HomePage';
 import OrdersPage from './pages/OrdersPage';
 import CreateOrderPage from './pages/CreateOrderPage';
 import LoginPage from './pages/LoginPage';
@@ -31,7 +30,6 @@ const App = () => {
                         <Navbar />
                         <Routes>
                             <Route path="/" element={<StartPage />} />
-                            <Route path="/home" element={<HomePage />} />
                             <Route path="/register" element={<RegisterPage />} />
                             <Route path="/login" element={<LoginPage />} />
                             <Route path="/profile" element={<ProfilePage />}/>

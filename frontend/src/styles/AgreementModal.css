@@ -1,0 +1,95 @@
+.agreement-content {
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(12px);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    color: #fff;
+    font-size: 15px;
+    line-height: 1.6;
+    height: auto;
+    max-height: 65vh;
+    overflow-y: auto;
+    transition: all 0.3s ease;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.3) transparent;
+}
+
+.agreement-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.agreement-content::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+}
+
+.agreement-content p,
+.agreement-content ul {
+    margin-bottom: 12px;
+}
+
+.agreement-content ul {
+    padding-left: 20px;
+}
+
+.checkbox-block {
+    display: flex;
+    align-items: center;
+    margin-top: 20px;
+}
+
+.checkbox-block input[type="checkbox"] {
+    margin-right: 10px;
+    width: 18px;
+    height: 18px;
+    accent-color: #00b894;
+    cursor: pointer;
+}
+
+.checkbox-block label {
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.agree-button {
+    margin-top: 20px;
+    width: 100%;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #00b894, #0984e3);
+    color: white;
+    font-weight: bold;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    box-shadow: 0 4px 16px rgba(0, 184, 148, 0.4);
+}
+
+.agree-button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.agree-button:disabled {
+    background: rgba(255, 255, 255, 0.2);
+    color: #ccc;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+@media (max-width: 600px) {
+    .agreement-content {
+        padding: 16px;
+        font-size: 14px;
+    }
+
+    .agree-button {
+        font-size: 14px;
+    }
+
+    .checkbox-block label {
+        font-size: 13px;
+    }
+}

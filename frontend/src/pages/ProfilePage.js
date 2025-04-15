@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../utils/authContext";
 import axios from "axios";
 import "../styles/ProfilePage.css"; // Импортируем CSS файл
+import AgreementModal from "../components/AgreementModal";
 const apiUrl = process.env.REACT_APP_API_URL;
 
 const ProfilePage = () => {
@@ -14,6 +15,7 @@ const ProfilePage = () => {
     const navigate = useNavigate();
     const { logout, isAuthenticated } = useAuth();
     const [cardInfo, setCardInfo] = useState();
+    const [showAgreement, setShowAgreement] = useState(false);
 
     useEffect(() => {
         let isMounted = true;
@@ -125,6 +127,15 @@ const ProfilePage = () => {
         return fullStar.repeat(Math.round(rating)) + emptyStar.repeat(maxStars - Math.round(rating));
     };
 
+    const handleCardLinkClick = () => {
+        setShowAgreement(true);
+    };
+
+    const handleAgree = () => {
+        setShowAgreement(false);
+        handleBindCard(); // твоя функция
+    };
+
     if (loading) {
         return <div className="loading-container">Загрузка данных профиля...</div>;
     }
@@ -169,10 +180,14 @@ const ProfilePage = () => {
                                     </button>
                                 </div>
                             ) : (
-                                <button className="bind-card-button" onClick={handleBindCard}>
+                                <button className="bind-card-button" onClick={handleCardLinkClick}>
                                     Привязать карту
                                 </button>
+
                             )}
+
+
+
 
                         </div>
 
@@ -200,6 +215,16 @@ const ProfilePage = () => {
                     <p className="info">Загрузка данных профиля...</p>
                 )}
             </div>
+
+            {showAgreement && (
+                <AgreementModal
+                    isOpen={showAgreement}
+                    onClose={() => setShowAgreement(false)}
+                    onAgree={handleAgree}
+                    onCancel={() => setShowAgreement(false)}
+                />
+            )}
+
         </div>
     );
 };
