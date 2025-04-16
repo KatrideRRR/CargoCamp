@@ -53,7 +53,7 @@
     display: inline-block;
     padding: 10px 20px;
     margin-top: 20px;
-    background-color: #4CAF50; /* Зеленый фон */
+    background: linear-gradient(135deg, #6fb1fc 0%, #4364f7 100%);
     color: white; /* Белый текст */
     font-size: 16px;
     font-weight: bold;
@@ -64,7 +64,7 @@
 }
 
 .view-orders-button:hover {
-    background-color: #45a049; /* Темнее при наведении */
+    background: linear-gradient(135deg, #5a9cf7 0%, #334cd4 100%);
     transform: scale(1.05); /* Легкое увеличение кнопки при наведении */
 }
 

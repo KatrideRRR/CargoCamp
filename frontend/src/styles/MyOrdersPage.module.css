@@ -1,221 +1,194 @@
+/* MyOrdersPage.module.css */
+
 .container {
-    max-width: 500px;
-    margin: 100px auto;
-    padding: 20px;
-    background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    text-align: center;
+    padding: 2rem;
+    margin-top: 50px;
+    min-height: 100vh;
+    background: linear-gradient(to bottom right, #e8f0ff, #ffffff);
+    display: flex;
+    justify-content: center;
+    align-items: start;
+    overflow-y: auto;
 }
 
 .ordersWrapper {
-    text-align: left;
+    width: 100%;
+    max-width: 1000px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
 }
 
 .createButton {
-    display: block;
-    margin-bottom: 20px;
-    padding: 10px 15px;
-    background-color: #007bff;
-    color: white;
-    text-align: center;
-    border-radius: 5px;
+    align-self: flex-end;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, #4b6cb7, #182848);
+    color: #fff;
+    font-weight: bold;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
     text-decoration: none;
+    width: 100%;
+    display: block;
+    text-align: center;
+}
+.paymentInfo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+    margin-left: 0.25rem;
 }
 
 .createButton:hover {
-    background-color: #0056b3;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.newRequest {
+    background: linear-gradient(135deg, #ff7e5f, #feb47b);
 }
 
 .ordersList {
     list-style: none;
     padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
 }
 
 .orderCard {
-    padding: 15px;
-    border-radius: 5px;
-    background: #f9f9f9;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    margin-bottom: 10px;
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(12px);
+    border-radius: 20px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    transition: all 0.3s ease;
 }
 
-.orderImage {
-    width: 100px;
-    height: auto;
-    margin-top: 10px;
+.orderCard:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
 }
 
-
-.executorCard {
+.orderContent {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    padding: 10px;
-    background: #fff;
+    gap: 1rem;
+}
+
+.orderHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.orderTitle {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.orderLeft p,
+.orderContent p {
+    margin: 0.25rem 0;
+}
+
+.image-stack-container {
+    margin-top: 1rem;
+}
+
+.order-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    margin-bottom: 10px;
-    margin-right: 35px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transition: transform 0.2s ease;
+    cursor: pointer;
+}
+
+.order-image:hover {
+    transform: scale(1.05);
+}
+
+.executors-list {
+    margin-top: 1rem;
+    background: rgba(255, 255, 255, 0.35);
+    border-radius: 16px;
+    padding: 1rem;
+    backdrop-filter: blur(8px);
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.05);
+}
+
+.executorCard {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .executorInfo {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    margin: 10px;
+    gap: 0.25rem;
 }
 
 .executorName {
-    font-weight: bold;
+    font-weight: 500;
 }
 
 .verifiedBadge {
-    display: inline-block;
-    background-color: #4caf50;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 5px;
-    font-size: 0.9em;
-    margin-top: 5px;
+    color: #4caf50;
+    font-weight: bold;
 }
 
 .buttonsContainer {
     display: flex;
-    gap: 10px;
-
-
-    .complaintButton {
-        background-color: #ff9800;
-        color: white;
-        padding: 10px 20px;
-        border-radius: 8px; /* Скругление */
-        border: none;
-        cursor: pointer;
-        transition: all 0.3s;
-        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2); /* Тень */
-    }
-
-    .complaintButton:hover {
-        background-color: #e68900;
-        box-shadow: 0px 6px 8px rgba(0, 0, 0, 0.3); /* Увеличение тени при наведении */
-    }
-
-
-    .approveButton {
-        background-color: #28a745;
-        color: white;
-        padding: 10px 20px;
-        border-radius: 8px; /* Скругление */
-        border: none;
-        cursor: pointer;
-        transition: all 0.3s;
-        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2); /* Тень */    }
-    .approveButton:hover {
-        background-color: #238701;
-        box-shadow: 0px 6px 8px rgba(0, 0, 0, 0.3); /* Увеличение тени при наведении */
-    }
+    gap: 0.5rem;
+    margin-top: 0.5rem;
 }
 
-.orderHeader {
-    font-size: 18px;
-    font-weight: bold;
-    color: #333;
-    padding-bottom: 8px;
-    border-bottom: 3px solid #67727e; /* Синяя линия */
-    margin-bottom: 12px;
-}
-
-.orderHeader {
-    display: flex;
-    flex-direction: column;
-    position: relative; /* Чтобы вложенные абсолютные элементы ориентировались на этот блок */
-}
-
-.payment-icon-container {
-    display: flex;
-    align-items: center;
-    gap: 8px; /* Отступ между иконкой и текстом */
-    margin-top: 5px; /* Добавляет отступ от заголовка */
-}
-
-.payment-icon {
-    font-size: 1.2rem;
-}
-
-/* Контейнер, чтобы изображения не выходили за границы */
-.image-stack-container {
-    width: 120px; /* Фиксированная ширина */
-    height: 80px; /* Фиксированная высота */
-    overflow: hidden; /* Ограничиваем выход изображений */
-    position: relative;
-}
-
-/* Контейнер для колоды */
-.image-stack {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    cursor: pointer;
-}
-
-/* Стили для изображений */
-.order-image {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    object-fit: cover; /* Заполняем контейнер */
-    border-radius: 8px;
-    transition: transform 0.3s ease, z-index 0.3s ease;
-}
-
-/* Увеличение при наведении */
-.image-stack:hover .order-image {
-    transform: scale(1.1) !important;
-    z-index: 5;
-}
-
-/* Модальное окно поверх всего */
-.modal {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1000;
-    background: white;
-    padding: 20px;
+.approveButton,
+.complaintButton {
+    background: #4b6cb7;
+    color: white;
+    padding: 0.5rem 1rem;
     border-radius: 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    border: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease;
 }
 
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 999;
+.complaintButton {
+    background: #ff6b6b;
 }
 
-/* На мобильных устройствах кнопки идут внизу */
-@media (max-width: 768px) {
-    .executorCard {
-        align-items: center;
-        text-align: center;
-    }
+.approveButton:hover {
+    background: #3a56a1;
+}
 
-    .buttonsContainer {
-        flex-direction: column;
-        width: 80%;
-    }
+.complaintButton:hover {
+    background: #e64545;
+}
 
-    .complaintButton, .approveButton {
-        width: 100%;
-    }
+.errorMessage {
+    color: red;
+    font-weight: bold;
+    text-align: center;
+}
 
-    .verifiedBadge {
-        align-self: center;
-        margin-bottom: 5px;
-    }
+.noOrders {
+    text-align: center;
+    font-size: 1.1rem;
+    color: #444;
 }

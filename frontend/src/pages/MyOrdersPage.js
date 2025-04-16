@@ -5,6 +5,7 @@ import io from 'socket.io-client';
 import styles from '../styles/MyOrdersPage.module.css';
 import {AuthContext} from "../utils/authContext";
 import Modal from "react-modal";
+import {FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity} from "react-icons/fa";
 const apiUrl = process.env.REACT_APP_API_URL;
 
 const socket = io(process.env.REACT_APP_SOCKET_URL);
@@ -128,9 +129,17 @@ const MyOrdersPage = () => {
         }
     };
 
-    const getPaymentIcon = (paymentType) => {
-        const method = paymentMethods.find(method => method.id === paymentType);
-        return method ? method.icon : "";
+    const getPaymentIcon = (type) => {
+        switch (type) {
+            case 'guarantee':
+                return <FaUniversity title="Tinkoff" />;
+            case 'cash':
+                return <FaMoneyBillWave title="Наличные" />;
+            case 'installments':
+                return <FaCreditCard title="Карта" />;
+            default:
+                return <FaQuestionCircle title="Неизвестно" />;
+        }
     };
 
     const openModal = (images) => {
@@ -177,13 +186,11 @@ const MyOrdersPage = () => {
                                             <strong>Заказ №{order.id}</strong>.
                                             Создан {new Date(order.createdAt).toLocaleString()}
                                         </p>
-                                        {/* Иконка способа оплаты вынесена за пределы <p> */}
-                                        <div className={styles.paymentIconContainer}>
-                                            <span
-                                                className={styles.paymentIcon}>{getPaymentIcon(order.paymentType)}</span>
-                                            <span className={styles.paymentLabel}>
-                                                {paymentMethods.find(method => method.id === order.paymentType)?.label}
-                                                    </span>
+                                        <div className={styles.paymentInfo}>
+                                            <span className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
+                                            <span className="payment-label">
+            {paymentMethods.find(method => method.id === order.paymentType)?.label}
+        </span>
                                         </div>
                                     </div>
 
@@ -207,7 +214,7 @@ const MyOrdersPage = () => {
                                                             src={imageUrl}
                                                             alt={`Order pic ${index + 1}`}
                                                             className="order-image"
-                                                            style={{ transform: `translateX(${index * 10}px)` }} // Смещение только вправо
+                                                            style={{transform: `translateX(${index * 10}px)`}} // Смещение только вправо
                                                         />
                                                     );
                                                 })}

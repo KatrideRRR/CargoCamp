@@ -1,348 +1,291 @@
-/* Общий контейнер страницы */
-.active-orders-page .orders-container {
-    padding: calc(75px + env(safe-area-inset-top)) 15px calc(80px + env(safe-area-inset-bottom));
-    font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    background-color: #f4f4f4;
-    min-height: 100vh;
+.active-orders-page {
+    margin-top: 50px;
+    padding: 2rem;
+    min-height: 1000vh;
+    background: linear-gradient(135deg, #f0f4ff, #ffffff);
     display: flex;
     justify-content: center;
-    box-sizing: border-box;
+    align-items: flex-start;
+    margin-bottom: 40px;
 }
 
-/* Ограничение ширины контента */
-.active-orders-page .orders-wrapper {
+.active-orders-container {
     width: 100%;
-    max-width: 500px; /* Оптимальная ширина */
+    max-width: 700px;
+    backdrop-filter: blur(20px);
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 2px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    padding: 2rem;
+    animation: fadeIn 0.5s ease;
 }
 
-/* Список заказов */
-.active-orders-page .orders-list {
-    list-style-type: none;
+.orders-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9999;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(5px);
+}
+
+.modal {
+    background: white;
+    padding: 2rem;
+    border-radius: 1rem;
+    max-width: 90%;
+    max-height: 90%;
+    overflow-y: auto;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.orders-list {
+    list-style: none;
     padding: 0;
     margin: 0;
 }
 
-/* Карточка заказа */
-.active-orders-page .order-card {
-    display: flex;
-    flex-direction: column; /* Основное содержимое сверху, кнопки внизу */
-    background-color: #fff;
-    border-radius: 10px;
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
-    padding: 14px;
-    margin-bottom: 14px;
-    border-left: 4px solid #34c759; /* Цвет по умолчанию */
+.order-card {
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 1rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.07);
+    padding: 1.5rem;
+    margin-bottom: 1rem; /* добавлено */
+    transition: box-shadow 0.3s ease, transform 0.2s ease;
 }
 
-.active-orders-page .order-card.creator {
-    border-left-color: #007aff; /* Цвет для заказчика */
+.order-card:hover {
+    transform: translateY(-2px); /* уменьшено */
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
 }
 
-.active-orders-page .order-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.12);
+
+.order-header {
+    cursor: pointer;
 }
 
-/* Общий стиль для текста */
-.active-orders-page .order-card p {
-    font-size: 15px;
-    color: #333;
-    margin: 6px 0;
-}
-
-/* Кнопки действий */
-.active-orders-page .orders-wrapper .action-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 10px;
-}
-
-/* Общий стиль кнопок */
-.active-orders-page .orders-wrapper .action-buttons button {
-    flex: 1;
-    padding: 10px;
-    font-size: 14px;
+.order-title {
+    font-size: 1.1rem;
     font-weight: 600;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 90px;
-}
-
-/* Индивидуальные стили кнопок */
-.active-orders-page .orders-wrapper .call-button {
-    background-color: #28a745;
-}
-
-.active-orders-page .orders-wrapper .call-button:hover {
-    background-color: #218838 ;
-}
-
-.active-orders-page .orders-wrapper .message-button {
-    background-color: #007bff ;
-}
-
-.active-orders-page .orders-wrapper .message-button:hover {
-    background-color: #0056b3 ;
-}
-
-.active-orders-page .orders-wrapper .route-button {
-    background-color: #e0a800 ;
-    color: #222;
-}
-
-.active-orders-page .orders-wrapper .route-button:hover {
-    background-color: #c67600 ;
-}
-.active-orders-page .orders-wrapper .complain-button {
-    background-color: #dc3545 ;
-}
-.active-orders-page .orders-wrapper .complain-button:hover {
-    background-color: #c82333 ;
-}
-
-.active-orders-page .orders-wrapper .complete-button {
-    background-color: #6c757d  ;
-}
-
-.active-orders-page .orders-wrapper .complete-button:hover {
-    background-color: #5a6268  ;
-}
-/* Заголовок заказа */
-.active-orders-page .order-header {
-    margin-bottom: 12px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid #f0f0f0;
-}
-
-/* Кнопка "Взять в работу" */
-.active-orders-page .take-order-button {
-    width: 100%;
-    padding: 12px;
-    background-color: #007aff;
-    color: white;
-    font-size: 15px;
-    font-weight: 600;
-    text-align: center;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background 0.2s ease;
-}
-
-.active-orders-page .take-order-button:hover {
-    background-color: #005ecb;
-}
-
-/* Сообщения */
-.active-orders-page .error-message {
-    text-align: center;
-    color: #ff3b30;
-    font-size: 16px;
-    font-weight: 500;
-    margin-top: 15px;
-}
-
-.active-orders-page .no-orders {
-    text-align: center;
-    font-size: 16px;
-    color: #777;
-    margin-top: 15px;
-}
-/* Гарантируем перенос длинного текста */
-.active-orders-page .order-card p {
-    word-wrap: break-word; /* Разрыв длинных слов */
-    overflow-wrap: break-word; /* Перенос слов */
-    white-space: normal; /* Разрешаем перенос строк */
-}
-
-/* Если текст слишком длинный, ограничиваем ширину */
-.active-orders-page .order-description {
-    max-width: 100%; /* Запрещаем выход за границы */
-    word-break: break-word; /* Принудительный перенос длинных слов */
-}
-.active-orders-page .order-photo {
-    width: 150px; /* Ширина 150px */
-    height: 150px; /* Высота 150px */
-    object-fit: cover; /* Картинка заполняет область */
-    border-radius: 10px; /* Скругленные углы */
-    margin-top: 10px; /* Отступ сверху */
-}
-.active-orders-page .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-
-.active-orders-page .modal {
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    text-align: center;
-    z-index: 1001;
-}
-
-.active-orders-page .stars {
-    font-size: 30px;
-    cursor: pointer;
-}
-
-.active-orders-page .star {
-    color: gray;
-    transition: color 0.2s;
-}
-
-.active-orders-page .star.selected {
-    color: gold;
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1); /* разделение */
 }
 
 
-/* --- АДАПТАЦИЯ ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ --- */
-@media (max-width: 480px) {
-    .active-orders-page .orders-container {
-        padding: calc(65px + env(safe-area-inset-top)) 10px calc(70px + env(safe-area-inset-bottom));
-    }
-
-    .active-orders-page  .orders-wrapper {
-        max-width: 100%;
-    }
-
-    .active-orders-page  .order-card {
-        padding: 12px;
-    }
-
-    .active-orders-page  .page-title {
-        font-size: 20px;
-    }
-
-    .active-orders-page .orders-wrapper .action-buttons {
-        flex-direction: column;
-        gap: 6px;
-    }
-
-    .active-orders-page .orders-wrapper .action-buttons button {
-        flex: none;
-        width: 100%;
-    }
-}
-@media (max-width: 768px) {
-    .active-orders-page .orders-wrapper .action-buttons {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 8px;
-    }
-
-    .active-orders-page .orders-wrapper .action-buttons button {
-        width: 40px;
-        height: 40px;
-        padding: 5px;
-        font-size: 20px;
-        min-width: auto;
-    }
-
-    .active-orders-page  .orders-wrapper .action-buttons button svg {
-        width: 20px;
-        height: 20px;
-    }
-}
-/* --- МОБИЛЬНАЯ ВЕРСИЯ: компактные кнопки в один ряд --- */
-@media (max-width: 480px) {
-    .active-orders-page .orders-wrapper .action-buttons {
-        flex-direction: row;  /* Горизонтальное расположение кнопок */
-        flex-wrap: nowrap;
-        justify-content: space-between;
-    }
-
-    .active-orders-page .orders-wrapper .action-buttons button {
-        flex: 1;
-        min-width: auto;
-        padding: 8px;
-        font-size: 0; /* Скрываем текст */
-        height: 40px; /* Уменьшаем высоту кнопок */
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-
+.dot {
+    margin-left: 10px;
 }
 
-/* Контейнер, чтобы изображения не выходили за границы */
-.active-orders-page .image-stack-container {
-    width: 120px; /* Фиксированная ширина */
-    height: 80px; /* Фиксированная высота */
-    overflow: hidden; /* Ограничиваем выход изображений */
-    position: relative;
-}
-
-/* Контейнер для колоды */
-.active-orders-page .image-stack {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    cursor: pointer;
-}
-
-/* Стили для изображений */
-.active-orders-page .order-image {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    object-fit: cover; /* Заполняем контейнер */
-    border-radius: 8px;
-    transition: transform 0.3s ease, z-index 0.3s ease;
-}
-
-/* Увеличение при наведении */
-.active-orders-page .image-stack:hover .order-image {
-    transform: scale(1.1) !important;
-    z-index: 5;
-}
-
-/* Модальное окно поверх всего */
-.active-orders-page .modal {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1000;
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-}
-
-.active-orders-page .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 999;
-}
 .payment-icon-container {
     display: flex;
     align-items: center;
-    gap: 8px; /* Отступ между иконкой и текстом */
-    margin-top: 5px; /* Добавляет отступ от заголовка */
+    margin-top: 0.5rem;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    background: rgba(99, 102, 241, 0.1);
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.75rem;
+    width: fit-content;
 }
 
 .payment-icon {
     font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6366f1;
+    background: white;
+    border-radius: 50%;
+    padding: 0.4rem;
+    box-shadow: 0 0 0 2px #c7d2fe;
+}
+
+
+.payment-label {
+    font-weight: 500;
+}
+
+.action-buttons {
+    margin-top: 1rem;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    overflow-x: auto;
+}
+
+.call-button,
+.message-button,
+.route-button,
+.complain-button,
+.complete-button,
+.remove-button {
+    width: 110px; /* фиксированная ширина */
+    padding: 0.4rem 0.6rem;
+    font-size: 0.85rem;
+    border: none;
+    border-radius: 0.6rem;
+    background: linear-gradient(135deg, #c7d2fe, #e0e7ff);
+    color: #1f2937;
+    font-weight: 500;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    transition: background 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.call-button:hover,
+.message-button:hover,
+.route-button:hover,
+.complain-button:hover,
+.complete-button:hover,
+.remove-button:hover {
+    background: linear-gradient(135deg, #a5b4fc, #c7d2fe);
+}
+
+
+.order-details {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.image-stack-container {
+    margin-top: 1rem;
+    overflow-x: auto;
+}
+
+.image-stack {
+    display: flex;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.order-image {
+    height: 80px;
+    border-radius: 0.5rem;
+    object-fit: cover;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Анимация */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.order-card.creator {
+    background-color: #f0f8ff; /* Светлый фон для заказов, созданных пользователем */
+    border-left: 5px solid #007bff; /* Синяя линия слева для выделения */
+    padding: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Легкая тень для выделения */
+}
+
+.order-card.creator .order-header {
+    font-weight: bold; /* Подчеркивание важности заголовка */
+    color: #007bff; /* Цвет текста заголовка */
+}
+
+.order-card.creator .order-title {
+    color: #333; /* Цвет заголовка заказа */
+}
+
+/* Пустой список */
+.no-orders {
+    text-align: center;
+    font-size: 1.2rem;
+    color: #6b7280;
+    padding: 2rem;
+}
+
+@media (max-width: 768px) {
+    .active-orders-page {
+        padding: 1rem;
+        margin-top: 30px;
+        margin-bottom: 30px;
+    }
+
+    .orders-container {
+        padding: 1.5rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    .order-card {
+        padding: 1rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .order-title {
+        font-size: 1rem;
+        padding-bottom: 0.4rem;
+        margin-bottom: 0.6rem;
+    }
+
+    .payment-icon-container {
+        font-size: 0.85rem;
+        padding: 0.3rem 0.6rem;
+        gap: 0.4rem;
+    }
+
+    .payment-icon {
+        font-size: 1rem;
+        padding: 0.3rem;
+    }
+
+    .action-buttons {
+        gap: 0.4rem;
+        margin-top: 0.8rem;
+    }
+
+    .call-button,
+    .message-button,
+    .route-button,
+    .complain-button,
+    .complete-button,
+    .remove-button {
+        width: 90px;
+        font-size: 0.75rem;
+        padding: 0.3rem 0.5rem;
+        border-radius: 0.5rem;
+    }
+
+    .order-details {
+        margin-top: 0.8rem;
+        padding-top: 0.8rem;
+    }
+
+    .image-stack {
+        gap: 0.4rem;
+    }
+
+    .order-image {
+        height: 70px;
+        border-radius: 0.4rem;
+    }
+
+    .no-orders {
+        font-size: 1rem;
+        padding: 1.5rem;
+    }
 }
 

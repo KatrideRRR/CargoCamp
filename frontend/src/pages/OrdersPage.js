@@ -5,6 +5,7 @@ import '../styles/OrdersPage.css';
 import io from 'socket.io-client';
 import Modal from 'react-modal';
 import SwipeableMap from "../components/SwipeableMap.js";
+import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 const socket = io(process.env.REACT_APP_SOCKET_URL, {
@@ -47,10 +48,19 @@ const OrdersPage = () => {
     }, []);
 
     // Функция для получения иконки по способу оплаты
-    const getPaymentIcon = (paymentType) => {
-        const method = paymentMethods.find(method => method.id === paymentType);
-        return method ? method.icon : "";
+    const getPaymentIcon = (type) => {
+        switch (type) {
+            case 'guarantee':
+                return <FaUniversity title="Tinkoff" />;
+            case 'cash':
+                return <FaMoneyBillWave title="Наличные" />;
+            case 'installments':
+                return <FaCreditCard title="Карта" />;
+            default:
+                return <FaQuestionCircle title="Неизвестно" />;
+        }
     };
+
 
     const openModal = (images) => {
         setCurrentImages(images);
@@ -375,21 +385,22 @@ const OrdersPage = () => {
                                                                 <strong>Рейтинг
                                                                     заказчика:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
                                                             </p>
-                                                            {/* Иконка способа оплаты */}
-                                                            <div className="payment-info">
-                                                        <span
-                                                            className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
-                                                                <span className="payment-label">
-                {paymentMethods.find(method => method.id === order.paymentType)?.label}
-                </span>
-                                                            </div>
-                                                            {/* Кнопка для перехода на страницу жалоб */}
+
                                                             {creator.username && (
                                                                 <Link to={`/complaints/${order.creatorId}`}
                                                                       className="complaints-button">
                                                                     Жалобы на создателя: {creator.complaintsCount || 0}
                                                                 </Link>
                                                             )}
+                                                            {/* Иконка способа оплаты */}
+                                                            <div className="order-payment-icon-container">
+                                                <span
+                                                    className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
+                                                                <span
+                                                                    className="payment-label">{paymentMethods.find(method => method.id === order.paymentType)?.label}</span>
+                                                            </div>
+
+
 
 
                                                         </div>
@@ -479,9 +490,6 @@ const OrdersPage = () => {
                             </div>
                         </div>
                     </Modal>
-
-
-            );
         </div>
     )
 };

@@ -8,6 +8,7 @@ import {useMediaQuery} from 'react-responsive';
 import {FaPhone, FaComments, FaRoute, FaExclamationTriangle, FaCheck, FaTrash} from 'react-icons/fa';
 import Modal from "react-modal";
 import axiosInstance from "../utils/axiosInstance";
+import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 const socket = io(process.env.REACT_APP_SOCKET_URL, {
@@ -38,16 +39,13 @@ const ActiveOrdersPage = () => {
         { id: "installments", label: "Рассрочка", icon: "💳" },
     ];
     const [removedOrders, setRemovedOrders] = useState(() => {
-        // Загружаем удалённые заказы из localStorage при загрузке страницы
         const saved = localStorage.getItem("removedOrders");
         return saved ? JSON.parse(saved) : [];
     });
     const [expandedOrders, setExpandedOrders] = useState({});
     const [unreadOrders, setUnreadOrders] = useState({});
-    const [notifications, setNotifications] = useState([]);
 
     useEffect(() => {
-        // Сохраняем удалённые заказы в localStorage при каждом изменении
         localStorage.setItem("removedOrders", JSON.stringify(removedOrders));
     }, [removedOrders]);
 
@@ -74,7 +72,6 @@ const ActiveOrdersPage = () => {
                 });
 
                 console.log("📦 Ответ от сервера:", response.data);
-                const { orders: activeOrders, notifications } = response.data; // Явно деструктурируем
 
                 // Проверяем, что `orders` - это массив
                 if (!Array.isArray(response.data.orders)) {
@@ -190,10 +187,19 @@ const ActiveOrdersPage = () => {
     };
 
     // Функция для получения иконки по способу оплаты
-    const getPaymentIcon = (paymentType) => {
-        const method = paymentMethods.find(method => method.id === paymentType);
-        return method ? method.icon : "";
+    const getPaymentIcon = (type) => {
+        switch (type) {
+            case 'guarantee':
+                return <FaUniversity title="Tinkoff" />;
+            case 'cash':
+                return <FaMoneyBillWave title="Наличные" />;
+            case 'installments':
+                return <FaCreditCard title="Карта" />;
+            default:
+                return <FaQuestionCircle title="Неизвестно" />;
+        }
     };
+
 
     const openModal = (images) => {
         setCurrentImages(images);
@@ -337,7 +343,7 @@ const ActiveOrdersPage = () => {
     return (
         <div className="active-orders-page">
 
-            <div className="orders-container">
+            <div className="active-orders-container">
                 <div className="orders-wrapper">
                     {orders.length > 0 ? (
                         <ul className="orders-list">
@@ -487,63 +493,63 @@ const ActiveOrdersPage = () => {
                     )}
                 </div>
 
-                <Modal
-                    appElement={document.getElementById('root')}
-                    isOpen={isModalOpen}
-                    onRequestClose={closeModal}
-                    contentLabel="Full Image Modal"
-                    className="custom-modal"
-                    overlayClassName="custom-modal-overlay"
-                >
-                    <div className="custom-modal-content">
-                        {/* Кнопка закрытия */}
-                        <button onClick={closeModal} className="custom-close-button">✖</button>
-
-                        {/* Изображение */}
-                        <img
-                            src={`${apiUrl}${currentImages[currentImageIndex]}`}
-                            alt="Full-size view"
-                            className="custom-modal-image"
-                        />
-
-                        {/* Кнопки переключения */}
-                        <div className="custom-image-navigation">
-                            <button onClick={prevImage} className="custom-nav-button">◀</button>
-                            <button onClick={nextImage} className="custom-nav-button">▶</button>
-                        </div>
-                    </div>
-                </Modal>
-
-                {/* Модальное окно для оценки */}
-                {showRatingModal && (
-                    <div className="modal-overlay" onClick={() => setShowRatingModal(false)}>
-                        <div className="modal" onClick={(e) => e.stopPropagation()}>
-                            <h2>Оцените участника</h2>
-                            <div className="stars">
-                                {[1, 2, 3, 4, 5].map((star) => (
-                                    <span key={star} className={star <= rating ? "star selected" : "star"}
-                                          onClick={() => setRating(star)}>★</span>
-                                ))}
-                            </div>
-                            <button onClick={submitRating} disabled={rating === 0}>Завершить заказ</button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Модальное окно для жалобы */}
-                {showComplaintModal && (
-                    <div className="modal-overlay" onClick={() => setShowComplaintModal(false)}>
-                        <div className="modal" onClick={(e) => e.stopPropagation()}>
-                            <h2>Напишите жалобу:</h2>
-                            <textarea value={complaintText} onChange={(e) => setComplaintText(e.target.value)}
-                                      rows="5" placeholder="Введите текст жалобы"/>
-                            <button onClick={handleSubmitComplaint}>Отправить</button>
-                        </div>
-                    </div>
-                )}
-
             </div>
-            );
+
+            <Modal
+                appElement={document.getElementById('root')}
+                isOpen={isModalOpen}
+                onRequestClose={closeModal}
+                contentLabel="Full Image Modal"
+                className="custom-modal"
+                overlayClassName="custom-modal-overlay"
+            >
+                <div className="custom-modal-content">
+                    {/* Кнопка закрытия */}
+                    <button onClick={closeModal} className="custom-close-button">✖</button>
+
+                    {/* Изображение */}
+                    <img
+                        src={`${apiUrl}${currentImages[currentImageIndex]}`}
+                        alt="Full-size view"
+                        className="custom-modal-image"
+                    />
+
+                    {/* Кнопки переключения */}
+                    <div className="custom-image-navigation">
+                        <button onClick={prevImage} className="custom-nav-button">◀</button>
+                        <button onClick={nextImage} className="custom-nav-button">▶</button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Модальное окно для оценки */}
+            {showRatingModal && (
+                <div className="modal-overlay" onClick={() => setShowRatingModal(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()}>
+                        <h2>Оцените участника</h2>
+                        <div className="stars">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                                <span key={star} className={star <= rating ? "star selected" : "star"}
+                                      onClick={() => setRating(star)}>★</span>
+                            ))}
+                        </div>
+                        <button onClick={submitRating} disabled={rating === 0}>Завершить заказ</button>
+                    </div>
+                </div>
+            )}
+
+            {/* Модальное окно для жалобы */}
+            {showComplaintModal && (
+                <div className="modal-overlay" onClick={() => setShowComplaintModal(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()}>
+                        <h2>Напишите жалобу:</h2>
+                        <textarea value={complaintText} onChange={(e) => setComplaintText(e.target.value)}
+                                  rows="5" placeholder="Введите текст жалобы"/>
+                        <button onClick={handleSubmitComplaint}>Отправить</button>
+                    </div>
+                </div>
+            )}
+
         </div>
     )
 
