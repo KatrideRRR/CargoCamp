@@ -1,3 +1,4 @@
+import RequestModal from '../components/RequestModal'; // путь к компоненту
 import React, { useEffect, useState } from 'react';
 import axiosInstance from '../utils/axiosInstance';
 import {Link, useNavigate} from 'react-router-dom';
@@ -32,6 +33,9 @@ const OrdersPage = () => {
     const navigate = useNavigate();
     const [filteredByCategory, setFilteredByCategory] = useState([]); // заказы после фильтра по категории
     const [isMapVisible, setIsMapVisible] = useState(true); // Состояние для контроля видимости карты
+    const [showModal, setShowModal] = useState(false);
+    const [activeOrderId, setActiveOrderId] = useState(null);
+
 
     const paymentMethods = [
         { id: "cash", label: "Наличные", icon: "💵" },
@@ -61,6 +65,10 @@ const OrdersPage = () => {
         }
     };
 
+    const openModalRequest = (orderId) => {
+        setActiveOrderId(orderId);
+        setShowModal(true);
+    };
 
     const openModal = (images) => {
         setCurrentImages(images);
@@ -81,6 +89,7 @@ const OrdersPage = () => {
     const prevImage = () => {
         setCurrentImageIndex((prevIndex) => (prevIndex - 1 + currentImages.length) % currentImages.length);  // Переход к предыдущему изображению
     };
+
 
     // Получение геолокации пользователя
     const getUserLocation = () => {
@@ -289,14 +298,39 @@ const OrdersPage = () => {
         if (!token) {
             alert('Вы не авторизованы! Пожалуйста, войдите в систему.');
             navigate('/login');
+            return;
         }
+
+        const proposedSum = prompt("Введите сумму, которую вы хотите получить за выполнение:");
+        const comment = prompt("Комментарий к заказчику (необязательно):");
+
+        if (!proposedSum) {
+            alert("Вы не указали сумму!");
+            return;
+        }
+
         try {
-            await axiosInstance.post(`/orders/${orderId}/request`);
+            await axiosInstance.post(`/orders/${orderId}/request`, { proposedSum, comment }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             alert("Запрос отправлен заказчику!");
         } catch (error) {
             console.error("Ошибка при запросе на выполнение заказа:", error);
         }
     };
+
+    const sendRequest = async ({ proposedSum, comment }) => {
+        const token = localStorage.getItem('authToken');
+        try {
+            await axiosInstance.post(`/orders/${activeOrderId}/request`, { proposedSum, comment }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert("Запрос отправлен заказчику!");
+        } catch (error) {
+            console.error("Ошибка при запросе на выполнение заказа:", error);
+        }
+    };
+
 
     if (error) {
         return <div className="error-message">Ошибка: {error}</div>;
@@ -448,10 +482,13 @@ const OrdersPage = () => {
 
 
                                                 {userId !== order.creatorId && !order.executorId && order.status === 'pending' && (
-                                                    <button className="take-order-button"
-                                                            onClick={() => handleRequestOrder(order.id)}>Запросить
-                                                        выполнение</button>
+                                                    <button className="take-order-button" onClick={() => handleRequestOrder(order.id)}>
+                                                        Запросить выполнение
+                                                    </button>
                                                 )}
+
+
+
                                             </li>
                                         );
                                     })}
@@ -464,6 +501,7 @@ const OrdersPage = () => {
                     </div>
                 </div>
             </div>
+
             <Modal
                 appElement={document.getElementById('root')}
                 isOpen={isModalOpen}
@@ -490,6 +528,9 @@ const OrdersPage = () => {
                             </div>
                         </div>
                     </Modal>
+
+
+
         </div>
     )
 };

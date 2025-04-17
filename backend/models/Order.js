@@ -49,6 +49,12 @@ module.exports = (sequelize) => {
                 type: DataTypes.ENUM('cash', 'guarantee', 'installment'),
                 allowNull: false
             },
+            requests: {
+                type: DataTypes.JSON,
+                allowNull: true,
+                defaultValue: [],
+            },
+
         },
         {
             sequelize,

@@ -235,6 +235,8 @@ const MyOrdersPage = () => {
                                                                 {executor.username} {executor.id} (Рейтинг: {executor.rating ? executor.rating.toFixed(1) : "—"} ⭐,
                                                                 Оценок: {executor.ratingCount || 0})
                                                             </p>
+                                                            <p>Цена: {executor.proposedSum ? `${executor.proposedSum} ₽` : "—"}</p>
+                                                            {executor.comment && <p>Комментарий: {executor.comment}</p>}
 
                                                             {executor.isVerified && (
                                                                 <span

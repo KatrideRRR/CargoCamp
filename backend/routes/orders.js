@@ -211,49 +211,54 @@ module.exports = (io) => {
 
     // Запрос на выполнение заказа
     router.post("/:id/request", authenticateToken, async (req, res) => {
-        const { id } = req.params; // ID заказа
-        const executorId = req.user.id; // ID исполнителя
+        const { id } = req.params;
+        const { proposedSum, comment } = req.body;
+        const executorId = req.user.id;
 
         try {
             const order = await Order.findByPk(id);
+            if (!order) return res.status(404).json({ message: "Заказ не найден" });
+            if (order.status !== "pending") return res.status(400).json({ message: "Заказ недоступен" });
 
-            if (!order) {
-                console.log(`❌ Заказ с ID ${id} не найден.`);
-                return res.status(404).json({ message: "Заказ не найден" });
+            // Парсим existing requests
+            let requests = [];
+            if (order.requests) {
+                try {
+                    requests = Array.isArray(order.requests) ? order.requests : JSON.parse(order.requests);
+                } catch (e) {
+                    console.error("Ошибка парсинга requests:", e);
+                }
             }
 
-            if (order.status !== "pending") {
-                console.log(`⚠️ Заказ ${id} недоступен (статус: ${order.status}).`);
-                return res.status(400).json({ message: "Заказ недоступен" });
+            // Проверка на повторный запрос
+            if (requests.some(req => req.executorId === executorId)) {
+                return res.status(400).json({ message: "Вы уже отправили запрос на этот заказ" });
             }
 
-            // Загружаем `requestedExecutors`
+            // Добавляем новый запрос
+            requests.push({
+                executorId,
+                proposedSum,
+                comment,
+                createdAt: new Date().toISOString()
+            });
+
+            order.requests = JSON.stringify(requests);
+
+            // Обновим requestedExecutors (старый механизм)
             let requestedExecutors = [];
             if (order.requestedExecutors) {
                 try {
                     requestedExecutors = JSON.parse(order.requestedExecutors);
-                    if (!Array.isArray(requestedExecutors)) requestedExecutors = [];
-                } catch (error) {
-                    console.error("Ошибка парсинга requestedExecutors:", error);
-                    requestedExecutors = [];
-                }
+                } catch (e) {}
+            }
+            if (!requestedExecutors.includes(executorId)) {
+                requestedExecutors.push(executorId);
+                order.requestedExecutors = JSON.stringify(requestedExecutors);
             }
 
-            // Проверяем, не отправлял ли уже этот исполнитель запрос
-            if (requestedExecutors.includes(executorId)) {
-                console.log(`🔄 Исполнитель ${executorId} уже запрашивал заказ ${id}.`);
-                return res.status(400).json({ message: "Вы уже отправили запрос на этот заказ" });
-            }
-
-            // Добавляем исполнителя в список запросов
-            requestedExecutors.push(executorId);
-            order.requestedExecutors = JSON.stringify(requestedExecutors);
             await order.save();
 
-            // Логируем ID заказчика (userId)
-            console.log(`🔔 Отправляем уведомление заказчику userId=${order.userId} о запросе на заказ ID=${order.id}`);
-
-            // Отправляем уведомление ТОЛЬКО заказчику
             io.emit(`orderRequest:${order.userId}`, { orderId: order.id });
 
             res.json({ message: "Запрос на выполнение отправлен заказчику", order });
@@ -269,12 +274,12 @@ module.exports = (io) => {
 
         try {
             const order = await Order.findByPk(id);
+            const requests = order.requests ? JSON.parse(order.requests) : [];
 
             if (!order) {
                 return res.status(404).json({ message: 'Заказ не найден' });
             }
 
-    // Парсим массив ID исполнителей
             let requestedExecutors = [];
             if (order.requestedExecutors) {
                 // Проверяем, что строка не пуста и является строкой
@@ -306,8 +311,16 @@ module.exports = (io) => {
                 attributes: ['id', 'username', 'rating', 'ratingCount', 'isVerified'] // Выбираем нужные поля
             });
             console.log('📡 Ответ сервера:', requestedExecutors);
+            const result = executors.map(exec => {
+                const reqData = requests.find(r => r.executorId === exec.id);
+                return {
+                    ...exec.toJSON(),
+                    proposedSum: reqData?.proposedSum,
+                    comment: reqData?.comment
+                };
+            });
 
-            res.json(executors || []);
+            res.json(result);
         } catch (error) {
             console.error('Ошибка при получении запросивших исполнителей:', error);
             res.status(500).json({ message: 'Ошибка сервера' });
@@ -354,6 +367,24 @@ module.exports = (io) => {
             if (!requestedExecutors.includes(executorId)) {
                 console.log('❌ Исполнитель не найден среди запросивших');
                 return res.status(400).json({ message: 'Исполнитель не найден среди запросивших' });
+            }
+
+            // Предположим, что заявки хранятся как строка JSON в order.requests
+            let requests = [];
+            try {
+                requests = JSON.parse(order.requests);
+                if (!Array.isArray(requests)) requests = [];
+            } catch (error) {
+                console.error('Ошибка парсинга requests:', error);
+            }
+
+            const matchedRequest = requests.find(r => r.executorId === executorId);
+
+            if (matchedRequest) {
+                order.proposedSum = matchedRequest.proposedSum; // 👈 Сюда пишем цену из заявки
+                console.log(`💰 Установлена сумма заказа: ${matchedRequest.proposedSum} ₽`);
+            } else {
+                console.log('⚠️ Не найдена заявка исполнителя, сумма не будет обновлена');
             }
 
             // Устанавливаем исполнителя и очищаем список запросов
