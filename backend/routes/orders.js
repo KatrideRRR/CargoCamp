@@ -8,7 +8,9 @@ const { Op } = require('sequelize');
 const path = require('path');
 const { Sequelize } = require('sequelize');  // Импортируем Sequelize
 const moment = require('moment'); // Для работы с датами
-const { Order, User } = require('../models'); // Добавь User
+const { Order, User, Category, Subcategory } = require('../models'); // Добавь User
+const fs = require('fs');
+const generateContractPDF = require('../utils/generateContractPDF'); // путь поправь, если другой
 
 // Устанавливаем интервал для проверки заказов (например, каждое утро в 6:00)
 setInterval(async () => {
@@ -396,6 +398,40 @@ module.exports = (io) => {
 
             console.log(`✅ Заказ ${order.id} одобрен, исполнитель выбран!`);
 
+            // ⬇️ Добавляем updatedAt (если нужно)
+            order.updatedAt = new Date();
+            await order.save();
+
+// ✅ Генерация PDF-договора
+            const contractData = {
+                orderId: order.id,
+                approvalDate: new Date().toLocaleDateString('ru-RU'),
+                city: 'Москва', // или из профиля
+                customerId: order.creatorId,
+                performerId: executorId,
+                customerName: `Пользователь ${order.creatorId}`, // позже можно из Users
+                performerName: `Пользователь ${executorId}`,     // позже можно из Users
+                category: order.category || 'Общая категория',
+                subcategory: order.subcategory || 'Общая подкатегория',
+                address: order.address || 'Адрес не указан',
+                description: order.description || 'Описание не указано',
+                price: order.proposedSum || 0,
+                paymentType: order.paymentType || 'не указано',
+                dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('ru-RU'),
+                completeAt: null,
+                completedBy: [],
+            };
+
+// Путь для сохранения файла
+            const filePath = path.join(__dirname, '..', 'contracts', `contract_${order.id}.pdf`);
+
+            try {
+                await generateContractPDF(contractData, filePath);
+                console.log(`📄 Договор сохранён: ${filePath}`);
+            } catch (err) {
+                console.error('❌ Ошибка генерации PDF договора:', err);
+            }
+
             // Обновление списка заказов
             io.emit('orderUpdated');
 
@@ -454,56 +490,86 @@ module.exports = (io) => {
     router.post("/complete/:id", authenticateToken, async (req, res) => {
         try {
             const orderId = req.params.id;
-            const userId = req.user.id; // ID текущего пользователя
+            const userId = req.user.id;
 
             const order = await Order.findByPk(orderId);
             if (!order) return res.status(404).json({ message: "Заказ не найден" });
 
-            // Проверяем, есть ли текущий пользователь среди тех, кто подтверждал завершение
             if (order.completedBy.includes(userId)) {
                 return res.status(400).json({ message: "Вы уже подтвердили завершение" });
             }
 
-            // Добавляем пользователя в массив `completedBy`
             order.completedBy = [...order.completedBy, userId];
 
-            // Проверьте, если заказчик подтвердил завершение
             if (order.completedBy.includes(order.creatorId) && !order.completedBy.includes(order.executorId)) {
-                // Уведомление исполнителю
                 io.to(`user_${order.executorId}`).emit('orderCompleted', {
                     orderId: order.id,
                     message: 'Заказчик предложил завершить заказ',
                 });
             }
 
-            // Проверьте, если исполнитель подтвердил завершение
             if (order.completedBy.includes(order.executorId) && !order.completedBy.includes(order.creatorId)) {
-                // Уведомление заказчику
                 io.to(`user_${order.creatorId}`).emit('orderCompleted', {
                     orderId: order.id,
                     message: 'Исполнитель предложил завершить заказ',
-                    creatorId: order.creatorId,   // ✅ Добавлено
-                    executorId: order.executorId  // ✅ Добавлено
+                    creatorId: order.creatorId,
+                    executorId: order.executorId
                 });
             }
 
-
-            // Если оба участника подтвердили, устанавливаем статус "completed"
             if (order.completedBy.includes(order.creatorId) && order.completedBy.includes(order.executorId)) {
                 order.status = "completed";
+                order.completedAt = new Date();
             }
-            order.completedAt = new Date(); // Фиксируем дату завершения
+
             await order.save();
 
-            io.emit('orderUpdated'); // Обновление списка заказов
-            io.emit('activeOrdersUpdated'); // Обновляем список активных заказов
+            // 👉 Обновим заказ с пользователями
+            const fullOrder = await Order.findByPk(orderId, {
+                include: [
+                    { model: User, as: 'creator' },
+                    { model: User, as: 'executor' },
+                    { model: Category, as: 'category' },
+                    { model: Subcategory, as: 'subcategory' }
+                ]
+            });
 
-            res.json(order);
+            // 👉 Генерация PDF с учетом второй страницы
+            const data = {
+                orderId: fullOrder.id,
+                approvalDate: fullOrder.createdAt.toLocaleDateString('ru-RU'),
+                city: "Москва", // или брать из данных заказа
+                customerId: fullOrder.creatorId,
+                customerName: fullOrder.creator.username,
+                performerId: fullOrder.executorId,
+                performerName: fullOrder.executor.username,
+                category: fullOrder.category.name,
+                subcategory: fullOrder.subcategory.name,
+                address: fullOrder.address,
+                description: fullOrder.description,
+                price: fullOrder.proposedSum,
+                paymentType: fullOrder.paymentType,
+                dueDate: new Date(fullOrder.createdAt.getTime() + 5 * 24 * 60 * 60 * 1000).toLocaleDateString('ru-RU'),
+                completeAt: fullOrder.completedAt,
+                completedBy: fullOrder.completedBy
+            };
+
+            const contractPath = path.join(__dirname, `../contracts/contract_${order.id}.pdf`);
+            await generateContractPDF(data, contractPath);
+
+            fullOrder.contractPath = contractPath;
+            await fullOrder.save();
+
+            io.emit('orderUpdated');
+            io.emit('activeOrdersUpdated');
+
+            res.json(fullOrder);
         } catch (error) {
             console.error("Ошибка завершения заказа:", error);
             res.status(500).json({ message: "Ошибка сервера" });
         }
     });
+
 
     // Эндпоинт для отправки жалобы
     router.post('/complain', authenticateToken, async (req, res) => {

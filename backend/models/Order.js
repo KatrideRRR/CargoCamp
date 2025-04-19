@@ -8,6 +8,8 @@ module.exports = (sequelize) => {
             Order.belongsTo(models.User, { foreignKey: 'userId', as: 'users' });
             Order.belongsTo(models.Category, { foreignKey: 'categoryId', as: 'category' });
             Order.belongsTo(models.Subcategory, { foreignKey: 'subcategoryId', as: 'subcategory' });
+            Order.belongsTo(models.User, { as: 'creator', foreignKey: 'creatorId' });
+            Order.belongsTo(models.User, { as: 'executor', foreignKey: 'executorId' });
         }
     }
 
