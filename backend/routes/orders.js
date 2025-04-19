@@ -156,8 +156,10 @@ module.exports = (io) => {
                 },
                 include: [
                     { model: db.Category, as: 'category', attributes: ['id', 'name'] },
-                    { model: db.Subcategory, as: 'subcategory', attributes: ['id', 'name'] }
-                ]
+                    { model: db.Subcategory, as: 'subcategory', attributes: ['id', 'name'] },
+                    { model: User, as: 'creator', attributes: ['id', 'username']},
+                    { model: User, as: 'executor', attributes: ['id', 'username']},
+                ],
             });
 
             if (!activeOrders.length) {
@@ -424,10 +426,14 @@ module.exports = (io) => {
 
 // Путь для сохранения файла
             const filePath = path.join(__dirname, '..', 'contracts', `contract_${order.id}.pdf`);
-
+            console.log(filePath)
             try {
                 await generateContractPDF(contractData, filePath);
                 console.log(`📄 Договор сохранён: ${filePath}`);
+                order.contractPath = path.relative(path.join(__dirname, '..'), filePath); // например, "contracts/contract_123.pdf"
+                await order.save();
+                console.log(`💾 Путь к договору сохранён в БД: ${order.contractPath}`);
+
             } catch (err) {
                 console.error('❌ Ошибка генерации PDF договора:', err);
             }
@@ -570,7 +576,6 @@ module.exports = (io) => {
         }
     });
 
-
     // Эндпоинт для отправки жалобы
     router.post('/complain', authenticateToken, async (req, res) => {
         const { orderId, complaintText } = req.body;
@@ -643,7 +648,7 @@ module.exports = (io) => {
                         { executorId: userId }   // Исполнитель
                     ]
                 },
-                attributes: ['id','type','address','proposedSum', 'status', 'completedAt', 'creatorId', 'executorId', 'description'], // Указываем, какие поля хотим вернуть
+                attributes: ['id','type','address','proposedSum', 'status', 'completedAt', 'creatorId', 'executorId', 'description', 'contractPath'], // Указываем, какие поля хотим вернуть
             });
 
             // Отправляем заказ с актуальной датой завершения

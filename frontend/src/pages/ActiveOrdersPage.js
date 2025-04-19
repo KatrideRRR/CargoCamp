@@ -476,8 +476,22 @@ const ActiveOrdersPage = () => {
                                                         </div>
                                                     </div>
                                                 )}
+                                                {order.contractPath && (
+                                                    <div className="mt-2">
+                                                        <a
+                                                            href={`http://localhost:5001/${order.contractPath.replace(/\\/g, '/')}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-blue-600 underline hover:text-blue-800 transition"
+                                                        >
+                                                            Скачать договор (PDF)
+                                                        </a>
+                                                    </div>
+                                                )}
 
                                                 <p><strong>Описание:</strong> {order.description}</p>
+
+
                                             </div>
                                         )}
 

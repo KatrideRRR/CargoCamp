@@ -52,6 +52,16 @@ const OrderHistoryPage = () => {
                             <p><strong>ID создателя:</strong> {order.creatorId}</p>
                             <p><strong>ID исполнителя:</strong> {order.executorId}</p>
                             <p><strong>Дата завершения:</strong> {order.completedAt}</p>
+                            {order.contractPath && (
+                                <a
+                                    href={`http://localhost:5001/${order.contractPath.replace(/^.*contracts[\\/]/, 'contracts/')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    Скачать договор (PDF)
+                                </a>
+                            )}
+
                         </li>
                     ))}
                 </ul>

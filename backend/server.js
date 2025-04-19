@@ -4,6 +4,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const http = require('http');
 const jwt = require('jsonwebtoken');
+const path = require('path');
 
 const { initializeSocket } = require('./socket'); // Импортируем инициализацию WebSocket
 const orderRoutes = require('./routes/orders');
@@ -30,6 +31,7 @@ app.use('/uploads', express.static('uploads'));
 app.use('/api/category', categoryRouter);
 app.use('/api/admin', adminRoutes);
 app.use("/api/payment", payment);
+app.use('/contracts', express.static(path.join(__dirname, 'contracts')));
 
 // Database connection
 const sequelize = require('./config/database');

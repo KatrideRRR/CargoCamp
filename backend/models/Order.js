@@ -56,6 +56,10 @@ module.exports = (sequelize) => {
                 allowNull: true,
                 defaultValue: [],
             },
+            contractPath: {
+                type: DataTypes.STRING,
+                allowNull: true
+            }
 
         },
         {
