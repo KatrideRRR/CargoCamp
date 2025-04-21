@@ -2,8 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { User } = require('../models'); // Убедитесь, что путь к модели корректен
-const authenticateToken = require('../middlewares/authenticateToken'); // Middleware для проверки токена
+const { User } = require('../models');
+const authenticateToken = require('../middlewares/userAuth');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
@@ -15,16 +15,14 @@ const storage = multer.diskStorage({
         cb(null, 'uploads/upload-document');
     },
     filename: (req, file, cb) => {
-        const userId = req.user.id; // Получаем ID пользователя из токена или сессии
-        const ext = path.extname(file.originalname); // Получаем расширение файла (например, .jpg)
+        const userId = req.user.id;
+        const ext = path.extname(file.originalname);
 
-        // Имя файла будет таким: id_пользователя_номер_изображения.расширение
-        // Для этого нужно будет сначала получить количество загруженных файлов для пользователя
         User.findByPk(userId)
             .then(user => {
                 const imageCount = user.documentPhotos ? user.documentPhotos.length : 0;
-                const newFileName = `${userId}_${imageCount + 1}${ext}`; // Формируем новое имя
-                cb(null, newFileName); // Отправляем новое имя файла
+                const newFileName = `${userId}_${imageCount + 1}${ext}`;
+                cb(null, newFileName);
             })
             .catch(error => {
                 cb(error);
@@ -35,7 +33,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 const generateTemporaryPassword = () => {
-    return Math.random().toString(36).slice(-8); // Генерируем случайный 8-значный пароль
+    return Math.random().toString(36).slice(-8);
 };
 
 const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -181,7 +179,7 @@ router.post('/login', async (req, res) => {
 router.get('/profile', authenticateToken, async (req, res) => {
     try {
         const user = await User.findByPk(req.user.id, {
-            attributes: ['id', 'username', 'phone','cardLastFour' ,'cardType' , 'rating', 'createdAt','complaints','complaintsCount', 'isVerified', 'cardLastFour', 'cardType'],
+            attributes: ['id', 'username', 'phone','cardLastFour' ,'cardType' , 'rating', 'createdAt','complaints','complaintsCount', 'userStatus', 'cardLastFour', 'cardType'],
         });
 
         if (!user) {

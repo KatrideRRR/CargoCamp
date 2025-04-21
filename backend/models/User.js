@@ -57,9 +57,10 @@ module.exports = (sequelize) => {
                 type: DataTypes.ENUM('user', 'admin', 'banned'),
                 defaultValue: 'user' // по умолчанию обычный пользователь
             },
-            isVerified: {
-                type: Sequelize.BOOLEAN,
-                defaultValue: false,
+            userStatus: {
+                type: DataTypes.STRING,
+                defaultValue: 'unverified',
+                allowNull: false
             },
             cardNumber: {
                 type: DataTypes.STRING,

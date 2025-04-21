@@ -118,13 +118,16 @@ function UsersPage() {
     };
     // Функция для обновления статуса верификации
     const toggleVerification = async (id, currentStatus) => {
+        const statusOptions = ["unverified", "pensioner", "verified"];
+        const currentIndex = statusOptions.indexOf(currentStatus);
+        const nextStatus = statusOptions[(currentIndex + 1) % statusOptions.length]; // Переход к следующему статусу
+
         try {
-            const newStatus = !currentStatus; // Меняем на противоположное значение
-            await axios.put(`${apiUrl}/api/admin/users/${id}/verify`, { isVerified: newStatus }, {
+            await axios.put(`${apiUrl}/api/admin/users/${id}/verify`, { userStatus: nextStatus }, {
                 headers: { Authorization: `Bearer ${token}` },
             });
-            setUsers(users.map(user => user.id === id ? { ...user, isVerified: newStatus } : user));
-            setFilteredUsers(filteredUsers.map(user => user.id === id ? { ...user, isVerified: newStatus } : user));
+            setUsers(users.map(user => user.id === id ? { ...user, userStatus: nextStatus } : user));
+            setFilteredUsers(filteredUsers.map(user => user.id === id ? { ...user, userStatus: nextStatus } : user));
         } catch (error) {
             console.error("Ошибка обновления верификации", error);
         }
@@ -173,10 +176,10 @@ function UsersPage() {
                         <td>{user.rating ? user.rating.toFixed(1) : "—"}</td>
                         <td>
                             <button
-                                className={`verify-button ${user.isVerified ? 'verified' : 'not-verified'}`}
-                                onClick={() => toggleVerification(user.id, user.isVerified)}
+                                className={`verify-button ${user.userStatus === 'verified' ? 'verified' : user.userStatus === 'pensioner' ? 'pensioner' : 'unverified'}`}
+                                onClick={() => toggleVerification(user.id, user.userStatus)}
                             >
-                                {user.isVerified ? 'Верифицирован' : 'Не верифицирован'}
+                                {user.userStatus === 'verified' ? 'Верифицирован' : user.userStatus === 'pensioner' ? 'Пенсионер' : 'Не верифицирован'}
                             </button>
                         </td>
 

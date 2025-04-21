@@ -198,3 +198,82 @@ button {
         transform: translateY(0);
     }
 }
+.verification-upload {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.verification-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.upload-label {
+    cursor: pointer;
+}
+
+.upload-button-style {
+    background: linear-gradient(to right, #6dd5ed, #2193b0);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    transition: background 0.3s ease;
+}
+
+.upload-button-style:hover {
+    background: linear-gradient(to right, #5bc0de, #1a7ca8);
+}
+
+.verification-status.verified {
+    color: #2ecc71;
+}
+
+.verification-status.not-verified {
+    color: #e74c3c;
+}
+.verification-upload {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.verification-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.verification-info {
+    display: flex;
+    justify-content: space-between; /* Размещаем верификацию и статус на одной линии */
+    align-items: center;
+    width: 100%;
+}
+
+.upload-label {
+    display: block;
+    width: 100%;
+}
+
+.upload-button-style {
+    display: inline-block;
+    background-color: #007bff;
+    color: white;
+    padding: 10px 15px;
+    text-align: center;
+    border-radius: 5px;
+    cursor: pointer;
+    width: 100%; /* Растягиваем на всю ширину */
+    text-align: center;
+    font-size: 16px;
+}
+
+.upload-button-style:hover {
+    background-color: #0056b3;
+}

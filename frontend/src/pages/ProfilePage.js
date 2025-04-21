@@ -16,6 +16,7 @@ const ProfilePage = () => {
     const { logout, isAuthenticated } = useAuth();
     const [cardInfo, setCardInfo] = useState();
     const [showAgreement, setShowAgreement] = useState(false);
+    const [documentFiles, setDocumentFiles] = useState([]);
 
     useEffect(() => {
         let isMounted = true;
@@ -136,6 +137,33 @@ const ProfilePage = () => {
         handleBindCard(); // твоя функция
     };
 
+    const handleAutoUpload = async (files) => {
+        const token = localStorage.getItem("authToken");
+
+        if (!files.length) return;
+
+        const formData = new FormData();
+        for (let file of files) {
+            formData.append("documents", file);
+        }
+
+        try {
+            const response = await axios.post(`${apiUrl}/api/auth/upload-documents`, formData, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "multipart/form-data",
+                },
+            });
+
+            toast.success("Документы успешно загружены");
+            // TODO: можно обновить профиль, если хочешь, чтобы верификация менялась на лету
+        } catch (error) {
+            console.error("Ошибка загрузки документов:", error);
+            toast.error("Ошибка загрузки документов");
+        }
+    };
+
+
     if (loading) {
         return <div className="loading-container">Загрузка данных профиля...</div>;
     }
@@ -185,18 +213,32 @@ const ProfilePage = () => {
                                 </button>
 
                             )}
-
-
-
-
                         </div>
 
-
-                        <div className="section verification-row">
+                        <div className="section verification-upload">
                             <h2 className="subtitle">Верификация:</h2>
-                            <p className={`info verification-status ${profile.isVerified ? "verified" : "not-verified"}`}>
-                                {profile.isVerified ? "Пройдена" : "Не пройдена"}
-                            </p>
+                            <div className="verification-content">
+                                <div className="verification-info">
+                                    <p className={`info verification-status ${profile.userStatus}`}>
+                                        {profile.userStatus === "pensioner"
+                                            ? "Пенсионер"
+                                            : profile.userStatus === "verified"
+                                                ? "Пройдена"
+                                                : "Не пройдена"}
+                                    </p>
+                                </div>
+
+                                <label className="upload-label">
+                                    <input
+                                        type="file"
+                                        multiple
+                                        accept="image/*,.pdf"
+                                        onChange={(e) => handleAutoUpload(e.target.files)}
+                                        style={{display: "none"}}
+                                    />
+                                    <span className="upload-button-style">Загрузить документы</span>
+                                </label>
+                            </div>
                         </div>
 
 

@@ -1,9 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const {Message, User} = require('../models');
-const authenticateToken = require('../middlewares/authenticateToken');
+const authenticateToken = require('../middlewares/userAuth');
 
-// Отправка сообщения
 router.post('/', authenticateToken, async (req, res) => {
     const {content, receiverId, orderId} = req.body;
 
@@ -29,7 +28,6 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 });
 
-// Получение сообщений для заказа
 router.get('/:orderId', authenticateToken, async (req, res) => {
     const {orderId} = req.params;
 

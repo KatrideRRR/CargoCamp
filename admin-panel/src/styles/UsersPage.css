@@ -231,3 +231,28 @@ button:disabled {
         font-size: 12px;
     }
 }
+.verify-button {
+    padding: 5px 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.verify-button.not-verified {
+    background-color: gray;
+    color: white;
+}
+
+.verify-button.pensioner {
+    background-color: #ffc107;
+    color: black;
+}
+
+.verify-button.verified {
+    background-color: green;
+    color: white;
+}
+
+.verify-button:hover {
+    opacity: 0.8;
+}

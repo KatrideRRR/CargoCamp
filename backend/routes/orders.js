@@ -2,17 +2,16 @@ const express = require('express');
 const router = express.Router();
 const NodeGeocoder = require('node-geocoder');
 const db = require('../models');
-const authenticateToken = require('../middlewares/authenticateToken');
+const authenticateToken = require('../middlewares/userAuth');
 const multer = require('multer');
 const { Op } = require('sequelize');
 const path = require('path');
-const { Sequelize } = require('sequelize');  // Импортируем Sequelize
-const moment = require('moment'); // Для работы с датами
-const { Order, User, Category, Subcategory } = require('../models'); // Добавь User
+const { Sequelize } = require('sequelize');
+const moment = require('moment');
+const { Order, User, Category, Subcategory } = require('../models');
 const fs = require('fs');
-const generateContractPDF = require('../utils/generateContractPDF'); // путь поправь, если другой
+const generateContractPDF = require('../utils/generateContractPDF');
 
-// Устанавливаем интервал для проверки заказов (например, каждое утро в 6:00)
 setInterval(async () => {
     try {
         // Получаем все заказы, которые не были взяты в работу и созданы более 24 часов назад
@@ -33,14 +32,14 @@ setInterval(async () => {
     } catch (error) {
         console.error("Ошибка при удалении старых заказов:", error);
     }
-}, 60 * 60 * 1000); // Проверка раз в час (можно настроить под свои нужды)
+}, 60 * 60 * 1000);
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'uploads/orders'); // Папка для загрузки изображений
+        cb(null, 'uploads/orders');
     },
     filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname)); // Уникальное имя файла
+        cb(null, Date.now() + path.extname(file.originalname));
     },
 });
 
@@ -50,7 +49,6 @@ const geocoder = NodeGeocoder({ provider: 'openstreetmap' });
 
 module.exports = (io) => {
 
-    // Add a new order
     router.post('/', authenticateToken, upload.array('images', 5), async (req, res) => {  // 'images' — это поле для загрузки
         const { address, description, workTime, proposedSum, type, categoryId, subcategoryId, paymentType} = req.body;
         const userId = req.user.id;
@@ -101,7 +99,6 @@ module.exports = (io) => {
         }
     });
 
-    // Получить все заказы
     router.get('/all', async (req, res) => {
         try {
             // Удаляем старые заказы, не взятые в работу (старше 24 часов)
@@ -188,7 +185,6 @@ module.exports = (io) => {
         }
     });
 
-    // Get order by ID
     router.get('/:id', async (req, res) => {
         const { id } = req.params;
 
@@ -213,7 +209,6 @@ module.exports = (io) => {
         }
     });
 
-    // Запрос на выполнение заказа
     router.post("/:id/request", authenticateToken, async (req, res) => {
         const { id } = req.params;
         const { proposedSum, comment } = req.body;
@@ -272,7 +267,6 @@ module.exports = (io) => {
         }
     });
 
-    // Получить список пользователей, запросивших заказ
     router.get('/:id/requested-executors', authenticateToken, async (req, res) => {
         const { id } = req.params;
 
@@ -331,7 +325,6 @@ module.exports = (io) => {
         }
     });
 
-    // Get approve for order
     router.post('/:id/approve', authenticateToken, async (req, res) => {
         const { id } = req.params;
         const { executorId } = req.body;  // Получаем executorId из тела запроса
@@ -404,7 +397,6 @@ module.exports = (io) => {
             order.updatedAt = new Date();
             await order.save();
 
-// ✅ Генерация PDF-договора
             const contractData = {
                 orderId: order.id,
                 approvalDate: new Date().toLocaleDateString('ru-RU'),
@@ -424,7 +416,6 @@ module.exports = (io) => {
                 completedBy: [],
             };
 
-// Путь для сохранения файла
             const filePath = path.join(__dirname, '..', 'contracts', `contract_${order.id}.pdf`);
             console.log(filePath)
             try {
@@ -460,7 +451,6 @@ module.exports = (io) => {
         }
     });
 
-    //Get reject for order
     router.post('/:id/reject', authenticateToken, async (req, res) => {
         const { id } = req.params;
 
@@ -492,7 +482,6 @@ module.exports = (io) => {
         }
     });
 
-    // Complete an order
     router.post("/complete/:id", authenticateToken, async (req, res) => {
         try {
             const orderId = req.params.id;
@@ -576,7 +565,6 @@ module.exports = (io) => {
         }
     });
 
-    // Эндпоинт для отправки жалобы
     router.post('/complain', authenticateToken, async (req, res) => {
         const { orderId, complaintText } = req.body;
         const userId = req.user?.id;
@@ -629,7 +617,6 @@ module.exports = (io) => {
         }
     });
 
-    // Завершенные заказы пользователя
     router.get('/completed/:userId', async (req, res) => {
         const { userId } = req.params;
 
@@ -659,7 +646,6 @@ module.exports = (io) => {
         }
     });
 
-    // Созданные пользователем заказы
     router.get('/creator/:userId', async (req, res) => {
         const { userId } = req.params;
 

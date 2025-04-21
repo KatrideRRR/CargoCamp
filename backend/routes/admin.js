@@ -1,5 +1,5 @@
 const express = require('express');
-const { authMiddleware, adminMiddleware } = require('../middlewares/adminMiddlewares');
+const { authMiddleware, adminMiddleware } = require('../middlewares/adminAuth');
 const { User, Order, Message, Category, Subcategory } = require('../models');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -11,12 +11,17 @@ const geocoder = NodeGeocoder({
 
 const router = express.Router();
 
-// PUT запрос для верификации пользователя
 router.put('/users/:id/verify', async (req, res) => {
     const { id } = req.params; // Получаем id пользователя из параметров URL
-    const { isVerified } = req.body; // Получаем новый статус верификации
+    const { userStatus } = req.body; // Получаем новый статус верификации
 
     try {
+        // Проверка на валидность статуса
+        const validStatuses = ["unverified", "pensioner", "verified"];
+        if (!validStatuses.includes(userStatus)) {
+            return res.status(400).json({ message: 'Неверный статус верификации' });
+        }
+
         // Ищем пользователя по ID
         const user = await User.findByPk(id);
 
@@ -24,8 +29,8 @@ router.put('/users/:id/verify', async (req, res) => {
             return res.status(404).json({ message: 'Пользователь не найден' });
         }
 
-        // Обновляем поле isVerified
-        user.isVerified = isVerified;
+        // Обновляем поле userStatus
+        user.userStatus = userStatus;
 
         // Сохраняем изменения в базе
         await user.save();
@@ -38,7 +43,7 @@ router.put('/users/:id/verify', async (req, res) => {
     }
 });
 
-// Получение документов пользователя (только для админов)
+
 router.get('/user-documents/:userId', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { userId } = req.params;
@@ -58,7 +63,6 @@ router.get('/user-documents/:userId', authMiddleware, adminMiddleware, async (re
     }
 });
 
-// Add a new order as admin
 router.post('/create-order', authMiddleware,  async (req, res) => {
     const { address, description, workTime, proposedSum, type, categoryId, subcategoryId, userId } = req.body;
 
@@ -100,7 +104,6 @@ router.post('/create-order', authMiddleware,  async (req, res) => {
     }
 });
 
-// Админский маршрут для создания пользователя
 router.post('/create-user', authMiddleware, adminMiddleware, async (req, res) => {
     const { username, phone, password } = req.body;
 
@@ -125,7 +128,6 @@ router.post('/create-user', authMiddleware, adminMiddleware, async (req, res) =>
     }
 });
 
-// Получить всех пользователей (только для админов)
 router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const users = await User.findAll();
@@ -135,7 +137,6 @@ router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
     }
 });
 
-// Заблокировать пользователя (установить статус "banned")
 router.put('/users/:id/block', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const user = await User.findByPk(req.params.id);
@@ -150,7 +151,6 @@ router.put('/users/:id/block', authMiddleware, adminMiddleware, async (req, res)
     }
 });
 
-// Разблокировать пользователя (установить статус "user")
 router.put('/users/:id/unblock', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const user = await User.findByPk(req.params.id);
@@ -165,7 +165,6 @@ router.put('/users/:id/unblock', authMiddleware, adminMiddleware, async (req, re
     }
 });
 
-// Получить все заказы
 router.get('/orders', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const orders = await Order.findAll();
@@ -175,7 +174,6 @@ router.get('/orders', authMiddleware, adminMiddleware, async (req, res) => {
     }
 });
 
-// Удалить заказ
 router.delete('/orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const order = await Order.findByPk(req.params.id);
@@ -188,7 +186,6 @@ router.delete('/orders/:id', authMiddleware, adminMiddleware, async (req, res) =
     }
 });
 
-// Вход администратора
 router.post('/login', async (req, res) => {
     const { phone, password } = req.body;
     try {
@@ -246,7 +243,6 @@ router.get("/:orderId/messages", async (req, res) => {
     }
 });
 
-// Детали заказа
 router.get('/orders/:id', async (req, res) => {
     const { id } = req.params;
     try {
@@ -267,7 +263,6 @@ router.get('/orders/:id', async (req, res) => {
     }
 });
 
-// Получение информации о пользователе по ID (включая жалобы)
 router.get("/users/:id/complaints", authMiddleware, adminMiddleware, async (req, res) => {
     const { id } = req.params;
 
@@ -290,7 +285,6 @@ router.get("/users/:id/complaints", authMiddleware, adminMiddleware, async (req,
     }
 });
 
-// routes/adminRoutes.js
 router.get("/users/:userId/orders", authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { userId } = req.params;
@@ -301,63 +295,5 @@ router.get("/users/:userId/orders", authMiddleware, adminMiddleware, async (req,
         res.status(500).json({ error: "Ошибка сервера" });
     }
 });
-
-// Админ создаёт заказ за другого пользователя
-router.post("/create", authMiddleware, adminMiddleware, async (req, res) => {
-        try {
-            const {
-                userId,
-                address,
-                description,
-                workTime,
-                proposedSum,
-                type,
-                categoryId,
-                subcategoryId,
-            } = req.body;
-
-            if (!userId || !address) {
-                return res.status(400).json({ message: "ID пользователя и адрес обязательны" });
-            }
-
-            // Проверяем, существует ли пользователь
-            const user = await User.findByPk(userId);
-            if (!user) {
-                return res.status(404).json({ message: "Пользователь не найден" });
-            }
-
-            // Получаем координаты из геокодера
-            const geoData = await geocoder.geocode(address);
-            if (!geoData.length) {
-                return res.status(404).json({ message: "Адрес не найден" });
-            }
-
-            const { latitude, longitude } = geoData[0];
-            const coordinates = `${latitude},${longitude}`;
-
-            // Собираем фото в массив
-            const photoUrls = req.files ? req.files.map(file => `/uploads/orders/${file.filename}`) : [];
-
-            // Создаем заказ
-            const newOrder = await Order.create({
-                userId,
-                address,
-                description,
-                workTime,
-                proposedSum,
-                coordinates,
-                type,
-                createdAt: new Date().toISOString(),
-                creatorId: userId,
-                status: "pending",
-                categoryId,
-                subcategoryId,
-            });
-            res.status(201).json({ message: "Заказ успешно создан", order: newOrder });
-        } catch (error) {
-            console.error("Ошибка при создании заказа админом:", error);
-            res.status(500).json({ message: "Ошибка сервера" });
-        }
-    });
 
 module.exports = router;

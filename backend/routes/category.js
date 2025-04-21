@@ -1,9 +1,7 @@
-// routes/Category.js
 const express = require('express');
 const { Category, Subcategory } = require('../models');
 const router = express.Router();
 
-// Получение всех категорий
 router.get('/', async (req, res) => {
     try {
         const categories = await Category.findAll({
@@ -16,8 +14,6 @@ router.get('/', async (req, res) => {
     }
 });
 
-
-// Получение подкатегорий для выбранной категории
 router.get('/subcategory/:categoryId', async (req, res) => {
     const { categoryId } = req.params;
     try {

@@ -1,22 +1,11 @@
 const crypto = require("crypto");
 const axios = require("axios");
+const { generateToken } = require("./tinkoffUtils");
 
 const TERMINAL_KEY = process.env.TERMINAL_KEY;
 const PASSWORD = process.env.TINKOFF_PASSWORD;
 const API_URL = "https://securepay.tinkoff.ru/v2";
 
-function generateToken(params) {
-    delete params.Token;
-    const { Receipt, ...paramsWithoutReceipt } = params;
-    paramsWithoutReceipt.Password = PASSWORD;
-
-    const sortedKeys = Object.keys(paramsWithoutReceipt).sort();
-    const dataString = sortedKeys.map(key => paramsWithoutReceipt[key]).join('');
-    const hash = crypto.createHash('sha256').update(dataString).digest('hex');
-
-    delete paramsWithoutReceipt.Password;
-    return hash;
-}
 
 async function processPayment(userId, amount) {
     try {

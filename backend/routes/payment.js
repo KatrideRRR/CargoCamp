@@ -4,9 +4,8 @@ const crypto = require("crypto");
 const router = express.Router();
 const { Order } = require("../models");
 const { User } = require("../models");
-const { processPayment, refundPayment } = require("../paymentService");
-const { encryptCard, decryptCard } = require("../encryption");
-const authenticateToken = require("../middlewares/authenticateToken");
+const { processPayment, refundPayment } = require("../utils/paymentService");
+const authenticateToken = require("../middlewares/userAuth");
 
 const TERMINAL_KEY = process.env.TERMINAL_KEY;
 const PASSWORD = process.env.TINKOFF_PASSWORD;
@@ -183,7 +182,7 @@ router.post("/unbind-card", authenticateToken, async (req, res) => {
                 cardNumber: null,
                 cardLastFour: null,
                 cardType: null,
-                rebillId: null
+                RebillId: null
             },
             { where: { id } }
         );
