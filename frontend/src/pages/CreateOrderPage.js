@@ -233,6 +233,7 @@ function CreateOrderPage() {
         }
         console.log(paymentType);
     };
+
     const getPaymentIcon = (type) => {
         switch (type) {
             case 'guarantee':
@@ -245,6 +246,7 @@ function CreateOrderPage() {
                 return <FaQuestionCircle title="Неизвестно" />;
         }
     };
+
     const handleDescriptionChange = (e) => {
         const textarea = e.target;
         textarea.style.height = "auto"; // Сброс высоты

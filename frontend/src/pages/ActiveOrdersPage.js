@@ -189,7 +189,6 @@ const ActiveOrdersPage = () => {
         navigate(`/messages/${orderId}`);
     };
 
-    // Функция для получения иконки по способу оплаты
     const getPaymentIcon = (type) => {
         switch (type) {
             case 'guarantee':
@@ -202,7 +201,6 @@ const ActiveOrdersPage = () => {
                 return <FaQuestionCircle title="Неизвестно" />;
         }
     };
-
 
     const openModal = (images) => {
         setCurrentImages(images);
