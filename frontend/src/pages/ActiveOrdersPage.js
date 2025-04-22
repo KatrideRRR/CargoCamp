@@ -21,6 +21,9 @@ const ActiveOrdersPage = () => {
     const [error, setError] = useState(null);
     const navigate = useNavigate();
     const {user} = useAuth();
+    const [activeBanner, setActiveBanner] = useState(null); // Храним активный заказ с баннером
+    const [showBanner, setShowBanner] = useState(false);
+    const [routeUrl, setRouteUrl] = useState('');
     const [showRatingModal, setShowRatingModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [rating, setRating] = useState(0);
@@ -331,6 +334,35 @@ const ActiveOrdersPage = () => {
         }));
     };
 
+    const handleRouteClick = (order) => {
+        if (!order?.coordinates || !order.coordinates.includes(',')) {
+            alert('Координаты заказа не найдены');
+            return;
+        }
+
+        const [orderLat, orderLon] = order.coordinates.split(',').map(coord => parseFloat(coord));
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const userLat = position.coords.latitude;
+                const userLon = position.coords.longitude;
+
+                const url = `https://yandex.ru/navi/?rtext=${userLat},${userLon}~${orderLat},${orderLon}&rtt=auto`;
+
+                // Показать alert с запросом на переход
+                const confirmNavigation = window.confirm("Хотите открыть маршрут в Яндекс.Навигаторе?");
+
+                if (confirmNavigation) {
+                    window.open(url, '_blank'); // Открыть маршрут в новой вкладке
+                }
+            },
+            (error) => {
+                alert('Не удалось определить местоположение');
+                console.error(error);
+            }
+        );
+    };
+
     // Проверка на наличие пользователя перед рендерингом
     if (!user || !user.id) {
         return <p>Загрузка...</p>;
@@ -417,9 +449,34 @@ const ActiveOrdersPage = () => {
                                                 </button>
 
 
-                                                <button className="route-button">
+                                                <button className="route-button"
+                                                        onClick={() => handleRouteClick(order)}>
                                                     {isMobile ? <FaRoute/> : "Маршрут"}
                                                 </button>
+
+
+                                                {/* Всплывающее окошко для текущего заказа */}
+                                                {activeBanner === order.id && (
+                                                    <div className="fixed top-0 left-0 right-0 z-50 bg-black text-white px-4 py-3 shadow-lg flex justify-between items-center">
+                                                        <span>Открыть маршрут в Яндекс.Навигаторе?</span>
+                                                        <div className="flex gap-3 ml-4">
+                                                            <button
+                                                                onClick={() => window.open(routeUrl, '_blank')} // Открываем маршрут
+                                                                className="bg-green-600 px-3 py-1 rounded text-white"
+                                                            >
+                                                                Да
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setActiveBanner(null)} // Закрываем баннер
+                                                                className="bg-gray-600 px-3 py-1 rounded text-white"
+                                                            >
+                                                                Отмена
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+
                                                 <button className="complain-button"
                                                         onClick={() => handleComplaint(order.id)}>
                                                     {isMobile ? <FaExclamationTriangle/> : "Пожаловаться"}

@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { YMaps, Map, Placemark } from "@pbe/react-yandex-maps";
 import "../styles/CreateOrderPage.css";
 import imageCompression from "browser-image-compression";
+import {FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity} from "react-icons/fa";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -148,7 +149,6 @@ function CreateOrderPage() {
         setFormData({...formData, address});
         setAddressSuggestions([]); // Закрываем список подсказок
 
-        // Запрос координат для выбранного адреса
         try {
             const response = await fetch(
                 `https://geocode-maps.yandex.ru/1.x/?apikey=bf97867b-5ffb-4fc4-9fd5-8997874b300e&geocode=${encodeURIComponent(address)}&format=json`
@@ -232,27 +232,19 @@ function CreateOrderPage() {
             setError("Не удалось создать заказ. Попробуйте снова.");
         }
         console.log(paymentType);
-
-//        try {
-//            const response = await fetch(`${apiUrl}/api/payments/create`, {
-//                method: "POST",
-//                headers: {"Content-Type": "application/json"},
-//                body: JSON.stringify(paymentType)
-//            });
-//
-//          const data = await response.json();
-//
-//          if (data.success && data.paymentUrl) {
-//            window.location.href = data.paymentUrl;
-//            } else {
-//                alert("Ошибка при создании платежа");
-//           }
-//        } catch (err) {
-//            console.error("Ошибка при создании платежа:", err);
-//        }
-
     };
-
+    const getPaymentIcon = (type) => {
+        switch (type) {
+            case 'guarantee':
+                return <FaUniversity title="Tinkoff" />;
+            case 'cash':
+                return <FaMoneyBillWave title="Наличные" />;
+            case 'installments':
+                return <FaCreditCard title="Карта" />;
+            default:
+                return <FaQuestionCircle title="Неизвестно" />;
+        }
+    };
     const handleDescriptionChange = (e) => {
         const textarea = e.target;
         textarea.style.height = "auto"; // Сброс высоты
@@ -435,12 +427,16 @@ function CreateOrderPage() {
                                         className={`payment-option ${selectedMethod === paymentType.id ? "selected" : ""}`}
                                         onClick={(event) => handleSelect(event, paymentType.id)}
                                     >
-
-                                        <span className="payment-icon">{paymentType.icon}</span>
-                                        <span className="payment-label">{paymentType.label}</span>
+                                        <div className="payment-icon-container">
+        <span className="payment-icon">
+          {getPaymentIcon(paymentType.id)} {/* Используем функцию getPaymentIcon */}
+        </span>
+                                            <span className="payment-label">{paymentType.label}</span>
+                                        </div>
                                     </button>
                                 ))}
                             </div>
+
                             <button type="submit" disabled={isSubmitting} className="submit-button">
                                 {isSubmitting ? "Создание..." : "Создать заказ"}
                             </button>
