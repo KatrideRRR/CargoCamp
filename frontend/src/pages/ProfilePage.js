@@ -16,7 +16,6 @@ const ProfilePage = () => {
     const { logout, isAuthenticated } = useAuth();
     const [cardInfo, setCardInfo] = useState();
     const [showAgreement, setShowAgreement] = useState(false);
-    const [documentFiles, setDocumentFiles] = useState([]);
 
     useEffect(() => {
         let isMounted = true;
@@ -91,6 +90,8 @@ const ProfilePage = () => {
 
             const result = await response.json();
 
+            console.log(cardInfo);
+
             if (response.ok) {
                 toast.success("Карта успешно удалена");
                 setRebillId(null);
@@ -154,6 +155,7 @@ const ProfilePage = () => {
                     "Content-Type": "multipart/form-data",
                 },
             });
+            console.log(response)
 
             toast.success("Документы успешно загружены");
             // TODO: можно обновить профиль, если хочешь, чтобы верификация менялась на лету

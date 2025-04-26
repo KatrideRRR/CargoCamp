@@ -135,9 +135,11 @@ router.post("/pay_commission", async (req, res) => {
 });
 
 router.post("/callback", async (req, res) => {
-    const { Success, Status, RebillId, CustomerKey, CardPan } = req.body;
+    const { Success, Status, RebillId, CustomerKey, CardPan, PaymentId } = req.body;
 
-    if (Success && Status === "CONFIRMED" && RebillId) {
+    console.log("🔥 Пришёл колбэк:", req.body);
+
+    if (Success && Status === "CONFIRMED" && RebillId && CustomerKey) {
         const userId = CustomerKey.replace("user_", "");
 
         const last4 = CardPan?.slice(-4);
@@ -147,7 +149,7 @@ router.post("/callback", async (req, res) => {
 
         try {
             // Возврат 1 рубля
-            await refundPayment(req.body.PaymentId);
+            await refundPayment(PaymentId);
 
             await User.update(
                 {

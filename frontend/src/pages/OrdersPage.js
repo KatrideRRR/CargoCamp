@@ -1,4 +1,3 @@
-import RequestModal from '../components/RequestModal'; // путь к компоненту
 import React, { useEffect, useState } from 'react';
 import axiosInstance from '../utils/axiosInstance';
 import {Link, useNavigate} from 'react-router-dom';
@@ -33,9 +32,6 @@ const OrdersPage = () => {
     const navigate = useNavigate();
     const [filteredByCategory, setFilteredByCategory] = useState([]); // заказы после фильтра по категории
     const [isMapVisible, setIsMapVisible] = useState(true); // Состояние для контроля видимости карты
-    const [showModal, setShowModal] = useState(false);
-    const [activeOrderId, setActiveOrderId] = useState(null);
-
 
     const paymentMethods = [
         { id: "cash", label: "Наличные", icon: "💵" },
@@ -63,11 +59,6 @@ const OrdersPage = () => {
             default:
                 return <FaQuestionCircle title="Неизвестно" />;
         }
-    };
-
-    const openModalRequest = (orderId) => {
-        setActiveOrderId(orderId);
-        setShowModal(true);
     };
 
     const openModal = (images) => {
@@ -318,19 +309,6 @@ const OrdersPage = () => {
             console.error("Ошибка при запросе на выполнение заказа:", error);
         }
     };
-
-    const sendRequest = async ({ proposedSum, comment }) => {
-        const token = localStorage.getItem('authToken');
-        try {
-            await axiosInstance.post(`/orders/${activeOrderId}/request`, { proposedSum, comment }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            alert("Запрос отправлен заказчику!");
-        } catch (error) {
-            console.error("Ошибка при запросе на выполнение заказа:", error);
-        }
-    };
-
 
     if (error) {
         return <div className="error-message">Ошибка: {error}</div>;

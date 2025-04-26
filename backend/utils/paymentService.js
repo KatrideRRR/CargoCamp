@@ -14,7 +14,7 @@ async function processPayment(userId, amount) {
             Amount: amount * 100, // В копейках
             OrderId: `test_${userId}_${Date.now()}`,
             Description: "Привязка карты",
-            CustomerKey: crypto.createHash('sha256').update(`user_${userId}`).digest('hex'),
+            CustomerKey:`user_${userId}`,
             Recurrent: "Y",
             NotificationURL: `https://18.184.43.44:5001/api/payment/callback`, // важен!
             Receipt: {

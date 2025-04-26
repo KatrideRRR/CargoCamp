@@ -151,6 +151,7 @@ export const ModalProvider = ({ children }) => {
         }
     };
 
+    console.log(modalData);
 
     return (
         <ModalContext.Provider value={{ openModal: setModalData, closeModal: () => setModalData(null) }}>

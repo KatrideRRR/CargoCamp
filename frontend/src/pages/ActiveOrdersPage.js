@@ -22,7 +22,6 @@ const ActiveOrdersPage = () => {
     const navigate = useNavigate();
     const {user} = useAuth();
     const [activeBanner, setActiveBanner] = useState(null); // Храним активный заказ с баннером
-    const [showBanner, setShowBanner] = useState(false);
     const [routeUrl, setRouteUrl] = useState('');
     const [showRatingModal, setShowRatingModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
@@ -47,6 +46,8 @@ const ActiveOrdersPage = () => {
     });
     const [expandedOrders, setExpandedOrders] = useState({});
     const [unreadOrders, setUnreadOrders] = useState({});
+
+    console.log(setRouteUrl);
 
     useEffect(() => {
         localStorage.setItem("removedOrders", JSON.stringify(removedOrders));
@@ -164,7 +165,7 @@ const ActiveOrdersPage = () => {
             socket.off('activeOrdersUpdated', fetchActiveOrders);
             socket.off("new_notification");
         };
-    }, [navigate, removedOrders, user]);
+    }, [navigate, removedOrders, user, unreadOrders]);
 
     if (!user) {
         return <p>Загрузка...</p>;
