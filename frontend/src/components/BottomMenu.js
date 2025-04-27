@@ -1,9 +1,9 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardList, List, BellRing } from 'lucide-react';
 import '../styles/BottomMenu.css';
 import io from 'socket.io-client';
 import { AuthContext } from "../utils/authContext";
+import { ListTodo, Home, ClipboardList, ArrowUpCircle, UserRound } from 'lucide-react';
 
 const socket = io(process.env.REACT_APP_SOCKET_URL, {
     transports: ['websocket'],
@@ -66,33 +66,32 @@ const BottomMenu = () => {
 
     return (
         <div className="bottom-menu">
+            <button className="navbar-item navbar-home" onClick={() => navigate('/')}>
+                <Home size={24} className="menu-icon"/>
+                <span className="menu-label">Старт</span>
+            </button>
+
             <button className="menu-item menu-left" onClick={() => navigate('/orders')}>
-                <List size={20} className="menu-icon"/>
-                Заказы
+                <ListTodo size={24} className="menu-icon"/>
+                <span className="menu-label">Заказы</span>
             </button>
 
-            <button
-                className={`menu-item menu-center ${hasNewRequests ? 'new-request' : ''}`}
-                onClick={handleMyOrdersClick}
-            >
-                {hasNewRequests ? (
-                    <BellRing size={28} className="menu-icon-alert"/>
-                ) : (
-                    <List size={28} className="menu-icon-normal"/>
-                )}
+            <button className={`menu-item menu-center ${hasNewRequests ? 'new-request' : ''}`}
+                    onClick={handleMyOrdersClick}>
+                <ArrowUpCircle size={34} className="menu-icon-center"/>
             </button>
 
-            {/* Ваша кнопка с уведомлением и навигацией */}
-            <button
-                className={`menu-item menu-right ${hasNewMessage ? 'new-message' : ''}`}
-                onClick={handleOpenActive}
-            >
-                <ClipboardList size={20} className="menu-icon" />
-                Активные {hasNewMessage && <span className="dot"></span>}
+            <button className={`menu-item menu-right ${hasNewMessage ? 'new-message' : ''}`} onClick={handleOpenActive}>
+                <ClipboardList size={24} className="menu-icon"/>
+                <span className="menu-label">Активные</span>
             </button>
 
-
+            <button className="navbar-item navbar-profile" onClick={() => navigate('/profile')}>
+                <UserRound size={24} className="menu-icon"/>
+                <span className="menu-label">Профиль</span>
+            </button>
         </div>
+
     );
 };
 

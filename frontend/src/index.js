@@ -7,7 +7,6 @@ import CreateOrderPage from './pages/CreateOrderPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
-import Navbar from './components/Navbar';
 import ActiveOrdersPage from './pages/ActiveOrdersPage';
 import BottomMenu from './components/BottomMenu';
 import ChatPage from './pages/ChatPage';
@@ -27,7 +26,6 @@ const App = () => {
         <ModalProvider>
         <AuthProvider>
             <UserProvider>
-                        <Navbar />
                         <Routes>
                             <Route path="/" element={<StartPage />} />
                             <Route path="/register" element={<RegisterPage />} />

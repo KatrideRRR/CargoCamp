@@ -179,7 +179,7 @@ const ProfilePage = () => {
     }
 
     return (
-        <div className="container">
+        <div className="container-p">
             <div className="profile-container">
                 {profile ? (
                     <>

@@ -4,124 +4,112 @@
     left: 0;
     right: 0;
     height: 70px;
-    background-color: #ffffff;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
     display: flex;
-    justify-content: center;
+    justify-content: space-around;
     align-items: center;
-    font-family: 'Arial', sans-serif;
-    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
     z-index: 1000;
 }
 
-.menu-left,
-.menu-right {
+.menu-item, .navbar-item {
+    background: none;
+    border: none;
+    outline: none;
     display: flex;
+    flex-direction: column;
     align-items: center;
-}
-.new-message {
-    color: red;
-}
-
-.dot {
-    width: 8px;
-    height: 8px;
-    background-color: red;
-    border-radius: 50%;
-    display: inline-block;
-    margin-left: 5px;
-}
-
-.menu-left {
-    margin-right: 120px;
-}
-
-.menu-right {
-    margin-left: 120px;
-}
-
-.menu-item {
-    font-size: 14px;
-    font-weight: 600;
-    color: #007bff;
-    text-decoration: none;
-    padding: 10px 16px;
-    border-radius: 12px;
-    transition: all 0.3s ease;
-    border: 2px solid transparent;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.menu-item:hover {
-    background-color: rgba(0, 123, 255, 0.1);
-    border: 2px solid #007bff;
-    color: #0056b3;
-}
-
-.menu-center {
-    background: linear-gradient(90deg, #007bff, #0056b3);
-    color: #ffffff;
-    border-radius: 50%;
-    width: 65px;
-    height: 65px;
-    display: flex;
     justify-content: center;
-    align-items: center;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-    font-size: 20px;
-    transition: transform 0.3s ease, background-color 0.3s ease;
+    color: #333;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    font-size: 12px;
 }
 
-.menu-center:hover {
-    background-color: #0056b3;
+.menu-item:hover, .navbar-item:hover {
+    color: #4f46e5;
+}
+
+.menu-icon, .menu-icon-center {
+    transition: transform 0.3s ease;
+}
+
+.menu-item:hover .menu-icon,
+.menu-item:hover .menu-icon-center,
+.navbar-item:hover .menu-icon {
     transform: scale(1.1);
 }
 
-/* Состояние кнопки, когда пришла новая заявка */
-.new-request {
-    background: #ff9800; /* Оранжевый цвет */
-    box-shadow: 0 0 10px rgba(255, 152, 0, 0.8);
+.menu-label {
+    margin-top: 2px;
 }
 
-/* Цвет иконки уведомления */
-.menu-icon-alert {
-    color: #ff0000; /* Красный */
-    animation: shake 0.5s infinite alternate;
-}
-
-/* Обычная иконка */
-.menu-icon-normal {
+/* Центр */
+.menu-center {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
     color: white;
+    border-radius: 50%;
+    width: 72px;
+    height: 72px;
+    margin-top: -30px;
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-/* Анимация покачивания для уведомления */
-@keyframes shake {
-    0% { transform: rotate(0deg); }
-    25% { transform: rotate(-5deg); }
-    50% { transform: rotate(5deg); }
-    75% { transform: rotate(-5deg); }
-    100% { transform: rotate(5deg); }
+.menu-icon-center {
+    margin: 0;
 }
 
+/* Эффект уведомления */
+.new-request {
+    animation: pulse 1.5s infinite;
+}
+
+.new-message .dot {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    width: 8px;
+    height: 8px;
+    background: #ef4444;
+    border-radius: 50%;
+    animation: pulseDot 1.5s infinite;
+}
+
+/* Анимации */
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+}
+
+@keyframes pulseDot {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+}
+
+/* Мобильная версия */
 @media (max-width: 768px) {
-    .bottom-menu {
-        height: 60px;
-    }
-
-    .menu-item {
-        font-size: 12px;
-        padding: 6px 8px;
+    .menu-label {
+        display: none;
     }
 
     .menu-center {
-        width: 50px;
-        height: 50px;
-        font-size: 18px;
+        width: 64px;
+        height: 64px;
+        margin-top: -28px;
     }
+}
 
-    .menu-item.menu-left,
-    .menu-item.menu-right {
-        margin: 50px;
+/* Десктоп */
+@media (min-width: 769px) {
+    .menu-label {
+        display: block;
     }
 }

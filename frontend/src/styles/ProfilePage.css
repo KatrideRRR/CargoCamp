@@ -7,10 +7,12 @@ body {
     color: #333;
 }
 
-.container {
+.container-p {
     display: flex;
     justify-content: center;
     padding: 40px 20px;
+    margin-top: -20px;
+    margin-bottom: 50px;
 }
 
 .profile-container {
