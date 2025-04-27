@@ -30,7 +30,7 @@
 }
 
 .menu-item:hover, .navbar-item:hover {
-    color: #4f46e5;
+    color: #1948df;
 }
 
 .menu-icon, .menu-icon-center {
@@ -49,9 +49,9 @@
 
 /* Центр */
 .menu-center {
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    background: linear-gradient(180deg, #48A9FF 0%, #003366 100%);
     color: white;
-    border-radius: 50%;
+    border-radius: 30%;
     width: 72px;
     height: 72px;
     margin-top: -30px;
@@ -112,4 +112,27 @@
     .menu-label {
         display: block;
     }
+}
+.icon-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.notification-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background-color: red;
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 2px 5px;
+    border-radius: 12px;
+    min-width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid white;
+    z-index: 10;
 }

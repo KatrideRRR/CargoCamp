@@ -12,56 +12,50 @@ const socket = io(process.env.REACT_APP_SOCKET_URL, {
 
 const BottomMenu = () => {
     const navigate = useNavigate();
-    const [hasNewRequests, setHasNewRequests] = useState(false);
     const { user } = useContext(AuthContext);
-    const [hasNewMessage, setHasNewMessage] = useState(false);
+    const [requestCount, setRequestCount] = useState(0);
+    const [messageCount, setMessageCount] = useState(0);
 
     useEffect(() => {
         if (!user?.id) return;
 
-        // Подключаемся к WebSocket
         socket.connect();
 
-        // Подписка на уведомления
         console.log('Подписка на уведомления, userId:', user.id);
         socket.emit('subscribeToNotifications', user.id);
 
-        socket.on(`notifications_${user.id}`, (notifications) => {
-            console.log("🔔 Уведомления через комнату:", notifications);
-            setHasNewMessage(notifications.length > 0);
+        socket.on('new_notification', (message) => {
+            console.log("✉️ Новое сообщение:", message);
+            setMessageCount(prev => prev + 1);
         });
 
-        // Получение новых уведомлений
-        socket.on('new_notification', (notifications) => {
-            console.log("Новые уведомления:", notifications);
-            setHasNewMessage(notifications.length > 0);  // Проверяем длину массива
+        const orderRequestEvent = `orderRequest:${user.id}`;
+        console.log(`🔍 Подписка на запросы: ${orderRequestEvent}`);
+
+        socket.on(orderRequestEvent, (data) => {
+            console.log("🔥 Новый запрос на заказ:", data);
+            setRequestCount(prev => prev + 1);
         });
 
-
-        // Подписка на запросы на заказ
-        const eventName = `orderRequest:${user.id}`;
-        console.log(`🔍 Подписка на WebSocket-событие: ${eventName}`);
-
-        socket.on(eventName, (data) => {
-            console.log("🔥 Получено уведомление о заказе:", data);
-            setHasNewRequests(true);
-        });
-
-        // Очистка при размонтировании
         return () => {
-            socket.off(eventName);
             socket.off('new_notification');
+            socket.off(orderRequestEvent);
         };
     }, [user]);
 
     const handleMyOrdersClick = () => {
         navigate(`/my-orders/${user.id}`);
-        setHasNewRequests(false); // Сбрасываем уведомление
+        setRequestCount(0); // Сбрасываем счетчик запросов
     };
 
     const handleOpenActive = () => {
-        // Отмечаем уведомления как прочитанные
-        navigate('/active-orders'); // Навигация на страницу активных заказов
+        navigate('/active-orders');
+        setMessageCount(0); // Сбрасываем счетчик сообщений
+    };
+
+    const formatCount = (count) => {
+        if (count > 9) return '9+';
+        return count;
     };
 
     return (
@@ -76,13 +70,22 @@ const BottomMenu = () => {
                 <span className="menu-label">Заказы</span>
             </button>
 
-            <button className={`menu-item menu-center ${hasNewRequests ? 'new-request' : ''}`}
-                    onClick={handleMyOrdersClick}>
-                <ArrowUpCircle size={34} className="menu-icon-center"/>
+            <button className="menu-item menu-center" onClick={handleMyOrdersClick}>
+                <div className="icon-wrapper">
+                    <ArrowUpCircle size={34} className="menu-icon-center"/>
+                    {requestCount > 0 && (
+                        <span className="notification-badge">{formatCount(requestCount)}</span>
+                    )}
+                </div>
             </button>
 
-            <button className={`menu-item menu-right ${hasNewMessage ? 'new-message' : ''}`} onClick={handleOpenActive}>
-                <ClipboardList size={24} className="menu-icon"/>
+            <button className="menu-item menu-right" onClick={handleOpenActive}>
+                <div className="icon-wrapper">
+                    <ClipboardList size={24} className="menu-icon"/>
+                    {messageCount > 0 && (
+                        <span className="notification-badge">{formatCount(messageCount)}</span>
+                    )}
+                </div>
                 <span className="menu-label">Активные</span>
             </button>
 
@@ -91,7 +94,6 @@ const BottomMenu = () => {
                 <span className="menu-label">Профиль</span>
             </button>
         </div>
-
     );
 };
 

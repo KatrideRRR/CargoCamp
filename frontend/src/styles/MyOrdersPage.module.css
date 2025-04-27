@@ -2,7 +2,6 @@
 
 .container {
     padding: 2rem;
-    margin-top: 50px;
     min-height: 100vh;
     background: linear-gradient(to bottom right, #e8f0ff, #ffffff);
     display: flex;
