@@ -218,18 +218,18 @@ const ProfilePage = () => {
                         </div>
 
                         <div className="section verification-upload">
-                            <h2 className="subtitle">Верификация:</h2>
-                            <div className="verification-content">
-                                <div className="verification-info">
-                                    <p className={`info verification-status ${profile.userStatus}`}>
-                                        {profile.userStatus === "pensioner"
-                                            ? "Пенсионер"
-                                            : profile.userStatus === "verified"
-                                                ? "Пройдена"
-                                                : "Не пройдена"}
-                                    </p>
-                                </div>
+                            <div className="verification-header">
+                                <h2 className="subtitle">Верификация:</h2>
+                                <p className={`info verification-status ${profile.userStatus}`}>
+                                    {profile.userStatus === "pensioner"
+                                        ? "Пенсионер"
+                                        : profile.userStatus === "verified"
+                                            ? "Пройдена"
+                                            : "Не пройдена"}
+                                </p>
+                            </div>
 
+                            <div className="verification-content">
                                 <label className="upload-label">
                                     <input
                                         type="file"

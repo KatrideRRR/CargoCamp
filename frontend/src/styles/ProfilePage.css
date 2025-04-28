@@ -231,6 +231,12 @@ button {
 .upload-button-style:hover {
     background: linear-gradient(to right, #5bc0de, #1a7ca8);
 }
+.verification-header {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* расстояние между "Верификация:" и статусом */
+    margin-bottom: 10px;
+}
 
 .verification-status.verified {
     color: #2ecc71;
@@ -269,7 +275,7 @@ button {
     color: white;
     padding: 10px 15px;
     text-align: center;
-    border-radius: 5px;
+    border-radius: 8px;
     cursor: pointer;
     width: 100%; /* Растягиваем на всю ширину */
     text-align: center;
