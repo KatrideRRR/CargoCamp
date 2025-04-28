@@ -11,22 +11,22 @@ async function processPayment(userId, amount) {
     try {
         const params = {
             TerminalKey: TERMINAL_KEY,
-            Amount: amount * 100, // В копейках
+            Amount: amount * 100,
             OrderId: `test_${userId}_${Date.now()}`,
             Description: "Привязка карты",
             CustomerKey:`user_${userId}`,
             Recurrent: "Y",
-            NotificationURL: `https://18.184.43.44:5001/api/payment/callback`, // важен!
+            NotificationURL: `https://18.184.43.44:5001/api/payment/callback`,
             Receipt: {
                 Email: "test@example.com",
-                Taxation: "usn_income", // Упрощенная система налогообложения (доход)
+                Taxation: "usn_income",
                 Items: [
                     {
                         Name: "Привязка карты",
                         Price: amount * 100,
                         Quantity: 1,
                         Amount: amount * 100,
-                        Tax: "none", // Без НДС
+                        Tax: "none",
                         PaymentMethod: "full_prepayment",
                         PaymentObject: "service",
                     }
@@ -34,7 +34,7 @@ async function processPayment(userId, amount) {
             }
         };
 
-        params.Token = generateToken(params); // Генерируем токен без Receipt
+        params.Token = generateToken(params);
 
         const response = await axios.post(`${API_URL}/Init`, params);
         console.log("Ответ Тинькофф:", response.data);
@@ -43,7 +43,6 @@ async function processPayment(userId, amount) {
             return {
                 success: true,
                 transactionId: response.data.PaymentId,
-                RebillId: response.data.RebillId,
                 paymentUrl: response.data.PaymentURL // Добавим сюда!
             };
         }

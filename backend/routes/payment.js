@@ -148,9 +148,6 @@ router.post("/callback", async (req, res) => {
         console.log(`✅ Карта привязана: userId: ${userId}, last4: ${last4}, type: ${cardType}, RebillId: ${RebillId}`);
 
         try {
-            // Возврат 1 рубля
-            await refundPayment(PaymentId);
-
             await User.update(
                 {
                     cardLastFour: last4,
@@ -159,6 +156,8 @@ router.post("/callback", async (req, res) => {
                 },
                 { where: { id: userId } }
             );
+
+            await refundPayment(PaymentId);
 
             return res.json({ success: true });
         } catch (err) {
