@@ -165,7 +165,7 @@ const ActiveOrdersPage = () => {
             socket.off('activeOrdersUpdated', fetchActiveOrders);
             socket.off("new_notification");
         };
-    }, [navigate, removedOrders, user, unreadOrders]);
+    }, [navigate, removedOrders, user]);
 
     if (!user) {
         return <p>Загрузка...</p>;
@@ -263,7 +263,6 @@ const ActiveOrdersPage = () => {
             setShowRatingModal(false);
             setSelectedOrder(null);
             setRating(0);
-
         } catch (error) {
             console.error("Ошибка при завершении заказа или отправке рейтинга", error);
         }
