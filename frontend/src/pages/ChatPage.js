@@ -27,6 +27,10 @@ const ChatPage = () => {
             transports: ['websocket'],
             withCredentials: true
         });
+        if (process.env.NODE_ENV === 'development') {
+            window.socket = socket.current;
+        }
+
 
         if (currentUser) {
             socket.current.emit('joinChat', { userId: currentUser.id });
