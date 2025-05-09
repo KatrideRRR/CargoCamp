@@ -376,8 +376,9 @@ const OrdersPage = () => {
 
                                             <li
                                                 key={order.id}
-                                                className={`order-card ${isCreator ? 'creator' : ''} `}
+                                                className={`order-card ${isCreator ? 'creator' : ''} ${order.is_highlighted ? 'highlighted-order' : ''}`}
                                             >
+
                                                 <div className="order-content">
                                                     <div className="order-header">
                                                         <div className="order-info">
@@ -399,11 +400,14 @@ const OrdersPage = () => {
                                                             </p>
 
                                                             {creator.username && (
-                                                                <Link to={`/complaints/${order.creatorId}`}
-                                                                      className="complaints-button">
-                                                                    Жалобы на создателя: {creator.complaintsCount || 0}
+                                                                <Link
+                                                                    to={`/complaints/${order.creatorId}`}
+                                                                    className="text-sm text-red-600 hover:underline font-medium inline-block mt-2"
+                                                                >
+                                                                    Жалобы: {creator.complaintsCount || 0}
                                                                 </Link>
                                                             )}
+
                                                             {/* Иконка способа оплаты */}
                                                             <div className="order-payment-icon-container">
                                                 <span
@@ -411,8 +415,6 @@ const OrdersPage = () => {
                                                                 <span
                                                                     className="payment-label">{paymentMethods.find(method => method.id === order.paymentType)?.label}</span>
                                                             </div>
-
-
 
 
                                                         </div>
@@ -460,11 +462,11 @@ const OrdersPage = () => {
 
 
                                                 {userId !== order.creatorId && !order.executorId && order.status === 'pending' && (
-                                                    <button className="take-order-button" onClick={() => handleRequestOrder(order.id)}>
+                                                    <button className="take-order-button"
+                                                            onClick={() => handleRequestOrder(order.id)}>
                                                         Запросить выполнение
                                                     </button>
                                                 )}
-
 
 
                                             </li>

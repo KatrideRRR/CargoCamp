@@ -50,9 +50,17 @@ const geocoder = NodeGeocoder({ provider: 'openstreetmap' });
 module.exports = (io) => {
 
     router.post('/', authenticateToken, upload.array('images', 5), async (req, res) => {  // 'images' — это поле для загрузки
-        const { address, description, workTime, proposedSum, type, categoryId, subcategoryId, paymentType} = req.body;
+        const { address, description, workTime, proposedSum, type,categoryId, subcategoryId} = req.body;
         const userId = req.user.id;
+        let parsedPromotion = {};
         console.log(req.body); // Посмотреть входящие данные
+
+        try {
+            parsedPromotion = JSON.parse(req.body.promotion || "{}");
+        } catch (e) {
+            console.error("Ошибка парсинга promotion:", e);
+        }
+
 
         try {
             if (!address) {
@@ -87,7 +95,11 @@ module.exports = (io) => {
                 status: 'pending',
                 categoryId,
                 subcategoryId,
-                paymentType
+                paymentType,
+                is_highlighted: parsedPromotion.highlight ?? false,
+                is_recommended: parsedPromotion.recommended ?? false,
+                is_push_notified: parsedPromotion.push ?? false,
+
             });
 
             io.emit('orderUpdated'); // Отправляем событие обновления заказов
@@ -125,13 +137,18 @@ module.exports = (io) => {
                 attributes: [
                     'id', 'createdAt', 'address', 'description', 'workTime',
                     'images', 'proposedSum', 'creatorId', 'coordinates',
-                    'type', 'executorId', 'status', 'paymentType'
+                    'type', 'executorId', 'status', 'paymentType',
+                    'is_highlighted', 'is_recommended', 'is_push_notified'
                 ],
                 where: whereClause,
                 include: [
                     { model: db.Category, as: 'category', attributes: ['id', 'name'] },
                     { model: db.Subcategory, as: 'subcategory', attributes: ['id', 'name'] },
                 ],
+                order: [
+                    ['is_recommended', 'DESC'],
+                ],
+
             });
 
             console.log("📦 Найденные заказы:", orders.length);

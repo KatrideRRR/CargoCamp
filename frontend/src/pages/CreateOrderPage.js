@@ -7,6 +7,7 @@ import { YMaps, Map, Placemark } from "@pbe/react-yandex-maps";
 import "../styles/CreateOrderPage.css";
 import imageCompression from "browser-image-compression";
 import {FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity} from "react-icons/fa";
+import PromotionOptions, { PROMOTION_PRICES } from "../components/PromotionOptions";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -20,7 +21,6 @@ function CreateOrderPage() {
         type: "",
         paymentType: "",  // Добавлено для хранения типа оплаты
     });
-
     const [error, setError] = useState("");
     const [markerPosition, setMarkerPosition] = useState(null);
     const navigate = useNavigate();
@@ -39,6 +39,18 @@ function CreateOrderPage() {
         { id: "guarantee", label: "Гарантия", icon: "🛡️" },
         { id: "installments", label: "Рассрочка", icon: "💳" },
     ];
+    const [promotion, setPromotion] = useState({
+        highlight: false,
+        recommended: false,
+        push: false,
+    });
+
+    const promotionTotal = Object.entries(promotion).reduce(
+        (sum, [key, enabled]) =>
+            enabled ? sum + PROMOTION_PRICES[key] : sum,
+        0
+    );
+
     const handleImageChange = async (event) => {
         const files = event.target.files;
         const compressedImages = [];
@@ -181,6 +193,8 @@ function CreateOrderPage() {
         setIsSubmitting(true);
 
         const orderData = {
+            promotion,
+            promotionCost: promotionTotal,
             categoryId: selectedCategory,
             subcategoryId: selectedSubcategory,
             description: "Оплата за услугу",
@@ -201,6 +215,7 @@ function CreateOrderPage() {
         });
         data.append("categoryId", Number(selectedCategory));
         data.append("subcategoryId", Number(selectedSubcategory));
+        data.append("promotion", JSON.stringify(promotion)); // <— ВАЖНО
 
         // Добавляем изображения, если они есть
         images.forEach((image) => {
@@ -421,27 +436,46 @@ function CreateOrderPage() {
                                 )}
                             </div>
 
-                            <h3>Выберите способ оплаты</h3>
+                            <h3 className="payment-title">Выберите способ оплаты</h3>
                             <div className="payment-selector">
+
                                 {paymentMethods.map((paymentType) => (
                                     <button
                                         key={paymentType.id}
                                         className={`payment-option ${selectedMethod === paymentType.id ? "selected" : ""}`}
                                         onClick={(event) => handleSelect(event, paymentType.id)}
                                     >
-                                        <div className="payment-icon-container">
+                                        <div className="payment-icon-container-create">
         <span className="payment-icon">
           {getPaymentIcon(paymentType.id)} {/* Используем функцию getPaymentIcon */}
         </span>
-                                            <span className="payment-label">{paymentType.label}</span>
+                                            <span className="payment-label-create">{paymentType.label}</span>
                                         </div>
                                     </button>
                                 ))}
                             </div>
 
-                            <button type="submit" disabled={isSubmitting} className="submit-button">
-                                {isSubmitting ? "Создание..." : "Создать заказ"}
-                            </button>
+                            <div className="promotion-options">
+
+                            {/* Блок продвижения */}
+                                <PromotionOptions value={promotion} onChange={setPromotion}/>
+
+                                <div className="mt-4 text-sm text-gray-600">
+                                    <p>Итоговая стоимость продвижения: <strong>{promotionTotal} ₽</strong></p>
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        💡 Мы не гарантируем, что заказ будет принят исполнителем. Продвижение лишь
+                                        повышает шансы.
+                                    </p>
+                                    <p className="text-xs text-red-500 mt-1">
+                                        ⏰ Заказ будет автоматически удалён через 24 часа, если его никто не примет.
+                                    </p>
+                                </div>
+                            </div>
+
+
+                                <button type="submit" disabled={isSubmitting} className="submit-button">
+                                    {isSubmitting ? "Создание..." : "Создать заказ"}
+                                </button>
                         </form>
                     </div>
                 </div>

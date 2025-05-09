@@ -249,3 +249,9 @@
     cursor: pointer;
     font-weight: 600;
 }
+/* Выделенная карточка заказа */
+.highlighted-order {
+    background: #fffbea !important;
+    border: 2px solid #fcd34d !important;
+    box-shadow: 0 0 0 3px rgba(253, 224, 71, 0.3);
+}

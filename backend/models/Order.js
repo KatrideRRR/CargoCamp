@@ -59,8 +59,19 @@ module.exports = (sequelize) => {
             contractPath: {
                 type: DataTypes.STRING,
                 allowNull: true
-            }
-
+            },
+            is_highlighted: {
+                type: DataTypes.BOOLEAN,
+                defaultValue: false,
+            },
+            is_recommended: {
+                type: DataTypes.BOOLEAN,
+                defaultValue: false,
+            },
+            is_push_notified: {
+                type: DataTypes.BOOLEAN,
+                defaultValue: false,
+            },
         },
         {
             sequelize,
