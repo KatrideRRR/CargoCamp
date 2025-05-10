@@ -201,17 +201,19 @@ button {
     }
 }
 .verification-upload {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
+    background-color: #f8f9fc; /* светлый фон */
+    border: 2px solid #e0e0e0;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    margin-top: 24px;
+    transition: all 0.3s ease;
 }
 
 .verification-content {
     display: flex;
+    justify-content: center;
     align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    flex-wrap: wrap;
     gap: 12px;
 }
 
@@ -231,24 +233,37 @@ button {
 .upload-button-style:hover {
     background: linear-gradient(to right, #5bc0de, #1a7ca8);
 }
-.verification-header {
-    display: flex;
-    align-items: center;
-    gap: 10px; /* расстояние между "Верификация:" и статусом */
-    margin-bottom: 10px;
+.verification-upload:hover {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.verification-header .subtitle {
+    font-size: 1.6rem;
+    margin-bottom: 8px;
+    color: #333;
+    text-align: center;
+}
+
+.verification-status {
+    color: #555;
+    font-size: 1rem;
+    margin-bottom: 16px;
+    text-align: center; /* выравнивание текста по центру */
+}
+
+.verification-status.pensioner {
+    color: #28a745; /* зеленый для пенсионера */
+    font-weight: 600;
 }
 
 .verification-status.verified {
-    color: #2ecc71;
+    color: #007bff; /* синий для верифицированного */
+    font-weight: 600;
 }
 
 .verification-status.not-verified {
-    color: #e74c3c;
-}
-.verification-upload {
-    margin-top: 20px;
-    display: flex;
-    flex-direction: column;
+    color: #dc3545; /* красный для не верифицированного */
+    font-weight: 600;
 }
 
 .verification-content {
@@ -284,4 +299,63 @@ button {
 
 .upload-button-style:hover {
     background-color: #0056b3;
+}
+.premium-section {
+    background-color: #f8f9fc; /* светлый фон */
+    border: 2px solid #e0e0e0;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    margin-top: 24px;
+    transition: all 0.3s ease;
+}
+
+.premium-section:hover {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.premium-section .subtitle {
+    font-size: 1.6rem;
+    margin-bottom: 16px;
+    color: #333;
+    text-align: center; /* выравнивание заголовка по центру */
+}
+
+.premium-status, .trial-status, .info {
+    color: #555;
+    font-size: 1rem;
+    margin-bottom: 16px;
+    text-align: center; /* выравнивание текста по центру */
+}
+
+.premium-status {
+    color: #d4af37; /* золотистый для премиум */
+    font-weight: 600;
+}
+
+.trial-status {
+    color: #007bff; /* синий для пробной */
+    font-weight: 600;
+}
+
+.subscription-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+.subscribe-button {
+    background-color: #d4af37;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 0.875rem;
+    transition: background-color 0.3s ease;
+}
+
+.subscribe-button:hover {
+    background-color: #c59f2f;
 }

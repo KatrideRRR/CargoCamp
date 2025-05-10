@@ -16,6 +16,13 @@ const ProfilePage = () => {
     const { logout, isAuthenticated } = useAuth();
     const [cardInfo, setCardInfo] = useState();
     const [showAgreement, setShowAgreement] = useState(false);
+    const getRemainingDays = (expiresAt) => {
+        if (!expiresAt) return 0;
+        const now = new Date();
+        const expiration = new Date(expiresAt);
+        const diff = expiration - now;
+        return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+    };
 
     useEffect(() => {
         let isMounted = true;
@@ -58,6 +65,30 @@ const ProfilePage = () => {
             isMounted = false;
         };
     }, [isAuthenticated, navigate]);
+
+    const handleBuyPremium = async (days) => {
+        const token = localStorage.getItem("authToken");
+        const duration = `${days}d`; // '7d' или '30d'
+
+        try {
+            const response = await axios.post(`${apiUrl}/api/auth/buy`, {
+                duration,
+            }, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (response.data.success) {
+                toast.success(`Премиум активирован до ${new Date(response.data.until).toLocaleDateString()}`);
+                window.location.reload(); // или вручную обнови профиль
+            } else {
+                toast.error("Не удалось оформить подписку");
+            }
+        } catch (error) {
+            console.error("Ошибка при подписке:", error);
+            toast.error("Ошибка сервера при подписке");
+        }
+    };
+
 
     const handleBindCard = async () => {
         const token = localStorage.getItem("authToken");
@@ -217,8 +248,32 @@ const ProfilePage = () => {
                             )}
                         </div>
 
+                        <div className="section premium-section">
+                            {profile.subscriptionType === "premium" ? (
+                                <p className="info premium-status">
+                                    Премиум активен на {getRemainingDays(profile.subscriptionExpiresAt)} дней
+                                </p>
+                            ) : profile.subscriptionType === "trial" ? (
+                                <p className="info trial-status">
+                                    🔄 Пробная подписка. Осталось: {getRemainingDays(profile.subscriptionExpiresAt)} дней
+                                </p>
+                            ) : (
+                                <p className="info">У вас обычный аккаунт.</p>
+                            )}
+
+                            <div className="subscription-buttons">
+                                <button onClick={() => handleBuyPremium(7)} className="subscribe-button">
+                                    Купить Премиум (7 дней)
+                                </button>
+                                <button onClick={() => handleBuyPremium(30)} className="subscribe-button">
+                                    Купить Премиум (30 дней)
+                                </button>
+                            </div>
+                        </div>
+
+
                         <div className="section verification-upload">
-                            <div className="verification-header">
+                        <div className="verification-header">
                                 <h2 className="subtitle">Верификация:</h2>
                                 <p className={`info verification-status ${profile.userStatus}`}>
                                     {profile.userStatus === "pensioner"

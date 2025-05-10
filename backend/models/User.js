@@ -77,7 +77,16 @@ module.exports = (sequelize) => {
             RebillId: {
                 type: DataTypes.STRING,
                 allowNull: true
-            }
+            },
+            subscription_type: {
+                type: DataTypes.ENUM('standard', 'trial', 'premium'),
+                allowNull: false,
+                defaultValue: 'trial',
+            },
+            subscription_expires_at: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
 
         },
         {

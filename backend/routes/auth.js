@@ -179,14 +179,29 @@ router.post('/login', async (req, res) => {
 router.get('/profile', authenticateToken, async (req, res) => {
     try {
         const user = await User.findByPk(req.user.id, {
-            attributes: ['id', 'username', 'phone','cardLastFour' ,'cardType' , 'rating', 'createdAt','complaints','complaintsCount', 'userStatus', 'cardLastFour', 'cardType'],
+            attributes: ['id', 'username', 'phone','cardLastFour' ,'cardType' , 'rating', 'createdAt','complaints','complaintsCount', 'userStatus', 'cardLastFour', 'cardType', 'subscription_type', 'subscription_expires_at'],
         });
 
         if (!user) {
             return res.status(405).json({ message: 'User not found' });
         }
 
-        res.json(user);
+        if (
+            user.subscription_type !== 'standard' &&
+            user.subscription_expires_at &&
+            new Date(user.subscription_expires_at) < new Date()
+        ) {
+            user.subscription_type = 'standard';
+            user.subscription_expires_at = null;
+            await user.save();
+        }
+
+        res.json({
+            ...user.toJSON(),
+            isPremium: user.subscription_type === 'premium',
+            subscriptionType: user.subscription_type,
+            subscriptionExpiresAt: user.subscription_expires_at,
+        });
     } catch (error) {
         console.error('Error fetching profile:', error);
         res.status(500).json({ message: 'Server error' });
@@ -305,6 +320,40 @@ router.post("/recover-password", async (req, res) => {
     } catch (error) {
         console.error("Ошибка восстановления пароля:", error);
         return res.status(500).json({ message: "Ошибка сервера" });
+    }
+});
+
+router.post('/buy', authenticateToken, async (req, res) => {
+    const userId = req.user.id; // получен из токена
+    const { duration } = req.body; // '7d' или '30d'
+
+    const daysMap = {
+        '7d': 7,
+        '30d': 30,
+    };
+
+    const days = daysMap[duration];
+    if (!days) {
+        return res.status(400).json({ error: 'Неверная длительность подписки' });
+    }
+
+    try {
+        const executor = await User.findByPk(userId);
+        if (!executor) return res.status(404).json({ error: 'Пользователь не найден' });
+
+        const now = new Date();
+        const newExpiration = executor.subscription_expires_at && executor.subscription_type === 'premium'
+            ? new Date(executor.subscription_expires_at.getTime() + days * 86400000) // продлеваем текущую
+            : new Date(now.getTime() + days * 86400000); // новая подписка
+
+        executor.subscription_type = 'premium';
+        executor.subscription_expires_at = newExpiration;
+        await executor.save();
+
+        return res.json({ success: true, until: newExpiration });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Ошибка сервера' });
     }
 });
 
