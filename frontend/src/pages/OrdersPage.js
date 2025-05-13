@@ -6,6 +6,7 @@ import io from 'socket.io-client';
 import Modal from 'react-modal';
 import SwipeableMap from "../components/SwipeableMap.js";
 import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
+import { useSwipeable } from 'react-swipeable';
 
 const apiUrl = process.env.REACT_APP_API_URL;
 const socket = io(process.env.REACT_APP_SOCKET_URL, {
@@ -32,15 +33,43 @@ const OrdersPage = () => {
     const navigate = useNavigate();
     const [filteredByCategory, setFilteredByCategory] = useState([]); // заказы после фильтра по категории
     const [isMapVisible, setIsMapVisible] = useState(true); // Состояние для контроля видимости карты
-
+    const [activeTab, setActiveTab] = useState('all'); // 'all' | 'courier' | 'urgent'
     const paymentMethods = [
         { id: "cash", label: "Наличные", icon: "💵" },
         { id: "guarantee", label: "Гарантия", icon: "🛡️" },
         { id: "installments", label: "Рассрочка", icon: "💳" },
     ];
+
     const toggleMapVisibility = () => {
         setIsMapVisible(prev => !prev); // Переключить состояние карты
     };
+
+    const getVisibleOrders = () => {
+        return orders.filter(order => {
+            if (activeTab === 'all') {
+                return !order.is_recommended && !order.taxi_courier;
+            }
+            if (activeTab === 'courier') {
+                return order.taxi_courier === true;
+            }
+            if (activeTab === 'urgent') {
+                return order.is_recommended === true;
+            }
+            return true;
+        });
+    };
+
+
+    const swipeHandlers = useSwipeable({
+        onSwipedLeft: () => {
+            if (activeTab === 'all') setActiveTab('courier');
+            else if (activeTab === 'courier') setActiveTab('urgent');
+        },
+        onSwipedRight: () => {
+            if (activeTab === 'urgent') setActiveTab('courier');
+            else if (activeTab === 'courier') setActiveTab('all');
+        },
+    });
 
     useEffect(() => {
         fetchCategories();
@@ -318,7 +347,7 @@ const OrdersPage = () => {
         <div className="orders-page">
 
             <div className="map-containern">
-                {isMapVisible && <SwipeableMap orders={filteredOrders} userLocation={userLocation}  />}
+                {isMapVisible && <SwipeableMap orders={getVisibleOrders()} userLocation={userLocation}  />}
                 <div className="flex-1 overflow-auto">
                     <button
                         className="toggle-map-button"
@@ -329,7 +358,30 @@ const OrdersPage = () => {
                     </button>
 
 
-                    <div className="orders-container">
+                    <div {...swipeHandlers} className="orders-container">
+
+                        <div className="carousel-tabs-container">
+                            <div
+                                className={`carousel-tab ${activeTab === 'all' ? 'active' : 'inactive'}`}
+                                onClick={() => setActiveTab('all')}
+                            >
+                                Все заказы
+                            </div>
+                            <div
+                                className={`carousel-tab ${activeTab === 'courier' ? 'active' : 'inactive'}`}
+                                onClick={() => setActiveTab('courier')}
+                            >
+                                Курьер / Такси
+                            </div>
+                            <div
+                                className={`carousel-tab ${activeTab === 'urgent' ? 'active' : 'inactive'}`}
+                                onClick={() => setActiveTab('urgent')}
+                            >
+                                Срочные
+                            </div>
+                        </div>
+
+
                         <div className="orders-wrapper">
                             <div className="filters">
                                 <label>Категория:</label>
@@ -368,7 +420,7 @@ const OrdersPage = () => {
 
                             {orders.length > 0 ? (
                                 <ul className="orders-list">
-                                    {orders.map((order) => {
+                                    {getVisibleOrders().map((order) => {
                                         const creator = creatorsInfo[order.creatorId] || {};
                                         const isCreator = order.creatorId === userId;
 
@@ -488,11 +540,11 @@ const OrdersPage = () => {
                 onRequestClose={closeModal}
                 contentLabel="Full Image Modal"
                 className="custom-modal"
-                        overlayClassName="custom-modal-overlay"
-                    >
-                        <div className="custom-modal-content">
-                            {/* Кнопка закрытия */}
-                            <button onClick={closeModal} className="custom-close-button">✖</button>
+                overlayClassName="custom-modal-overlay"
+            >
+                <div className="custom-modal-content">
+                    {/* Кнопка закрытия */}
+                    <button onClick={closeModal} className="custom-close-button">✖</button>
 
                             {/* Изображение */}
                             <img
