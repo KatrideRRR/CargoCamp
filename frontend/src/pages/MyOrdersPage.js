@@ -1,3 +1,4 @@
+import CreateOrderModal from '../components/CreateOrderModal';
 import React, {useState, useEffect, useContext} from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axiosInstance from '../utils/axiosInstance';
@@ -165,12 +166,13 @@ const MyOrdersPage = () => {
     return (
         <div className={styles.container}>
             <div className={styles.ordersWrapper}>
-                <Link
-                    to="/create-order"
+                <button
+                    onClick={() => setIsModalOpen(true)}
                     className={`${styles.createButton} ${hasNewRequests ? styles.newRequest : ''}`}
                 >
                     Разместить заказ
-                </Link>
+                </button>
+
 
                 {loading ? (
                     <p>Загрузка заказов...</p>
@@ -302,6 +304,11 @@ const MyOrdersPage = () => {
                     <p className={styles.noOrders}>Вы пока не размещали заказы.</p>
                 )}
             </div>
+            <CreateOrderModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+            />
+
         </div>
     );
 };

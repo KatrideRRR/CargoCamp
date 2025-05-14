@@ -19,6 +19,7 @@ import OrderPage from './pages/OrderPage';
 import UserOrdersPage from './pages/UserOrdersPage';
 import MyOrdersPage from './pages/MyOrdersPage';
 import StartPage from './pages/StartPage';
+import ExpressOrderPage from "./pages/ExpressOrderPage";
 
 const App = () => {
     return (
@@ -40,6 +41,7 @@ const App = () => {
                             <Route path="/order/:id" element={<OrderPage />} />
                             <Route path="/user-orders/:userId" element={<UserOrdersPage />} />
                             <Route path="/my-orders/:userId" element={<MyOrdersPage />} />
+                            <Route path="/express" element={<ExpressOrderPage />} />
                         </Routes>
                         <BottomMenu />
             </UserProvider>

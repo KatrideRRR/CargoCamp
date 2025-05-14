@@ -1,0 +1,44 @@
+.create-order-modal {
+    background: white;
+    padding: 24px;
+    border-radius: 12px;
+    max-width: 400px;
+    margin: auto;
+    text-align: center;
+}
+
+.modal-options {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 20px 0;
+}
+
+.modal-option {
+    padding: 12px;
+    font-size: 16px;
+    font-weight: 500;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #f1f1f1;
+    transition: 0.2s;
+}
+
+.modal-option.express {
+    background: #e9f4ff;
+    border: 1px solid #007bff;
+    color: #007bff;
+}
+
+.modal-option:hover {
+    background: #ddd;
+}
+
+.modal-close {
+    margin-top: 10px;
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+}

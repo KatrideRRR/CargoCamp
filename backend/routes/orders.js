@@ -138,7 +138,7 @@ module.exports = (io) => {
                     'id', 'createdAt', 'address', 'description', 'workTime',
                     'images', 'proposedSum', 'creatorId', 'coordinates',
                     'type', 'executorId', 'status', 'paymentType',
-                    'is_highlighted', 'is_recommended', 'is_push_notified'
+                    'is_highlighted', 'is_recommended', 'is_push_notified', 'taxi_courier'
                 ],
                 where: whereClause,
                 include: [
@@ -688,6 +688,51 @@ module.exports = (io) => {
             res.json(orders);
         } catch (error) {
             console.error('Error fetching orders:', error);
+            res.status(500).json({ message: 'Ошибка сервера' });
+        }
+    });
+
+    router.post('/express', authenticateToken, async (req, res) => {
+        try {
+            const { type, from, to, description, proposedSum, paymentType, subcategory } = req.body;
+
+            if (!type || !from || !to || !paymentType) {
+                return res.status(400).json({ message: 'Не все обязательные поля заполнены' });
+            }
+
+            const userId = req.user.id;
+
+            const address = `${from} → ${to}`;
+            const categoryName = type === 'taxi' ? 'Такси' : 'Курьер';
+            const category = await Category.findOne({ where: { name: categoryName } });
+
+            if (!category) {
+                return res.status(400).json({ message: 'Категория не найдена' });
+            }
+
+            let subcategoryId = null;
+            if (subcategory) {
+                const subcat = await Subcategory.findOne({ where: { name: subcategory, categoryId: category.id } });
+                if (subcat) subcategoryId = subcat.id;
+            }
+
+            const newOrder = await Order.create({
+                address,
+                description,
+                proposedSum,
+                paymentType,
+                type,
+                userId,
+                creatorId: userId,
+                categoryId: category.id,
+                subcategoryId,
+                taxi_courier: true,
+                createdAt: new Date(),
+            });
+
+            res.status(201).json(newOrder);
+        } catch (err) {
+            console.error('❌ Ошибка создания express-заказа:', err);
             res.status(500).json({ message: 'Ошибка сервера' });
         }
     });

@@ -1,0 +1,87 @@
+.express-order-page {
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.type-selector {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.type-selector button {
+    flex: 1;
+    margin: 0 5px;
+    padding: 10px;
+    font-weight: bold;
+    border: 1px solid #ccc;
+    background-color: #f8f8f8;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: 0.3s;
+}
+
+.type-selector button.active {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.form-fields label {
+    display: block;
+    margin-bottom: 12px;
+    font-size: 14px;
+}
+.required {
+    color: red;
+    margin-left: 4px;
+}
+.subcategory-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 16px 0;
+}
+
+.subcategory-button {
+    padding: 10px 14px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background-color: #f7f7f7;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.subcategory-button.selected {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+.subcategory-icon {
+    margin-right: 6px;
+}
+
+.form-fields input,
+.form-fields textarea,
+.form-fields select {
+    width: 100%;
+    padding: 8px;
+    margin-top: 4px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.submit-button {
+    margin-top: 20px;
+    padding: 12px 20px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 6px;
+    cursor: pointer;
+}
