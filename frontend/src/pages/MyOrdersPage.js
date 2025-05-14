@@ -1,6 +1,6 @@
 import CreateOrderModal from '../components/CreateOrderModal';
 import React, {useState, useEffect, useContext} from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import axiosInstance from '../utils/axiosInstance';
 import io from 'socket.io-client';
 import styles from '../styles/MyOrdersPage.module.css';

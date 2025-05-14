@@ -25,12 +25,6 @@
     transition: 0.2s;
 }
 
-.modal-option.express {
-    background: #e9f4ff;
-    border: 1px solid #007bff;
-    color: #007bff;
-}
-
 .modal-option:hover {
     background: #ddd;
 }
