@@ -1,11 +1,10 @@
 .active-orders-page {
     padding: 2rem;
-    min-height: 1000vh;
     background: linear-gradient(135deg, #f0f4ff, #ffffff);
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    margin-bottom: 40px;
+    margin-bottom: 70px;
 }
 
 .active-orders-container {
@@ -13,7 +12,7 @@
     max-width: 700px;
     backdrop-filter: blur(20px);
     background: rgba(255, 255, 255, 0.6);
-    border-radius: 2px;
+    border-radius: 16px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
     padding: 2rem;
     animation: fadeIn 0.5s ease;

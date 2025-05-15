@@ -1,14 +1,15 @@
-.orders-page {
+.all-orders-page {
     padding: 16px;
     backdrop-filter: blur(12px);
     background: rgba(255, 255, 255, 0.6);
     border-radius: 16px;
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
     color: #333;
-    margin-bottom: 50px;
+    margin-bottom: 70px;
+    justify-content: center;
 }
 
-.map-containern {
+.map-container {
     display: flex;
     flex-direction: column;
     gap: 1rem;
@@ -30,8 +31,9 @@
 }
 
 
-.orders-container {
-    margin-top: 1rem;
+.all-orders-container {
+    margin: 1rem auto 0 auto; /* верхний отступ 1rem, горизонтальные — auto */
+    max-width: 700px;
     padding: 16px;
     background: rgba(255, 255, 255, 0.55);
     border-radius: 16px;
@@ -53,7 +55,7 @@
     flex: 1;
     max-width: 120px; /* ограничение ширины, чтобы не растягивались */
     text-align: center;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 500;
     color: #444;
     transition: all 0.3s ease;
@@ -65,6 +67,29 @@
     white-space: nowrap;
     opacity: 0.85;
 }
+
+.location-row {
+    display: flex;
+    align-items: center;       /* выравнивание по вертикали */
+    justify-content: space-between;  /* слева и справа элементы */
+    gap: 10px;                 /* расстояние между элементами */
+}
+
+.location-row label {
+    flex-shrink: 0;            /* чтобы label не сжимался */
+    font-weight: 600;
+}
+
+.geolocation-status {
+    margin: 0;
+    color: green;
+    font-weight: 500;
+    white-space: nowrap;      /* запрет переноса текста */
+    flex-shrink: 0;           /* запрет сжатия */
+    padding-left: 10px;       /* отступ слева для воздуха */
+}
+
+
 
 .carousel-tab.inactive {
     background-color: #f3f4f6;

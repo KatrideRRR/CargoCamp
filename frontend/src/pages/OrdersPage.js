@@ -44,6 +44,14 @@ const OrdersPage = () => {
         setIsMapVisible(prev => !prev); // Переключить состояние карты
     };
 
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        setSelectedCategory('');
+        setSelectedSubcategory('');
+        applyFilters(undefined, undefined);
+    };
+
+
     const getVisibleOrders = () => {
         return orders.filter(order => {
             if (activeTab === 'all') {
@@ -342,12 +350,21 @@ const OrdersPage = () => {
     if (error) {
         return <div className="error-message">Ошибка: {error}</div>;
     }
+    const filteredCategories = categories.filter(cat => {
+        const name = cat.name.toLowerCase();
+        if (activeTab === 'courier') {
+            return name === 'такси' || name === 'курьер';
+        } else {
+            return name !== 'такси' && name !== 'курьер';
+        }
+    });
+
 
     return (
-        <div className="orders-page">
+        <div className="all-orders-page">
 
-            <div className="map-containern">
-                {isMapVisible && <SwipeableMap orders={getVisibleOrders()} userLocation={userLocation}  />}
+            <div className="map-container">
+                {isMapVisible && <SwipeableMap orders={filteredOrders} userLocation={userLocation}  />}
                 <div className="flex-1 overflow-auto">
                     <button
                         className="toggle-map-button"
@@ -358,24 +375,24 @@ const OrdersPage = () => {
                     </button>
 
 
-                    <div {...swipeHandlers} className="orders-container">
+                    <div {...swipeHandlers} className="all-orders-container">
 
                         <div className="carousel-tabs-container">
                             <div
                                 className={`carousel-tab ${activeTab === 'all' ? 'active' : 'inactive'}`}
-                                onClick={() => setActiveTab('all')}
+                                onClick={() => handleTabChange('all')}
                             >
                                 Все заказы
                             </div>
                             <div
                                 className={`carousel-tab ${activeTab === 'courier' ? 'active' : 'inactive'}`}
-                                onClick={() => setActiveTab('courier')}
+                                onClick={() => handleTabChange('courier')}
                             >
                                 Курьер / Такси
                             </div>
                             <div
                                 className={`carousel-tab ${activeTab === 'urgent' ? 'active' : 'inactive'}`}
-                                onClick={() => setActiveTab('urgent')}
+                                onClick={() => handleTabChange('urgent')}
                             >
                                 Срочные
                             </div>
@@ -387,7 +404,7 @@ const OrdersPage = () => {
                                 <label>Категория:</label>
                                 <select value={selectedCategory} onChange={handleCategoryChange}>
                                     <option value="">Все категории</option>
-                                    {categories.map(category => (
+                                    {filteredCategories.map(category => (
                                         <option key={category.id} value={category.id}>{category.name}</option>
                                     ))}
                                 </select>
@@ -400,20 +417,23 @@ const OrdersPage = () => {
                                         <option key={subcategory.id} value={subcategory.id}>{subcategory.name}</option>
                                     ))}
                                 </select>
-                                <label>Ваше местоположение:</label>
-                                {isGeolocationDenied ? (
-                                    <>
-                                        <input
-                                            type="text"
-                                            value={manualAddress}
-                                            onChange={(e) => setManualAddress(e.target.value)}
-                                            placeholder="Введите ваш адрес"
-                                        />
-                                        <button onClick={() => geocodeAddress(manualAddress)}>Определить</button>
-                                    </>
-                                ) : (
-                                    <p>Геолокация включена</p>
-                                )}
+                                <div className="location-row">
+                                    <label>Ваше местоположение:</label>
+                                    {isGeolocationDenied ? (
+                                        <>
+                                            <input
+                                                type="text"
+                                                value={manualAddress}
+                                                onChange={(e) => setManualAddress(e.target.value)}
+                                                placeholder="Введите ваш адрес"
+                                            />
+                                            <button onClick={() => geocodeAddress(manualAddress)}>Определить</button>
+                                        </>
+                                    ) : (
+                                        <p className="geolocation-status">Геолокация включена</p>
+                                    )}
+                                </div>
+
 
                             </div>
 

@@ -19,6 +19,8 @@ router.get('/subcategory/:categoryId', async (req, res) => {
     try {
         const subcategories = await Subcategory.findAll({
             where: { categoryId },
+            attributes: ['id', 'name', 'price'], // 👈 важно включить price
+
         });
         res.json(subcategories);
     } catch (error) {

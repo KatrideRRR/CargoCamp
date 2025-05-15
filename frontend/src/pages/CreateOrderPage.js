@@ -298,13 +298,14 @@ function CreateOrderPage() {
                                         disabled={!selectedCategory}
                                     >
                                         <option value="">Выберите подкатегорию</option>
-                                        {subcategory.map(subcategory => (
-                                            <option key={subcategory.id} value={subcategory.id}>
-                                                {subcategory.name}
+                                        {subcategory.map(sub => (
+                                            <option key={sub.id} value={sub.id}>
+                                                {sub.name}{sub.price ? ` — ${sub.price} ₽` : ''}
                                             </option>
                                         ))}
                                     </select>
                                 </div>
+
                                 <label className="label">Ключевое слово</label>
                                 <input
                                     className="input"
