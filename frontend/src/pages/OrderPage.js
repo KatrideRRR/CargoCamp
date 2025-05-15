@@ -129,9 +129,9 @@ const OrderPage = () => {
     const isCreator = order.creatorId === userId;
 
     return (
-        <div className="orders-page">
+        <div className="all-orders-page">
 
-            <div className="orders-container">
+            <div className="all-orders-container">
                 <div className="orders-wrapper">
                     <ul className="orders-list">
                         <li
