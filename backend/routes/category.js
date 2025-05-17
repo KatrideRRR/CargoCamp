@@ -1,5 +1,5 @@
 const express = require('express');
-const { Category, Subcategory } = require('../models');
+const { Category, Subcategory, Service } = require('../models');
 const router = express.Router();
 
 router.get('/', async (req, res) => {
@@ -25,6 +25,21 @@ router.get('/subcategory/:categoryId', async (req, res) => {
         res.json(subcategories);
     } catch (error) {
         res.status(500).json({ error: 'Не удалось загрузить подкатегории.' });
+    }
+});
+
+router.get('/services/:subcategoryId', async (req, res) => {
+    const { subcategoryId } = req.params;
+    try {
+        const services = await Service.findAll({
+            where: { subcategoryId },
+            attributes: ['id', 'name', 'price'],
+            order: [['name', 'ASC']]
+        });
+        res.json(services);
+    } catch (error) {
+        console.error("Ошибка при получении услуг:", error);
+        res.status(500).json({ message: "Ошибка сервера" });
     }
 });
 

@@ -44,6 +44,8 @@ function CreateOrderPage() {
         recommended: false,
         push: false,
     });
+    const [services, setServices] = useState([]);
+    const [selectedService, setSelectedService] = useState('');
 
     const promotionTotal = Object.entries(promotion).reduce(
         (sum, [key, enabled]) =>
@@ -173,6 +175,9 @@ function CreateOrderPage() {
             console.error("Ошибка получения координат:", err);
         }
     };
+    useEffect(() => {
+        console.log('🔧 Услуги подкатегории:', services);
+    }, [services]);
 
     const handleSelect = (event, paymentId) => {
         event.preventDefault();
@@ -198,7 +203,8 @@ function CreateOrderPage() {
             categoryId: selectedCategory,
             subcategoryId: selectedSubcategory,
             description: "Оплата за услугу",
-            paymentType: formData.paymentType,  // Передаем paymentType из formData
+            paymentType: formData.paymentType,
+            serviceId:selectedService || null,
         };
         // Отправить данные на сервер
         console.log('Создание заказа:', orderData);
@@ -215,6 +221,7 @@ function CreateOrderPage() {
         });
         data.append("categoryId", Number(selectedCategory));
         data.append("subcategoryId", Number(selectedSubcategory));
+        data.append("serviceId", Number(selectedService));
         data.append("promotion", JSON.stringify(promotion)); // <— ВАЖНО
 
         // Добавляем изображения, если они есть
@@ -262,6 +269,27 @@ function CreateOrderPage() {
         }
     };
 
+    const fetchServices = async (subcategoryId) => {
+        if (!subcategoryId) {
+            setServices([]);
+            return;
+        }
+
+        try {
+            const response = await axios.get(`${apiUrl}/api/category/services/${subcategoryId}`);
+            setServices(response.data);
+        } catch (error) {
+            console.error("Ошибка при загрузке услуг:", error);
+            setServices([]);
+        }
+    };
+    const handleSubcategoryChange = async (e) => {
+        const subId = e.target.value;
+        setSelectedSubcategory(subId);
+        setSelectedService('');
+        await fetchServices(subId); // 👈 загружаем услуги
+    };
+
     const handleDescriptionChange = (e) => {
         const textarea = e.target;
         textarea.style.height = "auto"; // Сброс высоты
@@ -282,21 +310,25 @@ function CreateOrderPage() {
                                     <label>Выберите категорию:</label>
                                     <select value={selectedCategory} onChange={handleCategoryChange}>
                                         <option value="">Выберите категорию</option>
-                                        {category.map(category => (
-                                            <option key={category.id} value={category.id}>
-                                                {category.name}
-                                            </option>
-                                        ))}
+                                        {category
+                                            .filter(cat => cat.id !== 12 && cat.id !== 13)  // Исключаем 12 и 13
+                                            .map(cat => (
+                                                <option key={cat.id} value={cat.id}>
+                                                    {cat.name}
+                                                </option>
+                                            ))}
                                     </select>
+
                                 </div>
 
                                 <div>
                                     <label>Выберите подкатегорию:</label>
                                     <select
                                         value={selectedSubcategory}
-                                        onChange={e => setSelectedSubcategory(e.target.value)}
+                                        onChange={handleSubcategoryChange}
                                         disabled={!selectedCategory}
                                     >
+
                                         <option value="">Выберите подкатегорию</option>
                                         {subcategory.map(sub => (
                                             <option key={sub.id} value={sub.id}>
@@ -305,6 +337,25 @@ function CreateOrderPage() {
                                         ))}
                                     </select>
                                 </div>
+
+                                {services.length > 0 && (
+                                    <>
+                                        <label>Услуга:</label>
+                                        <select
+                                            value={selectedService}
+                                            onChange={(e) => setSelectedService(e.target.value)}
+                                        >
+                                            <option value="">Выберите услугу</option>
+                                            {services.map(service => (
+                                                <option key={service.id} value={service.id}>
+                                                    {service.name} — {service.price} ₽
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </>
+                                )}
+
+
 
                                 <label className="label">Ключевое слово</label>
                                 <input

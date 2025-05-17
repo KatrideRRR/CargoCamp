@@ -39,6 +39,8 @@ const OrdersPage = () => {
         { id: "guarantee", label: "Гарантия", icon: "🛡️" },
         { id: "installments", label: "Рассрочка", icon: "💳" },
     ];
+    const [services, setServices] = useState([]);
+    const [selectedService, setSelectedService] = useState('');
 
     const toggleMapVisibility = () => {
         setIsMapVisible(prev => !prev); // Переключить состояние карты
@@ -50,7 +52,6 @@ const OrdersPage = () => {
         setSelectedSubcategory('');
         applyFilters(undefined, undefined);
     };
-
 
     const getVisibleOrders = () => {
         return orders.filter(order => {
@@ -65,6 +66,21 @@ const OrdersPage = () => {
             }
             return true;
         });
+    };
+
+    const fetchServices = async (subcategoryId) => {
+        if (!subcategoryId) {
+            setServices([]);
+            return;
+        }
+
+        try {
+            const response = await axiosInstance.get(`/category/services/${subcategoryId}`);
+            setServices(response.data);
+        } catch (error) {
+            console.error('Ошибка загрузки услуг:', error);
+            setServices([]);
+        }
     };
 
 
@@ -280,25 +296,29 @@ const OrdersPage = () => {
     const handleSubcategoryChange = async (event) => {
         const subcategoryId = event.target.value;
         setSelectedSubcategory(subcategoryId);
-        applyFilters(selectedCategory, subcategoryId);
+        setSelectedService('');
+        await fetchServices(subcategoryId);
+        applyFilters(selectedCategory, subcategoryId, ''); // сбрасываем фильтрацию по услуге
     };
 
+    useEffect(() => {
+        console.log('📦 Услуги:', services);
+    }, [services]);
 
-
-    const applyFilters = async (categoryId, subcategoryId) => {
+    const applyFilters = async (categoryId, subcategoryId, serviceId = '') => {
         try {
             const response = await axiosInstance.get('/orders/all', {
                 params: {
                     categoryId: categoryId || undefined,
-                    subcategoryId: subcategoryId || undefined
+                    subcategoryId: subcategoryId || undefined,
+                    serviceId: serviceId || undefined
                 }
             });
 
             const categoryFiltered = response.data;
-            setOrders(categoryFiltered); // сохраняем оригинал
-            setFilteredByCategory(categoryFiltered); // фильтр по категории
+            setOrders(categoryFiltered);
+            setFilteredByCategory(categoryFiltered);
 
-            // если геолокация есть — фильтруем сразу
             if (userLocation) {
                 const geoFiltered = categoryFiltered.filter(order => {
                     if (!order.latitude || !order.longitude) return false;
@@ -319,7 +339,6 @@ const OrdersPage = () => {
             console.error("❌ Ошибка фильтрации заказов:", error);
         }
     };
-
 
     const handleRequestOrder = async (orderId) => {
         const token = localStorage.getItem('authToken');
@@ -414,9 +433,31 @@ const OrdersPage = () => {
                                         disabled={!selectedCategory}>
                                     <option value="">Все подкатегории</option>
                                     {subcategories.map(subcategory => (
-                                        <option key={subcategory.id} value={subcategory.id}>{subcategory.name}</option>
+                                        <option key={subcategory.id}
+                                                value={subcategory.id}>{subcategory.name} - {subcategory.price}</option>
                                     ))}
                                 </select>
+
+                                {services.length > 0 && (
+                                    <>
+                                <label>Услуга:</label>
+                                <select
+                                    value={selectedService}
+                                    onChange={(e) => {
+                                        setSelectedService(e.target.value);
+                                        applyFilters(selectedCategory, selectedSubcategory, e.target.value);
+                                    }}
+                                    disabled={!selectedSubcategory || services.length === 0}
+                                >
+                                    <option value="">Все услуги</option>
+                                    {services.map(service => (
+                                        <option key={service.id} value={service.id}>
+                                            {service.name} — {service.price} ₽
+                                        </option>
+                                    ))}
+                                </select>
+                                    </>
+                                )}
                                 <div className="location-row">
                                     <label>Ваше местоположение:</label>
                                     {isGeolocationDenied ? (
@@ -499,6 +540,9 @@ const OrdersPage = () => {
                                                         </p>
                                                         <p>
                                                             <strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : 'Не указано'}
+                                                        </p>
+                                                        <p>
+                                                            <strong>Услуга:</strong> {order.service ? order.service.name : 'Не указано'}
                                                         </p>
                                                         <p><strong>Адрес:</strong> {order.address}</p>
                                                         <p><strong>Цена:</strong> {order.proposedSum} ₽</p>

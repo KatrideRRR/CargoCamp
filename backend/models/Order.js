@@ -10,6 +10,7 @@ module.exports = (sequelize) => {
             Order.belongsTo(models.Subcategory, { foreignKey: 'subcategoryId', as: 'subcategory' });
             Order.belongsTo(models.User, { as: 'creator', foreignKey: 'creatorId' });
             Order.belongsTo(models.User, { as: 'executor', foreignKey: 'executorId' });
+            Order.belongsTo(models.Service, { foreignKey: 'serviceId', as: 'service' });
         }
     }
 
@@ -76,6 +77,12 @@ module.exports = (sequelize) => {
                 type: DataTypes.BOOLEAN,
                 defaultValue: false,
             },
+            serviceId: {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+                references: { model: 'services', key: 'id' }
+            }
+
         },
         {
             sequelize,
