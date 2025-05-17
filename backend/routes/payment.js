@@ -86,6 +86,11 @@ router.post("/pay_commission", async (req, res) => {
             commission = Math.round(order.proposedSum * 100 * 0.20);
         }
 
+        if (order.is_recommended) {
+            commission -= 100 * 100;
+            if (commission < 0) commission = 0; // комиссия не может быть отрицательной
+        }
+
         if (commission <= 0) {
             return res.status(400).json({ success: false, error: "Некорректная комиссия" });
         }
