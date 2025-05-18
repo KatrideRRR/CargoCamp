@@ -30,28 +30,33 @@ const UserComplaintsPage = () => {
     }
 
     return (
-        <div className="complaints-container">
-            <h1>Жалобы на пользователя {user.username} (ID: {user.id})</h1>
-            <p><strong>Количество жалоб:</strong> {user.complaintsCount}</p>
-            {user.complaints && user.complaints.length > 0 ? (
-                <ul className="complaints-list">
-                    {user.complaints.map((complaint, index) => (
-                        <li key={index} className="complaint-item">
-                            <p><strong>Дата:</strong> {new Date(complaint.date).toLocaleString()}</p>
-                            <p><strong>Текст жалобы:</strong> {complaint.complaintText}</p>
-                        </li>
-                    ))}
-                </ul>
-            ) : (
-                <p>Жалоб пока нет.</p>
-            )}
-            {/* Кнопка для перехода на страницу заказов */}
-            <Link to={`/user-orders/${user.id}`} className="view-orders-button">
-                Посмотреть заказы этого пользователя
-            </Link>
+        <div className="complaints">
 
+            <div className="complaintsPage">
 
+                <div className="complaints-container">
+                    <h1>Жалобы на пользователя {user.username} (ID: {user.id})</h1>
+                    <p className="complaints-count"><strong>Количество жалоб:</strong> {user.complaintsCount}</p>
+                    <Link to={`/user-orders/${user.id}`} className="view-orders-button">
+                        Посмотреть заказы этого пользователя
+                    </Link>
+                    {user.complaints && user.complaints.length > 0 ? (
+                        <ul className="complaints-list">
+                            {user.complaints.map((complaint, index) => (
+                                <li key={index} className="complaint-item">
+                                    <p><strong>Дата:</strong> {new Date(complaint.date).toLocaleString()}</p>
+                                    <p><strong>Текст жалобы:</strong> {complaint.complaintText}</p>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p>Жалоб пока нет.</p>
+                    )}
+
+                </div>
+            </div>
         </div>
+
     );
 };
 

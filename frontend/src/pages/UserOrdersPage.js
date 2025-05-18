@@ -5,6 +5,7 @@ import '../styles/OrdersPage.css';
 import io from 'socket.io-client';
 import Modal from 'react-modal';
 import {FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity} from "react-icons/fa";
+import {FiAlertTriangle} from "react-icons/fi";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 const socket = io(process.env.REACT_APP_SOCKET_URL, {
@@ -22,11 +23,7 @@ const UserOrdersPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentImages, setCurrentImages] = useState([]);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
-    const paymentMethods = [
-        { id: "cash", label: "Наличные", icon: "💵" },
-        { id: "guarantee", label: "Гарантия", icon: "🛡️" },
-        { id: "installments", label: "Рассрочка", icon: "💳" },
-    ];
+    const [user, setUser] = useState(null);
 
     useEffect(() => {
         const fetchUserOrders = async () => {
@@ -51,11 +48,11 @@ const UserOrdersPage = () => {
             }
         };
 
-
         const fetchUserData = async () => {
             try {
                 const response = await axiosInstance.get('/auth/profile');
                 console.log("👤 Данные пользователя:", response.data);
+                setUser(response.data);
                 setUserId(response.data.id);
                 socket.emit('register', response.data.id);
             } catch (err) {
@@ -138,117 +135,149 @@ const UserOrdersPage = () => {
     };
 
     return (
-        <div className="orders-container">
-            <div className="orders-wrapper">
-                {orders.length > 0 ? (
-                    <ul className="orders-list">
-                        {orders.map((order) => {
-                            const creator = creatorsInfo[order.creatorId] || {};
+        <div className="all-orders">
 
-                            return (
-                                <li className="user-order-card" key={order.id}>
-                                    <div className="order-content">
-                                        <div className="order-header">
-                                            <p className="order-title">
-                                                <strong>Заказ номер {order.id}</strong> от заказчика с
-                                                ID {order.creatorId}.
-                                                Создан {new Date(order.createdAt).toLocaleString()}
-                                                <p><strong>ID заказчика:</strong> {order.creatorId || "Неизвестно"} </p>
-                                                <p><strong>Имя заказчика:</strong> {creator.username || "Неизвестно"}
-                                                </p>
-                                                <p><strong>Рейтинг
-                                                    заказчика:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
-                                                </p>
-                                                {/* Кнопка для перехода на страницу жалоб для создателя */}
-                                                {creator.username && (
-                                                    <Link to={`/complaints/${order.creatorId}`}
-                                                          className="complaints-button">
-                                                        Жалобы на
-                                                        создателя: {creator.complaintsCount || 0}                                       </Link>
-                                                )}
-                                            </p>
-                                            {/* Иконка способа оплаты ниже заголовка */}
-                                            <div className="order-payment-icon-container">
+            <div className="pageContainer">
+
+                <div className="all-orders-page">
+
+                    {user && (
+                        <h1 className="text-2xl font-bold mb-4">
+                            Заказы, размещенные пользователем {user.username} (ID: {user.id})
+                        </h1>
+                    )}
+                    {orders.length > 0 ? (
+                        <ul className="orders-list">
+                            {orders.map((order) => {
+                                const creator = creatorsInfo[order.creatorId] || {};
+
+                                return (
+                                    <li
+                                        key={order.id}
+                                        className={`floatingCard ${order.is_highlighted ? 'highlighted-order' : ''}`}
+                                    >
+                                        <div className="order-content">
+                                            <div className="order-header">
+                                                <div className="order-info">
+                                                    <p className="order-title">
+                                                        <strong>Заказ
+                                                            №{order.id}</strong> от {creator.username || "Неизвестно"}.
+                                                        Создан {new Date(order.createdAt).toLocaleString()}.
+                                                        <div className="order-payment-icon-container">
                                                 <span
                                                     className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
-                                                <span
-                                                    className="payment-label">{paymentMethods.find(method => method.id === order.paymentType)?.label}</span>
-                                            </div>
-                                        </div>
+                                                        </div>
+                                                    </p>
 
-                                        <div className="order-left">
-                                            <p><strong>Тип заказа:</strong> {order.type}</p>
-                                            <p><strong>Описание:</strong> {order.description}</p>
-                                            <p><strong>Адрес:</strong> {order.address}</p>
-                                            <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
+                                                    <p><strong>ID
+                                                        заказчика:</strong> {order.creatorId || "Неизвестно"}
+                                                    </p>
+                                                    <p><strong>Имя
+                                                        заказчика:</strong> {creator.username || "Неизвестно"}
+                                                    </p>
+                                                    <p>
+                                                        <strong>Рейтинг
+                                                            заказчика:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
+                                                        <Link
+                                                            to={`/complaints/${order.creatorId}`}
+                                                            className="inline-flex items-center mt-2 px-3 py-1 text-sm font-medium text-red-600 bg-red-100 rounded-md hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                                            aria-label={`Жалобы (${creator.complaintsCount || 0})`}
+                                                        >
+                                                            <FiAlertTriangle className="mr-2 h-5 w-5"/>
+                                                            {creator.complaintsCount || 0}
+                                                        </Link>
 
-                                        </div>
+                                                    </p>
 
-                                        {Array.isArray(order.images) && order.images.length > 0 ? (
-                                            <div className="image-stack-container">
-                                                <div className="image-stack" onClick={() => openModal(order.images)}>
-                                                    {order.images.map((image, index) => {
-                                                        const imageUrl = `${apiUrl}${image}`;
-                                                        return (
-                                                            <img
-                                                                key={index}
-                                                                src={imageUrl}
-                                                                alt={`Order pic ${index + 1}`}
-                                                                className="order-image"
-                                                                style={{ transform: `translateX(${index * 10}px)` }} // Смещение только вправо
-                                                            />
-                                                        );
-                                                    })}
                                                 </div>
                                             </div>
-                                        ) : null}
+
+                                            <div className="order-left">
+                                                <p>
+                                                    <strong>Категория:</strong> {order.category ? order.category.name : 'Не указано'}
+                                                </p>
+                                                <p>
+                                                    <strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : 'Не указано'}
+                                                </p>
+                                                <p>
+                                                    <strong>Услуга:</strong> {order.service ? order.service.name : 'Не указано'}
+                                                </p>
+
+                                            </div>
+
+                                            {Array.isArray(order.images) && order.images.length > 0 ? (
+                                                <div className="image-stack-container">
+                                                    <div className="image-stack"
+                                                         onClick={() => openModal(order.images)}>
+                                                        {order.images.map((image, index) => {
+                                                            const imageUrl = `${apiUrl}${image}`;
+                                                            return (
+                                                                <img
+                                                                    key={index}
+                                                                    src={imageUrl}
+                                                                    alt={`Order pic ${index + 1}`}
+                                                                    className="order-image"
+                                                                    style={{transform: `translateX(${index * 10}px)`}} // Смещение только вправо
+                                                                />
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            ) : null}
+
+                                            <p><strong>Адрес:</strong> {order.address}</p>
+                                            <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
+                                            <p><strong>Описание:</strong> {order.description}</p>
 
 
-                                    </div>
+                                        </div>
 
 
-
-                                    {userId !== order.creatorId && !order.executorId && order.status === 'pending' && (
-                                        <button className="take-order-button" onClick={() => handleRequestOrder(order.id)}>Запросить выполнение</button>
-                                    )}
-                                </li>
-                            );
-                        })}
-                    </ul>
-                ) : (
-                    <p className="no-orders">Нет доступных заказов.</p>
-                )}
-            </div>
-
-            {/* Модальное окно просмотра изображений */}
-            <Modal
-                appElement={document.getElementById('root')}
-                isOpen={isModalOpen}
-                onRequestClose={closeModal}
-                contentLabel="Full Image Modal"
-                className="custom-modal"
-                overlayClassName="custom-modal-overlay"
-            >
-                <div className="custom-modal-content">
-                    {/* Кнопка закрытия */}
-                    <button onClick={closeModal} className="custom-close-button">✖</button>
-
-                    {/* Изображение */}
-                    <img
-                        src={`${apiUrl}${currentImages[currentImageIndex]}`}
-                        alt="Full-size view"
-                        className="custom-modal-image"
-                    />
-
-                    {/* Кнопки переключения */}
-                    <div className="custom-image-navigation">
-                        <button onClick={prevImage} className="custom-nav-button">◀</button>
-                        <button onClick={nextImage} className="custom-nav-button">▶</button>
-                    </div>
+                                        {userId !== order.creatorId && !order.executorId && order.status === 'pending' && (
+                                            <button className="take-order-button"
+                                                    onClick={() => handleRequestOrder(order.id)}>Запросить
+                                                выполнение</button>
+                                        )}
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    ) : (
+                        <p className="no-orders">Нет доступных заказов.</p>
+                    )}
                 </div>
-            </Modal>
 
+                {/* Модальное окно просмотра изображений */}
+                <Modal
+                    appElement={document.getElementById('root')}
+                    isOpen={isModalOpen}
+                    onRequestClose={closeModal}
+                    contentLabel="Full Image Modal"
+                    className="custom-modal"
+                    overlayClassName="custom-modal-overlay"
+                >
+                    <div className="custom-modal-content">
+                        {/* Кнопка закрытия */}
+                        <button onClick={closeModal} className="custom-close-button">✖</button>
+
+                        {/* Изображение */}
+                        <img
+                            src={`${apiUrl}${currentImages[currentImageIndex]}`}
+                            alt="Full-size view"
+                            className="custom-modal-image"
+                        />
+
+                        {/* Кнопки переключения */}
+                        <div className="custom-image-navigation">
+                            <button onClick={prevImage} className="custom-nav-button">◀</button>
+                            <button onClick={nextImage} className="custom-nav-button">▶</button>
+                        </div>
+                    </div>
+                </Modal>
+
+            </div>
         </div>
+
     );
 };
 export default UserOrdersPage;

@@ -7,6 +7,7 @@ import Modal from 'react-modal';
 import SwipeableMap from "../components/SwipeableMap.js";
 import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
 import { useSwipeable } from 'react-swipeable';
+import { FiAlertTriangle } from 'react-icons/fi';
 
 const apiUrl = process.env.REACT_APP_API_URL;
 const socket = io(process.env.REACT_APP_SOCKET_URL, {
@@ -34,11 +35,6 @@ const OrdersPage = () => {
     const [filteredByCategory, setFilteredByCategory] = useState([]); // заказы после фильтра по категории
     const [isMapVisible, setIsMapVisible] = useState(true); // Состояние для контроля видимости карты
     const [activeTab, setActiveTab] = useState('all'); // 'all' | 'courier' | 'urgent'
-    const paymentMethods = [
-        { id: "cash", label: "Наличные", icon: "💵" },
-        { id: "guarantee", label: "Гарантия", icon: "🛡️" },
-        { id: "installments", label: "Рассрочка", icon: "💳" },
-    ];
     const [services, setServices] = useState([]);
     const [selectedService, setSelectedService] = useState('');
 
@@ -380,235 +376,232 @@ const OrdersPage = () => {
 
 
     return (
-        <div className="all-orders-page">
+        <div className="all-orders">
 
-            <div className="map-container">
-                {isMapVisible && <SwipeableMap orders={filteredOrders} userLocation={userLocation}  />}
-                <div className="flex-1 overflow-auto">
-                    <button
-                        className="toggle-map-button"
-                        onClick={toggleMapVisibility}
-                    >
-                        {/* В зависимости от состояния показываем либо стрелочку вниз, либо вверх */}
-                        {isMapVisible ? <span>Скрыть карту</span> : <span>Показать карту</span>}
-                    </button>
+            <div className="pageContainer">
+                <div className="all-orders-page">
 
-
-                    <div {...swipeHandlers} className="all-orders-container">
-
-                        <div className="carousel-tabs-container">
-                            <div
-                                className={`carousel-tab ${activeTab === 'all' ? 'active' : 'inactive'}`}
-                                onClick={() => handleTabChange('all')}
-                            >
-                                Все заказы
+                    <div className="map-container">
+                        {isMapVisible && (
+                            <div className="map-wrapper">
+                                <SwipeableMap orders={filteredOrders} userLocation={userLocation}/>
                             </div>
-                            <div
-                                className={`carousel-tab ${activeTab === 'courier' ? 'active' : 'inactive'}`}
-                                onClick={() => handleTabChange('courier')}
+                        )}
+                        <div className="flex-1 overflow-auto">
+                            <button
+                                className="toggle-map-button"
+                                onClick={toggleMapVisibility}
                             >
-                                Курьер / Такси
-                            </div>
-                            <div
-                                className={`carousel-tab ${activeTab === 'urgent' ? 'active' : 'inactive'}`}
-                                onClick={() => handleTabChange('urgent')}
-                            >
-                                Срочные
-                            </div>
-                        </div>
+                                {isMapVisible ? "▲ Скрыть карту" : "▼ Показать карту"}
+                            </button>
 
 
-                        <div className="orders-wrapper">
-                            <div className="filters">
-                                <label>Категория:</label>
-                                <select value={selectedCategory} onChange={handleCategoryChange}>
-                                    <option value="">Все категории</option>
-                                    {filteredCategories.map(category => (
-                                        <option key={category.id} value={category.id}>{category.name}</option>
-                                    ))}
-                                </select>
+                            <div {...swipeHandlers} className="contentWrapper">
 
-                                <label>Подкатегория:</label>
-                                <select value={selectedSubcategory} onChange={handleSubcategoryChange}
-                                        disabled={!selectedCategory}>
-                                    <option value="">Все подкатегории</option>
-                                    {subcategories.map(subcategory => (
-                                        <option key={subcategory.id}
-                                                value={subcategory.id}>{subcategory.name} - {subcategory.price}</option>
-                                    ))}
-                                </select>
-
-                                {services.length > 0 && (
-                                    <>
-                                <label>Услуга:</label>
-                                <select
-                                    value={selectedService}
-                                    onChange={(e) => {
-                                        setSelectedService(e.target.value);
-                                        applyFilters(selectedCategory, selectedSubcategory, e.target.value);
-                                    }}
-                                    disabled={!selectedSubcategory || services.length === 0}
-                                >
-                                    <option value="">Все услуги</option>
-                                    {services.map(service => (
-                                        <option key={service.id} value={service.id}>
-                                            {service.name} — {service.price} ₽
-                                        </option>
-                                    ))}
-                                </select>
-                                    </>
-                                )}
-                                <div className="location-row">
-                                    <label>Ваше местоположение:</label>
-                                    {isGeolocationDenied ? (
-                                        <>
-                                            <input
-                                                type="text"
-                                                value={manualAddress}
-                                                onChange={(e) => setManualAddress(e.target.value)}
-                                                placeholder="Введите ваш адрес"
-                                            />
-                                            <button onClick={() => geocodeAddress(manualAddress)}>Определить</button>
-                                        </>
-                                    ) : (
-                                        <p className="geolocation-status">Геолокация включена</p>
-                                    )}
+                                <div className="carousel-tabs-container">
+                                    <div
+                                        className={`carousel-tab ${activeTab === 'all' ? 'active' : ''}`}
+                                        onClick={() => handleTabChange('all')}
+                                    >
+                                        Все заказы
+                                    </div>
+                                    <div
+                                        className={`carousel-tab ${activeTab === 'courier' ? 'active' : ''}`}
+                                        onClick={() => handleTabChange('courier')}
+                                    >
+                                        Курьер / Такси
+                                    </div>
+                                    <div
+                                        className={`carousel-tab ${activeTab === 'urgent' ? 'active' : ''}`}
+                                        onClick={() => handleTabChange('urgent')}
+                                    >
+                                        Срочные
+                                    </div>
                                 </div>
 
 
-                            </div>
+                                <div className="orders-wrapper">
+                                    <div className="filters">
+                                        <label>Категория:</label>
+                                        <select value={selectedCategory} onChange={handleCategoryChange}>
+                                            <option value="">Все категории</option>
+                                            {filteredCategories.map(category => (
+                                                <option key={category.id} value={category.id}>{category.name}</option>
+                                            ))}
+                                        </select>
+
+                                        <label>Подкатегория:</label>
+                                        <select value={selectedSubcategory} onChange={handleSubcategoryChange}
+                                                disabled={!selectedCategory}>
+                                            <option value="">Все подкатегории</option>
+                                            {subcategories.map(subcategory => (
+                                                <option key={subcategory.id}
+                                                        value={subcategory.id}>{subcategory.name} - {subcategory.price}</option>
+                                            ))}
+                                        </select>
+
+                                        <label>Услуга:</label>
+                                        <select
+                                            value={selectedService}
+                                            onChange={(e) => {
+                                                setSelectedService(e.target.value);
+                                                applyFilters(selectedCategory, selectedSubcategory, e.target.value);
+                                            }}
+                                            disabled={!selectedSubcategory || services.length === 0}
+                                        >
+                                            <option value="">Все услуги</option>
+                                            {services.map(service => (
+                                                <option key={service.id} value={service.id}>
+                                                    {service.name} — {service.price} ₽
+                                                </option>
+                                            ))}
+                                        </select>
+
+                                        <div className="location-row">
+                                            <label>Ваше местоположение:</label>
+                                            {isGeolocationDenied ? (
+                                                <>
+                                                    <input
+                                                        type="text"
+                                                        value={manualAddress}
+                                                        onChange={(e) => setManualAddress(e.target.value)}
+                                                        placeholder="Введите ваш адрес"
+                                                    />
+                                                    <button onClick={() => geocodeAddress(manualAddress)}>Определить
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <p className="geolocation-status">Геолокация включена</p>
+                                            )}
+                                        </div>
 
 
-                            {orders.length > 0 ? (
-                                <ul className="orders-list">
-                                    {getVisibleOrders().map((order) => {
-                                        const creator = creatorsInfo[order.creatorId] || {};
-                                        const isCreator = order.creatorId === userId;
+                                    </div>
 
-                                        return (
 
-                                            <li
-                                                key={order.id}
-                                                className={`order-card ${isCreator ? 'creator' : ''} ${order.is_highlighted ? 'highlighted-order' : ''}`}
-                                            >
+                                    {orders.length > 0 ? (
+                                        <ul className="orders-list">
+                                            {getVisibleOrders().map((order) => {
+                                                const creator = creatorsInfo[order.creatorId] || {};
+                                                const isCreator = order.creatorId === userId;
 
-                                                <div className="order-content">
-                                                    <div className="order-header">
-                                                        <div className="order-info">
-                                                            <p className="order-title">
-                                                                <strong>Заказ
-                                                                    №{order.id}</strong> от {creator.username || "Неизвестно"}.
-                                                                Создан {new Date(order.createdAt).toLocaleString()}.
-                                                            </p>
+                                                return (
 
-                                                            <p><strong>ID
-                                                                заказчика:</strong> {order.creatorId || "Неизвестно"}
-                                                            </p>
-                                                            <p><strong>Имя
-                                                                заказчика:</strong> {creator.username || "Неизвестно"}
-                                                            </p>
-                                                            <p>
-                                                                <strong>Рейтинг
-                                                                    заказчика:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
-                                                            </p>
+                                                    <li
+                                                        key={order.id}
+                                                        className={`floatingCard ${isCreator ? 'creator' : ''} ${order.is_highlighted ? 'highlighted-order' : ''}`}
+                                                    >
 
-                                                            {creator.username && (
-                                                                <Link
-                                                                    to={`/complaints/${order.creatorId}`}
-                                                                    className="text-sm text-red-600 hover:underline font-medium inline-block mt-2"
-                                                                >
-                                                                    Жалобы: {creator.complaintsCount || 0}
-                                                                </Link>
-                                                            )}
-
-                                                            {/* Иконка способа оплаты */}
-                                                            <div className="order-payment-icon-container">
+                                                        <div className="order-content">
+                                                            <div className="order-header">
+                                                                <div className="order-info">
+                                                                    <p className="order-title">
+                                                                        <strong>Заказ
+                                                                            №{order.id}</strong> от {creator.username || "Неизвестно"}.
+                                                                        Создан {new Date(order.createdAt).toLocaleString()}. <div
+                                                                        className="order-payment-icon-container">
                                                 <span
                                                     className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
-                                                                <span
-                                                                    className="payment-label">{paymentMethods.find(method => method.id === order.paymentType)?.label}</span>
+
+                                                                    </div>
+                                                                    </p>
+
+                                                                    <p><strong>ID
+                                                                        заказчика:</strong> {order.creatorId || "Неизвестно"}
+                                                                    </p>
+                                                                    <p><strong>Имя
+                                                                        заказчика:</strong> {creator.username || "Неизвестно"}
+                                                                    </p>
+                                                                    <p>
+                                                                        <strong>Рейтинг
+                                                                            заказчика:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
+                                                                        <Link
+                                                                            to={`/complaints/${order.creatorId}`}
+                                                                            className="inline-flex items-center mt-2 px-3 py-1 text-sm font-medium text-red-600 bg-red-100 rounded-md hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                                                            aria-label={`Жалобы (${creator.complaintsCount || 0})`}
+                                                                        >
+                                                                            <FiAlertTriangle className="mr-2 h-5 w-5"/>
+                                                                            {creator.complaintsCount || 0}
+                                                                        </Link>
+
+                                                                    </p>
+
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="order-left">
+                                                                <p>
+                                                                    <strong>Категория:</strong> {order.category ? order.category.name : 'Не указано'}
+                                                                </p>
+                                                                <p>
+                                                                    <strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : 'Не указано'}
+                                                                </p>
+                                                                <p>
+                                                                    <strong>Услуга:</strong> {order.service ? order.service.name : 'Не указано'}
+                                                                </p>
+
                                                             </div>
 
 
+                                                            {Array.isArray(order.images) && order.images.length > 0 ? (
+                                                                <div className="image-stack-container">
+                                                                    <div className="image-stack"
+                                                                         onClick={() => openModal(order.images)}>
+                                                                        {order.images.map((image, index) => {
+                                                                            const imageUrl = `${apiUrl}${image}`;
+                                                                            return (
+                                                                                <img
+                                                                                    key={index}
+                                                                                    src={imageUrl}
+                                                                                    alt={`Order pic ${index + 1}`}
+                                                                                    className="order-image"
+                                                                                    style={{transform: `translateX(${index * 10}px)`}} // Смещение только вправо
+                                                                                />
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </div>
+                                                            ) : null}
+
+                                                            <p><strong>Адрес:</strong> {order.address}</p>
+                                                            <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
+                                                            <p><strong>Описание:</strong> {order.description}</p>
+
                                                         </div>
-                                                    </div>
-
-                                                    <div className="order-left">
-                                                        <p><strong>Название заказа:</strong> {order.type}</p>
-                                                        <p>
-                                                            <strong>Категория:</strong> {order.category ? order.category.name : 'Не указано'}
-                                                        </p>
-                                                        <p>
-                                                            <strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : 'Не указано'}
-                                                        </p>
-                                                        <p>
-                                                            <strong>Услуга:</strong> {order.service ? order.service.name : 'Не указано'}
-                                                        </p>
-                                                        <p><strong>Адрес:</strong> {order.address}</p>
-                                                        <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
 
 
-                                                    </div>
+                                                        {userId !== order.creatorId && !order.executorId && order.status === 'pending' && (
+                                                            <button className="take-order-button"
+                                                                    onClick={() => handleRequestOrder(order.id)}>
+                                                                Запросить выполнение
+                                                            </button>
+                                                        )}
 
 
-                                                    {Array.isArray(order.images) && order.images.length > 0 ? (
-                                                        <div className="image-stack-container">
-                                                            <div className="image-stack"
-                                                                 onClick={() => openModal(order.images)}>
-                                                                {order.images.map((image, index) => {
-                                                                    const imageUrl = `${apiUrl}${image}`;
-                                                                    return (
-                                                                        <img
-                                                                            key={index}
-                                                                            src={imageUrl}
-                                                                            alt={`Order pic ${index + 1}`}
-                                                                            className="order-image"
-                                                                            style={{transform: `translateX(${index * 10}px)`}} // Смещение только вправо
-                                                                        />
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        </div>
-                                                    ) : null}
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    ) : (
+                                        <p className="no-orders">Нет доступных заказов.</p>
 
-                                                    <p><strong>Описание:</strong> {order.description}</p>
-
-
-                                                </div>
-
-
-                                                {userId !== order.creatorId && !order.executorId && order.status === 'pending' && (
-                                                    <button className="take-order-button"
-                                                            onClick={() => handleRequestOrder(order.id)}>
-                                                        Запросить выполнение
-                                                    </button>
-                                                )}
-
-
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            ) : (
-                                <p className="no-orders">Нет доступных заказов.</p>
-
-                            )}
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <Modal
-                appElement={document.getElementById('root')}
-                isOpen={isModalOpen}
-                onRequestClose={closeModal}
-                contentLabel="Full Image Modal"
-                className="custom-modal"
-                overlayClassName="custom-modal-overlay"
-            >
-                <div className="custom-modal-content">
-                    {/* Кнопка закрытия */}
-                    <button onClick={closeModal} className="custom-close-button">✖</button>
+                    <Modal
+                        appElement={document.getElementById('root')}
+                        isOpen={isModalOpen}
+                        onRequestClose={closeModal}
+                        contentLabel="Full Image Modal"
+                        className="custom-modal"
+                        overlayClassName="custom-modal-overlay"
+                    >
+                        <div className="custom-modal-content">
+                            {/* Кнопка закрытия */}
+                            <button onClick={closeModal} className="custom-close-button">✖</button>
 
                             {/* Изображение */}
                             <img
@@ -625,9 +618,10 @@ const OrdersPage = () => {
                         </div>
                     </Modal>
 
-
-
+                </div>
+            </div>
         </div>
+
     )
 };
 

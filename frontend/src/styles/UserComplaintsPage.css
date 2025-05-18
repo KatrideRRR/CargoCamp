@@ -1,79 +1,116 @@
-.complaints-container {
-    max-width: 800px;
-    width: 100%;
-    margin: 85px auto 50px auto; /* Отступ сверху для фиксации перекрытия */
-    padding: 20px;
-    background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    display: flex;
-    flex-direction: column;
-    align-items: center; /* Центрирование содержимого */
-    justify-content: center;
-    text-align: center;
-}
+.complaints {
 
-/* Заголовок */
-.complaints-container h1 {
-    font-size: 22px;
-    margin-bottom: 10px;
-    text-align: center;
-}
-
-.complaints-list {
-    list-style: none;
-    padding: 0;
-    width: 100%;
-}
-
-.complaint-item {
-    background: #f8d7da;
-    color: #721c24;
-    padding: 10px;
-    border-radius: 5px;
-    margin-bottom: 5px;
-    width: 98%;
-    text-align: left;
-}
-
-/* Адаптивность */
-@media (max-width: 768px) {
-    .complaints-container {
-        width: 90%; /* Уменьшаем ширину, чтобы контейнер не выходил за пределы экрана */
-        margin: 80px auto 20px auto; /* Центрирование и отступ сверху */
-        padding: 15px;
-        margin-bottom: 80px;
+    .complaintsPage {
+        display: flex;
+        justify-content: center;
+        padding: 40px 20px;
+        background-color: #f4f6f8;
+        min-height: 100vh;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin-bottom: 60px;
     }
+
+    .complaints-container h1 {
+        font-size: 26px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 16px;
+        border-bottom: 1px solid #e0e0e0;
+        padding-bottom: 12px;
+        text-align: center;
+    }
+
+    .complaints-count {
+        font-size: 16px;
+        color: #555;
+        margin: 12px 0 24px;
+        text-align: center;
+    }
+
+    .complaints-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-top: 10px;
+        padding: 0;
+        list-style: none; /* убирает точки */
+    }
+
     .complaint-item {
-        width: 95%;
+        background-color: #fdfdfd;
+        border-radius: 12px;
+        padding: 20px 24px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .complaint-item:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Центровка кнопки */
+
+    .view-orders-button {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 40px auto 0;
+        padding: 12px 24px;
+        font-size: 15px;
+        font-weight: 500;
+        color: #fff;
+        background: linear-gradient(135deg, #4b6cb7, #182848);
+        text-decoration: none;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 4px 10px rgba(75, 108, 183, 0.3);
+        transition: all 0.3s ease;
+        max-width: fit-content;
+    }
+
+    .view-orders-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 14px rgba(24, 40, 72, 0.4);
+    }
+
+    .error-message,
+    .loading-message {
+        font-size: 18px;
+        color: #b00020;
+        padding: 20px;
+        text-align: center;
+    }
+
+    /* 📱 Мобильная адаптация */
+    @media (max-width: 600px) {
+        .complaints-container {
+            padding: 20px;
+            border-radius: 12px;
+        }
+
+        .complaints-container h1 {
+            font-size: 20px;
+        }
+
+        .complaints-count {
+            font-size: 14px;
+        }
+
+        .complaints-list {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .complaint-item {
+            padding: 16px;
+            font-size: 14px;
+        }
+
+        .view-orders-button {
+            padding: 10px 20px;
+            font-size: 14px;
+            margin-top: 30px;
+        }
     }
 }
-
-.view-orders-button {
-    display: inline-block;
-    padding: 10px 20px;
-    margin-top: 20px;
-    background: linear-gradient(135deg, #6fb1fc 0%, #4364f7 100%);
-    color: white; /* Белый текст */
-    font-size: 16px;
-    font-weight: bold;
-    text-align: center;
-    border-radius: 5px; /* Слегка закругленные углы */
-    text-decoration: none; /* Убирает подчеркивание */
-    transition: background-color 0.3s, transform 0.2s; /* Плавное изменение цвета фона и эффекта нажатия */
-}
-
-.view-orders-button:hover {
-    background: linear-gradient(135deg, #5a9cf7 0%, #334cd4 100%);
-    transform: scale(1.05); /* Легкое увеличение кнопки при наведении */
-}
-
-.view-orders-button:active {
-    transform: scale(1); /* Восстановление нормального размера при клике */
-    background-color: #388e3c; /* Еще темнее при клике */
-}
-
-.view-orders-button:focus {
-    outline: none; /* Убираем обводку фокуса */
-}
-
