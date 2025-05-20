@@ -1,73 +1,563 @@
-/* ProfilePage.css */
+.profile {
 
-body {
-    margin: 0;
-    font-family: "Segoe UI", Roboto, sans-serif;
-    background: linear-gradient(145deg, #f1f4f9, #e3eaf4);
-    color: #333;
-}
+    .pageContainer-profile {
+        padding: 2rem;
+        min-height: 100vh;
+        background: linear-gradient(to bottom right, #e8f0ff, #ffffff);
+        display: flex;
+        justify-content: center;
+        align-items: start;
+        overflow-y: auto;
+        margin-bottom: 70px;
+    }
 
-.container-p {
-    display: flex;
-    justify-content: center;
-    padding: 40px 20px;
-    margin-top: -20px;
-    margin-bottom: 50px;
-}
+    .contentWrapper {
+        width: 100%;
+        max-width: 1000px;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
 
-.profile-container {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
-    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.2);
-    border-radius: 20px;
-    padding: 30px;
-    max-width: 500px;
-    width: 100%;
-    animation: fadeInUp 0.8s ease;
-}
+    body {
+        margin: 0;
+        font-family: "Segoe UI", Roboto, sans-serif;
+        background: linear-gradient(145deg, #f1f4f9, #e3eaf4);
+        color: #333;
 
-/* Секция */
-.section {
-    display: flex;
-    align-items: center;  /* Вертикальное выравнивание элементов */
-}
+    }
 
-/* Заголовок блока (например, имя пользователя) */
-.subtitle {
-    font-size: 18px;
-    font-weight: 600;
-    color: #333;
-    margin-right: 10px;  /* Отступ между заголовком и значением */
-    white-space: nowrap; /* Чтобы заголовок не переносился на новую строку */
-    font-family: 'Segoe UI', sans-serif;
-}
+    .container-p {
+        display: flex;
+        justify-content: center;
+        padding: 40px 20px;
+        margin-top: -20px;
+        margin-bottom: 50px;
+    }
 
-/* Текст информации */
-.info {
-    font-size: 18px;
-    color: #444;
-    word-break: break-word; /* Разрыв слов, если текст длинный */
-    font-family: 'Segoe UI', sans-serif;
-    margin-top: -8px;
+    .profile-container {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(16px) saturate(180%);
+        -webkit-backdrop-filter: blur(16px) saturate(180%);
+        box-shadow: 0 8px 32px rgba(31, 38, 135, 0.2);
+        border-radius: 20px;
+        padding: 30px;
+        max-width: 500px;
+        width: 100%;
+        animation: fadeInUp 0.8s ease;
+    }
 
-}
+    .profile-container {
+        margin-left: auto;
+        margin-right: auto;
+    }
 
-/* Рейтинг */
-.rating {
-    font-size: 20px;
-    color: #ffa500;
-}
 
-/* Адаптивность */
-@media (max-width: 768px) {
+    /* Секция */
+
     .section {
-        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        flex-wrap: nowrap;
+        gap: 0.5rem;
+    }
+    .section {
+        margin-bottom: 1rem;
+    }
+
+    .username {
+        text-align: left;
+    }
+
+    .user-id {
+        text-align: center;
+    }
+
+    .user-rating {
+        text-align: right;
+    }
+
+    .subtitle {
+        font-weight: bold;
+        margin-bottom: 0.25rem;
+    }
+
+    .info {
+        font-size: 1rem;
+    }
+
+    .rating {
+        display: flex;
+        justify-content: flex-end;
+        gap: 4px;
+    }
+
+
+    /* Заголовок блока (например, имя пользователя) */
+
+    .subtitle {
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+        margin-right: 10px; /* Отступ между заголовком и значением */
+        white-space: nowrap; /* Чтобы заголовок не переносился на новую строку */
+        font-family: 'Segoe UI', sans-serif;
+    }
+
+    /* Текст информации */
+
+    .info {
+        font-size: 18px;
+        color: #444;
+        word-break: break-word; /* Разрыв слов, если текст длинный */
+        font-family: 'Segoe UI', sans-serif;
+
+    }
+
+    /* Рейтинг */
+
+    .rating {
+        font-size: 20px;
+        color: #ffa500;
+    }
+
+    /* Адаптивность */
+    @media (max-width: 768px) {
+        .section {
+            margin-bottom: 15px;
+        }
+
+        .subtitle {
+            font-size: 16px;
+            margin-right: 8px;
+        }
+
+        .info {
+            font-size: 14px;
+        }
+
+        .rating {
+            font-size: 18px;
+        }
+    }
+
+    .verified {
+        color: #2ecc71;
+        font-size: 18px;
+    }
+
+    .not-verified {
+        color: #e74c3c;
+        font-size: 18px;
+    }
+
+    button {
+        display: block;
+        width: 100%;
+        padding: 12px;
+        margin-top: 15px;
+        border: none;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+
+    .bind-card-button {
+        background: linear-gradient(to right, #6dd5ed, #2193b0);
+        color: white;
+    }
+
+    .bind-card-button:hover {
+        background: linear-gradient(to right, #5bc0de, #1a7ca8);
+    }
+
+    .charge-button {
+        background: linear-gradient(to right, #f7797d, #FBD786, #C6FFDD);
+        color: #2c3e50;
+    }
+
+    .charge-button:hover {
+        background: linear-gradient(to right, #f5576c, #f093fb, #c9ffbf);
+    }
+
+    .complaints-button,
+    .history-button,
+    .logout-button {
+        background: linear-gradient(to right, #fdfbfb, #ebedee);
+        color: #2c3e50;
+        border: 1px solid #dcdde1;
+    }
+
+    .complaints-button:hover,
+    .history-button:hover,
+    .logout-button:hover {
+        background: linear-gradient(to right, #e1e8ed, #d8dde2);
+    }
+
+    .card-info-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+    }
+
+    .unbind-card-button {
+        background-color: transparent;
+        color: #999; /* серый крестик */
+        font-size: 1rem;
+        padding: 0.1rem 0.4rem;
+        border: none;
+        cursor: pointer;
+        transition: color 0.3s ease;
+        width: 10%;
+    }
+
+    .unbind-card-button:hover {
+        color: #555;
+    }
+
+    .unbind-card-button:hover {
+        background: linear-gradient(to right, #e1e8ed, #d8dde2);
+    }
+
+    .verification-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .verification-status {
+        margin-top: -8px;
+    }
+
+    .loading-container,
+    .error-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+    }
+
+    .error-text {
+        color: #e74c3c;
+        font-size: 18px;
+    }
+
+    @media (max-width: 768px) {
+        .container {
+            margin-top: 25vh;
+            margin-bottom: 25vh;
+        }
+    }
+
+    /* Анимация появления */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .verification-upload {
+        background-color: #f8f9fc; /* светлый фон */
+        border: 2px solid #e0e0e0;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        margin-top: 24px;
+        transition: all 0.3s ease;
+    }
+
+    .verification-content {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .upload-label {
+        cursor: pointer;
+    }
+
+    .upload-button-style {
+        background: linear-gradient(to right, #6dd5ed, #2193b0);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 12px;
+        font-size: 14px;
+        transition: background 0.3s ease;
+    }
+
+    .upload-button-style:hover {
+        background: linear-gradient(to right, #5bc0de, #1a7ca8);
+    }
+
+    .verification-upload:hover {
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .verification-header .subtitle {
+        font-size: 1.6rem;
+        margin-bottom: 8px;
+        color: #333;
+        text-align: center;
+    }
+
+    .verification-status {
+        color: #555;
+        font-size: 1rem;
+        margin-bottom: 16px;
+        text-align: center; /* выравнивание текста по центру */
+    }
+
+    .verification-status.pensioner {
+        color: #28a745; /* зеленый для пенсионера */
+        font-weight: 600;
+    }
+
+    .verification-status.verified {
+        color: #007bff; /* синий для верифицированного */
+        font-weight: 600;
+    }
+
+    .verification-status.not-verified {
+        color: #dc3545; /* красный для не верифицированного */
+        font-weight: 600;
+    }
+
+    .verification-content {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .verification-info {
+        display: flex;
+        justify-content: space-between; /* Размещаем верификацию и статус на одной линии */
+        align-items: center;
+        width: 100%;
+    }
+
+    .upload-label {
+        display: block;
+        width: 100%;
+    }
+
+    .upload-button-style {
+        display: inline-block;
+        background-color: #007bff;
+        color: white;
+        padding: 10px 15px;
+        text-align: center;
+        border-radius: 8px;
+        cursor: pointer;
+        width: 100%; /* Растягиваем на всю ширину */
+        font-size: 16px;
+    }
+
+    .upload-button-style:hover {
+        background-color: #0056b3;
+    }
+
+    .premium-section,
+    .verification-upload {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        background-color: #f8f9fc;
+        border: 2px solid #e0e0e0;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        margin-top: 24px;
+        transition: all 0.3s ease;
+
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .premium-section:hover,
+    .verification-upload:hover {
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .premium-section .subtitle,
+    .verification-upload .subtitle {
+        font-size: 1.4rem;
+        font-weight: 600;
+        text-align: center;
+        color: #040000;
+        margin-bottom: 8px;
+    }
+
+    .premium-status,
+    .trial-status,
+    .verification-status,
+    .info {
+        font-size: 1.4rem;
+        text-align: center;
+        margin: 0;
+        word-wrap: break-word;
+        max-width: 100%;
+        font-weight: 600;
+
+    }
+
+    /* Кнопки подписки */
+
+    .subscription-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .subscribe-button {
+        flex: 1 1 45%;
+        min-width: 130px;
+        text-align: center;
+        background: linear-gradient(to right, #6dd5ed, #2193b0);
+        color: white;
+        padding: 12px;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+
+    .subscribe-button:hover {
+        background: linear-gradient(to right, #5bc0de, #1a7ca8);
+    }
+
+
+    /* Верификация */
+
+    .verification-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .upload-button-style {
+        width: 100%;
+        text-align: center;
+        font-size: 16px;
+        background: linear-gradient(to right, #6dd5ed, #2193b0);
+        color: white;
+        padding: 10px 15px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    .upload-button-style:hover {
+        background: linear-gradient(to right, #5bc0de, #1a7ca8);
+    }
+}
+.card-section {
+    background-color: #f8f9fc;
+    border: 2px solid #e0e0e0;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    margin-top: 24px;
+    transition: all 0.3s ease;
+
+    &:hover {
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .subtitle {
+        font-size: 1.6rem;
+        margin-bottom: 16px;
+        color: #333;
+        text-align: center;
+    }
+
+    .card-info {
+        text-align: center;
+
+        .info {
+            font-size: 1rem;
+            color: #2ecc71;
+            margin-bottom: 12px;
+        }
+
+        .unbind-button {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+
+            &:hover {
+                background-color: #c0392b;
+            }
+        }
+    }
+
+    .bind-card-button {
+        width: 100%;
+        text-align: center;
+        background: linear-gradient(to right, #6dd5ed, #2193b0);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: background 0.3s ease;
+
+        &:hover {
+            background: linear-gradient(to right, #5bc0de, #1a7ca8);
+        }
+    }
+    .upload-button-style:hover {
+        background: linear-gradient(to right, #5bc0de, #1a7ca8);
+    }
+
+}
+
+@media (max-width: 768px) {
+    .pageContainer-profile {
+        padding: 1rem;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .contentWrapper {
+        width: 100%;
+        gap: 1rem;
+    }
+
+    .profile-container {
+        padding: 20px;
+        border-radius: 16px;
+    }
+
+    .section {
+        flex-direction: column;
+        align-items: flex-start;
     }
 
     .subtitle {
         font-size: 16px;
-        margin-right: 8px;
+        margin-bottom: 4px;
     }
 
     .info {
@@ -75,287 +565,74 @@ body {
     }
 
     .rating {
+        justify-content: flex-start;
         font-size: 18px;
     }
-}
 
-.verified {
-    color: #2ecc71;
-    font-size: 18px;
-}
+    .button,
+    .bind-card-button,
+    .charge-button,
+    .complaints-button,
+    .history-button,
+    .logout-button,
+    .subscribe-button,
+    .upload-button-style {
+        font-size: 14px;
+        padding: 10px;
+    }
 
-.not-verified {
-    color: #e74c3c;
-    font-size: 18px;
-}
+    .unbind-card-button {
+        font-size: 0.875rem;
+        width: auto;
+        padding: 0.2rem 0.6rem;
+    }
 
-button {
-    display: block;
-    width: 100%;
-    padding: 12px;
-    margin-top: 15px;
-    border: none;
-    border-radius: 12px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.3s ease;
-}
+    .verification-content,
+    .premium-section,
+    .verification-upload,
+    .card-section {
+        padding: 16px;
+    }
 
-.bind-card-button {
-    background: linear-gradient(to right, #6dd5ed, #2193b0);
-    color: white;
-}
+    .verification-status,
+    .premium-status,
+    .trial-status {
+        font-size: 1rem;
+    }
 
-.bind-card-button:hover {
-    background: linear-gradient(to right, #5bc0de, #1a7ca8);
-}
+    .subscription-buttons {
+        flex-direction: column;
+        gap: 8px;
+    }
 
-.charge-button {
-    background: linear-gradient(to right, #f7797d, #FBD786, #C6FFDD);
-    color: #2c3e50;
-}
+    .subscribe-button {
+        flex: none;
+        width: 100%;
+    }
 
-.charge-button:hover {
-    background: linear-gradient(to right, #f5576c, #f093fb, #c9ffbf);
-}
+    .card-info .unbind-button {
+        font-size: 0.8rem;
+        padding: 8px 16px;
+    }
 
-.complaints-button,
-.history-button,
-.logout-button {
-    background: linear-gradient(to right, #fdfbfb, #ebedee);
-    color: #2c3e50;
-    border: 1px solid #dcdde1;
-}
+    .card-info .info {
+        font-size: 0.9rem;
+    }
 
-.complaints-button:hover,
-.history-button:hover,
-.logout-button:hover {
-    background: linear-gradient(to right, #e1e8ed, #d8dde2);
-}
-.card-info-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-}
+    .upload-button-style {
+        font-size: 14px;
+        padding: 10px;
+    }
 
-.unbind-card-button {
-    background-color: transparent;
-    color: #999; /* серый крестик */
-    font-size: 1rem;
-    padding: 0.1rem 0.4rem;
-    border: none;
-    cursor: pointer;
-    transition: color 0.3s ease;
-    width: 10%;
-}
+    .container-p {
+        padding: 20px 10px;
+        margin-bottom: 30px;
+    }
 
-.unbind-card-button:hover {
-    color: #555;
-}
-
-.unbind-card-button:hover {
-    background: linear-gradient(to right, #e1e8ed, #d8dde2);
-}
-
-.verification-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.verification-status {
-    margin-top: -8px;
-}
-
-.loading-container,
-.error-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-}
-
-.error-text {
-    color: #e74c3c;
-    font-size: 18px;
-}
-
-@media (max-width: 768px) {
-    .container {
-        margin-top: 25vh;
-        margin-bottom: 25vh;
+    .verification-header .subtitle {
+        font-size: 1.2rem;
     }
 }
 
-/* Анимация появления */
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-.verification-upload {
-    background-color: #f8f9fc; /* светлый фон */
-    border: 2px solid #e0e0e0;
-    border-radius: 16px;
-    padding: 24px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    margin-top: 24px;
-    transition: all 0.3s ease;
-}
 
-.verification-content {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 12px;
-}
 
-.upload-label {
-    cursor: pointer;
-}
-
-.upload-button-style {
-    background: linear-gradient(to right, #6dd5ed, #2193b0);
-    color: white;
-    padding: 10px 20px;
-    border-radius: 12px;
-    font-size: 14px;
-    transition: background 0.3s ease;
-}
-
-.upload-button-style:hover {
-    background: linear-gradient(to right, #5bc0de, #1a7ca8);
-}
-.verification-upload:hover {
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-}
-
-.verification-header .subtitle {
-    font-size: 1.6rem;
-    margin-bottom: 8px;
-    color: #333;
-    text-align: center;
-}
-
-.verification-status {
-    color: #555;
-    font-size: 1rem;
-    margin-bottom: 16px;
-    text-align: center; /* выравнивание текста по центру */
-}
-
-.verification-status.pensioner {
-    color: #28a745; /* зеленый для пенсионера */
-    font-weight: 600;
-}
-
-.verification-status.verified {
-    color: #007bff; /* синий для верифицированного */
-    font-weight: 600;
-}
-
-.verification-status.not-verified {
-    color: #dc3545; /* красный для не верифицированного */
-    font-weight: 600;
-}
-
-.verification-content {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.verification-info {
-    display: flex;
-    justify-content: space-between; /* Размещаем верификацию и статус на одной линии */
-    align-items: center;
-    width: 100%;
-}
-
-.upload-label {
-    display: block;
-    width: 100%;
-}
-
-.upload-button-style {
-    display: inline-block;
-    background-color: #007bff;
-    color: white;
-    padding: 10px 15px;
-    text-align: center;
-    border-radius: 8px;
-    cursor: pointer;
-    width: 100%; /* Растягиваем на всю ширину */
-    text-align: center;
-    font-size: 16px;
-}
-
-.upload-button-style:hover {
-    background-color: #0056b3;
-}
-.premium-section {
-    background-color: #f8f9fc; /* светлый фон */
-    border: 2px solid #e0e0e0;
-    border-radius: 16px;
-    padding: 24px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    margin-top: 24px;
-    transition: all 0.3s ease;
-}
-
-.premium-section:hover {
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-}
-
-.premium-section .subtitle {
-    font-size: 1.6rem;
-    margin-bottom: 16px;
-    color: #333;
-    text-align: center; /* выравнивание заголовка по центру */
-}
-
-.premium-status, .trial-status, .info {
-    color: #555;
-    font-size: 1rem;
-    margin-bottom: 16px;
-    text-align: center; /* выравнивание текста по центру */
-}
-
-.premium-status {
-    color: #d4af37; /* золотистый для премиум */
-    font-weight: 600;
-}
-
-.trial-status {
-    color: #007bff; /* синий для пробной */
-    font-weight: 600;
-}
-
-.subscription-buttons {
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-}
-
-.subscribe-button {
-    background-color: #d4af37;
-    color: white;
-    border: none;
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-weight: 500;
-    text-transform: uppercase;
-    font-size: 0.875rem;
-    transition: background-color 0.3s ease;
-}
-
-.subscribe-button:hover {
-    background-color: #c59f2f;
-}

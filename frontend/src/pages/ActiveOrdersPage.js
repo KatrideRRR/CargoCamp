@@ -35,11 +35,6 @@ const ActiveOrdersPage = () => {
     const [currentImages, setCurrentImages] = useState([]);  // Массив изображений для отображения
     const [creatorsInfo, setCreatorsInfo] = useState({}); // Данные о создателях заказов
     const [executorsInfo, setExecutorsInfo] = useState({}); // Данные о создателях заказов
-    const paymentMethods = [
-        { id: "cash", label: "Наличные", icon: "💵" },
-        { id: "guarantee", label: "Гарантия", icon: "🛡️" },
-        { id: "installments", label: "Рассрочка", icon: "💳" },
-    ];
     const [removedOrders, setRemovedOrders] = useState(() => {
         const saved = localStorage.getItem("removedOrders");
         return saved ? JSON.parse(saved) : [];
@@ -122,15 +117,22 @@ const ActiveOrdersPage = () => {
                 console.log("📋 `unreadOrders` перед обновлением:", unreadOrders);
 
                 // Обновляем непрочитанные уведомления
-                setUnreadOrders((prev) => {
-                    const updated = { ...prev };
-                    response.data.notifications.forEach(notification => {
-                        updated[notification.orderId] = true;
-                    });
-                    console.log("✅ Обновленный `unreadOrders`:", updated);
-                    return updated;
-                });
+                setUnreadOrders(() => {
+                    const counts = {};
 
+                    response.data.notifications.forEach((notification) => {
+                        if (
+                            notification.type === 'new_message' &&
+                            notification.userId === user.id &&
+                            !notification.isRead
+                        ) {
+                            const orderId = notification.orderId;
+                            counts[orderId] = (counts[orderId] || 0) + 1;
+                        }
+                    });
+
+                    return counts;
+                });
 
             } catch (err) {
                 console.error('Ошибка при загрузке активных заказов:', err);
@@ -142,23 +144,9 @@ const ActiveOrdersPage = () => {
 
         // Подписываемся на обновления
         socket.on('activeOrdersUpdated', fetchActiveOrders);
-        socket.on("new_notification", (data) => {
-            console.log("📩 Получено уведомление:", data);
-            console.log("🔴 Текущее `unreadOrders` перед обновлением:", unreadOrders);
-            if (data && data.length) {
-                setUnreadOrders((prev) => {
-                    const updated = { ...prev };
-                    data.forEach(notification => {
-                        if (notification.orderId) {
-                            updated[notification.orderId] = true;
-                        }
-                    });
-                    console.log("🆕 Обновлённый `unreadOrders`:", updated);
-                    return updated;
-                });
-            }
+        socket.on("new_notification", () => {
+            fetchActiveOrders(); // перезагружает всё и считает точно
         });
-
 
 
         return () => {
@@ -371,257 +359,270 @@ const ActiveOrdersPage = () => {
     }
 
     return (
-        <div className="active-orders-page">
+        <div className="active-orders">
+            <div className="pageContainer">
 
-            <div className="active-orders-container">
-                <div className="orders-wrapper">
-                    {orders.length > 0 ? (
-                        <ul className="orders-list">
-                            {orders.map((order) => {
-                                const isCompletedByUser = Array.isArray(order.completedBy) && order.completedBy.includes(user.id);
-                                const isWaitingForOther = Array.isArray(order.completedBy) && order.completedBy.length === 1;
-                                const isExecutor = order.executorId === user.id;
-                                const isCreator = order.creatorId === user.id;
-                                const creator = creatorsInfo[order.creatorId] || {};
-                                const executor = executorsInfo[order.executorId] || {};
+                <div className="active-orders-page">
 
-                                return (
-                                    <li
-                                        key={order.id}
-                                        className={`order-card ${isCreator ? 'creator' : ''} `}
-                                    >
-                                        <div className="order-header" onClick={() => toggleExpand(order.id)}>
+                    <div className="active-orders-container">
+                        <div className="contentWrapper">
+                            {orders.length > 0 ? (
+                                <ul className="orders-list">
+                                    {orders.map((order) => {
+                                        const isCompletedByUser = Array.isArray(order.completedBy) && order.completedBy.includes(user.id);
+                                        const isWaitingForOther = Array.isArray(order.completedBy) && order.completedBy.length === 1;
+                                        const isExecutor = order.executorId === user.id;
+                                        const isCreator = order.creatorId === user.id;
+                                        const creator = creatorsInfo[order.creatorId] || {};
+                                        const executor = executorsInfo[order.executorId] || {};
 
-                                        <p className="order-title">
-                                                <strong>Заказ номер {order.id}</strong>
-                                                {isCreator ? '. Вы являетесь заказчиком' : `. Вы являетесь исполнителем`}.
-                                                Создан {new Date(order.createdAt).toLocaleString()}
-                                            </p>
+                                        return (
+                                            <li
+                                                key={order.id}
+                                                className={`order-card `}
+                                            >
+                                                <div className="order-header" onClick={() => toggleExpand(order.id)}>
 
-                                            {unreadOrders[order.id] && <span className="dot">🔴</span>}
-
-                                            {isExecutor ?
-                                                <>
-                                                    <p><strong>ID заказчика:</strong> {order.creatorId || "Неизвестно"}
-                                                    </p>
-                                                    <p><strong>Имя
-                                                        заказчика:</strong> {creator.username || "Неизвестно"}</p>
-                                                    <p><strong>Рейтинг
-                                                        заказчика:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
-                                                    </p>
-                                                </> :
-                                                <>
-                                                    <p><strong>ID
-                                                        исполнителя:</strong> {order.executorId || "Неизвестно"}</p>
-                                                    <p><strong>Имя
-                                                        исполнителя:</strong> {executor?.username || "Неизвестно"}</p>
-                                                    <p><strong>Рейтинг
-                                                        исполнителя:</strong> {executor?.rating ? executor.rating.toFixed(1) : "Нет данных"}
-                                                    </p>
-                                                </>
-
-                                            }
-                                            {/* Иконка способа оплаты ниже заголовка */}
-                                            <div className="payment-icon-container">
+                                                    <p className="order-title">
+                                                        <strong>Заказ номер {order.id}</strong>
+                                                        {isCreator ? '. Вы являетесь заказчиком' : `. Вы являетесь исполнителем`}.
+                                                        Создан {new Date(order.createdAt).toLocaleString()}
+                                                        <div className="payment-icon-container">
                                                 <span
                                                     className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
-                                                <span
-                                                    className="payment-label">{paymentMethods.find(method => method.id === order.paymentType)?.label}</span>
-                                            </div>
-
-                                            <div className="action-buttons">
-                                                <button
-                                                    className="call-button"
-                                                    onClick={async () => {
-                                                        const phone = isCreator ? await getUserPhone(order.executorId) : await getUserPhone(order.creatorId);
-                                                        window.open(`tel:${phone}`);
-                                                    }}
-                                                >
-                                                    {isMobile ? <FaPhone/> : "Позвонить"}
-                                                </button>
-                                                <button
-                                                    className="message-button"
-                                                    onClick={() => handleOpenChat(order.id)}  // Если orderId внутри объекта order
-                                                >
-                                                    {isMobile ? <FaComments/> : "Сообщение"}
-                                                </button>
-
-
-                                                <button className="route-button"
-                                                        onClick={() => handleRouteClick(order)}>
-                                                    {isMobile ? <FaRoute/> : "Маршрут"}
-                                                </button>
-
-
-                                                {/* Всплывающее окошко для текущего заказа */}
-                                                {activeBanner === order.id && (
-                                                    <div className="fixed top-0 left-0 right-0 z-50 bg-black text-white px-4 py-3 shadow-lg flex justify-between items-center">
-                                                        <span>Открыть маршрут в Яндекс.Навигаторе?</span>
-                                                        <div className="flex gap-3 ml-4">
-                                                            <button
-                                                                onClick={() => window.open(routeUrl, '_blank')} // Открываем маршрут
-                                                                className="bg-green-600 px-3 py-1 rounded text-white"
-                                                            >
-                                                                Да
-                                                            </button>
-                                                            <button
-                                                                onClick={() => setActiveBanner(null)} // Закрываем баннер
-                                                                className="bg-gray-600 px-3 py-1 rounded text-white"
-                                                            >
-                                                                Отмена
-                                                            </button>
                                                         </div>
-                                                    </div>
-                                                )}
+                                                    </p>
+
+                                                    {isExecutor ?
+                                                        <>
+                                                        <p><strong>ID
+                                                                заказчика:</strong> {order.creatorId || "Неизвестно"}
+                                                            </p>
+                                                            <p><strong>Имя
+                                                                заказчика:</strong> {creator.username || "Неизвестно"}
+                                                            </p>
+                                                            <p><strong>Рейтинг
+                                                                заказчика:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
+                                                            </p>
+                                                        </> :
+                                                        <>
+                                                            <p><strong>ID
+                                                                исполнителя:</strong> {order.executorId || "Неизвестно"}
+                                                            </p>
+                                                            <p><strong>Имя
+                                                                исполнителя:</strong> {executor?.username || "Неизвестно"}
+                                                            </p>
+                                                            <p><strong>Рейтинг
+                                                                исполнителя:</strong> {executor?.rating ? executor.rating.toFixed(1) : "Нет данных"}
+                                                            </p>
+                                                        </>
+
+                                                    }
 
 
-                                                <button className="complain-button"
-                                                        onClick={() => handleComplaint(order.id)}>
-                                                    {isMobile ? <FaExclamationTriangle/> : "Пожаловаться"}
-                                                </button>
-
-                                                {isCompletedByUser ? (
-                                                    isWaitingForOther ? (
+                                                    <div className="active-buttons">
                                                         <button
-                                                            className="remove-button"
-                                                            onClick={() => handleRemoveOrder(order.id)}
+                                                            className="call-button"
+                                                            onClick={async () => {
+                                                                const phone = isCreator ? await getUserPhone(order.executorId) : await getUserPhone(order.creatorId);
+                                                                window.open(`tel:${phone}`);
+                                                            }}
                                                         >
-                                                            {isMobile ? <FaTrash/> : "Удалить"}
+                                                            {isMobile ? <FaPhone/> : "Позвонить"}
                                                         </button>
-                                                    ) : null
-                                                ) : (
-                                                    <button
-                                                        className="complete-button"
-                                                        onClick={() => handleCompleteOrder(order.id)}
-                                                    >
-                                                        {isMobile ? <FaCheck/> : "Завершить"}
-                                                    </button>
-                                                )}
-                                            </div>
 
-                                        </div>
+                                                        <button className="message-button" onClick={() => handleOpenChat(order.id)}>
+                                                            <span className="message-button-content">{isMobile ? <FaComments/> : "Сообщение"}</span>
+
+                                                            {typeof unreadOrders[order.id] === 'number' && unreadOrders[order.id] > 0 && (
+                                                                <span className="notification-badge-ios">{unreadOrders[order.id] > 99 ? '99+' : unreadOrders[order.id]}</span>
+                                                            )}
+                                                        </button>
 
 
-                                        {/* Детали заказа (появляются только при раскрытии) */}
-                                        {expandedOrders[order.id] && (
-                                            <div className="order-details">
-                                                <p><strong>Название:</strong> {order.type}</p>
-                                                <p>
-                                                    <strong>Категория:</strong> {order.category ? order.category.name : 'Не указано'}
-                                                </p>
-                                                <p>
-                                                    <strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : 'Не указано'}
-                                                </p>
-                                                <p><strong>Адрес:</strong> {order.address}</p>
-                                                <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
+                                                        <button className="route-button" onClick={() => handleRouteClick(order)}>
+                                                            {isMobile ? <FaRoute/> : "Маршрут"}
+                                                        </button>
 
-                                                {/* Изображения, если есть */}
-                                                {Array.isArray(order.images) && order.images.length > 0 && (
-                                                    <div className="image-stack-container">
-                                                        <div className="image-stack" onClick={() => openModal(order.images)}>
-                                                            {order.images.map((image, index) => (
-                                                                <img
-                                                                    key={index}
-                                                                    src={`${apiUrl}${image}`}
-                                                                    alt={`Order pic ${index + 1}`}
-                                                                    className="order-image"
-                                                                    style={{ transform: `translateX(${index * 10}px)` }} // Смещение вправо
-                                                                />
-                                                            ))}
-                                                        </div>
+
+                                                        {/* Всплывающее окошко для текущего заказа */}
+                                                        {activeBanner === order.id && (
+                                                            <div
+                                                                className="fixed top-0 left-0 right-0 z-50 bg-black text-white px-4 py-3 shadow-lg flex justify-between items-center">
+                                                                <span>Открыть маршрут в Яндекс.Навигаторе?</span>
+                                                                <div className="flex gap-3 ml-4">
+                                                                    <button
+                                                                        onClick={() => window.open(routeUrl, '_blank')} // Открываем маршрут
+                                                                        className="bg-green-600 px-3 py-1 rounded text-white"
+                                                                    >
+                                                                        Да
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => setActiveBanner(null)} // Закрываем баннер
+                                                                        className="bg-gray-600 px-3 py-1 rounded text-white"
+                                                                    >
+                                                                        Отмена
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+
+                                                        <button className="complain-button"
+                                                                onClick={() => handleComplaint(order.id)}>
+                                                            {isMobile ? <FaExclamationTriangle/> : "Пожаловаться"}
+                                                        </button>
+
+                                                        {isCompletedByUser ? (
+                                                            isWaitingForOther ? (
+                                                                <button
+                                                                    className="remove-button"
+                                                                    onClick={() => handleRemoveOrder(order.id)}
+                                                                >
+                                                                    {isMobile ? <FaTrash/> : "Удалить"}
+                                                                </button>
+                                                            ) : null
+                                                        ) : (
+                                                            <button
+                                                                className="complete-button"
+                                                                onClick={() => handleCompleteOrder(order.id)}
+                                                            >
+                                                                {isMobile ? <FaCheck/> : "Завершить"}
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                </div>
+
+
+                                                {/* Детали заказа (появляются только при раскрытии) */}
+                                                {expandedOrders[order.id] && (
+                                                    <div className="order-details">
+                                                        <div className="order-left">
+
+                                                        <p>
+                                                            <strong>Категория:</strong> {order.category ? order.category.name : 'Не указано'}
+                                                        </p>
+                                                        <p>
+                                                            <strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : 'Не указано'}
+                                                        </p>
+                                                        <p>
+                                                            <strong>Услуга:</strong> {order.service ? order.service.name : 'Не указано'}
+                                                        </p>
+                                                            </div>
+
+                                                        {Array.isArray(order.images) && order.images.length > 0 && (
+                                                            <div className="image-stack-container">
+                                                                <div className="image-stack"
+                                                                     onClick={() => openModal(order.images)}>
+                                                                    {order.images.map((image, index) => (
+                                                                        <img
+                                                                            key={index}
+                                                                            src={`${apiUrl}${image}`}
+                                                                            alt={`Order pic ${index + 1}`}
+                                                                            className="order-image"
+                                                                            style={{transform: `translateX(${index * 10}px)`}} // Смещение вправо
+                                                                        />
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        <p><strong>Адрес:</strong> {order.address}</p>
+                                                        <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
+                                                        <p><strong>Описание:</strong> {order.description}</p>
+
+
+                                                        {order.contractPath && (
+                                                            <div className="mt-2">
+                                                                <a
+                                                                    href={`http://localhost:5001/${order.contractPath.replace(/\\/g, '/')}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="text-blue-600 underline hover:text-blue-800 transition"
+                                                                >
+                                                                    Скачать договор (PDF)
+                                                                </a>
+                                                            </div>
+                                                        )}
+
                                                     </div>
                                                 )}
-                                                {order.contractPath && (
-                                                    <div className="mt-2">
-                                                        <a
-                                                            href={`http://localhost:5001/${order.contractPath.replace(/\\/g, '/')}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="text-blue-600 underline hover:text-blue-800 transition"
-                                                        >
-                                                            Скачать договор (PDF)
-                                                        </a>
-                                                    </div>
-                                                )}
-
-                                                <p><strong>Описание:</strong> {order.description}</p>
 
 
-                                            </div>
-                                        )}
+                                            </li>
+                                        );
 
-
-
-                                    </li>
-                                );
-
-                            })}
-                        </ul>
-                    ) : (
-                        <p className="no-orders">Нет активных заказов.</p>
-                    )}
-                </div>
-
-            </div>
-
-            <Modal
-                appElement={document.getElementById('root')}
-                isOpen={isModalOpen}
-                onRequestClose={closeModal}
-                contentLabel="Full Image Modal"
-                className="custom-modal"
-                overlayClassName="custom-modal-overlay"
-            >
-                <div className="custom-modal-content">
-                    {/* Кнопка закрытия */}
-                    <button onClick={closeModal} className="custom-close-button">✖</button>
-
-                    {/* Изображение */}
-                    <img
-                        src={`${apiUrl}${currentImages[currentImageIndex]}`}
-                        alt="Full-size view"
-                        className="custom-modal-image"
-                    />
-
-                    {/* Кнопки переключения */}
-                    <div className="custom-image-navigation">
-                        <button onClick={prevImage} className="custom-nav-button">◀</button>
-                        <button onClick={nextImage} className="custom-nav-button">▶</button>
-                    </div>
-                </div>
-            </Modal>
-
-            {/* Модальное окно для оценки */}
-            {showRatingModal && (
-                <div className="modal-overlay" onClick={() => setShowRatingModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <h2>Оцените участника</h2>
-                        <div className="stars">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                                <span key={star} className={star <= rating ? "star selected" : "star"}
-                                      onClick={() => setRating(star)}>★</span>
-                            ))}
+                                    })}
+                                </ul>
+                            ) : (
+                                <p className="no-orders">Нет активных заказов.</p>
+                            )}
                         </div>
-                        <button onClick={submitRating} disabled={rating === 0}>Завершить заказ</button>
-                    </div>
-                </div>
-            )}
 
-            {/* Модальное окно для жалобы */}
-            {showComplaintModal && (
-                <div className="modal-overlay" onClick={() => setShowComplaintModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <h2>Напишите жалобу:</h2>
-                        <textarea value={complaintText} onChange={(e) => setComplaintText(e.target.value)}
-                                  rows="5" placeholder="Введите текст жалобы"/>
-                        <button onClick={handleSubmitComplaint}>Отправить</button>
                     </div>
-                </div>
-            )}
 
+                    <Modal
+                        appElement={document.getElementById('root')}
+                        isOpen={isModalOpen}
+                        onRequestClose={closeModal}
+                        contentLabel="Full Image Modal"
+                        className="custom-modal"
+                        overlayClassName="custom-modal-overlay"
+                    >
+                        <div className="custom-modal-content">
+                            {/* Кнопка закрытия */}
+                            <button onClick={closeModal} className="custom-close-button">✖</button>
+
+                            {/* Изображение */}
+                            <img
+                                src={`${apiUrl}${currentImages[currentImageIndex]}`}
+                                alt="Full-size view"
+                                className="custom-modal-image"
+                            />
+
+                            {/* Кнопки переключения */}
+                            <div className="custom-image-navigation">
+                                <button onClick={prevImage} className="custom-nav-button">◀</button>
+                                <button onClick={nextImage} className="custom-nav-button">▶</button>
+                            </div>
+                        </div>
+                    </Modal>
+
+                    {/* Модальное окно для оценки */}
+                    {showRatingModal && (
+                        <div className="modal-overlay" onClick={() => setShowRatingModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()}>
+                                <h2>Оцените участника</h2>
+                                <div className="stars">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                        <span key={star} className={star <= rating ? "star selected" : "star"}
+                                              onClick={() => setRating(star)}>★</span>
+                                    ))}
+                                </div>
+                                <button onClick={submitRating} disabled={rating === 0}>Завершить заказ</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Модальное окно для жалобы */}
+                    {showComplaintModal && (
+                        <div className="modal-overlay" onClick={() => setShowComplaintModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()}>
+                                <h2>Напишите жалобу:</h2>
+                                <textarea value={complaintText} onChange={(e) => setComplaintText(e.target.value)}
+                                          rows="5" placeholder="Введите текст жалобы"/>
+                                <button onClick={handleSubmitComplaint}>Отправить</button>
+                            </div>
+                        </div>
+                    )}
+
+                </div>
+            </div>
         </div>
+
     )
 
 };
 
-            export default ActiveOrdersPage;
+export default ActiveOrdersPage;

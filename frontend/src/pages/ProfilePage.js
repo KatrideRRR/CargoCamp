@@ -210,121 +210,135 @@ const ProfilePage = () => {
     }
 
     return (
-        <div className="container-p">
-            <div className="profile-container">
-                {profile ? (
-                    <>
-                        <div className="section">
-                            <h2 className="subtitle">Имя пользователя:</h2>
-                            <p className="info">{profile.username}</p>
-                        </div>
-                        <div className="section">
-                            <h2 className="subtitle">ID пользователя:</h2>
-                            <p className="info">{profile.id}</p>
-                        </div>
-                        <div className="section">
-                            <h2 className="subtitle">Рейтинг:</h2>
-                            <p className="info rating">
-                                {profile.rating ? renderStars(profile.rating) : "Нет рейтинга"}
-                            </p>
-                        </div>
+        <div className="profile">
 
-                        <div className="section1">
-                            <h2 className="subtitle">Ваша карта:</h2>
+            <div className="pageContainer-profile">
 
-                            {rebillId ? (
-                                <div>
-                                    <p className="info verified">Карта
-                                        привязана: {profile.cardType} •••• {profile.cardLastFour}</p>
-                                    <button className="unbind-button" onClick={handleUnbindCard}>
-                                        Удалить карту
+                <div className="container-p">
+                    <div className="contentWrapper">
+
+                        <div className="profile-container">
+                            {profile ? (
+                                <>
+                                    <div className="section username">
+                                        <h2 className="subtitle">Имя пользователя:</h2>
+                                        <p className="info">{profile.username}</p>
+                                    </div>
+                                    <div className="section user-id">
+                                        <h2 className="subtitle">ID пользователя:</h2>
+                                        <p className="info">{profile.id}</p>
+                                    </div>
+                                    <div className="section user-rating">
+                                        <h2 className="subtitle">Рейтинг:</h2>
+                                        <p className="info rating">
+                                            {profile.rating ? renderStars(profile.rating) : "Нет рейтинга"}
+                                        </p>
+                                    </div>
+
+
+                                    <div className="section1 card-section">
+                                        <h2 className="subtitle">Ваша карта:</h2>
+
+                                        {rebillId ? (
+                                            <div className="card-info">
+                                                <p className="info verified">
+                                                    Карта привязана: {profile.cardType} •••• {profile.cardLastFour}
+                                                </p>
+                                                <button className="unbind-button" onClick={handleUnbindCard}>
+                                                    Удалить карту
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button className="bind-card-button" onClick={handleCardLinkClick}>
+                                                Привязать карту
+                                            </button>
+                                        )}
+                                    </div>
+
+
+                                    <div className="section premium-section">
+                                        {profile.subscriptionType === "premium" ? (
+                                            <p className="info premium-status">
+                                                Премиум активен
+                                                на {getRemainingDays(profile.subscriptionExpiresAt)} дней
+                                            </p>
+                                        ) : profile.subscriptionType === "trial" ? (
+                                            <p className="info trial-status">
+                                                🔄 Пробная подписка.
+                                                Осталось: {getRemainingDays(profile.subscriptionExpiresAt)} дней
+                                            </p>
+                                        ) : (
+                                            <p className="info">У вас обычный аккаунт.</p>
+                                        )}
+
+                                        <div className="subscription-buttons">
+                                            <button onClick={() => handleBuyPremium(7)} className="subscribe-button">
+                                                Купить Премиум (7 дней)
+                                            </button>
+                                            <button onClick={() => handleBuyPremium(30)} className="subscribe-button">
+                                                Купить Премиум (30 дней)
+                                            </button>
+                                        </div>
+                                    </div>
+
+
+                                    <div className="section verification-upload">
+                                        <div className="verification-header">
+                                            <h2 className="subtitle">Верификация:</h2>
+                                            <p className={`info verification-status ${profile.userStatus}`}>
+                                                {profile.userStatus === "pensioner"
+                                                    ? "Пенсионер"
+                                                    : profile.userStatus === "verified"
+                                                        ? "Пройдена"
+                                                        : "Не пройдена"}
+                                            </p>
+                                        </div>
+
+                                        <div className="verification-content">
+                                            <label className="upload-label">
+                                                <input
+                                                    type="file"
+                                                    multiple
+                                                    accept="image/*,.pdf"
+                                                    onChange={(e) => handleAutoUpload(e.target.files)}
+                                                    style={{display: "none"}}
+                                                />
+                                                <span className="upload-button-style">Загрузить документы</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+
+                                    {/* Кнопки навигации */}
+                                    <button onClick={handleMyComplaints} className="complaints-button">
+                                        Мои жалобы
                                     </button>
-                                </div>
+                                    <button onClick={handleOrderHistory} className="history-button">
+                                        История заказов
+                                    </button>
+                                    <button onClick={handleLogout} className="logout-button">
+                                        Выйти
+                                    </button>
+                                </>
                             ) : (
-                                <button className="bind-card-button" onClick={handleCardLinkClick}>
-                                    Привязать карту
-                                </button>
-
+                                <p className="info">Загрузка данных профиля...</p>
                             )}
                         </div>
 
-                        <div className="section premium-section">
-                            {profile.subscriptionType === "premium" ? (
-                                <p className="info premium-status">
-                                    Премиум активен на {getRemainingDays(profile.subscriptionExpiresAt)} дней
-                                </p>
-                            ) : profile.subscriptionType === "trial" ? (
-                                <p className="info trial-status">
-                                    🔄 Пробная подписка. Осталось: {getRemainingDays(profile.subscriptionExpiresAt)} дней
-                                </p>
-                            ) : (
-                                <p className="info">У вас обычный аккаунт.</p>
-                            )}
+                        {showAgreement && (
+                            <AgreementModal
+                                isOpen={showAgreement}
+                                onClose={() => setShowAgreement(false)}
+                                onAgree={handleAgree}
+                                onCancel={() => setShowAgreement(false)}
+                            />
+                        )}
 
-                            <div className="subscription-buttons">
-                                <button onClick={() => handleBuyPremium(7)} className="subscribe-button">
-                                    Купить Премиум (7 дней)
-                                </button>
-                                <button onClick={() => handleBuyPremium(30)} className="subscribe-button">
-                                    Купить Премиум (30 дней)
-                                </button>
-                            </div>
-                        </div>
-
-
-                        <div className="section verification-upload">
-                        <div className="verification-header">
-                                <h2 className="subtitle">Верификация:</h2>
-                                <p className={`info verification-status ${profile.userStatus}`}>
-                                    {profile.userStatus === "pensioner"
-                                        ? "Пенсионер"
-                                        : profile.userStatus === "verified"
-                                            ? "Пройдена"
-                                            : "Не пройдена"}
-                                </p>
-                            </div>
-
-                            <div className="verification-content">
-                                <label className="upload-label">
-                                    <input
-                                        type="file"
-                                        multiple
-                                        accept="image/*,.pdf"
-                                        onChange={(e) => handleAutoUpload(e.target.files)}
-                                        style={{display: "none"}}
-                                    />
-                                    <span className="upload-button-style">Загрузить документы</span>
-                                </label>
-                            </div>
-                        </div>
-
-
-                        {/* Кнопки навигации */}
-                        <button onClick={handleMyComplaints} className="complaints-button">
-                            Мои жалобы
-                        </button>
-                        <button onClick={handleOrderHistory} className="history-button">
-                            История заказов
-                        </button>
-                        <button onClick={handleLogout} className="logout-button">
-                            Выйти
-                        </button>
-                    </>
-                ) : (
-                    <p className="info">Загрузка данных профиля...</p>
-                )}
+                    </div>
+                </div>
             </div>
-
-            {showAgreement && (
-                <AgreementModal
-                    isOpen={showAgreement}
-                    onClose={() => setShowAgreement(false)}
-                    onAgree={handleAgree}
-                    onCancel={() => setShowAgreement(false)}
-                />
-            )}
-
         </div>
+
     );
 };
 

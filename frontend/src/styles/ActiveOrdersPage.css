@@ -1,257 +1,129 @@
-.active-orders-page {
-    padding: 2rem;
-    background: linear-gradient(135deg, #f0f4ff, #ffffff);
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    margin-bottom: 70px;
-}
+.active-orders {
 
-.active-orders-container {
-    width: 100%;
-    max-width: 700px;
-    backdrop-filter: blur(20px);
-    background: rgba(255, 255, 255, 0.6);
-    border-radius: 16px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-    padding: 2rem;
-    animation: fadeIn 0.5s ease;
-}
-
-.orders-wrapper {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 9999;
-    width: 100vw;
-    height: 100vh;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    backdrop-filter: blur(5px);
-}
-
-.modal {
-    background: white;
-    padding: 2rem;
-    border-radius: 1rem;
-    max-width: 90%;
-    max-height: 90%;
-    overflow-y: auto;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-}
-
-.orders-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.order-card {
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: 1rem;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.07);
-    padding: 1.5rem;
-    margin-bottom: 1rem; /* добавлено */
-    transition: box-shadow 0.3s ease, transform 0.2s ease;
-}
-
-.order-card:hover {
-    transform: translateY(-2px); /* уменьшено */
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-}
-
-
-.order-header {
-    cursor: pointer;
-}
-
-.order-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    margin-bottom: 0.8rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1); /* разделение */
-}
-
-
-.dot {
-    margin-left: 10px;
-}
-
-.payment-icon-container {
-    display: flex;
-    align-items: center;
-    margin-top: 0.5rem;
-    gap: 0.5rem;
-    font-size: 0.95rem;
-    background: rgba(99, 102, 241, 0.1);
-    padding: 0.4rem 0.8rem;
-    border-radius: 0.75rem;
-    width: fit-content;
-}
-
-.payment-icon {
-    font-size: 1.2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #6366f1;
-    background: white;
-    border-radius: 50%;
-    padding: 0.4rem;
-    box-shadow: 0 0 0 2px #c7d2fe;
-}
-
-
-.payment-label {
-    font-weight: 500;
-}
-
-.action-buttons {
-    margin-top: 1rem;
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 0.5rem;
-    overflow-x: auto;
-}
-
-.call-button,
-.message-button,
-.route-button,
-.complain-button,
-.complete-button,
-.remove-button {
-    width: 110px; /* фиксированная ширина */
-    padding: 0.4rem 0.6rem;
-    font-size: 0.85rem;
-    border: none;
-    border-radius: 0.6rem;
-    background: linear-gradient(135deg, #c7d2fe, #e0e7ff);
-    color: #1f2937;
-    font-weight: 500;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-    transition: background 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.call-button:hover,
-.message-button:hover,
-.route-button:hover,
-.complain-button:hover,
-.complete-button:hover,
-.remove-button:hover {
-    background: linear-gradient(135deg, #a5b4fc, #c7d2fe);
-}
-
-
-.order-details {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.image-stack-container {
-    margin-top: 1rem;
-    overflow-x: auto;
-}
-
-.image-stack {
-    display: flex;
-    gap: 0.5rem;
-    cursor: pointer;
-}
-
-.order-image {
-    height: 80px;
-    border-radius: 0.5rem;
-    object-fit: cover;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* Анимация */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
+    .pageContainer {
+        padding: 2rem;
+        min-height: 100vh;
+        background: linear-gradient(to bottom right, #e8f0ff, #ffffff);
+        display: flex;
+        justify-content: center;
+        align-items: start;
+        overflow-y: auto;
+        margin-bottom: 70px;
     }
 
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-.order-card.creator {
-    background-color: #f0f8ff; /* Светлый фон для заказов, созданных пользователем */
-    border-left: 5px solid #007bff; /* Синяя линия слева для выделения */
-    padding: 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Легкая тень для выделения */
-}
-
-.order-card.creator .order-header {
-    font-weight: bold; /* Подчеркивание важности заголовка */
-    color: #007bff; /* Цвет текста заголовка */
-}
-
-.order-card.creator .order-title {
-    color: #333; /* Цвет заголовка заказа */
-}
-
-/* Пустой список */
-.no-orders {
-    text-align: center;
-    font-size: 1.2rem;
-    color: #6b7280;
-    padding: 2rem;
-}
-
-@media (max-width: 768px) {
-    .active-orders-page {
-        padding: 1rem;
-        margin-bottom: 30px;
+    .contentWrapper {
+        width: 90%;
+        max-width: 1000px;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
     }
 
-    .orders-container {
-        padding: 1.5rem;
+
+    .orders-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 9999;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        backdrop-filter: blur(5px);
+    }
+
+    .modal {
+        background: white;
+        padding: 2rem;
         border-radius: 1rem;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        max-width: 90%;
+        max-height: 90%;
+        overflow-y: auto;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .orders-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
     }
 
     .order-card {
-        padding: 1rem;
-        margin-bottom: 0.8rem;
+        background: rgba(255, 255, 255, 0.8);
+        border-radius: 1rem;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.07);
+        padding: 1.5rem;
+        margin-bottom: 1rem; /* добавлено */
+        transition: box-shadow 0.3s ease, transform 0.2s ease;
+    }
+
+    .order-card:hover {
+        transform: translateY(-2px); /* уменьшено */
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    }
+
+
+    .order-header {
+
+        cursor: pointer;
     }
 
     .order-title {
-        font-size: 1rem;
-        padding-bottom: 0.4rem;
-        margin-bottom: 0.6rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 0.8rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1); /* разделение */
+    }
+
+
+    .dot {
+        margin-left: 10px;
     }
 
     .payment-icon-container {
-        font-size: 0.85rem;
-        padding: 0.3rem 0.6rem;
-        gap: 0.4rem;
+        display: flex;
+        align-items: center;
+        margin-top: 0.5rem;
+        gap: 0.5rem;
+        font-size: 0.95rem;
+        background: rgba(99, 102, 241, 0.1);
+        padding: 0.4rem 0.8rem;
+        border-radius: 0.75rem;
+        width: fit-content;
     }
 
     .payment-icon {
-        font-size: 1rem;
-        padding: 0.3rem;
+        font-size: 1.2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #6366f1;
+        background: white;
+        border-radius: 50%;
+        padding: 0.4rem;
+        box-shadow: 0 0 0 2px #c7d2fe;
     }
 
-    .action-buttons {
-        gap: 0.4rem;
-        margin-top: 0.8rem;
+
+    .payment-label {
+        font-weight: 500;
+    }
+
+    .active-buttons {
+        margin-top: 1rem;
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 0.5rem;
+        overflow-x: auto;
     }
 
     .call-button,
@@ -260,29 +132,252 @@
     .complain-button,
     .complete-button,
     .remove-button {
-        width: 90px;
-        font-size: 0.75rem;
-        padding: 0.3rem 0.5rem;
-        border-radius: 0.5rem;
+        width: 110px; /* фиксированная ширина */
+        padding: 0.4rem 0.6rem;
+        font-size: 0.85rem;
+        border: none;
+        border-radius: 0.6rem;
+        background: linear-gradient(135deg, #c7d2fe, #e0e7ff);
+        color: #1f2937;
+        font-weight: 500;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        transition: background 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
+    .call-button:hover,
+    .message-button:hover,
+    .route-button:hover,
+    .complain-button:hover,
+    .complete-button:hover,
+    .remove-button:hover {
+        background: linear-gradient(135deg, #a5b4fc, #c7d2fe);
+    }
+
+
     .order-details {
-        margin-top: 0.8rem;
-        padding-top: 0.8rem;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(0, 0, 0, 0.05);
+
+    }
+
+    .order-left {
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1); /* разделение */
+
+    }
+    .message-button {
+        position: relative;
+        display: inline-block;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 12px;
+        font-size: 14px;
+        background-color: #007aff;
+        color: #170d0d;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        min-width: 40px;
+        overflow: visible;
+        z-index: 1;
+    }
+
+    .notification-badge-ios {
+        position: absolute;
+        top: 0px;
+        right: -6px;
+        background-color: #ff3b30;
+        color: white;
+        font-size: 11px;
+        font-weight: 600;
+        height: 18px;
+        min-width: 18px;
+        padding: 0 5px;
+        line-height: 18px;
+        border-radius: 999px;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 0 2px white;
+        z-index: 2;
+        pointer-events: none;
+    }
+
+    .message-button-content {
+        z-index: 1; /* ниже бейджа */
+    }
+
+    .image-stack-container {
+        margin-top: 1rem;
+        overflow-x: auto;
     }
 
     .image-stack {
-        gap: 0.4rem;
+        display: flex;
+        gap: 0.5rem;
+        cursor: pointer;
     }
 
     .order-image {
-        height: 70px;
-        border-radius: 0.4rem;
+        height: 80px;
+        border-radius: 0.5rem;
+        object-fit: cover;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
 
+    /* Анимация */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .order-card.creator {
+        background-color: #f0f8ff; /* Светлый фон для заказов, созданных пользователем */
+        border-left: 5px solid #007bff; /* Синяя линия слева для выделения */
+        padding: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Легкая тень для выделения */
+    }
+
+    .order-card.creator .order-header {
+        font-weight: bold; /* Подчеркивание важности заголовка */
+        color: #007bff; /* Цвет текста заголовка */
+    }
+
+    .order-card.creator .order-title {
+        color: #333; /* Цвет заголовка заказа */
+    }
+
+    /* Пустой список */
+
     .no-orders {
-        font-size: 1rem;
-        padding: 1.5rem;
+        text-align: center;
+        font-size: 1.2rem;
+        color: #6b7280;
+        padding: 2rem;
+    }
+
+}
+
+@media (max-width: 768px) {
+    .active-orders {
+
+        .pageContainer {
+            padding: 1rem;
+            margin-bottom: 80px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            overflow-x: hidden; /* Убираем горизонтальный скролл */
+        }
+
+        .contentWrapper {
+            width: 100%;
+            max-width: 95vw; /* ограничение ширины */
+            padding: 0 0.5rem;
+            margin: 0 auto;
+            gap: 1rem;
+        }
+
+        .order-card {
+            padding: 1rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .order-title {
+            font-size: 1rem;
+            margin-bottom: 0.6rem;
+            padding-bottom: 0.4rem;
+        }
+
+        .payment-icon-container {
+            font-size: 0.8rem;
+            padding: 0.3rem 0.6rem;
+            gap: 0.3rem;
+        }
+
+        .payment-icon {
+            font-size: 1rem;
+            padding: 0.3rem;
+        }
+
+        .active-buttons {
+            margin-top: 0.8rem;
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            gap: 0.4rem;
+            padding-bottom: 0.5rem;
+            scrollbar-width: none; /* Firefox */
+            justify-content: center; /* центрируем */
+
+        }
+
+        .active-buttons::-webkit-scrollbar {
+            display: none; /* Chrome/Safari */
+        }
+
+        .call-button,
+        .message-button,
+        .route-button,
+        .complain-button,
+        .complete-button,
+        .remove-button {
+            flex: 0 0 auto;
+            max-width: 40px; /* достаточно для иконки */
+            font-size: 0.75rem;
+            padding: 0.35rem 0.5rem;
+            border-radius: 0.5rem;
+            white-space: nowrap;
+            text-align: center;
+            margin: 0 0.5rem;
+        }
+
+
+        .notification-badge {
+            top: -4px;
+            right: -4px;
+            font-size: 9px;
+            min-width: 16px;
+            height: 16px;
+        }
+
+        .order-details {
+            margin-top: 0.8rem;
+            padding-top: 0.8rem;
+        }
+
+        .image-stack {
+            gap: 0.4rem;
+        }
+
+        .order-image {
+            height: 70px;
+            border-radius: 0.4rem;
+        }
+
+        .modal {
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+        }
+
+        .no-orders {
+            font-size: 1rem;
+            padding: 1.5rem;
+        }
     }
 }
 
