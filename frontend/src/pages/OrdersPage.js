@@ -344,23 +344,42 @@ const OrdersPage = () => {
             return;
         }
 
-        const proposedSum = prompt("Введите сумму, которую вы хотите получить за выполнение:");
-        const comment = prompt("Комментарий к заказчику (необязательно):");
-
-        if (!proposedSum) {
-            alert("Вы не указали сумму!");
-            return;
-        }
-
         try {
+            // 👇 Запрашиваем статус пользователя
+            const statusResponse = await axiosInstance.get('/orders/me/status', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (statusResponse.data.has_debt) {
+                alert("У вас есть задолженность по комиссии. Погасите долг, чтобы продолжить работу.");
+                return;
+            }
+
+            // ✅ Только если нет долга, продолжаем
+            const proposedSum = prompt("Введите сумму, которую вы хотите получить за выполнение:");
+            if (!proposedSum) {
+                alert("Вы не указали сумму!");
+                return;
+            }
+
+            const comment = prompt("Комментарий к заказчику (необязательно):");
+
             await axiosInstance.post(`/orders/${orderId}/request`, { proposedSum, comment }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+
             alert("Запрос отправлен заказчику!");
         } catch (error) {
             console.error("Ошибка при запросе на выполнение заказа:", error);
+
+            if (error.response?.data?.message) {
+                alert(error.response.data.message);
+            } else {
+                alert("Произошла ошибка. Попробуйте позже.");
+            }
         }
     };
+
 
     if (error) {
         return <div className="error-message">Ошибка: {error}</div>;

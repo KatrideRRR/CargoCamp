@@ -158,9 +158,11 @@ router.post("/callback", async (req, res) => {
                     cardLastFour: last4,
                     cardType,
                     RebillId,
+                    has_debt: false, // 💥 снимаем флаг долга
                 },
                 { where: { id: userId } }
             );
+            console.log(`✅ Пользователь ${userId} успешно обновлён, долг снят`);
 
             await refundPayment(PaymentId);
 

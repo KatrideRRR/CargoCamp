@@ -232,6 +232,20 @@ module.exports = (io) => {
         }
     });
 
+    router.get('/me/status', authenticateToken, async (req, res) => {
+        try {
+            const user = await User.findByPk(req.user.id);
+            if (!user) {
+                return res.status(404).json({ message: 'Пользователь не найден' });
+            }
+
+            res.json({ has_debt: user.has_debt });
+        } catch (err) {
+            console.error('Ошибка при проверке статуса пользователя:', err);
+            res.status(500).json({ message: 'Ошибка сервера' });
+        }
+    });
+
     router.post("/:id/request", authenticateToken, async (req, res) => {
         const { id } = req.params;
         const { proposedSum, comment } = req.body;
@@ -409,6 +423,9 @@ module.exports = (io) => {
 
             // Устанавливаем исполнителя и очищаем список запросов
             order.executorId = executorId;
+            await User.update({ has_debt: true }, { where: { id: executorId } });
+            console.log(`💸 Установлен флаг has_debt для пользователя ${executorId}`);
+
             order.requestedExecutors = []; // Очищаем массив запросов
             order.status = 'active'; // Устанавливаем статус заказа как активный
 
