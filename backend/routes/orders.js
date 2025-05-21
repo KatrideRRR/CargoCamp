@@ -14,25 +14,25 @@ const generateContractPDF = require('../utils/generateContractPDF');
 
 setInterval(async () => {
     try {
-        // Получаем все заказы, которые не были взяты в работу и созданы более 24 часов назад
-        const ordersToDelete = await Order.findAll({
+        const expiredOrders = await Order.findAll({
             where: {
                 status: 'pending',
                 createdAt: {
-                    [Sequelize.Op.lt]: moment().subtract(24, 'hours').toDate(), // Заказы старше 24 часов
+                    [Sequelize.Op.lt]: moment().subtract(24, 'hours').toDate(),
                 },
             },
         });
 
-        // Удаляем все такие заказы
-        for (const order of ordersToDelete) {
-            await order.destroy();
-            console.log(`Заказ ${order.id} удален автоматически.`);
+        for (const order of expiredOrders) {
+            order.status = 'expired';
+            await order.save();
+            console.log(`Заказ ${order.id} переведен в статус "expired".`);
         }
     } catch (error) {
-        console.error("Ошибка при удалении старых заказов:", error);
+        console.error("Ошибка при архивировании старых заказов:", error);
     }
-}, 60 * 60 * 1000);
+}, 60 * 60 * 1000); // каждые 60 минут
+
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -48,6 +48,25 @@ const upload = multer({ storage });
 const geocoder = NodeGeocoder({ provider: 'openstreetmap' });
 
 module.exports = (io) => {
+
+    router.post('/orders/:id/restore', authenticateToken, async (req, res) => {
+        const { id } = req.params;
+
+        try {
+            const order = await Order.findByPk(id);
+            if (!order || order.status !== 'expired') {
+                return res.status(404).json({ success: false, error: 'Заказ не найден или не может быть восстановлен' });
+            }
+
+            order.status = 'pending';
+            await order.save();
+
+            res.json({ success: true, message: 'Заказ восстановлен' });
+        } catch (error) {
+            console.error("Ошибка при восстановлении заказа:", error);
+            res.status(500).json({ success: false, error: 'Ошибка сервера' });
+        }
+    });
 
     router.post('/', authenticateToken, upload.array('images', 5), async (req, res) => {  // 'images' — это поле для загрузки
         const { address, description, workTime, proposedSum, type,categoryId, subcategoryId, serviceId} = req.body;
@@ -669,7 +688,9 @@ module.exports = (io) => {
         try {
             const completedOrders = await Order.findAll({
                 where: {
-                    status: 'completed',
+                    status: {
+                        [Op.in]: ['completed', 'expired'], // ⬅️ Теперь ищем оба статуса
+                    },
                     [Op.or]: [
                         { creatorId: userId },  // Заказчик
                         { executorId: userId }   // Исполнитель

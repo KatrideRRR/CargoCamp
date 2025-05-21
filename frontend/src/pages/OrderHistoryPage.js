@@ -4,42 +4,53 @@ import axiosInstance from '../utils/axiosInstance';
 import '../styles/OrderHistotyPage.css';
 
 const OrderHistoryPage = () => {
-    const { userId } = useParams(); // Получаем ID пользователя из URL
+    const { userId } = useParams();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    useEffect(() => {
-        const fetchCompletedOrders = async () => {
-            try {
-                const response = await axiosInstance.get(`/orders/completed/${userId}`);
-                const formattedOrders = response.data.map(order => ({
-                    ...order,
-                    // Преобразуем строку с датой в объект Date и форматируем её
-                    completedAt: order.completedAt ? new Date(order.completedAt).toLocaleDateString() : 'Не указана',
-                }));
-                setOrders(formattedOrders);
-            } catch (err) {
-                setError(err.response?.data?.message || 'Ошибка загрузки заказов');
-            } finally {
-                setLoading(false);
-            }
-        };
+    const fetchCompletedOrders = async () => {
+        try {
+            const response = await axiosInstance.get(`/orders/completed/${userId}`);
+            const formattedOrders = response.data.map(order => ({
+                ...order,
+                completedAt: order.completedAt
+                    ? new Date(order.completedAt).toLocaleDateString()
+                    : 'Не указана',
+            }));
+            setOrders(formattedOrders);
+        } catch (err) {
+            setError(err.response?.data?.message || 'Ошибка загрузки заказов');
+        } finally {
+            setLoading(false);
+        }
+    };
 
+    useEffect(() => {
         fetchCompletedOrders();
     }, [userId]);
 
-    if (loading) {
-        return <div className="loading-message">Загрузка истории заказов...</div>;
-    }
+    const handleRestore = async (orderId) => {
+        try {
+            const response = await axiosInstance.post(`/orders/${orderId}/restore`);
+            if (response.data.success) {
+                alert('Заказ восстановлен!');
+                fetchCompletedOrders(); // Обновляем список
+            } else {
+                alert('Не удалось восстановить заказ');
+            }
+        } catch (error) {
+            console.error('Ошибка при восстановлении:', error);
+            alert('Ошибка при восстановлении заказа');
+        }
+    };
 
-    if (error) {
-        return <div className="error-message">Ошибка: {error}</div>;
-    }
+    if (loading) return <div className="loading-message">Загрузка истории заказов...</div>;
+    if (error) return <div className="error-message">Ошибка: {error}</div>;
 
     return (
         <div className="order-history-container">
-            <h1>История завершенных заказов ({orders.length})</h1>
+            <h1>История заказов ({orders.length})</h1>
             {orders.length > 0 ? (
                 <ul className="order-list">
                     {orders.map((order) => (
@@ -49,9 +60,11 @@ const OrderHistoryPage = () => {
                             <p><strong>Описание:</strong> {order.description}</p>
                             <p><strong>Адрес:</strong> {order.address}</p>
                             <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
+                            <p><strong>Статус:</strong> {order.status === 'expired' ? 'Просрочен' : 'Завершён'}</p>
                             <p><strong>ID создателя:</strong> {order.creatorId}</p>
                             <p><strong>ID исполнителя:</strong> {order.executorId}</p>
                             <p><strong>Дата завершения:</strong> {order.completedAt}</p>
+
                             {order.contractPath && (
                                 <a
                                     href={`http://localhost:5001/${order.contractPath.replace(/^.*contracts[\\/]/, 'contracts/')}`}
@@ -62,11 +75,17 @@ const OrderHistoryPage = () => {
                                 </a>
                             )}
 
+                            {/* 👇 Кнопка восстановить только для expired заказов */}
+                            {order.status === 'expired' && (
+                                <button onClick={() => handleRestore(order.id)} className="restore-button">
+                                    Восстановить заказ
+                                </button>
+                            )}
                         </li>
                     ))}
                 </ul>
             ) : (
-                <p>Завершенных заказов нет.</p>
+                <p>Завершенных или просроченных заказов нет.</p>
             )}
         </div>
     );
