@@ -97,6 +97,9 @@ router.post('/upload-documents',authenticateToken, upload.array('documents', 5),
 router.post('/register', async (req, res) => {
     const { username, phone, password, captchaToken, smsCode } = req.body;
 
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 7 * 86400000); // 7 дней
+
     if (!captchaToken) {
         return res.status(400).json({ error: "Капча не пройдена" });
     }
@@ -136,7 +139,10 @@ router.post('/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // Создание нового пользователя
-        const newUser = await User.create({ username, phone, password: hashedPassword, verified: true });
+        const newUser = await User.create({ username, phone, password: hashedPassword,
+            verified: true,subscription_type: 'premium',
+            subscription_expires_at: expiresAt
+        });
 
         smsCodes.delete(phone); // Удаляем код после успешной регистрации
 

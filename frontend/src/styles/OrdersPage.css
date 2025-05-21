@@ -30,7 +30,8 @@
     /* Красивая и лаконичная кнопка */
 
     .toggle-map-button {
-        display: inline-block;
+        display: block;
+        width: max-content;
         margin: 0 auto;
         padding: 10px 16px;
         background: linear-gradient(135deg, #4b6cb7, #182848);
@@ -306,7 +307,6 @@
     }
 
     .take-order-button {
-        margin-top: 16px;
         padding: 10px 16px;
         background: linear-gradient(135deg, #00c6ff, #0072ff);
         color: white;
@@ -315,6 +315,10 @@
         cursor: pointer;
         font-weight: 600;
         transition: background 0.3s ease;
+        display: block;
+        width: max-content;
+        margin: 0 auto;
+
     }
 
     .take-order-button:hover {

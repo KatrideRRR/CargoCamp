@@ -79,9 +79,9 @@ module.exports = (sequelize) => {
                 allowNull: true
             },
             subscription_type: {
-                type: DataTypes.ENUM('standard', 'trial', 'premium'),
+                type: DataTypes.ENUM('standard', 'premium'),
                 allowNull: false,
-                defaultValue: 'trial',
+                defaultValue: 'standard',
             },
             subscription_expires_at: {
                 type: DataTypes.DATE,

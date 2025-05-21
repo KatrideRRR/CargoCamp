@@ -75,24 +75,27 @@ router.post("/pay_commission", async (req, res) => {
         if (!order) {
             return res.status(404).json({ success: false, error: "Заказ не найден" });
         }
+        const user = await User.findByPk(userId);
+        const isPremium = user.subscription_type === 'premium' && new Date(user.subscription_expires_at) > new Date();
 
-        // Определяем комиссию
         let commission = 0;
-        if (order.paymentType === "cash") {
-            commission = 200 * 100; // 200 рублей (в копейках)
-        } else if (order.paymentType === "guarantee") {
-            commission = Math.round(order.proposedSum * 100 * 0.15);
-        } else if (order.paymentType === "installments") {
-            commission = Math.round(order.proposedSum * 100 * 0.20);
-        }
+        if (!isPremium) {
+            if (order.paymentType === "cash") {
+                commission = 200 * 100;
+            } else if (order.paymentType === "guarantee") {
+                commission = Math.round(order.proposedSum * 100 * 0.15);
+            } else if (order.paymentType === "installments") {
+                commission = Math.round(order.proposedSum * 100 * 0.20);
+            }
 
-        if (order.is_recommended) {
-            commission -= 100 * 100;
-            if (commission < 0) commission = 0; // комиссия не может быть отрицательной
+            if (order.is_recommended) {
+                commission -= 100 * 100;
+                if (commission < 0) commission = 0;
+            }
         }
 
         if (commission <= 0) {
-            return res.status(400).json({ success: false, error: "Некорректная комиссия" });
+            return res.status(400).json({ success: false, error: "Некорректная комиссия (возможно у вас премиум)" });
         }
 
         const params = {
@@ -200,6 +203,88 @@ router.post("/unbind-card", authenticateToken, async (req, res) => {
         console.error("Ошибка при удалении карты:", error);
         return res.status(500).json({ message: "Ошибка сервера при удалении карты" });
     }
+});
+
+router.post("/init_premium_payment", authenticateToken, async (req, res) => {
+    const { duration } = req.body; // '7d' или '30d'
+    const userId = req.user.id;
+
+    const prices = {
+        '7d': 250000,
+        '30d': 900000,
+    };
+
+    const descriptions = {
+        '7d': 'Премиум на 7 дней',
+        '30d': 'Премиум на 30 дней',
+    };
+
+    const amount = prices[duration];
+    if (!amount) {
+        return res.status(400).json({ success: false, error: "Неверная длительность подписки" });
+    }
+
+    const params = {
+        TerminalKey: TERMINAL_KEY,
+        Amount: amount,
+        OrderId: `premium_${userId}_${Date.now()}`,
+        Description: descriptions[duration],
+        CustomerKey: `user_${userId}`,
+        NotificationURL: "https://localhost:5000/api/payment/premium_callback"
+    };
+
+    params.Token = generateToken(params);
+
+    params.Receipt = {
+        Email: "test@example.com",
+        Phone: "+79001234567",
+        Taxation: "osn",
+        Items: [
+            {
+                Name: descriptions[duration],
+                Price: amount,
+                Quantity: 1,
+                Amount: amount,
+                Tax: "vat10",
+                PaymentMethod: "full_payment",
+                PaymentObject: "service"
+            }
+        ]
+    };
+
+    try {
+        const response = await axios.post(`${API_URL}/Init`, params);
+        res.json({ success: true, PaymentURL: response.data.PaymentURL });
+    } catch (err) {
+        console.error("Ошибка оплаты премиума:", err);
+        res.status(500).json({ success: false, error: "Ошибка создания платежа" });
+    }
+});
+
+router.post("/payment/premium_callback", async (req, res) => {
+    const { OrderId, Success } = req.body;
+    if (!Success) return res.send("OK");
+
+    // Извлекаем userId
+    const match = OrderId.match(/^premium_(\d+)_/);
+    if (!match) return res.send("OK");
+
+    const userId = parseInt(match[1], 10);
+    const user = await User.findByPk(userId);
+    if (!user) return res.send("OK");
+
+    const now = new Date();
+    const additionalDays = OrderId.includes("7d") ? 7 : 30;
+
+    const newExpiration = user.subscription_type === 'premium' && user.subscription_expires_at > now
+        ? new Date(user.subscription_expires_at.getTime() + additionalDays * 86400000)
+        : new Date(now.getTime() + additionalDays * 86400000);
+
+    user.subscription_type = 'premium';
+    user.subscription_expires_at = newExpiration;
+    await user.save();
+
+    res.send("OK");
 });
 
 module.exports = router;

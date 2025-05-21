@@ -68,24 +68,22 @@ const ProfilePage = () => {
 
     const handleBuyPremium = async (days) => {
         const token = localStorage.getItem("authToken");
-        const duration = `${days}d`; // '7d' или '30d'
 
         try {
-            const response = await axios.post(`${apiUrl}/api/auth/buy`, {
-                duration,
+            const response = await axios.post(`${apiUrl}/api/payment/init_premium_payment`, {
+                duration: `${days}d`,
             }, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
             if (response.data.success) {
-                toast.success(`Премиум активирован до ${new Date(response.data.until).toLocaleDateString()}`);
-                window.location.reload(); // или вручную обнови профиль
+                window.location.href = response.data.PaymentURL; // Перенаправление на оплату
             } else {
-                toast.error("Не удалось оформить подписку");
+                toast.error("Ошибка: " + response.data.error);
             }
         } catch (error) {
-            console.error("Ошибка при подписке:", error);
-            toast.error("Ошибка сервера при подписке");
+            console.error("Ошибка при запуске оплаты премиума:", error);
+            toast.error("Ошибка сервера при запуске оплаты");
         }
     };
 
