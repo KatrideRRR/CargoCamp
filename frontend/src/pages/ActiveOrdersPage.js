@@ -360,11 +360,13 @@ const ActiveOrdersPage = () => {
 
     return (
         <div className="active-orders">
+
             <div className="pageContainer">
 
                 <div className="active-orders-page">
 
                     <div className="active-orders-container">
+
                         <div className="contentWrapper">
                             {orders.length > 0 ? (
                                 <ul className="orders-list">

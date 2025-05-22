@@ -49,45 +49,55 @@ const OrderHistoryPage = () => {
     if (error) return <div className="error-message">Ошибка: {error}</div>;
 
     return (
-        <div className="order-history-container">
-            <h1>История заказов ({orders.length})</h1>
-            {orders.length > 0 ? (
-                <ul className="order-list">
-                    {orders.map((order) => (
-                        <li key={order.id} className="order-item">
-                            <p><strong>№ заказа:</strong> {order.id}</p>
-                            <p><strong>Тип заказа:</strong> {order.type}</p>
-                            <p><strong>Описание:</strong> {order.description}</p>
-                            <p><strong>Адрес:</strong> {order.address}</p>
-                            <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
-                            <p><strong>Статус:</strong> {order.status === 'expired' ? 'Просрочен' : 'Завершён'}</p>
-                            <p><strong>ID создателя:</strong> {order.creatorId}</p>
-                            <p><strong>ID исполнителя:</strong> {order.executorId}</p>
-                            <p><strong>Дата завершения:</strong> {order.completedAt}</p>
+        <div className="order-history">
 
-                            {order.contractPath && (
-                                <a
-                                    href={`http://localhost:5001/${order.contractPath.replace(/^.*contracts[\\/]/, 'contracts/')}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                >
-                                    Скачать договор (PDF)
-                                </a>
-                            )}
+            <div className="pageContainer">
 
-                            {/* 👇 Кнопка восстановить только для expired заказов */}
-                            {order.status === 'expired' && (
-                                <button onClick={() => handleRestore(order.id)} className="restore-button">
-                                    Восстановить заказ
-                                </button>
-                            )}
-                        </li>
-                    ))}
-                </ul>
-            ) : (
-                <p>Завершенных или просроченных заказов нет.</p>
-            )}
-        </div>
+                    <div className="contentWrapper">
+
+                        <h1>История заказов ({orders.length})</h1>
+                        {orders.length > 0 ? (
+                            <ul className="order-list">
+                                {[...orders].reverse().map(order => (
+                                    <li key={order.id} className="order-item">
+                                        <p><strong>№ заказа:</strong> {order.id}</p>
+                                        <p><strong>Тип заказа:</strong> {order.type}</p>
+                                        <p><strong>Описание:</strong> {order.description}</p>
+                                        <p><strong>Адрес:</strong> {order.address}</p>
+                                        <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
+                                        <p>
+                                            <strong>Статус:</strong> {order.status === 'expired' ? 'Просрочен' : 'Завершён'}
+                                        </p>
+                                        <p><strong>ID создателя:</strong> {order.creatorId}</p>
+                                        <p><strong>ID исполнителя:</strong> {order.executorId}</p>
+                                        <p><strong>Дата завершения:</strong> {order.completedAt}</p>
+
+                                        {order.contractPath && (
+                                            <a
+                                                href={`http://localhost:5001/${order.contractPath.replace(/^.*contracts[\\/]/, 'contracts/')}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                Скачать договор (PDF)
+                                            </a>
+                                        )}
+
+                                        {/* 👇 Кнопка восстановить только для expired заказов */}
+                                        {order.status === 'expired' && (
+                                            <button onClick={() => handleRestore(order.id)} className="restore-button">
+                                                Восстановить заказ
+                                            </button>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p>Завершенных или просроченных заказов нет.</p>
+                        )}
+                    </div>
+                </div>
+            </div>
+
     );
 };
 
