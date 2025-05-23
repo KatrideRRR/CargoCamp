@@ -41,5 +41,19 @@ services:
       REACT_APP_API_URL: backend:5001
       REACT_APP_SOCKET_URL: backend:5001
 
+  admin-panel:
+    build: ./admin-panel
+    container_name: cargo_camp_admin-panel
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend
+    env_file:
+      - ./admin-panel/.env
+    environment:
+      REACT_APP_API_URL: backend:5001
+      REACT_APP_SOCKET_URL: backend:5001
+
 volumes:
   mysql_data:
