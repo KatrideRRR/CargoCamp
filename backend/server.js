@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const http = require('http');
+const http = require('https');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 
@@ -15,14 +15,21 @@ const adminRoutes = require('./routes/admin');
 const payment = require("./routes/payment");
 
 const app = express();
-const server = http.createServer(app);
+const options = {
+    key: fs.readFileSync('/etc/letsencrypt/live/cargocamp.ru/privkey.pem'),
+    cert: fs.readFileSync('/etc/letsencrypt/live/cargocamp.ru/fullchain.pem')
+};
+
+const server = https.createServer(options, app);
 
 // Инициализация WebSocket
 const io = initializeSocket(server);
 const db = require('./models');
 db.sequelize.sync();
 
-app.use(cors({  origin: ['http://localhost:3000','http://localhost:3001', 'http://localhost:8080', 'http://18.184.43.44:3000', 'http://81.163.27.147:3000', 'http://81.163.27.147:8080'], methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization'], credentials: true}));
+app.use(cors({  origin: ['http://localhost:3000','http://localhost:3001', 'http://localhost:8080',
+        'http://18.184.43.44:3000', 'https://81.163.27.147:3000', 'https://81.163.27.147:8080',
+        'https://cargocamp.ru'], methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization'], credentials: true}));
 app.use(bodyParser.json());
 app.use('/api/orders', orderRoutes(io));
 app.use('/api/auth', authRoutes);

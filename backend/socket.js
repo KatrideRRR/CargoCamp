@@ -8,7 +8,9 @@ let users = {}; // Храним пользователей, подключивш
 function initializeSocket(server) {
     io = socketIo(server, {
         cors: {
-            origin: ['http://localhost:3000', 'http://localhost:8080', 'http://18.184.43.44:3000'],
+            origin: ['http://localhost:3000', 'http://localhost:8080', 'http://18.184.43.44:3000',
+                'https://81.163.27.147:3000', 'https://81.163.27.147:8080',
+                'https://cargocamp.ru'],
             methods: ["GET", "POST"],
             credentials: true,
         }
