@@ -16,7 +16,12 @@ const payment = require("./routes/payment");
 
 const app = express();
 
-const server = https.createServer(app);
+const options = {
+    key: fs.readFileSync('/etc/letsencrypt/live/cargocamp.ru/privkey.pem'),
+    cert: fs.readFileSync('/etc/letsencrypt/live/cargocamp.ru/fullchain.pem'),
+};
+
+const server = https.createServer(options, app);
 
 // Инициализация WebSocket
 const io = initializeSocket(server);
