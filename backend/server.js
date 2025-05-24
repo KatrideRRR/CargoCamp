@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const http = require('http');
+const https = require('https');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 
@@ -16,7 +16,7 @@ const payment = require("./routes/payment");
 
 const app = express();
 
-const server = http.createServer(app);
+const server = https.createServer(app);
 
 // Инициализация WebSocket
 const io = initializeSocket(server);
