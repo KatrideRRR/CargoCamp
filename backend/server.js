@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const https = require('https');
+const http = require('http');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 
@@ -21,7 +21,7 @@ const options = {
     cert: fs.readFileSync('/etc/letsencrypt/live/cargocamp.ru/fullchain.pem'),
 };
 
-const server = https.createServer(options, app);
+const server = http.createServer( app);
 
 // Инициализация WebSocket
 const io = initializeSocket(server);
