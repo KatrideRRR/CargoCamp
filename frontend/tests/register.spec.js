@@ -33,7 +33,7 @@ test.describe('RegisterPage — регистрация с моками', () => {
             };
         });
 
-        await page.goto('http://localhost:3000/register');
+        await page.goto('http://localhost:3001/register');
     });
 
     test('пользователь проходит регистрацию полностью', async ({ page }) => {
@@ -75,7 +75,7 @@ test.describe('RegisterPage — регистрация с моками', () => {
             };
         });
 
-        await page.goto('http://localhost:3000/register');
+        await page.goto('http://localhost:3001/register');
 
         await page.getByLabel('Имя пользователя:').fill('TestUser');
         await page.getByLabel('Телефон:').fill('89991234567');
@@ -112,7 +112,7 @@ test.describe('RegisterPage — регистрация с моками', () => {
             route.fulfill({ status: 200, body: JSON.stringify({ token: 'should-not-be-set' }) });
         });
 
-        await page.goto('http://localhost:3000/register');
+        await page.goto('http://localhost:3001/register');
 
         await page.getByLabel('Имя пользователя:').fill('TestUser');
         await page.getByLabel('Телефон:').fill('89991234567');

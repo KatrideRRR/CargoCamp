@@ -1,11 +1,12 @@
-FROM node:18
-
+# Этап сборки
+FROM node:18 AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm install
-
 COPY . .
-RUN npm run build  # Сборка React-приложения
+RUN npm run build
 
-EXPOSE 3000
-CMD ["npx", "serve", "-s", "build"]
+# Этап продакшн-сервера
+FROM nginx:alpine
+COPY --from=build /app/build /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf

@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 test.describe('StartPage', () => {
     test.beforeEach(async ({ page }) => {
         // Предзагрузка контекста авторизации (можно замокать или через localStorage)
-        await page.goto('http://localhost:3000/');
+        await page.goto('http://localhost:3001/');
         await page.evaluate(() => {
             localStorage.setItem('user', JSON.stringify({ id: 1 }));
         });
@@ -35,7 +35,7 @@ test.describe('StartPage', () => {
         }, token);
 
         // 3. Загружаем стартовую страницу
-        await page.goto('http://localhost:3000/'); // Переходим на стартовую страницу
+        await page.goto('http://localhost:3001/'); // Переходим на стартовую страницу
 
         // 4. Кликаем по кнопке "Я заказчик"
         await page.getByText('Я заказчик').click();
@@ -50,7 +50,7 @@ test.describe('StartPage', () => {
             localStorage.removeItem('user');
         });
 
-        await page.goto('http://localhost:3000/');
+        await page.goto('http://localhost:3001/');
         await page.getByText('Я заказчик').click();
 
         // Проверяем, что был редирект на /login

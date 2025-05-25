@@ -35,7 +35,7 @@ function getCardType(cardNumber) {
 }
 
 router.post("/bind-card", authenticateToken, async (req, res) => {
-    res.setHeader("Access-Control-Allow-Origin",  "http://18.184.43.44:3000");
+    res.setHeader("Access-Control-Allow-Origin",  "http://18.184.43.44:3001");
     res.setHeader("Access-Control-Allow-Credentials", "true");
 
     const { id } = req.user;

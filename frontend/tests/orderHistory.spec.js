@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('OrderHistoryPage', () => {
     const userId = 1;
-    const pageUrl = `http://localhost:3000/orders-history/${userId}`;
+    const pageUrl = `http://localhost:3001/orders-history/${userId}`;
 
     test('показывает список завершённых заказов', async ({ page }) => {
         await page.route(`**/orders/completed/${userId}`, async route => {
