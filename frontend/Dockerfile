@@ -1,12 +1,20 @@
-# Этап сборки
-FROM node:18 AS build
+# frontend/Dockerfile
+FROM node:18 as builder
+
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm install
+
 COPY . .
 RUN npm run build
 
-# Этап продакшн-сервера
+
+# Production image with nginx
 FROM nginx:alpine
-COPY --from=build /app/build /usr/share/nginx/html
+COPY --from=builder /app/build /usr/share/nginx/html
+
+# Копируем кастомный nginx конфиг
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
