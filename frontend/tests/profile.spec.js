@@ -43,7 +43,7 @@ test.describe("Страница профиля", () => {
     });
 
     test("отображает информацию профиля", async ({ page }) => {
-        await page.goto("http://localhost:3001/profile");
+        await page.goto("http://localhost:3000/profile");
 
         await expect(page.getByText("Имя пользователя:")).toBeVisible();
         await expect(page.getByText("testuser")).toBeVisible();
@@ -63,13 +63,13 @@ test.describe("Страница профиля", () => {
             localStorage.removeItem("authToken");
         });
 
-        await page.goto("http://localhost:3001/profile");
+        await page.goto("http://localhost:3000/profile");
 
         await expect(page).toHaveURL(/\/login/);
     });
 
     test("загрузка документов", async ({ page }) => {
-        await page.goto("http://localhost:3001/profile");
+        await page.goto("http://localhost:3000/profile");
 
         const inputFile = page.locator('input[type="file"]');
         const uploadButton = page.locator('.upload-button-style');

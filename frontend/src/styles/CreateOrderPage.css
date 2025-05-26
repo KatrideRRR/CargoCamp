@@ -1,448 +1,257 @@
+/* Фон и общий контейнер */
 .create-order-page {
-
-    /* Отступ сверху для всего контейнера */
-.container {
+    min-height: 100vh;
+    background: linear-gradient(to bottom right, #e8f0ff, #ffffff);
+    padding: 2rem 1rem;
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    box-sizing: border-box; /* Для учета внутренних отступов */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #1e293b; /* Темно-синий для текста */
     margin-bottom: 70px;
-    min-height: 100vh;
-    height: auto;
-    background: #f9f9f9;
-    padding: 20px;
-    width: 100%;
-    max-width: 900px;
-    margin-left: auto;
-    margin-right: auto;
-
 }
 
-/* Центровка формы */
+/* Центрируем форму и даём ей фон */
+.container {
+    max-width: 720px;
+    width: 100%;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(30, 64, 175, 0.12);
+    padding: 2rem 2.5rem;
+}
+
+/* Контейнер формы */
 .form-container {
     width: 100%;
-    max-width: 600px; /* Ограничиваем максимальную ширину формы */
-    padding: 30px;
-    background-color: #ffffff;
-    border-radius: 10px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    box-sizing: border-box; /* Учитываем padding внутри формы */
-    padding-bottom: 40px;
-}
-
-/* Форматирование формы */
-.form {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    flex-grow: 1; /* Это позволяет форме растягиваться, заполняя доступное пространство */
-}
-.image-preview {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 15px;
-    justify-content: center;
-    overflow-y: auto; /* Добавлено для прокрутки */
-    max-height: 300px; /* Ограничение высоты */
-
-}
-
-.image-preview-item {
-    width: 100px;
-    height: 100px;
-    object-fit: cover;
-    border-radius: 5px;
-}
-
-
-    /* Стили для меток (label) */
-    label {
-        display: block;
-        font-size: 16px;
-        font-weight: 500;
-        margin-bottom: 5px;
-        color: #333;
-    }
-
-    /* Основные стили для селекта */
-    select {
-        width: 100%;
-        padding: 10px;
-        font-size: 16px;
-        border: 2px solid #ddd;
-        border-radius: 5px;
-        background-color: #fff;
-        outline: none;
-        transition: border-color 0.3s ease-in-out;
-        appearance: none; /* Убирает стандартные стрелочки в браузерах */
-    }
-
-    /* При наведении */
-    select:hover {
-        border-color: #888;
-    }
-
-    /* При фокусе */
-    select:focus {
-        border-color: #007bff;
-        box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
-    }
-
-    /* Отключенный селект */
-    select:disabled {
-        background-color: #f2f2f2;
-        color: #aaa;
-        cursor: not-allowed;
-    }
-
-    /* Медиа-запрос для мобильных устройств */
-    @media (max-width: 600px) {
-        label {
-            font-size: 14px;
-        }
-
-        select {
-            font-size: 14px;
-            padding: 8px;
-        }
-    }
-
-    @media (max-width: 768px) {
-        .container {
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            background-color: #f8f9fa;
-            padding-top: 1px; /* Учитывает высоту navbar */
-            padding-bottom: 120px; /* Учитывает высоту bottommenu + небольшой отступ */
-            box-sizing: border-box;
-            overflow: auto;
-        }
-
-        .form-container {
-            padding: 20px;
-            width: 100%;
-            margin-bottom: 30px;
-            margin-top: 20px;
-        }
-
-        body {
-            margin-bottom: 130px; /* Чтобы вся страница не заходила за bottommenu */
-        }
-    }
-
-    .payment-selector {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 16px;
-        margin: 20px 0;
-    }
-
-    .payment-option {
-        width: 100px;
-        height: 100px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        background: #f1f5f9;
-        border: 2px solid #cbd5e1;
-        border-radius: 12px;
-        font-size: 14px;
-        font-weight: 600;
-        transition: 0.3s;
-        padding: 8px;
-    }
-
-    .payment-option.selected {
-        background-color: #3b82f6;
-        border-color: #1d4ed8;
-        color: white;
-    }
-
-    .payment-icon {
-        font-size: 28px;
-        margin-bottom: 8px;
-
-    }
-    .payment-title {
-        text-align: center;
-        font-size: 1.2rem;
-        margin-bottom: 1rem;
-        font-weight: 800;
-        color: #333;
-    }
-
-
-/* Поля в строку */
-.input-row {
-    display: flex;
-    justify-content: center;
-    align-items: flex-start; /* Выравнивание по началу */
-    gap: 1rem;
-}
-
-/* Поля в мобильной версии */
-@media (max-width: 768px) {
-    .input-row {
-        flex-direction: column; /* Перенос на новую строку */
-        align-items: stretch; /* Поля занимают 100% ширины */
-        gap: 1.5rem; /* Увеличиваем расстояние между элементами */
-    }
-    .container {
-        padding: 16px;
-        margin: 0;
-        border-radius: 0;
-        box-shadow: none;
-        margin-bottom: 40px;
-    }
-
-    .form-container {
-        padding: 16px;
-        box-shadow: none;
-    }
-
-    .payment-selector {
-        align-items: center;
-    }
-
-    .payment-option {
-        width: 90%;
-        max-width: 100px;
-    }
-
-    .promotion-options {
-        padding: 12px;
-    }
-
-}
-
-/* Контейнер для кнопки загрузки изображений */
-.file-upload-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-top: 1rem;
-}
-
-/* Скрываем стандартный input file */
-.file-input {
-    display: none;
-}
-
-/* Стили для кастомной кнопки загрузки */
-.file-input-label {
-    display: inline-block;
-    padding: 10px 20px;
-    font-size: 1rem;
-    font-weight: bold;
-    color: white;
-    background-color: #0077ff;
-    border-radius: 5px;
-    cursor: pointer;
-    text-align: center;
-    transition: background-color 0.3s ease;
-}
-
-.file-input-label:hover {
-    background-color: #005bb5;
-}
-
-/* Область предпросмотра изображений */
-.image-preview {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 15px;
-    justify-content: center;
-}
-
-/* Отдельное изображение в предпросмотре */
-.image-preview-item {
-    width: 100px;
-    height: 100px;
-    object-fit: cover;
-    border-radius: 5px;
-    border: 2px solid #dcdcdc;
-    transition: transform 0.2s ease-in-out;
-}
-
-.image-preview-item:hover {
-    transform: scale(1.05);
-}
-
-/* Сообщение при отсутствии изображений */
-.no-image-text {
-    font-size: 0.9rem;
-    color: #777;
-}
-
-
-
-/* Группа ввода */
-.input-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    flex: 1; /* Уравниваем ширину полей */
-    position: relative; /* Родительский элемент для абсолютного позиционирования подсказок */
-}
-
-/* Поле "Дата и время" */
-.input-group.date-picker {
-    flex: 1; /* Ширина поля равна ширине остальных */
-}
-
-/* Поля ввода */
-.input,
-.textarea {
-    width: 100%;
-    padding: 0.75rem;
-    font-size: 1rem;
-    border: 1px solid #dcdcdc;
-    border-radius: 5px;
-    outline: none;
-    transition: border-color 0.3s ease;
-    background-color: #f9f9f9;
-    box-sizing: border-box; /* Учет padding */
-}
-
-.input:focus,
-.textarea:focus {
-    border-color: #0077ff;
-    background-color: #ffffff;
-}
-
-/* Кнопка "Создать заказ" */
-.submit-button {
-    padding: 1rem;
-    font-size: 1rem;
-    font-weight: 600;
-    color: #ffffff;
-    background-color: #0077ff;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-    width: 100%;
-    text-align: center;
-}
-
-.submit-button:hover {
-    background-color: #005bb5;
 }
 
 /* Ошибки */
 .error-text {
-    color: red;
-    font-size: 0.9rem;
+    color: #dc2626; /* Красный */
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+/* Группы инпутов */
+.input-group {
+    margin-bottom: 1.6rem;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Лейблы */
+.label {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+    color: #334155; /* чуть темнее */
+}
+
+/* Инпуты и селекты */
+.input,
+select,
+.textarea {
+    background: #f9fafb;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 0.6rem 1rem;
+    font-size: 1rem;
+    color: #334155;
+    box-shadow: 0 6px 12px rgba(30, 64, 175, 0.1);
+    transition: all 0.25s ease;
+    outline-offset: 3px;
+}
+
+.input:focus,
+select:focus,
+.textarea:focus {
+    border-color: #4f46e5;
+    box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
+    background: #ffffff;
+}
+
+.textarea {
+    resize: vertical;
+}
+
+/* Списки подсказок */
+.address-suggestions {
+    margin-top: 0.3rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    max-height: 160px;
+    overflow-y: auto;
+    background: white;
+    box-shadow: 0 4px 12px rgba(30, 64, 175, 0.08);
+    list-style: none;
+    padding: 0;
+}
+
+.address-suggestions li {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.address-suggestions li:hover {
+    background-color: #e0e7ff;
 }
 
 /* Карта */
 .map-container {
-    margin: 1.5rem 0;
-    border: 1px solid #dcdcdc;
-    border-radius: 5px;
+    margin: 1rem 0 1.8rem 0;
+    border-radius: 16px;
     overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 20px rgba(30, 64, 175, 0.1);
 }
 
-/* Подсказки */
-.suggestions {
-    position: absolute; /* Абсолютное позиционирование относительно input-group */
-    z-index: 1000;
-    background-color: #ffffff;
-    border: 1px solid #dcdcdc;
-    border-radius: 5px;
-    margin-top: 4.5rem; /* Смещение вниз от текстового поля */
-    width: 100%; /* Ширина равна ширине текстового поля */
-    max-height: 150px; /* Ограничиваем высоту списка подсказок */
-    overflow-y: auto; /* Добавляем прокрутку, если подсказок слишком много */
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Эстетическая тень */
-    box-sizing: border-box; /* Учитываем padding и border */
+/* Ряд с датой и суммой */
+.input-row {
+    display: flex;
+    gap: 1.2rem;
+    flex-wrap: wrap;
 }
 
-.suggestion-item {
-    padding: 0.75rem;
+/* Дата/время */
+.date-picker {
+    flex: 1 1 300px;
+}
+
+/* Сумма */
+.input-row .input-group:last-child {
+    flex: 1 1 150px;
+}
+
+/* Кнопка загрузки файлов */
+.file-upload-container {
+    margin: 1rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.file-input-label {
+    background-color: #4f46e5;
+    color: white;
+    padding: 0.55rem 1.2rem;
+    border-radius: 14px;
     cursor: pointer;
+    font-weight: 600;
+    box-shadow: 0 6px 14px rgba(79, 70, 229, 0.3);
+    transition: background-color 0.3s ease;
+    user-select: none;
+}
+
+.file-input-label:hover {
+    background-color: #4338ca;
+}
+
+.file-input {
+    display: none;
+}
+
+/* Превью изображений */
+.image-preview {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 1.6rem;
+}
+
+.image-preview-item {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(30, 64, 175, 0.12);
+}
+
+.no-image-text {
+    color: #64748b;
+    font-style: italic;
+}
+
+/* Заголовок секции оплаты */
+.payment-title {
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    color: #334155;
+}
+
+/* Селектор оплаты */
+.payment-selector {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 2rem;
+}
+
+/* Кнопки оплаты */
+.payment-option {
+    flex: 1 1 120px;
+    padding: 0.7rem 1rem;
+    border-radius: 14px;
+    background-color: #f1f5f9;
+    border: 1.5px solid transparent;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    cursor: pointer;
+    transition: all 0.25s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.payment-option.selected {
+    background-color: #4f46e5;
+    border-color: #4338ca;
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 8px 20px rgba(79, 70, 229, 0.4);
+}
+
+.payment-option:hover {
+    background-color: #e0e7ff;
+}
+
+/* Иконки оплаты */
+.payment-icon-container-create {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 1.3rem;
+}
+
+.payment-label-create {
+    font-size: 1rem;
+}
+
+/* Продвижение */
+.promotion-options {
+    margin-bottom: 1.5rem;
+}
+
+/* Кнопка создания заказа */
+.submit-button {
+    width: 100%;
+    background-color: #4f46e5;
+    color: white;
+    font-weight: 700;
+    padding: 0.85rem 0;
+    font-size: 1.1rem;
+    border-radius: 14px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(79, 70, 229, 0.4);
     transition: background-color 0.3s ease;
 }
 
-.suggestion-item:hover {
-    background-color: #f2f2f2;
+.submit-button:hover:not(:disabled) {
+    background-color: #4338ca;
 }
 
-/* Для числовых полей */
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-
-input[type="number"] {
-    -moz-appearance: textfield;
-}
-
-.textarea {
-    width: 100%;
-    padding: 0.75rem;
-    font-size: 1rem;
-    border: 1px solid #dcdcdc;
-    border-radius: 5px;
-    outline: none;
-    transition: border-color 0.3s ease;
-    background-color: #f9f9f9;
-    overflow: hidden; /* Убирает лишние полосы прокрутки */
-    resize: none; /* Запрещает изменение размера вручную */
-    min-height: 60px; /* Минимальная высота */
-    box-sizing: border-box; /* Учитывает padding в высоте */
-}
-
-.textarea:focus {
-    border-color: #0077ff;
-    background-color: #ffffff;
-}
-.react-datepicker__portal {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1050;
-    width: 100%;
-    max-width: 320px;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    overflow: hidden;
-    padding: 1rem;
-    box-sizing: border-box;
-}
-
-    .promotion-options {
-        background-color: #fefce8;
-        border: 1px solid #fde68a;
-        padding: 16px;
-        border-radius: 10px;
-        margin-top: 16px;
-    }
-
-    .promotion-options label {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 0.95rem;
-        cursor: pointer;
-        margin-bottom: 10px;
-    }
-
-    .promotion-options input[type="checkbox"] {
-        transform: scale(1.2);
-        accent-color: #facc15;
-    }
-
-
+.submit-button:disabled {
+    background-color: #a5b4fc;
+    cursor: not-allowed;
 }

@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 test('Успешный логин', async ({ page }) => {
     // Зайти на страницу логина
-    await page.goto('http://localhost:3001/login');
+    await page.goto('http://localhost:3000/login');
 
     // Ввести телефон
     await page.getByLabel('Телефон:').fill('89786864117'); // Заменить на валидный тестовый номер
@@ -18,7 +18,7 @@ test('Успешный логин', async ({ page }) => {
 });
 
 test('Попытка входа заблокированного пользователя', async ({ page }) => {
-    await page.goto('http://localhost:3001/login');
+    await page.goto('http://localhost:3000/login');
 
     // Ввести номер и пароль пользователя с ролью "banned"
     await page.getByLabel('Телефон:').fill('89780434395'); // замените на тестовый номер заблокированного пользователя
@@ -34,7 +34,7 @@ test('Попытка входа заблокированного пользов�
 });
 
 test('Переход на страницу регистрации', async ({ page }) => {
-    await page.goto('http://localhost:3001/login');
+    await page.goto('http://localhost:3000/login');
 
     // Клик по ссылке "Зарегистрироваться"
     await page.getByText('Зарегистрироваться').click();
@@ -44,7 +44,7 @@ test('Переход на страницу регистрации', async ({ pag
 });
 
 test('Переход по кнопке "Забыли пароль?"', async ({ page }) => {
-    await page.goto('http://localhost:3001/login');
+    await page.goto('http://localhost:3000/login');
 
     // Ввести телефон (если требуется)
     await page.getByLabel('Телефон:').fill('89786864118');
@@ -57,7 +57,7 @@ test('Переход по кнопке "Забыли пароль?"', async ({ p
 });
 
 test('Неверный логин или пароль', async ({ page }) => {
-    await page.goto('http://localhost:3001/login');
+    await page.goto('http://localhost:3000/login');
 
     await page.getByLabel('Телефон:').fill('89999999999'); // несуществующий номер
     await page.getByLabel('Пароль:').fill('wrongpassword');

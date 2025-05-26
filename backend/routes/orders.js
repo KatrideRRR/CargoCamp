@@ -33,7 +33,6 @@ setInterval(async () => {
     }
 }, 60 * 60 * 1000); // каждые 60 минут
 
-
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, 'uploads/orders');
@@ -69,7 +68,7 @@ module.exports = (io) => {
     });
 
     router.post('/', authenticateToken, upload.array('images', 5), async (req, res) => {  // 'images' — это поле для загрузки
-        const { address, description, workTime, proposedSum, type,categoryId, subcategoryId, serviceId} = req.body;
+        const { address, description, workTime, proposedSum,categoryId, subcategoryId, serviceId} = req.body;
         const userId = req.user.id;
         let parsedPromotion = {};
         console.log(req.body); // Посмотреть входящие данные
@@ -107,14 +106,12 @@ module.exports = (io) => {
                 workTime,
                 proposedSum,
                 coordinates,
-                type,
                 createdAt: new Date().toISOString(),
                 images: photoUrls,  // Сохраняем массив ссылок на фото
                 creatorId: userId,
                 status: 'pending',
                 categoryId,
                 subcategoryId,
-                serviceId,
                 serviceId: serviceId || null,
                 paymentType,
                 is_highlighted: parsedPromotion.highlight ?? false,
@@ -161,7 +158,7 @@ module.exports = (io) => {
                 attributes: [
                     'id', 'createdAt', 'address', 'description', 'workTime',
                     'images', 'proposedSum', 'creatorId', 'coordinates',
-                    'type', 'executorId', 'status', 'paymentType',
+                    'executorId', 'status', 'paymentType',
                     'is_highlighted', 'is_recommended', 'is_push_notified', 'taxi_courier', 'serviceId',
                 ],
                 where: whereClause,

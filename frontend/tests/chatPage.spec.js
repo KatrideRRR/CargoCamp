@@ -4,14 +4,14 @@ import { test, expect } from '@playwright/test';
 test.describe('ChatPage', () => {
     test.beforeEach(async ({ page }) => {
         // Авторизация и переход на страницу чата
-        await page.goto('http://localhost:3001/login');
+        await page.goto('http://localhost:3000/login');
         await page.fill('input[id="phone"]', '89786864117');
         await page.fill('input[id="password"]', '11jan1999');
         await page.click('button[type="submit"]');
         await page.waitForURL('**/profile');
 
         // Переход к странице чата конкретного заказа
-        await page.goto('http://localhost:3001/messages/445');
+        await page.goto('http://localhost:3000/messages/445');
         await expect(page.locator('.chat-header')).toContainText('Чат для заказа #445');
     });
 

@@ -301,7 +301,6 @@ function CreateOrderPage() {
     return (
         <YMaps query={{apikey: "bf97867b-5ffb-4fc4-9fd5-8997874b300e"}}>
             <div className="create-order-page">
-                <div className="container">
                     <div className="form-container">
                         {error && <p className="error-text">{error}</p>}
                         <form onSubmit={handleSubmit} className="form">
@@ -354,18 +353,6 @@ function CreateOrderPage() {
                                         </select>
                                     </>
                                 )}
-
-
-
-                                <label className="label">Ключевое слово</label>
-                                <input
-                                    className="input"
-                                    type="text"
-                                    value={formData.type}
-                                    onChange={(e) => handleTypeInputChange(e.target.value)}
-                                    placeholder="Введите ключевое слово..."
-                                    required
-                                />
 
                             </div>
 
@@ -530,11 +517,9 @@ function CreateOrderPage() {
                                 </button>
                         </form>
                     </div>
-                </div>
             </div>
         </YMaps>
-    )
-        ;
+    );
 }
 
 export default CreateOrderPage;

@@ -8,6 +8,7 @@ import SwipeableMap from "../components/SwipeableMap.js";
 import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
 import { useSwipeable } from 'react-swipeable';
 import { FiAlertTriangle } from 'react-icons/fi';
+import axios from "axios";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 const socket = io(process.env.REACT_APP_SOCKET_URL, {
@@ -236,7 +237,16 @@ const OrdersPage = () => {
                 setUserId(response.data.id);
                 socket.emit('register', response.data.id);
             } catch (err) {
-                console.error("❌ Ошибка получения профиля:", err);
+                if (axios.isAxiosError(err)) {
+                    if (err.response?.status === 401) {
+                        console.info("ℹ️ Пользователь не авторизован — логин не выполнен.");
+                        return; // тихий выход, без ошибки
+                    }
+
+                    console.warn("⚠️ Ошибка от сервера:", err.response?.status, err.response?.data);
+                } else {
+                    console.error("❌ Неизвестная ошибка:", err);
+                }
             }
         };
 

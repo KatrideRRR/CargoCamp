@@ -48,6 +48,8 @@ router.post("/send-sms", async (req, res) => {
     smsCodes.set(phone, code); // Сохраняем код в памяти
 
     try {
+        console.log("Отправка SMS на:", phone);
+
         const response = await axios.get("https://sms.ru/sms/send", {
             params: {
                 api_id: "706A8778-9606-1CA6-F061-72BA6F3A60E3",
@@ -56,6 +58,8 @@ router.post("/send-sms", async (req, res) => {
                 json: 1,
             },
         });
+
+        console.log(response.data);
 
         if (response.data.status === "OK") {
             return res.json({ message: "Код отправлен" });

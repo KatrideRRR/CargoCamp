@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import axiosInstance from '../utils/axiosInstance';
 import '../styles/modalContext.css'
+import axios from "axios";
 
 export const ModalContext = createContext();
 const socket = io(process.env.REACT_APP_SOCKET_URL, {
@@ -24,14 +25,26 @@ export const ModalProvider = ({ children }) => {
             try {
                 const response = await axiosInstance.get('/auth/profile');
                 setUserId(response.data.id);
-                socket.emit('register', response.data.id); // Регистрация пользователя на сокете
+                socket.emit('register', response.data.id);
             } catch (error) {
-                console.error("❌ Ошибка загрузки профиля:", error);
+                console.log('⛔️ Ошибка поймана:', error); // <-- сюда попадает?
+
+                if (axios.isAxiosError(error)) {
+                    if (error.response?.status === 401) {
+                        console.info("ℹ️ Пользователь не авторизован");
+                        return;
+                    }
+
+                    console.warn("⚠️ Ответ сервера с ошибкой:", error.response?.status, error.response?.data);
+                } else {
+                    console.error("❌ Неизвестная ошибка:", error);
+                }
             }
         };
 
         fetchUserData();
     }, []);
+
 
     useEffect(() => {
 

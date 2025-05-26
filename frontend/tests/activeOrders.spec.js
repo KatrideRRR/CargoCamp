@@ -72,7 +72,7 @@ test.describe('ActiveOrdersPage', () => {
             })
         );
 
-        await page.goto('http://localhost:3001/active-orders');
+        await page.goto('http://localhost:3000/active-orders');
     });
 
     test('отображает заказы и разворачивает карточку', async ({ page }) => {

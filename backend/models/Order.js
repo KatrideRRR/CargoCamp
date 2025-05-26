@@ -1,5 +1,4 @@
 const { Model, DataTypes } = require('sequelize');
-const Sequelize = require('sequelize'); // Добавляем импорт Sequelize
 
 module.exports = (sequelize) => {
     class Order extends Model {
@@ -25,7 +24,6 @@ module.exports = (sequelize) => {
             userId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'users', key: 'id' } },
             status: { type: DataTypes.ENUM('pending', 'active', 'completed', 'expired'), defaultValue: 'pending' },
             executorId: { type: DataTypes.INTEGER, allowNull: true },
-            type: { type: DataTypes.STRING, allowNull: false },
             creatorId: { type: DataTypes.INTEGER, allowNull: false },
             completedBy: { type: DataTypes.JSON, allowNull: false, defaultValue: [] },
             images: {

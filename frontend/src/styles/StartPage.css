@@ -18,7 +18,7 @@ body {
     align-items: center;
     min-height: 100vh;
     padding: 24px;
-    background: linear-gradient(135deg, #f1f5f9, #ffffff);
+    background: linear-gradient(to bottom right, #e8f0ff, #ffffff);
 }
 
 .start-page-content {
