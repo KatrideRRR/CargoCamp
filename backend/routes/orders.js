@@ -693,7 +693,7 @@ module.exports = (io) => {
                         { executorId: userId }   // Исполнитель
                     ]
                 },
-                attributes: ['id','type','address','proposedSum', 'status', 'completedAt', 'creatorId', 'executorId', 'description', 'contractPath'], // Указываем, какие поля хотим вернуть
+                attributes: ['id','address','proposedSum', 'status', 'completedAt', 'creatorId', 'executorId', 'description', 'contractPath'], // Указываем, какие поля хотим вернуть
             });
 
             // Отправляем заказ с актуальной датой завершения
