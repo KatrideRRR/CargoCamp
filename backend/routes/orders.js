@@ -325,7 +325,15 @@ module.exports = (io) => {
 
         try {
             const order = await Order.findByPk(id);
-            const requests = order.requests ? JSON.parse(order.requests) : [];
+            let requests = [];
+            try {
+                if (typeof order.requests === 'string' && order.requests.trim() !== '') {
+                    requests = JSON.parse(order.requests);
+                }
+            } catch (e) {
+                console.error('Ошибка парсинга order.requests:', e);
+                requests = [];
+            }
 
             if (!order) {
                 return res.status(404).json({ message: 'Заказ не найден' });
@@ -359,7 +367,7 @@ module.exports = (io) => {
             // Находим пользователей по ID
             const executors = await User.findAll({
                 where: { id: requestedExecutors },
-                attributes: ['id', 'username', 'rating', 'ratingCount', 'isVerified'] // Выбираем нужные поля
+                attributes: ['id', 'username', 'rating', 'ratingCount', 'userStatus'] // Выбираем нужные поля
             });
             console.log('📡 Ответ сервера:', requestedExecutors);
             const result = executors.map(exec => {

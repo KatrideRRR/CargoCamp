@@ -43,8 +43,7 @@ const MyOrdersPage = () => {
                 const ordersWithExecutors = await Promise.all(
                     ordersData.map(async (order) => {
                         try {
-                            const executorsResponse = await axiosInstance.get(
-                                `/orders/${order.id}/requested-executors`,
+                            const executorsResponse = await axiosInstance.get(`/orders/${order.id}/requested-executors`,
                                 { headers: { Authorization: `Bearer ${token}` } }
                             );
                             return { ...order, requestedExecutors: Array.isArray(executorsResponse.data) ? executorsResponse.data : [] };
