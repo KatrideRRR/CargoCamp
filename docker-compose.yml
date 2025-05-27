@@ -1,6 +1,6 @@
 services:
   db:
-    build: ./Database
+    image: mysql:8.0
     container_name: cargo_camp_db
     restart: always
     ports:
