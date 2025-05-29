@@ -10,6 +10,11 @@ services:
       MYSQL_DATABASE: cargo_camp
     volumes:
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   backend:
     build: ./backend
@@ -55,3 +60,5 @@ services:
 
 volumes:
   mysql_data:
+    name: cargocamp_mysql_data
+    driver: local
