@@ -112,7 +112,7 @@ module.exports = (io) => {
                 status: 'pending',
                 categoryId,
                 subcategoryId,
-                serviceId: serviceId || null,
+                serviceId: serviceId && serviceId !== '0' ? serviceId : null,
                 paymentType,
                 is_highlighted: parsedPromotion.highlight ?? false,
                 is_recommended: parsedPromotion.recommended ?? false,
