@@ -432,7 +432,7 @@ const OrdersPage = () => {
                                         className={`carousel-tab ${activeTab === 'all' ? 'active' : ''}`}
                                         onClick={() => handleTabChange('all')}
                                     >
-                                        Все заказы
+                                        Основные
                                     </div>
                                     <div
                                         className={`carousel-tab ${activeTab === 'courier' ? 'active' : ''}`}
@@ -444,7 +444,7 @@ const OrdersPage = () => {
                                         className={`carousel-tab ${activeTab === 'urgent' ? 'active' : ''}`}
                                         onClick={() => handleTabChange('urgent')}
                                     >
-                                        Срочные
+                                        В приоритете
                                     </div>
                                 </div>
 

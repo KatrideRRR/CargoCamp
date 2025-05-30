@@ -59,108 +59,123 @@ const RegisterPage = () => {
     };
 
     return (
-        <div className="register-container">
-            <div className="form-container">
-                <h1 className="title">Регистрация</h1>
-                {error && <p className="error">{error}</p>}
-                <form onSubmit={handleRegister} className="form">
-                    <div className="input-group">
-                        <label htmlFor="username">Имя пользователя:</label>
-                        <input
-                            id="username"
-                            type="text"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            required
-                        />
-                    </div>
-                    <div className="input-group">
-                        <label htmlFor="phone">Телефон:</label>
-                        <InputMask
-                            mask="+7 (999) 999-99-99"
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                        >
-                            {(inputProps) => (
-                                <input
-                                    {...inputProps}
-                                    id="phone"
-                                    type="tel"
-                                    required
-                                />
-                            )}
-                        </InputMask>
+        <div className="register">
+            <div className="pageContainer-register">
+                <div className="container-r">
+                    <div className="contentWrapper">
+                        <div className="register-container">
+                            <div className="formContainer">
+                                <h1 className="title">Регистрация</h1>
+                                {error && <p className="error">{error}</p>}
 
-                    </div>
-                    <div className="input-group">
-                        <label htmlFor="password">Пароль:</label>
-                        <input
-                            id="password"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                        />
-                    </div>
+                                <form onSubmit={handleRegister} className="form">
+                                    <div className="inputGroup">
+                                        <label htmlFor="username" className="label">Имя пользователя:</label>
+                                        <input
+                                            id="username"
+                                            type="text"
+                                            value={username}
+                                            onChange={(e) => setUsername(e.target.value)}
+                                            required
+                                            className="input"
+                                        />
+                                    </div>
 
-                    <ReCAPTCHA sitekey={siteKey} onChange={handleCaptchaChange} />
+                                    <div className="inputGroup">
+                                        <label htmlFor="phone" className="label">Телефон:</label>
+                                        <InputMask
+                                            mask="+7 (999) 999-99-99"
+                                            value={phone}
+                                            onChange={(e) => setPhone(e.target.value)}
+                                        >
+                                            {(inputProps) => (
+                                                <input
+                                                    {...inputProps}
+                                                    id="phone"
+                                                    type="tel"
+                                                    required
+                                                    className="input"
+                                                />
+                                            )}
+                                        </InputMask>
+                                    </div>
 
-                    <div className="agreement">
-                        <input
-                            type="checkbox"
-                            checked={isAgreementChecked}
-                            onChange={handleCheckboxChange}
-                        />
-                        <span>
-                            Я согласен с{' '}
-                            <button type="button" className="link-button" onClick={handleOpenModal}>
-                                пользовательским соглашением
-                            </button>
-                        </span>
-                    </div>
+                                    <div className="inputGroup">
+                                        <label htmlFor="password" className="label">Пароль:</label>
+                                        <input
+                                            id="password"
+                                            type="password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            required
+                                            className="input"
+                                        />
+                                    </div>
 
-                    {!isSmsSent ? (
-                        <button type="button" onClick={sendSmsCode} disabled={!captchaValue}>
-                            Получить код
-                        </button>
-                    ) : (
-                        <>
-                            <input
-                                type="text"
-                                placeholder="Код из SMS"
-                                value={smsCode}
-                                onChange={(e) => setSmsCode(e.target.value)}
-                                required
-                            />
-                            <button type="submit" disabled={!captchaValue}>
-                                Зарегистрироваться
-                            </button>
-                        </>
-                    )}
-                </form>
+                                    <ReCAPTCHA sitekey={siteKey} onChange={handleCaptchaChange} />
 
-                {isModalOpen && (
-                    <div className="modal-overlay" onClick={handleCloseModal}>
-                        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                            <div className="terms-content">
-                                <h3>1. Общие положения</h3>
-                                <p>1.1. CargoCamp – это платформа, объединяющая заказчиков и исполнителей для поиска и выполнения грузоперевозок, доставки и других услуг.</p>
-                                <p>1.2. Администрация предоставляет техническую возможность взаимодействия, но не является стороной сделок.</p>
+                                    <div className="agreement">
+                                        <input
+                                            type="checkbox"
+                                            checked={isAgreementChecked}
+                                            onChange={handleCheckboxChange}
+                                            className="checkbox"
+                                        />
+                                        <span>
+                                        Я согласен с{" "}
+                                            <button type="button" className="link-button" onClick={handleOpenModal}>
+                                            пользовательским соглашением
+                                        </button>
+                                    </span>
+                                    </div>
+
+                                    {!isSmsSent ? (
+                                        <button type="button" className="button" onClick={sendSmsCode} disabled={!captchaValue}>
+                                            Получить код
+                                        </button>
+                                    ) : (
+                                        <>
+                                            <input
+                                                type="text"
+                                                placeholder="Код из SMS"
+                                                value={smsCode}
+                                                onChange={(e) => setSmsCode(e.target.value)}
+                                                required
+                                                className="input"
+                                            />
+                                            <button type="submit" className="button" disabled={!captchaValue}>
+                                                Зарегистрироваться
+                                            </button>
+                                        </>
+                                    )}
+                                </form>
+
+                                {isModalOpen && (
+                                    <div className="modal-overlay" onClick={handleCloseModal}>
+                                        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                                            <div className="terms-content">
+                                                <h3>1. Общие положения</h3>
+                                                <p>1.1. CargoCamp – это платформа, объединяющая заказчиков и исполнителей...</p>
+                                            </div>
+                                            <button className="button" onClick={handleCloseModal}>Закрыть</button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <p className="loginText">
+                                    Уже есть аккаунт?{" "}
+                                    <span className="loginLink" onClick={() => navigate("/login")}>
+                                    Войти
+                                </span>
+                                </p>
                             </div>
-                            <button onClick={handleCloseModal}>Закрыть</button>
                         </div>
                     </div>
-                )}
-
-                <p className="login-text">
-                    Уже есть аккаунт?{' '}
-                    <span className="login-link" onClick={() => navigate('/login')}>
-                        Войти
-                    </span>
-                </p>
+                </div>
             </div>
         </div>
     );
+
 };
 
 export default RegisterPage;

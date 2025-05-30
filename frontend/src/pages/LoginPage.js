@@ -48,62 +48,75 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="container">
-            <div className="formContainer">
-                <h1 className="title">Войти в аккаунт</h1>
-                {error && <p className="error">{error}</p>}
-                {message && <p className="error" style={{ color: "green" }}>{message}</p>}
+        <div className="login">
 
-                <form onSubmit={handleLogin} className="form">
-                    <div className="inputGroup">
-                        <label htmlFor="phone" className="label">Телефон:</label>
-                        <InputMask
-                            mask="+7 (999) 999-99-99"
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                        >
-                            {(inputProps) => (
-                                <input
-                                    {...inputProps}
-                                    id="phone"
-                                    type="tel"
-                                    required
-                                    className="input"
+            <div className="pageContainer-login">
 
-                                />
-                            )}
-                        </InputMask>
+                <div className="container-l">
 
-                    </div>
+                    <div className="contentWrapper">
 
-                    <div className="inputGroup">
-                        <label htmlFor="password" className="label">Пароль:</label>
-                        <input
-                            id="password"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                            className="input"
-                        />
-                    </div>
+                        <div className="login-container">
+                            <div className="formContainer">
+                                <h1 className="title">Войти в аккаунт</h1>
+                                {error && <p className="error">{error}</p>}
+                                {message && <p className="error" style={{color: "green"}}>{message}</p>}
 
-                    {/* Кнопка "Забыли пароль?" */}
-                    <button type="button" className="forgotPassword" onClick={handleRecoverPassword}>
-                        Забыли пароль?
-                    </button>
+                                <form onSubmit={handleLogin} className="form">
+                                    <div className="inputGroup">
+                                        <label htmlFor="phone" className="label">Телефон:</label>
+                                        <InputMask
+                                            mask="+7 (999) 999-99-99"
+                                            value={phone}
+                                            onChange={(e) => setPhone(e.target.value)}
+                                        >
+                                            {(inputProps) => (
+                                                <input
+                                                    {...inputProps}
+                                                    id="phone"
+                                                    type="tel"
+                                                    required
+                                                    className="input"
 
-                    <button type="submit" className="button">Войти</button>
-                </form>
+                                                />
+                                            )}
+                                        </InputMask>
 
-                <p className="registerText">
-                    Нет аккаунта?{" "}
-                    <span onClick={() => navigate("/register")} className="registerLink">
+                                    </div>
+
+                                    <div className="inputGroup">
+                                        <label htmlFor="password" className="label">Пароль:</label>
+                                        <input
+                                            id="password"
+                                            type="password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            required
+                                            className="input"
+                                        />
+                                    </div>
+
+                                    {/* Кнопка "Забыли пароль?" */}
+                                    <button type="button" className="forgotPassword" onClick={handleRecoverPassword}>
+                                        Забыли пароль?
+                                    </button>
+
+                                    <button type="submit" className="button">Войти</button>
+                                </form>
+
+                                <p className="registerText">
+                                    Нет аккаунта?{" "}
+                                    <span onClick={() => navigate("/register")} className="registerLink">
                         Зарегистрироваться
                     </span>
-                </p>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
+
     );
 };
 

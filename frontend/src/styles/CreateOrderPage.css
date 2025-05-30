@@ -39,6 +39,28 @@
     display: flex;
     flex-direction: column;
 }
+.input-group-responsive {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.select-responsive {
+    width: 440px;
+    max-width: 100%;
+    padding: 0.5rem;
+    font-size: 1rem;
+}
+
+@media (max-width: 600px) {
+    .input-group-responsive {
+        flex-direction: column;
+    }
+
+    .select-responsive {
+        width: 100%;
+    }
+}
 
 /* Лейблы */
 .label {

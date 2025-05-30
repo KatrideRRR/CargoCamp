@@ -304,30 +304,33 @@ function CreateOrderPage() {
                     <div className="form-container">
                         {error && <p className="error-text">{error}</p>}
                         <form onSubmit={handleSubmit} className="form">
-                            <div className="input-group">
+                            <div className="input-group-responsive">
                                 <div>
                                     <label>Выберите категорию:</label>
-                                    <select value={selectedCategory} onChange={handleCategoryChange}>
+                                    <select
+                                        className="select-responsive"
+                                        value={selectedCategory}
+                                        onChange={handleCategoryChange}
+                                    >
                                         <option value="">Выберите категорию</option>
                                         {category
-                                            .filter(cat => cat.id !== 12 && cat.id !== 13)  // Исключаем 12 и 13
+                                            .filter(cat => cat.id !== 12 && cat.id !== 13)
                                             .map(cat => (
                                                 <option key={cat.id} value={cat.id}>
                                                     {cat.name}
                                                 </option>
                                             ))}
                                     </select>
-
                                 </div>
 
                                 <div>
                                     <label>Выберите подкатегорию:</label>
                                     <select
+                                        className="select-responsive"
                                         value={selectedSubcategory}
                                         onChange={handleSubcategoryChange}
                                         disabled={!selectedCategory}
                                     >
-
                                         <option value="">Выберите подкатегорию</option>
                                         {subcategory.map(sub => (
                                             <option key={sub.id} value={sub.id}>
@@ -338,9 +341,10 @@ function CreateOrderPage() {
                                 </div>
 
                                 {services.length > 0 && (
-                                    <>
+                                    <div>
                                         <label>Услуга:</label>
                                         <select
+                                            className="select-responsive"
                                             value={selectedService}
                                             onChange={(e) => setSelectedService(e.target.value)}
                                         >
@@ -351,10 +355,10 @@ function CreateOrderPage() {
                                                 </option>
                                             ))}
                                         </select>
-                                    </>
+                                    </div>
                                 )}
-
                             </div>
+
 
                             <div className="input-group">
                                 <label className="label">Описание работы</label>
@@ -496,7 +500,7 @@ function CreateOrderPage() {
 
                             <div className="promotion-options">
 
-                            {/* Блок продвижения */}
+                                {/* Блок продвижения */}
                                 <PromotionOptions value={promotion} onChange={setPromotion}/>
 
                                 <div className="mt-4 text-sm text-gray-600">
@@ -506,15 +510,16 @@ function CreateOrderPage() {
                                         повышает шансы.
                                     </p>
                                     <p className="text-xs text-red-500 mt-1">
-                                        ⏰ Заказ будет автоматически перемещен в "историю заказов" через 24 часа, если его никто не примет.
+                                        ⏰ Заказ будет автоматически перемещен в "историю заказов" через 24 часа, если
+                                        его никто не примет.
                                     </p>
                                 </div>
                             </div>
 
 
-                                <button type="submit" disabled={isSubmitting} className="submit-button">
-                                    {isSubmitting ? "Создание..." : "Создать заказ"}
-                                </button>
+                            <button type="submit" disabled={isSubmitting} className="submit-button">
+                                {isSubmitting ? "Создание..." : "Создать заказ"}
+                            </button>
                         </form>
                     </div>
             </div>
