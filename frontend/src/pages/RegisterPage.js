@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import ReCAPTCHA from "react-google-recaptcha";
 import '../styles/RegisterPage.css';
+import InputMask from 'react-input-mask';
 
 const apiUrl = process.env.REACT_APP_API_URL;
 const siteKey = process.env.REACT_APP_RECAPTCHA_SITE_KEY;
@@ -75,13 +76,21 @@ const RegisterPage = () => {
                     </div>
                     <div className="input-group">
                         <label htmlFor="phone">Телефон:</label>
-                        <input
-                            id="phone"
-                            type="phone"
+                        <InputMask
+                            mask="+7 (999) 999-99-99"
                             value={phone}
                             onChange={(e) => setPhone(e.target.value)}
-                            required
-                        />
+                        >
+                            {(inputProps) => (
+                                <input
+                                    {...inputProps}
+                                    id="phone"
+                                    type="tel"
+                                    required
+                                />
+                            )}
+                        </InputMask>
+
                     </div>
                     <div className="input-group">
                         <label htmlFor="password">Пароль:</label>

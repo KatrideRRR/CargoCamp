@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import InputMask from 'react-input-mask';
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../utils/authContext";
@@ -56,14 +57,23 @@ const LoginPage = () => {
                 <form onSubmit={handleLogin} className="form">
                     <div className="inputGroup">
                         <label htmlFor="phone" className="label">Телефон:</label>
-                        <input
-                            id="phone"
-                            type="text"
+                        <InputMask
+                            mask="+7 (999) 999-99-99"
                             value={phone}
                             onChange={(e) => setPhone(e.target.value)}
-                            required
-                            className="input"
-                        />
+                        >
+                            {(inputProps) => (
+                                <input
+                                    {...inputProps}
+                                    id="phone"
+                                    type="tel"
+                                    required
+                                    className="input"
+
+                                />
+                            )}
+                        </InputMask>
+
                     </div>
 
                     <div className="inputGroup">
