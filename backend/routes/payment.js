@@ -95,7 +95,11 @@ router.post("/pay_commission", async (req, res) => {
         }
 
         if (commission <= 0) {
-            return res.status(400).json({ success: false, error: "Некорректная комиссия (возможно у вас премиум)" });
+            return res.json({
+                success: true,
+                noCommission: true,
+                message: "У вас премиум, комиссия отсутствует"
+            });
         }
 
         const params = {

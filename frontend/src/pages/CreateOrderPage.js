@@ -75,7 +75,6 @@ function CreateOrderPage() {
         setImages(prevImages => [...prevImages, ...compressedImages]);
     };
 
-
     useEffect(() => {
         // Получение списка категорий при загрузке компонента
         axios.get(`${apiUrl}/api/category`)
@@ -106,7 +105,6 @@ function CreateOrderPage() {
             });
     };
 
-
     const getMinTime = (selectedDate) => {
         if (!selectedDate || selectedDate.toDateString() === currentDate.toDateString()) {
             // Если дата совпадает с сегодняшней или не выбрана, возвращаем текущее время
@@ -121,10 +119,6 @@ function CreateOrderPage() {
             // Для других дат минимальное время — начало суток
             return new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0);
         }
-    };
-
-    const handleTypeInputChange = (value) => {
-        setFormData({...formData, type: value});
     };
 
     useEffect(() => {
@@ -175,6 +169,7 @@ function CreateOrderPage() {
             console.error("Ошибка получения координат:", err);
         }
     };
+
     useEffect(() => {
         console.log('🔧 Услуги подкатегории:', services);
     }, [services]);
@@ -283,6 +278,7 @@ function CreateOrderPage() {
             setServices([]);
         }
     };
+
     const handleSubcategoryChange = async (e) => {
         const subId = e.target.value;
         setSelectedSubcategory(subId);
@@ -297,11 +293,11 @@ function CreateOrderPage() {
         setFormData({...formData, description: textarea.value});
     };
 
-
     return (
         <YMaps query={{apikey: "bf97867b-5ffb-4fc4-9fd5-8997874b300e"}}>
             <div className="create-order-page">
-                    <div className="form-container">
+                <div className="container">
+                <div className="form-container">
                         {error && <p className="error-text">{error}</p>}
                         <form onSubmit={handleSubmit} className="form">
                             <div className="input-group-responsive">
@@ -522,6 +518,7 @@ function CreateOrderPage() {
                             </button>
                         </form>
                     </div>
+                </div>
             </div>
         </YMaps>
     );

@@ -57,29 +57,33 @@ export const ModalProvider = ({ children }) => {
                 console.log("🔔 Заказ одобрен:", data);
 
                 if (data.message.includes("Ваш запрос")) {
+                    const isPremium = data.isPremium === true; // <-- важно!
+
                     setNotificationData({
                         title: "Ваш запрос одобрен!",
                         description: `Заказ номер ${data.orderId}: ${data.message}`,
+                        isPremium,
                         onClose: () => setNotificationData(null),
                     });
 
-                    try {
-                        const response = await axiosInstance.post('/payment/pay_commission', {
-                            userId,
-                            orderId: data.orderId
-                        });
+                    if (!isPremium) {
+                        try {
+                            const response = await axiosInstance.post('/payment/pay_commission', {
+                                userId,
+                                orderId: data.orderId
+                            });
 
-                        if (response.data.success) {
-                            setPaymentUrl(response.data.PaymentURL);
-                        } else {
-                            console.error("❌ Ошибка получения ссылки на оплату:", response.data.error);
+                            if (response.data.success) {
+                                setPaymentUrl(response.data.PaymentURL);
+                            } else {
+                                console.error("❌ Ошибка получения ссылки на оплату:", response.data.error);
+                            }
+                        } catch (error) {
+                            console.error("❌ Ошибка запроса на оплату:", error);
                         }
-                    } catch (error) {
-                        console.error("❌ Ошибка запроса на оплату:", error);
                     }
                 }
             });
-
 
             // Слушаем уведомления о завершении заказа
             socket.on('orderCompleted', (data) => {
@@ -172,23 +176,26 @@ export const ModalProvider = ({ children }) => {
 
                     {/* Уведомление для исполнителя в виде модала */}
             {notificationData && (
-                        <div className="modal-overlay">
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <h2>{notificationData.title}</h2>
+                        <p>{notificationData.description}</p>
 
-                            <div className="modal">
-                                <h2>{notificationData.title}</h2>
-                                <p>{notificationData.description}</p>
-                                {paymentUrl ? (
-                                    <button onClick={() => window.open(paymentUrl, "_blank")}>
-                                        Оплатить комиссию
-                                    </button>
-                                ) : (
-                                    <p>Загрузка ссылки на оплату...</p>
-                                )}
-                                <button onClick={notificationData.onClose}>Закрыть</button>
-                            </div>
+                        {!notificationData.isPremium ? (
+                            paymentUrl ? (
+                                <button onClick={() => window.open(paymentUrl, "_blank")}>
+                                    Оплатить комиссию
+                                </button>
+                            ) : (
+                                <p>Загрузка ссылки на оплату...</p>
+                            )
+                        ) : (
+                            <p className="text-green-600">У вас активен Premium — комиссия не требуется 🎉</p>
+                        )}
 
-                        </div>
-
+                        <button onClick={notificationData.onClose}>Закрыть</button>
+                    </div>
+                </div>
             )}
 
             {/* Окно завершения заказа */}

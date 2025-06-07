@@ -58,11 +58,11 @@ app.post('/api/token', (req, res) => {
 });
 
 sequelize.authenticate()
-    .then(() => console.log('Database connected.'))
+    .then(() => console.log())
     .catch((err) => console.error('Database connection error:', err));
 
 sequelize.sync()
-    .then(() => console.log('Database synchronized.'))
+    .then(() => console.log())
     .catch(err => console.error('Error synchronizing database:', err));
 
 const PORT = process.env.PORT;

@@ -20,6 +20,7 @@ const OrdersPage = () => {
     const [orders, setOrders] = useState([]);
     const [error, setError] = useState(null);
     const [userId, setUserId] = useState(null);
+    const { user } = useState(null);
     const [creatorsInfo, setCreatorsInfo] = useState({}); // Данные о создателях заказов
     const [categories, setCategories] = useState([]);
     const [subcategories, setSubcategories] = useState([]);
@@ -80,7 +81,6 @@ const OrdersPage = () => {
         }
     };
 
-
     const swipeHandlers = useSwipeable({
         onSwipedLeft: () => {
             if (activeTab === 'all') setActiveTab('courier');
@@ -97,7 +97,28 @@ const OrdersPage = () => {
         getUserLocation();
     }, []);
 
-    // Функция для получения иконки по способу оплаты
+    const calculateCommission = ({paymentType, proposedSum, isRecommended, isPremium}) => {
+
+        if (isPremium) return 0;
+
+        let commission = 0;
+
+        if (paymentType === "cash") {
+            commission = 200;
+        } else if (paymentType === "guarantee") {
+            commission = Math.round(proposedSum * 0.15);
+        } else if (paymentType === "installments") {
+            commission = Math.round(proposedSum * 0.2);
+        }
+
+        if (isRecommended) {
+            commission -= 100;
+            if (commission < 0) commission = 0;
+        }
+
+        return commission;
+    };
+
     const getPaymentIcon = (type) => {
         switch (type) {
             case 'guarantee':
@@ -131,8 +152,6 @@ const OrdersPage = () => {
         setCurrentImageIndex((prevIndex) => (prevIndex - 1 + currentImages.length) % currentImages.length);  // Переход к предыдущему изображению
     };
 
-
-    // Получение геолокации пользователя
     const getUserLocation = () => {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
@@ -152,11 +171,10 @@ const OrdersPage = () => {
         }
     };
 
-    // Геокодинг адреса через API (пример на Яндекс.Картах)
     const geocodeAddress = async (address) => {
         try {
             const response = await fetch(
-                `https://geocode-maps.yandex.ru/1.x/?apikey=ВАШ_API_КЛЮЧ&geocode=${encodeURIComponent(address)}&format=json`
+                `https://geocode-maps.yandex.ru/1.x/?apikey=bf97867b-5ffb-4fc4-9fd5-8997874b300e&geocode=${encodeURIComponent(address)}&format=json`
             );
             const data = await response.json();
             const pos = data.response.GeoObjectCollection.featureMember[0]?.GeoObject?.Point?.pos;
@@ -187,8 +205,6 @@ const OrdersPage = () => {
         }
     }, [userLocation, filteredByCategory]);
 
-
-    // Формула расчета расстояния между координатами (Haversine formula)
     const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
         const R = 6371; // Радиус Земли в км
         const dLat = (lat2 - lat1) * (Math.PI / 180);
@@ -202,7 +218,6 @@ const OrdersPage = () => {
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c; // Расстояние в км
     };
-
 
     useEffect(() => {
         const fetchOrders = async () => {
@@ -289,7 +304,6 @@ const OrdersPage = () => {
             console.error('Ошибка загрузки подкатегорий:', error);
         }
     };
-
 
     const handleCategoryChange = async (event) => {
         const categoryId = event.target.value;
@@ -390,10 +404,10 @@ const OrdersPage = () => {
         }
     };
 
-
     if (error) {
         return <div className="error-message">Ошибка: {error}</div>;
     }
+
     const filteredCategories = categories.filter(cat => {
         const name = cat.name.toLowerCase();
         if (activeTab === 'courier') {
@@ -403,7 +417,7 @@ const OrdersPage = () => {
         }
     });
 
-
+    console.log(userId);
     return (
         <div className="all-orders">
 
@@ -507,108 +521,133 @@ const OrdersPage = () => {
 
                                     </div>
 
-
                                     {orders.length > 0 ? (
                                         <ul className="orders-list">
                                             {getVisibleOrders().map((order) => {
                                                 const creator = creatorsInfo[order.creatorId] || {};
                                                 const isCreator = order.creatorId === userId;
+                                                const getCommissionText = (order, user) => {
+                                                    const isPremium =
+                                                        user?.subscription_type === "premium" &&
+                                                        new Date(user.subscription_expires_at) > new Date();
+
+                                                    const commission = calculateCommission({
+                                                        paymentType: order.paymentType,
+                                                        proposedSum: order.proposedSum,
+                                                        isRecommended: order.is_recommended,
+                                                        isPremium,
+                                                    });
+
+                                                    return `Комиссия: ${commission} ₽`;
+                                                };
+
+
 
                                                 return (
 
-                                                    <li
-                                                        key={order.id}
-                                                        className={`floatingCard ${isCreator ? 'creator' : ''} ${order.is_highlighted ? 'highlighted-order' : ''}`}
-                                                    >
+                                                        <li
+                                                            key={order.id}
+                                                            className={`floatingCard ${isCreator ? 'creator' : ''} ${order.is_highlighted ? 'highlighted-order' : ''}`}
+                                                        >
 
-                                                        <div className="order-content">
-                                                            <div className="order-header">
-                                                                <div className="order-info">
-                                                                    <p className="order-title">
-                                                                        <strong>Заказ
-                                                                            №{order.id}</strong> от {creator.username || "Неизвестно"}.
-                                                                        Создан {new Date(order.createdAt).toLocaleString()}. <div
-                                                                        className="order-payment-icon-container">
+                                                            <div className="order-content">
+                                                                <div className="order-header">
+                                                                    <div className="order-info">
+                                                                        <p className="order-title">
+
+                                                                            <strong>Заказ
+                                                                                №{order.id}</strong> от {creator.username || "Неизвестно"}.
+                                                                            Создан {new Date(order.createdAt).toLocaleString()}. <div
+                                                                            className="order-payment-icon-container">
                                                 <span
                                                     className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
+                                                                            <span style={{
+                                                                                fontSize: "14px",
+                                                                                color: "#666"
+                                                                            }}>
+    {getCommissionText(order, user)}
+</span>
+
+
+                                                                        </div>
+                                                                        </p>
+
+                                                                        <p><strong>ID
+                                                                            заказчика:</strong> {order.creatorId || "Неизвестно"}
+                                                                        </p>
+                                                                        <p><strong>Имя
+                                                                            заказчика:</strong> {creator.username || "Неизвестно"}
+                                                                        </p>
+                                                                        <p>
+                                                                            <strong>Рейтинг
+                                                                                заказчика:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
+                                                                            <Link
+                                                                                to={`/complaints/${order.creatorId}`}
+                                                                                className="inline-flex items-center mt-2 px-3 py-1 text-sm font-medium text-red-600 bg-red-100 rounded-md hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                                                                aria-label={`Жалобы (${creator.complaintsCount || 0})`}
+                                                                            >
+                                                                                <FiAlertTriangle
+                                                                                    className="mr-2 h-5 w-5"/>
+                                                                                {creator.complaintsCount || 0}
+                                                                            </Link>
+
+                                                                        </p>
 
                                                                     </div>
-                                                                    </p>
+                                                                </div>
 
-                                                                    <p><strong>ID
-                                                                        заказчика:</strong> {order.creatorId || "Неизвестно"}
-                                                                    </p>
-                                                                    <p><strong>Имя
-                                                                        заказчика:</strong> {creator.username || "Неизвестно"}
+                                                                <div className="order-left">
+                                                                    <p>
+                                                                        <strong>Категория:</strong> {order.category ? order.category.name : 'Не указано'}
                                                                     </p>
                                                                     <p>
-                                                                        <strong>Рейтинг
-                                                                            заказчика:</strong> {creator.rating ? creator.rating.toFixed(1) : "Нет данных"}
-                                                                        <Link
-                                                                            to={`/complaints/${order.creatorId}`}
-                                                                            className="inline-flex items-center mt-2 px-3 py-1 text-sm font-medium text-red-600 bg-red-100 rounded-md hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500"
-                                                                            aria-label={`Жалобы (${creator.complaintsCount || 0})`}
-                                                                        >
-                                                                            <FiAlertTriangle className="mr-2 h-5 w-5"/>
-                                                                            {creator.complaintsCount || 0}
-                                                                        </Link>
-
+                                                                        <strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : 'Не указано'}
+                                                                    </p>
+                                                                    <p>
+                                                                        <strong>Услуга:</strong> {order.service ? order.service.name : 'Не указано'}
                                                                     </p>
 
                                                                 </div>
-                                                            </div>
-
-                                                            <div className="order-left">
-                                                                <p>
-                                                                    <strong>Категория:</strong> {order.category ? order.category.name : 'Не указано'}
-                                                                </p>
-                                                                <p>
-                                                                    <strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : 'Не указано'}
-                                                                </p>
-                                                                <p>
-                                                                    <strong>Услуга:</strong> {order.service ? order.service.name : 'Не указано'}
-                                                                </p>
-
-                                                            </div>
 
 
-                                                            {Array.isArray(order.images) && order.images.length > 0 ? (
-                                                                <div className="image-stack-container">
-                                                                    <div className="image-stack"
-                                                                         onClick={() => openModal(order.images)}>
-                                                                        {order.images.map((image, index) => {
-                                                                            const imageUrl = `${apiUrl}${image}`;
-                                                                            return (
-                                                                                <img
-                                                                                    key={index}
-                                                                                    src={imageUrl}
-                                                                                    alt={`Order pic ${index + 1}`}
-                                                                                    className="order-image"
-                                                                                    style={{transform: `translateX(${index * 10}px)`}} // Смещение только вправо
-                                                                                />
-                                                                            );
-                                                                        })}
+                                                                {Array.isArray(order.images) && order.images.length > 0 ? (
+                                                                    <div className="image-stack-container">
+                                                                        <div className="image-stack"
+                                                                             onClick={() => openModal(order.images)}>
+                                                                            {order.images.map((image, index) => {
+                                                                                const imageUrl = `${apiUrl}${image}`;
+                                                                                return (
+                                                                                    <img
+                                                                                        key={index}
+                                                                                        src={imageUrl}
+                                                                                        alt={`Order pic ${index + 1}`}
+                                                                                        className="order-image"
+                                                                                        style={{transform: `translateX(${index * 10}px)`}} // Смещение только вправо
+                                                                                    />
+                                                                                );
+                                                                            })}
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-                                                            ) : null}
+                                                                ) : null}
 
-                                                            <p><strong>Адрес:</strong> {order.address}</p>
-                                                            <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
-                                                            <p><strong>Описание:</strong> {order.description}</p>
+                                                                <p><strong>Адрес:</strong> {order.address}</p>
+                                                                <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
+                                                                <p><strong>Описание:</strong> {order.description}</p>
 
-                                                        </div>
-
-
-                                                        {userId !== order.creatorId && !order.executorId && order.status === 'pending' && (
-                                                            <button className="take-order-button"
-                                                                    onClick={() => handleRequestOrder(order.id)}>
-                                                                Запросить выполнение
-                                                            </button>
-                                                        )}
+                                                            </div>
 
 
-                                                    </li>
-                                                );
+                                                            {userId !== order.creatorId && !order.executorId && order.status === 'pending' && (
+                                                                <button className="take-order-button"
+                                                                        onClick={() => handleRequestOrder(order.id)}>
+                                                                    Запросить выполнение
+                                                                </button>
+                                                            )}
+
+
+                                                        </li>
+                                                    );
+
                                             })}
                                         </ul>
                                     ) : (

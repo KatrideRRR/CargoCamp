@@ -44,7 +44,11 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-const geocoder = NodeGeocoder({ provider: 'openstreetmap' });
+const geocoder = NodeGeocoder({
+    provider: 'yandex',
+    apiKey: process.env.YANDEX_API_KEY, // Помести ключ в .env
+    lang: 'ru-RU'
+});
 
 module.exports = (io) => {
 
@@ -447,8 +451,28 @@ module.exports = (io) => {
 
             // Устанавливаем исполнителя и очищаем список запросов
             order.executorId = executorId;
-            await User.update({ has_debt: true }, { where: { id: executorId } });
-            console.log(`💸 Установлен флаг has_debt для пользователя ${executorId}`);
+
+            // Получаем данные исполнителя
+            const executor = await User.findByPk(executorId);
+
+
+            let isPremium = false;
+            if (executor) {
+                const { subscription_type, subscription_expires_at } = executor;
+
+                isPremium =
+                    subscription_type === 'premium' &&
+                    new Date(subscription_expires_at) > new Date();
+            }
+
+            // Устанавливаем долг ТОЛЬКО если не премиум
+            if (!isPremium) {
+                await User.update({ has_debt: true }, { where: { id: executorId } });
+                console.log(`💸 Установлен флаг has_debt для пользователя ${executorId}`);
+            } else {
+                console.log(`✅ У пользователя ${executorId} активен Premium — долг не устанавливается`);
+            }
+
 
             order.requestedExecutors = []; // Очищаем массив запросов
             order.status = 'active'; // Устанавливаем статус заказа как активный
@@ -500,6 +524,7 @@ module.exports = (io) => {
             io.to(`user_${order.executorId}`).emit('orderApproved', {
                 orderId: order.id,
                 message: 'Ваш запрос на выполнение заказа одобрен!',
+                isPremium, // <-- добавлено
             });
 
             // Уведомляем заказчика

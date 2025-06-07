@@ -144,7 +144,7 @@
         color: #0056b3;
     }
 
-    .modal-overlay {
+    .modal-overlay-agreement {
         position: fixed;
         top: 0;
         left: 0;
@@ -157,13 +157,36 @@
         z-index: 1000;
     }
 
-    .modal-content {
+    .modal-content-agreement {
         background: white;
         padding: 20px;
         border-radius: 10px;
-        max-width: 600px;
+        max-width: 500px;
         width: 90%;
-        max-height: 80vh;
+        max-height: 70vh;
         overflow-y: auto;
+        &::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        &::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        scrollbar-width: thin; /* Firefox */
+        scrollbar-color: rgba(0,0,0,0.2) transparent;
+
+    }
+    @media (max-width: 600px) {
+        .modal-content-agreement {
+            padding: 16px;
+            max-width: 100%;
+            max-height: 60vh;
+        }
     }
 }

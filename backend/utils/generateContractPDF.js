@@ -17,19 +17,18 @@ function generateHTML(data) {
           line-height: 1.6;
           font-size: 14px;
         }
-        h1 {
+        h1, h2 {
           text-align: center;
         }
         .section {
           margin-top: 20px;
         }
         .signature-block {
-          display: flex;
-          justify-content: space-between;
-          margin-top: 60px;
+          margin-top: 40px;
         }
-        .signature {
-          width: 45%;
+        .auto-signature-note {
+          font-style: italic;
+          margin-top: 20px;
         }
         .second-page {
           page-break-before: always;
@@ -62,37 +61,20 @@ function generateHTML(data) {
       </div>
 
       <div class="signature-block">
-        <div class="signature">
-          <strong>Заказчик</strong><br><br>
-          _______________<br>
-          (${data.customerName})
-        </div>
-        <div class="signature">
-          <strong>Исполнитель</strong><br><br>
-          _______________<br>
-          (${data.performerName})
-        </div>
+        <p class="auto-signature-note">
+          Настоящий договор считается заключённым и подписанным обеими сторонами в электронной форме посредством действий в системе CargoCamp — отправки Исполнителем запроса на выполнение заказа и подтверждения его Заказчиком. Электронные действия сторон признаются юридически значимыми и эквивалентными собственноручной подписи.
+        </p>
       </div>
 
       ${
         data.completeAt && data.completedBy.length === 2
             ? `<div class="second-page">
-              <h2>Акт выполнения</h2>
-              <p>Работа по заказу №${data.orderId} была выполнена в срок — <strong>${new Date(data.completeAt).toLocaleDateString('ru-RU')}</strong>.</p>
-              <p>Стороны подтверждают отсутствие взаимных претензий. Полная оплата выполнена. Договор считается исполненным.</p>
-
-              <div class="signature-block">
-                <div class="signature">
-                  <strong>Заказчик</strong><br><br>
-                  _______________<br>
-                  (${data.customerName})
-                </div>
-                <div class="signature">
-                  <strong>Исполнитель</strong><br><br>
-                  _______________<br>
-                  (${data.performerName})
-                </div>
-              </div>
+              <h2>Акт выполнения работ</h2>
+              <p>Работы по заказу №${data.orderId} были выполнены в срок — <strong>${new Date(data.completeAt).toLocaleDateString('ru-RU')}</strong>.</p>
+              <p>Стороны подтверждают, что работы выполнены надлежащим образом, в полном объеме и в срок. Претензий друг к другу не имеют. Оплата произведена. Договор считается исполненным.</p>
+              <p class="auto-signature-note">
+                Настоящий акт подписан автоматически обеими сторонами через платформу CargoCamp.
+              </p>
             </div>`
             : ''
     }
@@ -101,6 +83,7 @@ function generateHTML(data) {
     </html>
   `;
 }
+
 
 /**
  * Генерация PDF-договора

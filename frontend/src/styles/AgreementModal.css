@@ -1,35 +1,72 @@
-.agreement-content {
-    padding: 20px;
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(12px);
-    border-radius: 16px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
-    color: #fff;
-    font-size: 15px;
-    line-height: 1.6;
-    height: auto;
-    max-height: 65vh;
-    overflow-y: auto;
-    transition: all 0.3s ease;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,0.3) transparent;
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
 }
 
-.agreement-content::-webkit-scrollbar {
+.modal-wrapper {
+    position: relative;
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(12px);
+    border-radius: 20px;
+    padding: 32px 24px 24px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 70vh;
+    color: #fff;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+}
+
+.modal-close {
+    position: absolute;
+    top: -15px;
+    right: -14px;
+    width: 32px;
+    height: 32px;
+    font-size: 24px;
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.modal-title {
+    text-align: center;         /* центрирование */
+    margin-bottom: 16px;
+    font-size: 20px;
+    color: white;
+}
+
+.modal-body {
+    font-size: 15px;
+    line-height: 1.6;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.modal-body::-webkit-scrollbar {
     width: 6px;
 }
 
-.agreement-content::-webkit-scrollbar-thumb {
+.modal-body::-webkit-scrollbar-thumb {
     background-color: rgba(255, 255, 255, 0.3);
     border-radius: 10px;
 }
 
-.agreement-content p,
-.agreement-content ul {
+.modal-body p,
+.modal-body ul {
     margin-bottom: 12px;
 }
 
-.agreement-content ul {
+.modal-body ul {
     padding-left: 20px;
 }
 
@@ -50,6 +87,7 @@
 .checkbox-block label {
     font-size: 14px;
     cursor: pointer;
+    color: white;
 }
 
 .agree-button {
@@ -80,8 +118,16 @@
 }
 
 @media (max-width: 600px) {
-    .agreement-content {
-        padding: 16px;
+    .modal-wrapper {
+        padding: 20px 16px;
+        overflow-y: auto;
+    }
+
+    .modal-title {
+        font-size: 18px;
+    }
+
+    .modal-body {
         font-size: 14px;
     }
 
