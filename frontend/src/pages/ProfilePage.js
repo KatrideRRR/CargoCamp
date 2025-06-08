@@ -8,6 +8,7 @@ import AgreementModal from "../components/AgreementModal";
 const apiUrl = process.env.REACT_APP_API_URL;
 
 const ProfilePage = () => {
+    const [showVerificationModal, setShowVerificationModal] = useState(false);
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -293,6 +294,13 @@ const ProfilePage = () => {
                                         </div>
 
                                         <div className="verification-content">
+
+
+                                            <p className="verification-description">
+    <span className="verification-more-link" onClick={() => setShowVerificationModal(true)}>
+        Подробнее о верификации
+    </span>
+                                            </p>
                                             <label className="upload-label">
                                                 <input
                                                     type="file"
@@ -302,6 +310,7 @@ const ProfilePage = () => {
                                                     style={{display: "none"}}
                                                 />
                                                 <span className="upload-button-style">Загрузить документы</span>
+
                                             </label>
                                         </div>
                                     </div>
@@ -335,6 +344,34 @@ const ProfilePage = () => {
                     </div>
                 </div>
             </div>
+            {showVerificationModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h3>О верификации пользователя</h3>
+                        <p>
+                            Верификация необходима для повышения доверия к вам как к пользователю платформы.
+                            Мы просим загрузить скан паспорта или другого документа, удостоверяющего личность,
+                            чтобы подтвердить, что вы — реальный человек, а не фейковый аккаунт.
+                        </p>
+                        <p>
+                            <strong>Для пенсионеров:</strong> если вы подтвердите свой пенсионный статус,
+                            исполнители будут видеть соответствующую отметку и получать <strong>скидку на комиссию</strong>
+                            при выполнении ваших заказов. Это увеличивает шанс, что ваш заказ примут быстрее.
+                        </p>
+                        <p>
+                            🔒 Все документы обрабатываются вручную и хранятся в зашифрованном виде.
+                            Мы не передаем их третьим лицам.
+                        </p>
+                        <p className="warning">
+                            ⚠️ Попытка загрузки поддельных документов приведет к ограничению или блокировке аккаунта.
+                        </p>
+                        <button className="close-button" onClick={() => setShowVerificationModal(false)}>
+                            Закрыть
+                        </button>
+                    </div>
+                </div>
+            )}
+
         </div>
 
     );
