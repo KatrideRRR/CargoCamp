@@ -427,7 +427,7 @@ const OrdersPage = () => {
                     <div className="map-container1">
                         {isMapVisible && (
                             <div className="map-wrapper">
-                                <SwipeableMap orders={filteredOrders} userLocation={userLocation}/>
+                                <SwipeableMap orders={getVisibleOrders()} userLocation={userLocation}/>
                             </div>
                         )}
                         <div className="flex-1 overflow-auto">

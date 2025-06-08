@@ -4,33 +4,16 @@ import axios from 'axios';
 import { io } from 'socket.io-client';
 import { motion } from 'framer-motion';
 
-const apiUrl = process.env.REACT_APP_API_URL;
 const socket = io(process.env.REACT_APP_SOCKET_URL, {
     transports: ['websocket'],
     withCredentials: true,
 });
 
-const SwipeableMap = () => {
-    const [orders, setOrders] = useState([]);
+const SwipeableMap = ( {orders} ) => {
     const [location, setLocation] = useState({ latitude: 44.9572, longitude: 34.1108 });
     const [setManualLocation] = useState({ latitude: '', longitude: '' });
     const [isManualInput, setIsManualInput] = useState(false);
     const [address, setAddress] = useState('');
-
-    // Загрузка заказов
-    const fetchOrders = async (filter) => {
-        try {
-            const response = await axios.get(`${apiUrl}/api/orders/all`, {
-                params: { status: 'pending',
-                    ...filter, // сюда попадают категории, тип и т.д.
-                },
-            });
-            const ordersWithCoordinates = response.data.filter(order => order.coordinates);
-            setOrders(ordersWithCoordinates);
-        } catch (error) {
-            console.error('Ошибка загрузки заказов:', error);
-        }
-    };
 
     // Геокодинг
     const geocodeAddress = async (address) => {
@@ -59,7 +42,6 @@ const SwipeableMap = () => {
     };
 
     useEffect(() => {
-        fetchOrders();
 
         navigator.geolocation.getCurrentPosition(
             (position) => {
@@ -78,7 +60,6 @@ const SwipeableMap = () => {
 
         socket.on('orderUpdated', () => {
             console.log('Обновление заказов через WebSocket');
-            fetchOrders();
         });
 
         return () => {
@@ -127,7 +108,7 @@ const SwipeableMap = () => {
                     transition={{ type: 'spring', stiffness: 300 }}
                 >
                     <Map
-                        defaultState={{
+                        state={{
                             center: location ? [location.latitude, location.longitude] : [44.9572, 34.1108],
                             zoom: 10,
                         }}
