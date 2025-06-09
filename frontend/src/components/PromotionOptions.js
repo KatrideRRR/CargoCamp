@@ -4,7 +4,7 @@ import { Star, Bell, Paintbrush } from "lucide-react";
 export const PROMOTION_PRICES = {
     highlight: 50,
     recommended: 100,
-    push: 30,
+    push: 150,
 };
 
 export default function PromotionOptions({ value, onChange }) {

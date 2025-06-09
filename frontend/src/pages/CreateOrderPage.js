@@ -236,18 +236,33 @@ function CreateOrderPage() {
         }
 
         try {
-            await axios.post(`${apiUrl}/api/orders/`, data, {
+            // Шаг 1: создаём заказ с статусом pending или pending_payment
+            const response = await axios.post(`${apiUrl}/api/orders/`, data, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                     "Content-Type": "multipart/form-data",
                 },
             });
-            alert("Заказ успешно создан");
-            navigate("/orders");
+
+            const orderId = response.data.id;
+
+            if (promotionTotal > 0) {
+                // Шаг 2: перенаправляем на оплату
+                const payResp = await axios.post(`${apiUrl}/api/payment/start`, {
+                    orderId,
+                    amount: promotionTotal,
+                });
+                window.location.href = payResp.data.paymentUrl;
+            } else {
+                // Шаг 3: обычный заказ без оплаты
+                alert("Заказ успешно создан");
+                navigate("/orders");
+            }
         } catch (err) {
             console.error("Ошибка при создании заказа:", err);
             setError("Не удалось создать заказ. Попробуйте снова.");
         }
+
         console.log(paymentType);
     };
 

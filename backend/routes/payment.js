@@ -6,10 +6,13 @@ const { Order } = require("../models");
 const { User } = require("../models");
 const { processPayment, refundPayment } = require("../utils/paymentService");
 const authenticateToken = require("../middlewares/userAuth");
+const { createPayment } = require("../utils/tinkoff"); // 👈 вот это важно
 
 const TERMINAL_KEY = process.env.TERMINAL_KEY;
 const PASSWORD = process.env.TINKOFF_PASSWORD;
 const API_URL = "https://securepay.tinkoff.ru/v2";
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5001";
 
 function generateToken(params) {
     delete params.Token;
@@ -290,5 +293,47 @@ router.post("/payment/premium_callback", async (req, res) => {
 
     res.send("OK");
 });
+
+router.post("/start", async (req, res) => {
+    const { orderId, amount } = req.body;
+
+    try {
+        // Подготовка параметров для Тинькофф Кассы
+        const paymentUrl = await createPayment({
+            amount,
+            orderId,
+            successURL: `${FRONTEND_URL}/orders`,
+            failURL: `${FRONTEND_URL}/payment-fail`,
+            notificationURL: `${BACKEND_URL}/order/callback`,
+        });
+
+        res.json({ paymentUrl });
+    } catch (error) {
+        console.error("Ошибка при создании платежа:", error);
+        res.status(500).json({ error: "Не удалось инициировать оплату" });
+    }
+});
+
+router.post("/order/callback", async (req, res) => {
+    const { OrderId, Status, Token } = req.body;
+
+    // Здесь должна быть проверка подписи Token
+    const isValid = validateTinkoffToken(req.body); // реализация зависит от твоего пароля
+    if (!isValid) return res.status(403).send("Invalid token");
+
+    try {
+        if (Status === "CONFIRMED") {
+            await db.query(
+                "UPDATE orders SET status = 'pending' WHERE id = ?",
+                [OrderId]
+            );
+        }
+        res.send("OK");
+    } catch (err) {
+        console.error("Ошибка при обработке колбэка:", err);
+        res.status(500).send("Server error");
+    }
+});
+
 
 module.exports = router;

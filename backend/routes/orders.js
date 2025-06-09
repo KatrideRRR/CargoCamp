@@ -77,6 +77,18 @@ module.exports = (io) => {
         let parsedPromotion = {};
         console.log(req.body); // Посмотреть входящие данные
 
+        const PROMOTION_PRICES = {
+            highlight: 50,
+            recommended: 100,
+            push: 150,
+        };
+
+        try {
+            parsedPromotion = JSON.parse(req.body.promotion || "{}");
+        } catch (e) {
+            console.error("Ошибка парсинга promotion:", e);
+        }
+
         try {
             parsedPromotion = JSON.parse(req.body.promotion || "{}");
         } catch (e) {
@@ -103,6 +115,16 @@ module.exports = (io) => {
 
             const paymentType = Array.isArray(req.body.paymentType) ? req.body.paymentType[0] : req.body.paymentType;
 
+            // 🧠 Вычисляем стоимость продвижения
+            const promotionTotal = Object.entries(parsedPromotion).reduce(
+                (sum, [key, enabled]) =>
+                    enabled && PROMOTION_PRICES[key] ? sum + PROMOTION_PRICES[key] : sum,
+                0
+            );
+
+            // 🟡 Выбираем статус: если есть стоимость — ждем оплаты
+            const status = promotionTotal > 0 ? 'pending_payment' : 'pending';
+
             const newOrder = await Order.create({
                 userId,
                 address,
@@ -113,7 +135,7 @@ module.exports = (io) => {
                 createdAt: new Date().toISOString(),
                 images: photoUrls,  // Сохраняем массив ссылок на фото
                 creatorId: userId,
-                status: 'pending',
+                status,
                 categoryId,
                 subcategoryId,
                 serviceId: serviceId && serviceId !== '0' ? serviceId : null,
@@ -121,6 +143,7 @@ module.exports = (io) => {
                 is_highlighted: parsedPromotion.highlight ?? false,
                 is_recommended: parsedPromotion.recommended ?? false,
                 is_push_notified: parsedPromotion.push ?? false,
+                promotionCost: promotionTotal, // если есть такое поле в модели
 
             });
 

@@ -22,7 +22,7 @@ module.exports = (sequelize) => {
             proposedSum: { type: DataTypes.INTEGER, allowNull: true },
             coordinates: { type: DataTypes.STRING, allowNull: true },
             userId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'users', key: 'id' } },
-            status: { type: DataTypes.ENUM('pending', 'active', 'completed', 'expired'), defaultValue: 'pending' },
+            status: { type: DataTypes.ENUM('pending', 'active', 'completed', 'expired', 'pending_payment'), defaultValue: 'pending' },
             executorId: { type: DataTypes.INTEGER, allowNull: true },
             creatorId: { type: DataTypes.INTEGER, allowNull: false },
             completedBy: { type: DataTypes.JSON, allowNull: false, defaultValue: [] },
@@ -79,7 +79,12 @@ module.exports = (sequelize) => {
                 type: DataTypes.INTEGER,
                 allowNull: true,
                 references: { model: 'services', key: 'id' }
-            }
+            },
+            promotionCost: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+                defaultValue: 0,
+            },
 
         },
         {
