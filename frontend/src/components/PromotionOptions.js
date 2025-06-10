@@ -38,13 +38,11 @@ export default function PromotionOptions({ value, onChange }) {
             <h3 className="text-lg font-semibold mb-4">Продвижение заказа (необязательно)</h3>
             <div className="space-y-3">
                 {options.map((opt) => (
-                    <label key={opt.id} className="flex items-center cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={!!value[opt.id]}
-                            onChange={() => handleToggle(opt.id)}
-                            className="mr-2 accent-primary"
-                        />
+                    <div
+                        key={opt.id}
+                        className="flex items-center gap-2 w-fit"
+                    >
+
                         <div className="flex items-center">
                             {opt.icon}
                             <span>
@@ -53,8 +51,14 @@ export default function PromotionOptions({ value, onChange }) {
                   +{PROMOTION_PRICES[opt.id]} ₽
                 </span>
               </span>
+                            <input
+                                type="checkbox"
+                                checked={!!value[opt.id]}
+                                onChange={() => handleToggle(opt.id)}
+                                className="mr-2 accent-primary"
+                            />
                         </div>
-                    </label>
+                    </div>
                 ))}
             </div>
         </div>
