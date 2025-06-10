@@ -45,6 +45,22 @@ const OrderHistoryPage = () => {
         }
     };
 
+    const handlePay = async (orderId) => {
+        try {
+            const response = await axiosInstance.post(`/payment/pay-pending/${orderId}`);
+            const { paymentUrl } = response.data;
+            if (paymentUrl) {
+                window.location.href = paymentUrl; // редирект на оплату
+            } else {
+                alert('Не удалось получить ссылку на оплату');
+            }
+        } catch (error) {
+            console.error('Ошибка при оплате:', error);
+            alert('Ошибка при попытке оплаты');
+        }
+    };
+
+
     if (loading) return <div className="loading-message">Загрузка истории заказов...</div>;
     if (error) return <div className="error-message">Ошибка: {error}</div>;
 
@@ -66,7 +82,12 @@ const OrderHistoryPage = () => {
                                         <p><strong>Адрес:</strong> {order.address}</p>
                                         <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
                                         <p>
-                                            <strong>Статус:</strong> {order.status === 'expired' ? 'Просрочен' : 'Завершён'}
+                                            <strong>Статус:</strong>{' '}
+                                            {order.status === 'expired'
+                                                ? 'Просрочен'
+                                                : order.status === 'pending_payment'
+                                                    ? 'Ожидает оплаты'
+                                                    : 'Завершён'}
                                         </p>
                                         <p><strong>ID создателя:</strong> {order.creatorId}</p>
                                         <p><strong>ID исполнителя:</strong> {order.executorId}</p>
@@ -80,6 +101,15 @@ const OrderHistoryPage = () => {
                                             >
                                                 Скачать договор (PDF)
                                             </a>
+                                        )}
+
+                                        {order.status === 'pending_payment' && (
+                                            <button
+                                                onClick={() => handlePay(order.id)}
+                                                className="pay-button"
+                                            >
+                                                Оплатить и разместить
+                                            </button>
                                         )}
 
                                         {/* 👇 Кнопка восстановить только для expired заказов */}

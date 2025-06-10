@@ -314,6 +314,40 @@ router.post("/start", async (req, res) => {
     }
 });
 
+router.post('/pay-pending/:orderId', async (req, res) => {
+    const { orderId } = req.params;
+
+    try {
+        const order = await Order.findByPk(orderId);
+
+        if (!order) {
+            return res.status(404).json({ message: 'Заказ не найден' });
+        }
+
+        if (order.status !== 'pending_payment') {
+            return res.status(400).json({ message: 'Заказ не ожидает оплаты' });
+        }
+
+        const amount = order.promotionCost;
+        if (!amount || amount <= 0) {
+            return res.status(400).json({ message: 'Продвижение не требуется' });
+        }
+
+        const paymentUrl = await createPayment({
+            amount,
+            orderId,
+            successURL: `${process.env.FRONTEND_URL}/orders`,
+            failURL: `${process.env.FRONTEND_URL}/payment-fail`,
+            notificationURL: `${process.env.BACKEND_URL}/order/callback`,
+        });
+
+        res.json({ paymentUrl });
+    } catch (error) {
+        console.error('Ошибка при создании оплаты для pending_payment:', error);
+        res.status(500).json({ message: 'Ошибка при создании оплаты' });
+    }
+});
+
 router.post("/order/callback", async (req, res) => {
     const { OrderId, Status, Token } = req.body;
 

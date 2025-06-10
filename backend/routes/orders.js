@@ -158,18 +158,6 @@ module.exports = (io) => {
 
     router.get('/all', async (req, res) => {
         try {
-            // Удаляем старые заказы, не взятые в работу (старше 24 часов)
-            await Order.destroy({
-                where: {
-                    status: 'pending',
-                    createdAt: {
-                        [Sequelize.Op.lt]: moment().subtract(24, 'hours').toDate(),
-                    },
-                },
-            });
-
-            console.log("✅ Старые заказы удалены");
-
             // Фильтрация по категории и подкатегории
             const { categoryId, subcategoryId, serviceId } = req.query;
             const whereClause = { status: 'pending' };
@@ -742,7 +730,7 @@ module.exports = (io) => {
             const completedOrders = await Order.findAll({
                 where: {
                     status: {
-                        [Op.in]: ['completed', 'expired'], // ⬅️ Теперь ищем оба статуса
+                        [Op.in]: ['completed', 'expired', 'pending_payment'], // ⬅️ Теперь ищем оба статуса
                     },
                     [Op.or]: [
                         { creatorId: userId },  // Заказчик

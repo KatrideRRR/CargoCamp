@@ -9,6 +9,18 @@
         overflow-y: auto;
         margin-bottom: 70px;
     }
+    .pay-button {
+        background-color: #28a745;
+        color: white;
+        padding: 8px 14px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-top: 8px;
+    }
+    .pay-button:hover {
+        background-color: #218838;
+    }
 
     .contentWrapper {
         width: 100%;
