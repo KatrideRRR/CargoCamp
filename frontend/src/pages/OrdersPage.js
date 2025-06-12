@@ -52,7 +52,7 @@ const OrdersPage = () => {
     };
 
     const getVisibleOrders = () => {
-        return orders.filter(order => {
+        return filteredOrders.filter(order => {
             if (activeTab === 'all') {
                 return !order.is_recommended && !order.taxi_courier;
             }
@@ -171,6 +171,13 @@ const OrdersPage = () => {
         }
     };
 
+    useEffect(() => {
+        const storedCoords = localStorage.getItem("manualCoords");
+        if (storedCoords) {
+            setUserLocation(JSON.parse(storedCoords));
+        }
+    }, []);
+
     const geocodeAddress = async (address) => {
         try {
             const response = await fetch(
@@ -183,27 +190,13 @@ const OrdersPage = () => {
             const [longitude, latitude] = pos.split(" ").map(Number);
             console.log("📍 Координаты введенного адреса:", latitude, longitude);
             setUserLocation({ latitude, longitude });
+            localStorage.setItem("manualCoords", JSON.stringify({ latitude, longitude }));
+            applyFilters(selectedCategory, selectedSubcategory, selectedService); // 🔧 вызов после установки локации
         } catch (error) {
             console.error("❌ Ошибка геокодинга:", error);
             alert("Не удалось определить координаты по адресу");
         }
     };
-
-    useEffect(() => {
-        if (userLocation && filteredByCategory.length > 0) {
-            const filtered = filteredByCategory.filter((order) => {
-                if (!order.latitude || !order.longitude) return false;
-                const distance = getDistanceFromLatLonInKm(
-                    userLocation.latitude,
-                    userLocation.longitude,
-                    order.latitude,
-                    order.longitude
-                );
-                return distance <= 50;
-            });
-            setFilteredOrders(filtered);
-        }
-    }, [userLocation, filteredByCategory]);
 
     const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
         const R = 6371; // Радиус Земли в км
@@ -221,6 +214,8 @@ const OrdersPage = () => {
 
     useEffect(() => {
         const fetchOrders = async () => {
+            applyFilters(selectedCategory, selectedSubcategory, selectedService);
+
             try {
                 const response = await axiosInstance.get('/orders/all');
                 console.log("📦 Загружены заказы:", response.data);
@@ -335,23 +330,56 @@ const OrdersPage = () => {
                 }
             });
 
-            const categoryFiltered = response.data;
-            setOrders(categoryFiltered);
-            setFilteredByCategory(categoryFiltered);
+            const allOrders = response.data;
+            setOrders(allOrders);
+            setFilteredByCategory(allOrders); // для других фильтров
+            const categoryFiltered = allOrders; // если никаких фильтров по категориям не применял
+
+            if (!userLocation) {
+                console.log("⚠️ userLocation ещё нет — фильтрация без гео");
+                setFilteredOrders(categoryFiltered);
+                return;
+            }
 
             if (userLocation) {
-                const geoFiltered = categoryFiltered.filter(order => {
-                    if (!order.latitude || !order.longitude) return false;
-                    const distance = getDistanceFromLatLonInKm(
-                        userLocation.latitude,
-                        userLocation.longitude,
-                        order.latitude,
-                        order.longitude
-                    );
-                    return distance <= 50;
-                });
+                console.log("📍 Фильтрация по гео. userLocation:", userLocation);
+
+                const geoFiltered = categoryFiltered
+                    .map(order => {
+                        const [lat, lon] = order.coordinates?.split(',')?.map(Number) || [];
+
+                        if (!lat || !lon) {
+                            console.warn(`❌ Координаты невалидны для заказа #${order.id}`);
+                            return null;
+                        }
+
+                        const distance = getDistanceFromLatLonInKm(
+                            userLocation.latitude,
+                            userLocation.longitude,
+                            lat,
+                            lon
+                        );
+
+                        console.log(`✅ Заказ #${order.id} — расстояние: ${distance.toFixed(2)} км`);
+
+                        return {
+                            ...order,
+                            latitude: lat,
+                            longitude: lon,
+                            _distance: distance,
+                        };
+                    })
+                    .filter(order => {
+                        const valid = order && order._distance <= 50;
+                        if (!valid) console.log(`⛔ Исключён заказ #${order?.id} — ${order?._distance?.toFixed(1)} км`);
+                        return valid;
+                    })
+                    .sort((a, b) => a._distance - b._distance);
+
+                console.log("📦 После фильтрации:", geoFiltered.length, "шт.");
                 setFilteredOrders(geoFiltered);
             } else {
+                console.log("⚠️ userLocation отсутствует, не фильтруем");
                 setFilteredOrders(categoryFiltered);
             }
 
@@ -359,6 +387,20 @@ const OrdersPage = () => {
             console.error("❌ Ошибка фильтрации заказов:", error);
         }
     };
+
+    useEffect(() => {
+        if (!userLocation) return;
+        console.log("🌍 userLocation установлен:", userLocation);
+    }, [userLocation]);
+
+    useEffect(() => {
+        applyFilters(selectedCategory, selectedSubcategory, selectedService);
+
+        if (orders.length && userLocation) {
+            console.log("📡 Вызов applyFilters после получения координат");
+            applyFilters(selectedCategory, selectedSubcategory, selectedService);
+        }
+    }, [userLocation, selectedCategory, selectedSubcategory, selectedService]);
 
     const handleRequestOrder = async (orderId) => {
         const token = localStorage.getItem('authToken');
@@ -418,6 +460,8 @@ const OrdersPage = () => {
     });
 
     console.log(userId);
+    console.log("🟢 getVisibleOrders:", getVisibleOrders().length);
+
     return (
         <div className="all-orders">
 
