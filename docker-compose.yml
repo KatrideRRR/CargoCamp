@@ -24,7 +24,7 @@ services:
     ports:
       - "5001:5001"
     depends_on:
-      - db
+      - mysql
     env_file:
       - ./backend/.env
     environment:
