@@ -15,8 +15,8 @@ services:
     volumes:
       - cargo_camp_mysql_data:/var/lib/mysql
     networks:
-      - cargo_camp_net
-      -
+      cargo_camp_net:
+
   backend:
     build: ./backend
     container_name: cargo_camp_backend
