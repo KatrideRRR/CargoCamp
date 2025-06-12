@@ -48,6 +48,7 @@ const ExpressOrderPage = () => {
             await axiosInstance.post('/orders/express', {
                 ...form,
                 type,
+                address: form.from,
             });
             alert('✅ Заказ успешно создан!');
         } catch (err) {

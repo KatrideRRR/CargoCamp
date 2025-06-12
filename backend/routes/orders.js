@@ -779,15 +779,23 @@ module.exports = (io) => {
 
     router.post('/express', authenticateToken, async (req, res) => {
         try {
-            const { type, from, to, description, proposedSum, paymentType, subcategory } = req.body;
+            const { address, to, description, proposedSum, paymentType, subcategory, type } = req.body;
 
-            if (!type || !from || !to || !paymentType) {
+            if (!type || !address || !to || !paymentType) {
                 return res.status(400).json({ message: 'Не все обязательные поля заполнены' });
             }
 
-            const userId = req.user.id;
+            // Геокодируем только адрес "откуда"
+            const geoData = await geocoder.geocode(address);
+            if (!geoData.length) {
+                return res.status(404).json({ message: 'Адрес (откуда) не найден' });
+            }
 
-            const address = `${from} → ${to}`;
+            const { latitude, longitude } = geoData[0];
+            const coordinates = `${latitude},${longitude}`;
+
+            const userId = req.user.id;
+            const fullAddress = `${address} → ${to}`;
             const categoryName = type === 'taxi' ? 'Такси' : 'Курьер';
             const category = await Category.findOne({ where: { name: categoryName } });
 
@@ -802,7 +810,8 @@ module.exports = (io) => {
             }
 
             const newOrder = await Order.create({
-                address,
+                address: fullAddress,
+                coordinates,
                 description,
                 proposedSum,
                 paymentType,
