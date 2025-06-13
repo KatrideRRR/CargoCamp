@@ -27,7 +27,8 @@ services:
       - ./backend/.env
     environment:
       DB_HOST: mysql
-    command: ["/wait-for-it.sh", "db:3306", "--", "npm", "start"]
+    command: [ "/wait-for-it.sh", "mysql:3306", "--", "npm", "start" ]
+
 
   frontend:
     build: ./frontend
