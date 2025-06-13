@@ -28,7 +28,8 @@ services:
     environment:
       DB_HOST: mysql
     command: [ "/wait-for-it.sh", "mysql:3306", "--", "npm", "start" ]
-
+    networks:
+      - cargo_camp_net
 
   frontend:
     build: ./frontend
@@ -43,6 +44,8 @@ services:
     environment:
       REACT_APP_API_URL: backend:5001
       REACT_APP_SOCKET_URL: backend:5001
+    networks:
+      - cargo_camp_net
 
   admin-panel:
     build: ./admin-panel
@@ -57,6 +60,8 @@ services:
     environment:
       REACT_APP_API_URL: backend:5001
       REACT_APP_SOCKET_URL: backend:5001
+    networks:
+      - cargo_camp_net
 
 volumes:
   cargo_camp_mysql_data:
