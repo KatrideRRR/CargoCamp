@@ -16,7 +16,7 @@ async function processPayment(userId, amount) {
             Description: "Привязка карты",
             CustomerKey:`user_${userId}`,
             Recurrent: "Y",
-            NotificationURL: `https://18.184.43.44:5001/api/payment/callback`,
+            NotificationURL: `https://cargocamp.ru/api/payment/callback`,
             Receipt: {
                 Email: "test@example.com",
                 Taxation: "usn_income",
