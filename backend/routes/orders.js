@@ -52,14 +52,16 @@ const geocoder = NodeGeocoder({
 
 module.exports = (io) => {
 
-    router.post('/orders/:id/restore', async (req, res) => {
+    router.post('/orders/:id/restore', authenticateToken, async (req, res) => {
         const { id } = req.params;
 
         try {
             const order = await Order.findByPk(id);
-            if (!order || order.status !== 'expired') {
-                return res.status(404).json({ success: false, error: 'Заказ не найден или не может быть восстановлен' });
+            if (!order) {
+                return res.status(404).json({ success: false, error: 'Заказ не найден' });
             }
+            console.log('order.status:', order.status);
+
 
             order.status = 'pending';
             await order.save();
