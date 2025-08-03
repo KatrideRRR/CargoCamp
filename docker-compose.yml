@@ -30,6 +30,8 @@ services:
     command: [ "/wait-for-it.sh", "mysql:3306", "--", "npm", "start" ]
     networks:
       - cargo_camp_net
+    volumes:
+      - ./uploads:/app/uploads
 
   frontend:
     build: ./frontend

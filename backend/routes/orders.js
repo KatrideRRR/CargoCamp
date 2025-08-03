@@ -57,11 +57,9 @@ module.exports = (io) => {
 
         try {
             const order = await Order.findByPk(id);
-            if (!order) {
-                return res.status(404).json({ success: false, error: 'Заказ не найден' });
+            if (!order || order.status !== 'expired') {
+                return res.status(404).json({ success: false, error: 'Заказ не найден или не может быть восстановлен' });
             }
-            console.log('order.status:', order.status);
-
 
             order.status = 'pending';
             await order.save();

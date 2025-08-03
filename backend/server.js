@@ -30,7 +30,7 @@ app.use(bodyParser.json());
 app.use('/api/orders', orderRoutes(io));
 app.use('/api/auth', authRoutes);
 app.use('/api/messages', messagesRoutes);
-app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/category', categoryRouter);
 app.use('/api/admin', adminRoutes);
 app.use("/api/payment", payment);
@@ -60,10 +60,6 @@ app.post('/api/token', (req, res) => {
 sequelize.authenticate()
     .then(() => console.log())
     .catch((err) => console.error('Database connection error:', err));
-
-sequelize.sync()
-    .then(() => console.log())
-    .catch(err => console.error('Error synchronizing database:', err));
 
 const PORT = process.env.PORT;
 
