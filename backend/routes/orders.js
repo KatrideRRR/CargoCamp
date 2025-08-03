@@ -52,7 +52,7 @@ const geocoder = NodeGeocoder({
 
 module.exports = (io) => {
 
-    router.post('/orders/:id/restore', authenticateToken, async (req, res) => {
+    router.post('/orders/:id/restore', async (req, res) => {
         const { id } = req.params;
 
         try {
