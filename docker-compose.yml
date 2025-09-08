@@ -5,8 +5,7 @@ services:
     build: ./backend
     container_name: cargo_camp_backend
     restart: always
-    ports:
-      - "5001:5001"
+    network_mode: "host"   # вот ключевое изменение
     env_file:
       - ./backend/.env
     environment:
