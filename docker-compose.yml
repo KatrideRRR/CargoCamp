@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   backend:
     build: ./backend
@@ -13,8 +11,6 @@ services:
       DB_USER: root            # поменяй на своего пользователя
       DB_PASSWORD: root        # поменяй на пароль
       DB_NAME: cargo_camp
-    networks:
-      - cargo_camp_net
     volumes:
       - ./uploads:/app/uploads
     command: ["npm", "start"]
