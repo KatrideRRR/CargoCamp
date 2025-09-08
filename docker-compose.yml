@@ -10,7 +10,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      DB_HOST: localhost       # теперь указываем локальную MySQL
+      DB_HOST: host.docker.internal  # обязательно сервер хост
       DB_USER: root            # поменяй на своего пользователя
       DB_PASSWORD: root        # поменяй на пароль
       DB_NAME: cargo_camp
