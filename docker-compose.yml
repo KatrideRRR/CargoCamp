@@ -10,12 +10,15 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      DB_HOST: mysql
-    command: [ "/wait-for-it.sh", "mysql:3306", "--", "npm", "start" ]
+      DB_HOST: localhost       # теперь указываем локальную MySQL
+      DB_USER: root            # поменяй на своего пользователя
+      DB_PASSWORD: root        # поменяй на пароль
+      DB_NAME: cargo_camp
     networks:
       - cargo_camp_net
     volumes:
       - ./uploads:/app/uploads
+    command: ["npm", "start"]
 
   frontend:
     build: ./frontend
@@ -23,13 +26,11 @@ services:
     restart: always
     ports:
       - "3001:80"
-    depends_on:
-      - backend
     env_file:
       - ./frontend/.env
     environment:
-      REACT_APP_API_URL: backend:5001
-      REACT_APP_SOCKET_URL: backend:5001
+      REACT_APP_API_URL: http://localhost:5001
+      REACT_APP_SOCKET_URL: http://localhost:5001
     networks:
       - cargo_camp_net
 
@@ -39,18 +40,13 @@ services:
     restart: always
     ports:
       - "8080:8080"
-    depends_on:
-      - backend
     env_file:
       - ./admin-panel/.env
     environment:
-      REACT_APP_API_URL: backend:5001
-      REACT_APP_SOCKET_URL: backend:5001
+      REACT_APP_API_URL: http://localhost:5001
+      REACT_APP_SOCKET_URL: http://localhost:5001
     networks:
       - cargo_camp_net
-
-volumes:
-  cargo_camp_mysql_data:
 
 networks:
   cargo_camp_net:
