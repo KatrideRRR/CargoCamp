@@ -10,7 +10,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      DB_HOST: host.docker.internal  # обязательно сервер хост
+      DB_HOST: 172.19.0.1
       DB_USER: root            # поменяй на своего пользователя
       DB_PASSWORD: root        # поменяй на пароль
       DB_NAME: cargo_camp
