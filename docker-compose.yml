@@ -1,37 +1,24 @@
 version: '3.9'
 
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: cargo_camp_db
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: cargo_camp
-    ports:
-      - "3306:3306"
-    volumes:
-      - cargo_camp_mysql_data:/var/lib/mysql
-    networks:
-      cargo_camp_net:
-
   backend:
     build: ./backend
     container_name: cargo_camp_backend
     restart: always
     ports:
       - "5001:5001"
-    depends_on:
-      - mysql
     env_file:
       - ./backend/.env
     environment:
-      DB_HOST: mysql
-    command: [ "/wait-for-it.sh", "mysql:3306", "--", "npm", "start" ]
+      DB_HOST: localhost       # теперь указываем локальную MySQL
+      DB_USER: root            # поменяй на своего пользователя
+      DB_PASSWORD: root        # поменяй на пароль
+      DB_NAME: cargo_camp
     networks:
       - cargo_camp_net
     volumes:
       - ./uploads:/app/uploads
+    command: ["npm", "start"]
 
   frontend:
     build: ./frontend
@@ -39,13 +26,11 @@ services:
     restart: always
     ports:
       - "3001:80"
-    depends_on:
-      - backend
     env_file:
       - ./frontend/.env
     environment:
-      REACT_APP_API_URL: backend:5001
-      REACT_APP_SOCKET_URL: backend:5001
+      REACT_APP_API_URL: http://localhost:5001
+      REACT_APP_SOCKET_URL: http://localhost:5001
     networks:
       - cargo_camp_net
 
@@ -55,18 +40,13 @@ services:
     restart: always
     ports:
       - "8080:8080"
-    depends_on:
-      - backend
     env_file:
       - ./admin-panel/.env
     environment:
-      REACT_APP_API_URL: backend:5001
-      REACT_APP_SOCKET_URL: backend:5001
+      REACT_APP_API_URL: http://localhost:5001
+      REACT_APP_SOCKET_URL: http://localhost:5001
     networks:
       - cargo_camp_net
-
-volumes:
-  cargo_camp_mysql_data:
 
 networks:
   cargo_camp_net:
