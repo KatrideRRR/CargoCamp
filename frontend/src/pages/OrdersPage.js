@@ -710,25 +710,117 @@ const OrdersPage = () => {
                         contentLabel="Full Image Modal"
                         className="custom-modal"
                         overlayClassName="custom-modal-overlay"
+                        parentSelector={() => document.body}
+                        style={{
+                            overlay: {
+                                zIndex: 99999,
+                                position: 'fixed',
+                                inset: 0,
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                backgroundColor: 'rgba(0,0,0,0.6)',
+                            },
+                            content: {
+                                position: 'relative',
+                                inset: 'auto',
+                                background: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: 0,
+                                maxWidth: '90vw',
+                                maxHeight: '90vh',
+                                overflow: 'hidden',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                            },
+                        }}
                     >
-                        <div className="custom-modal-content">
-                            {/* Кнопка закрытия */}
-                            <button onClick={closeModal} className="custom-close-button">✖</button>
+                        {/* Кнопка закрытия */}
+                        <button
+                            onClick={closeModal}
+                            style={{
+                                position: 'absolute',
+                                top: 10,
+                                right: 10,
+                                background: 'rgba(0,0,0,0.5)',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: 36,
+                                height: 36,
+                                cursor: 'pointer',
+                                color: '#fff',
+                                fontSize: 22,
+                                lineHeight: '36px',
+                                textAlign: 'center',
+                            }}
+                        >
+                            ×
+                        </button>
 
-                            {/* Изображение */}
-                            <img
-                                src={`${apiUrl}${currentImages[currentImageIndex]}`}
-                                alt="Full-size view"
-                                className="custom-modal-image"
-                            />
+                        {/* Кнопка "влево" */}
+                        <button
+                            onClick={() =>
+                                setCurrentImageIndex(
+                                    (prev) => (prev === 0 ? currentImages.length - 1 : prev - 1)
+                                )
+                            }
+                            style={{
+                                position: 'absolute',
+                                left: 10,
+                                background: 'rgba(0,0,0,0.4)',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: 40,
+                                height: 40,
+                                color: '#fff',
+                                fontSize: 24,
+                                cursor: 'pointer',
+                            }}
+                        >
+                            ‹
+                        </button>
 
-                            {/* Кнопки переключения */}
-                            <div className="custom-image-navigation">
-                                <button onClick={prevImage} className="custom-nav-button">◀</button>
-                                <button onClick={nextImage} className="custom-nav-button">▶</button>
-                            </div>
-                        </div>
+                        {/* Изображение */}
+                        <img
+                            src={`${apiUrl}${currentImages[currentImageIndex]}`}
+                            alt="full"
+                            style={{
+                                width: '100%',
+                                height: 'auto',
+                                maxHeight: '90vh',
+                                objectFit: 'contain',
+                                borderRadius: '8px',
+                                boxShadow: '0 0 12px rgba(0,0,0,0.4)',
+                            }}
+                        />
+
+                        {/* Кнопка "вправо" */}
+                        <button
+                            onClick={() =>
+                                setCurrentImageIndex(
+                                    (prev) => (prev === currentImages.length - 1 ? 0 : prev + 1)
+                                )
+                            }
+                            style={{
+                                position: 'absolute',
+                                right: 10,
+                                background: 'rgba(0,0,0,0.4)',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: 40,
+                                height: 40,
+                                color: '#fff',
+                                fontSize: 24,
+                                cursor: 'pointer',
+                            }}
+                        >
+                            ›
+                        </button>
                     </Modal>
+
+
 
                 </div>
             </div>

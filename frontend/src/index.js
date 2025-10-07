@@ -21,6 +21,10 @@ import MyOrdersPage from './pages/MyOrdersPage';
 import StartPage from './pages/StartPage';
 import ExpressOrderPage from "./pages/ExpressOrderPage";
 import Modal from "react-modal";
+
+Modal.setAppElement = function (s) {
+
+};
 Modal.setAppElement('#root'); // Указываем корневой элемент
 
 const App = () => {

@@ -52,7 +52,7 @@ const geocoder = NodeGeocoder({
 
 module.exports = (io) => {
 
-    router.post('/orders/:id/restore', authenticateToken, async (req, res) => {
+    router.post('/:id/restore', authenticateToken, async (req, res) => {
         const { id } = req.params;
 
         try {
@@ -62,9 +62,14 @@ module.exports = (io) => {
             }
 
             order.status = 'pending';
-            await order.save();
+            order.createdAt = new Date();
 
+            await Order.update(
+                { status: 'pending', createdAt: new Date(), updatedAt: new Date() },
+                { where: { id } }
+            );
             res.json({ success: true, message: 'Заказ восстановлен' });
+
         } catch (error) {
             console.error("Ошибка при восстановлении заказа:", error);
             res.status(500).json({ success: false, error: 'Ошибка сервера' });
