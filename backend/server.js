@@ -1,10 +1,20 @@
-require('dotenv').config();
+const path = require('path');
+const fs = require('fs');
+const dotenv = require('dotenv');
+
+// Определяем, какой env-файл подгрузить
+const envFile = fs.existsSync(path.resolve(__dirname, '.env.local'))
+    ? '.env.local'
+    : '.env';
+
+dotenv.config({ path: path.resolve(__dirname, envFile) });
+console.log(`✅ Загружен файл окружения: ${envFile}`);
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const http = require('http');
 const jwt = require('jsonwebtoken');
-const path = require('path');
 
 const { initializeSocket } = require('./socket'); // Импортируем инициализацию WebSocket
 const orderRoutes = require('./routes/orders');
