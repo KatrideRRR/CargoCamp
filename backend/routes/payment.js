@@ -237,7 +237,7 @@ router.post("/init_premium_payment", authenticateToken, async (req, res) => {
         OrderId: `premium_${userId}_${Date.now()}`,
         Description: descriptions[duration],
         CustomerKey: `user_${userId}`,
-        NotificationURL: "https://cargocamp.ru/api/payment/premium_callback"
+        NotificationURL: "https://localhost:5000/api/payment/premium_callback"
     };
 
     params.Token = generateToken(params);
