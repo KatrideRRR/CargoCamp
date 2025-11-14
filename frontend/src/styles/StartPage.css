@@ -5,6 +5,46 @@
     box-sizing: border-box;
 }
 
+
+.start-page-container {
+    display: flex;
+    flex-direction: column; /* Контент + футер по вертикали */
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 24px;
+    background: linear-gradient(to bottom right, #e8f0ff, #ffffff);
+}
+
+.start-page-content {
+    max-width: 400px;
+    width: 100%;
+    text-align: center;
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+    animation: fadeInUp 0.8s ease-out forwards;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.legal-buttons {
+    margin-top: 35px;
+    display: flex;
+    flex-direction: column; /* Кнопки одна под другой */
+    gap: 12px;
+    align-items: center;
+}
+
+.footer {
+    width: 100%;
+    text-align: center;
+    margin-top: 20px; /* Отступ от кнопок */
+    font-size: 0.875rem;
+    color: #6b7280;
+    opacity: 0.9;
+    line-height: 1.5;
+}
 body {
     margin: 0;
     font-family: 'Inter', sans-serif;
@@ -102,4 +142,137 @@ body {
     font-size: 0.875rem;
     color: #6b7280;
     margin: 0;
+}
+
+/* --- Добавленные стили для модалок, кнопок и футера --- */
+
+/* Кнопки открытия модалок */
+.legal-buttons {
+    margin-top: 35px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+}
+
+.legal-link {
+    padding: 10px 20px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    font-size: 0.95rem;
+    color: #1f2937;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.legal-link:hover {
+    background: rgba(255, 255, 255, 0.75);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+/* Модалки */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    animation: fadeIn 0.25s ease;
+}
+
+.modal-window {
+    background: #ffffff;
+    color: #111;
+    padding: 25px;
+    border-radius: 18px;
+    width: 90%;
+    max-width: 650px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 36px rgba(0,0,0,0.18);
+    animation: scaleIn 0.25s ease;
+}
+
+.modal-content {
+    margin-top: 15px;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    text-align: left;
+}
+
+.modal-content h2,
+.modal-content h3,
+.modal-content h4 {
+    color: #1f2937;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.modal-content p, .modal-content li {
+    color: #4b5563;
+    margin-bottom: 0.75rem;
+}
+
+.modal-content ul {
+    padding-left: 20px;
+}
+
+.modal-close {
+    width: 100%;
+    margin-top: 20px;
+    padding: 12px 0;
+    border: none;
+    background: #1f2937;
+    color: #fff;
+    border-radius: 10px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.modal-close:hover {
+    background: #374151;
+}
+
+/* Анимации */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+    from { transform: scale(0.92); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+
+/* Адаптив */
+@media (max-width: 480px) {
+    .modal-window {
+        width: 95%;
+        padding: 20px;
+        max-height: 85vh;
+    }
+
+    .modal-content {
+        font-size: 0.9rem;
+    }
+
+    .legal-link {
+        font-size: 0.9rem;
+        padding: 8px 16px;
+    }
+
+    .footer {
+        font-size: 0.8rem;
+        padding: 10px 0;
+    }
 }
