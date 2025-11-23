@@ -1,3 +1,5 @@
+/* global cp */
+
 import React, { useEffect, useState } from 'react';
 import axiosInstance from '../utils/axiosInstance';
 import {Link, useNavigate} from 'react-router-dom';
@@ -39,6 +41,24 @@ const OrdersPage = () => {
     const [activeTab, setActiveTab] = useState('all'); // 'all' | 'courier' | 'urgent'
     const [services, setServices] = useState([]);
     const [selectedService, setSelectedService] = useState('');
+    const [cardInfo, setCardInfo] = useState({ number: '', exp: '', cvv: '' });
+
+    const createCryptogram = async () => {
+        if (!window.cp) throw new Error("CloudPayments не загружен");
+
+        return new Promise((resolve, reject) => {
+            const widget = new window.cp.CloudPayments();
+            widget.createCardCryptogram(
+                {
+                    cardNumber: cardInfo?.number, // если есть локальная форма
+                    expDate: cardInfo?.exp,
+                    cvv: cardInfo?.cvv
+                },
+                (cryptogram) => resolve(cryptogram),
+                (reason) => reject(reason)
+            );
+        });
+    };
 
     const toggleMapVisibility = () => {
         setIsMapVisible(prev => !prev); // Переключить состояние карты
@@ -402,6 +422,43 @@ const OrdersPage = () => {
         }
     }, [userLocation, selectedCategory, selectedSubcategory, selectedService]);
 
+    const handlePayDebt = async () => {
+        const token = localStorage.getItem("authToken");
+        const user = JSON.parse(localStorage.getItem("user"));
+
+        try {
+            let cardCryptogramPacket = null;
+
+            // Если нет сохраненной карты — создаём криптограмму
+            if (!cardInfo) {
+                cardCryptogramPacket = await createCryptogram();
+            }
+
+            const response = await fetch(`${apiUrl}/api/payments/commission/pay-debt`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    userId: user.id,
+                    cardCryptogramPacket
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                alert("Задолженность успешно погашена!");
+            } else {
+                alert(data.error || "Ошибка при оплате долга");
+            }
+        } catch (err) {
+            console.error("Debt pay error:", err);
+            alert("Ошибка сервера при оплате долга");
+        }
+    };
+
     const handleRequestOrder = async (orderId) => {
         const token = localStorage.getItem('authToken');
         if (!token) {
@@ -417,7 +474,9 @@ const OrdersPage = () => {
             });
 
             if (statusResponse.data.has_debt) {
-                alert("У вас есть задолженность по комиссии. Погасите долг, чтобы продолжить работу.");
+                if (window.confirm("У вас есть задолженность по комиссии. Хотите оплатить сейчас?")) {
+                    await handlePayDebt();
+                }
                 return;
             }
 

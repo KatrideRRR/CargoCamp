@@ -19,6 +19,8 @@ const ProfilePage = () => {
     const { logout, isAuthenticated } = useAuth();
     const [cardInfo, setCardInfo] = useState();
     const [showAgreement, setShowAgreement] = useState(false);
+    const [hasDebt, setHasDebt] = useState(false);
+    const [debtAmount, setDebtAmount] = useState(0);
     const getRemainingDays = (expiresAt) => {
         if (!expiresAt) return 0;
         const now = new Date();
@@ -27,6 +29,23 @@ const ProfilePage = () => {
         return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
     };
     const { user } = useAuth();
+
+    const createCryptogram = async () => {
+        if (!window.cp) throw new Error("CloudPayments не загружен");
+
+        return new Promise((resolve, reject) => {
+            const widget = new window.cp.CloudPayments();
+            widget.createCardCryptogram(
+                {
+                    cardNumber: cardInfo?.number, // если есть локальная форма
+                    expDate: cardInfo?.exp,
+                    cvv: cardInfo?.cvv
+                },
+                (cryptogram) => resolve(cryptogram),
+                (reason) => reject(reason)
+            );
+        });
+    };
 
     useEffect(() => {
         let isMounted = true;
@@ -69,6 +88,68 @@ const ProfilePage = () => {
             isMounted = false;
         };
     }, [isAuthenticated, navigate]);
+
+    useEffect(() => {
+        loadDebtStatus();
+    }, []);
+
+    const loadDebtStatus = async () => {
+        const token = localStorage.getItem("authToken");
+
+        try {
+            const response = await axios.get(`${apiUrl}/orders/me/status`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            setHasDebt(response.data.has_debt);
+            setDebtAmount(response.data.debt_amount || 0);
+        } catch (e) {
+            console.error("Ошибка проверки долга:", e);
+        }
+    };
+
+    const handlePayDebt = async () => {
+        const token = localStorage.getItem("authToken");
+        const user = JSON.parse(localStorage.getItem("user"));
+
+        try {
+            let cardCryptogramPacket = null;
+
+            if (!cardInfo) {
+                // если нет сохранённой карты — создаём криптограмму
+                cardCryptogramPacket = await createCryptogram();
+            }
+
+            const response = await fetch(`${apiUrl}/api/payment/commission/pay-debt`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    userId: user.id,
+                    cardCryptogramPacket
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                toast.success("Задолженность успешно погашена!");
+
+                setHasDebt(false);
+                setDebtAmount(0);
+
+                // можно обновить данные о пользователе
+                loadDebtStatus();
+            } else {
+                toast.error(data.error || "Ошибка при оплате долга");
+            }
+        } catch (err) {
+            console.error("Debt pay error:", err);
+            toast.error("Ошибка сервера при оплате долга");
+        }
+    };
 
     const handleBuyPremium = async (duration) => {
         const token = localStorage.getItem("authToken");
@@ -313,6 +394,19 @@ const ProfilePage = () => {
                                                 Привязать карту
                                             </button>
                                         )}
+
+                                        {hasDebt && (
+                                            <div className="debt-box">
+                                                <p className="text-red-600 font-semibold">
+                                                    У вас задолженность по комиссии: {(debtAmount / 100).toFixed(2)} ₽
+                                                </p>
+
+                                                <button className="btn btn-red" onClick={handlePayDebt}>
+                                                    Оплатить задолженность
+                                                </button>
+                                            </div>
+                                        )}
+
                                     </div>
 
 

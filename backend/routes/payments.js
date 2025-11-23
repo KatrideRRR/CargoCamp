@@ -146,6 +146,87 @@ router.post('/commission', authenticateToken, async (req, res) => {
     }
 });
 
+router.post('/commission/pay-debt', authenticateToken, async (req, res) => {
+    try {
+        const { userId, cardCryptogramPacket } = req.body;
+
+        if (!userId)
+            return res.status(400).json({ success: false, error: 'userId обязателен' });
+
+        const user = await User.findByPk(userId);
+        if (!user)
+            return res.status(404).json({ success: false, error: 'Пользователь не найден' });
+
+        const debtKopecks = user.has_debt || 0;
+
+        if (debtKopecks <= 0)
+            return res.json({ success: true, noDebt: true, message: 'Долгов нет' });
+
+        const amountRub = (debtKopecks / 100).toFixed(2);
+
+        let payload;
+        let endpoint;
+
+        // 🔐 Оплата новой картой
+        if (cardCryptogramPacket) {
+            endpoint = '/payments/cards/charge';
+            payload = {
+                Amount: parseFloat(amountRub),
+                Currency: "RUB",
+                AccountId: `pay_debt_${userId}`,
+                Description: `Погашение задолженности пользователя #${userId}`,
+                JsonData: { userId, type: 'has_debt' },
+                CardCryptogramPacket: cardCryptogramPacket
+            };
+        }
+
+        // 💳 Оплата сохранённой картой
+        else {
+            const token = user.cardToken || user.card_token || user.RebillId || null;
+
+            if (!token)
+                return res.status(400).json({ success: false, error: 'Нет сохраненной карты и нет криптограммы' });
+
+            endpoint = '/payments/charge';
+            payload = {
+                Amount: parseFloat(amountRub),
+                Currency: "RUB",
+                AccountId: `pay_debt_${userId}`,
+                Description: `Погашение задолженности пользователя #${userId}`,
+                JsonData: { userId, type: 'has_debt' },
+                Token: token
+            };
+        }
+
+        const resp = await cloudRequest(endpoint, payload);
+
+        if (!resp || resp.Success !== true) {
+            console.error('CloudPayments debt payment failed:', resp);
+            return res.status(400).json({
+                success: false,
+                error: resp?.Message || 'Payment failed',
+                raw: resp
+            });
+        }
+
+        // 🟢 Обнуляем долг
+        user.has_debt = 0;
+        user.commissionDebtOrderId = null;
+        await user.save();
+
+        return res.json({
+            success: true,
+            transactionId: resp.Model?.TransactionId || null,
+            message: 'Долг успешно погашен',
+            raw: resp
+        });
+
+    } catch (err) {
+        console.error('Error /payment/commission/pay-debt:', err);
+        return res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
 router.post('/premium', authenticateToken, async (req, res) => {
     try {
         const { userId, duration, cardCryptogramPacket } = req.body;
