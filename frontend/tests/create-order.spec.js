@@ -33,37 +33,33 @@ test.describe('CreateOrderPage', () => {
 
         await page.goto('/create-order');
 
-        await page.getByPlaceholder('Ключевое слово').fill('Электричество');
         await page.getByPlaceholder('Описание работы').fill('Починить розетку');
         await page.getByPlaceholder('Адрес').fill('Москва, Арбат');
 
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(500);
         const suggestions = await page.locator('.suggestions-list div');
         if (await suggestions.count()) {
-            await suggestions.nth(0).click();
+            await suggestions.first().click();
         }
 
         await page.locator('select').first().selectOption('1');
         await page.locator('select').nth(1).selectOption('2');
         await page.getByPlaceholder('Введите сумму').fill('1500');
-        await page.getByPlaceholder('Выберите дату и время').fill('05/04/2025, 10:45 AM');
-        await page.keyboard.press('ArrowDown');
-        await page.keyboard.press('Enter');
-        await page.getByRole('button', { name: 'Наличные' }).click();
 
-        const filePath = 'tests/assets/sample.jpg';
-        await page.setInputFiles('input[type="file"]', filePath);
+        await page.getByRole('button', { name: /Наличные/ }).click();
+
+        await page.getByRole('textbox', { name: 'Выберите дату и время' }).click();
+        await page.getByRole('option', { name: /November 25th, 2025/i }).click();
+
+        await page.waitForSelector('#date-picker-portal', { state: 'hidden' });
+
+        await page.setInputFiles('input[type="file"]', 'tests/assets/sample.jpg');
 
         await page.evaluate(() => {
             const menu = document.querySelector('.bottom-menu');
             if (menu) menu.style.display = 'none';
         });
 
-        await page.addInitScript(() => {
-            window.alert = () => {}; // Подменяем alert, чтобы он не мешал переходу
-        });
-
         await page.getByRole('button', { name: /Создать заказ/i }).click();
     });
-
 });

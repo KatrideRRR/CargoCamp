@@ -2,7 +2,6 @@ const path = require('path');
 const fs = require('fs');
 const dotenv = require('dotenv');
 
-// Определяем, какой env-файл подгрузить
 const envFile = fs.existsSync(path.resolve(__dirname, '.env.local'))
     ? '.env.local'
     : '.env';
@@ -22,9 +21,15 @@ const authRoutes = require('./routes/auth');
 const messagesRoutes = require('./routes/messages');
 const categoryRouter = require('./routes/category');
 const adminRoutes = require('./routes/admin');
-const payment = require("./routes/payment");
+const payments = require("./routes/payments");
 
 const app = express();
+
+app.use(express.json({
+    verify: (req, res, buf) => {
+        req.rawBody = buf;
+    }
+}));
 
 const server = http.createServer( app);
 
@@ -43,7 +48,7 @@ app.use('/api/messages', messagesRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/category', categoryRouter);
 app.use('/api/admin', adminRoutes);
-app.use("/api/payment", payment);
+app.use("/api/payments", payments);
 app.use('/contracts', express.static(path.join(__dirname, 'contracts')));
 
 // Database connection

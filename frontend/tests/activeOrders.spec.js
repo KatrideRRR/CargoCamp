@@ -1,18 +1,16 @@
 import { test, expect } from '@playwright/test';
-import jwt from 'jsonwebtoken';
-
-const validToken = jwt.sign(
-    { id: 1, role: 'executor', name: 'Тестовый пользователь', exp: Math.floor(Date.now() / 1000) + 60 },
-    'secret'
-);
+import { login } from './utils/auth';
 
 test.describe('ActiveOrdersPage', () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto('about:blank');
-        await page.addInitScript(token => {
-            localStorage.setItem('authToken', token);
-        }, validToken);
 
+        // 🔐 1. ЛОГИН ИЗ ОБЩЕГО МЕТОДА
+        await login(page);
+
+        // 🔗 2. Переход на страницу активных заказов
+        await page.goto('http://localhost:3000/active-orders');
+
+        // 🧰 3. МОКИ ПОСЛЕ ТОГО, КАК ПОЛУЧЕН ТОКЕН
         await page.route('**/api/auth/profile', async route => {
             route.fulfill({
                 status: 200,
@@ -53,7 +51,7 @@ test.describe('ActiveOrdersPage', () => {
             });
         });
 
-        await page.route('**/api/auth/2', route =>
+        await page.route('**/api/auth/2', async route =>
             route.fulfill({
                 status: 200,
                 contentType: 'application/json',
@@ -64,16 +62,19 @@ test.describe('ActiveOrdersPage', () => {
             })
         );
 
-        await page.route('**/test-image.jpg', route =>
+        await page.route('**/test-image.jpg', async route =>
             route.fulfill({
                 status: 200,
-                body: '',
                 headers: { 'Content-Type': 'image/jpeg' },
+                body: '',
             })
         );
 
+        // 🔄 доп. обновление страницы после моков
         await page.goto('http://localhost:3000/active-orders');
     });
+
+    // ---------- ТЕСТЫ ---------- //
 
     test('отображает заказы и разворачивает карточку', async ({ page }) => {
         await expect(page.getByText('Заказ номер 101')).toBeVisible();
@@ -117,15 +118,12 @@ test.describe('ActiveOrdersPage', () => {
                 await page.getByRole('button', { name: /^Отправить$/ }).click();
             })()
         ]);
-
-        expect(request).toBeTruthy(); // 🔥 Проверяем факт вызова запроса
+        expect(request).toBeTruthy();
     });
 
     test('завершение заказа через модалку оценки', async ({ page }) => {
-        // Ожидаем появления модалки и кликаем на кнопку для начала завершения
         await page.getByRole('button', { name: /Завершить/i }).click();
         await page.locator('.star').nth(4).click();
         await page.getByRole('button', { name: /Завершить заказ/i }).click();
     });
-
 });

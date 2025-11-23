@@ -5,7 +5,7 @@ test('Успешный логин', async ({ page }) => {
     await page.goto('http://localhost:3000/login');
 
     // Ввести телефон
-    await page.getByLabel('Телефон:').fill('89786864117'); // Заменить на валидный тестовый номер
+    await page.getByLabel('Телефон:').fill('9780032978'); // Заменить на валидный тестовый номер
 
     // Ввести пароль
     await page.getByLabel('Пароль:').fill('11jan1999'); // Заменить на валидный пароль
@@ -21,7 +21,7 @@ test('Попытка входа заблокированного пользов�
     await page.goto('http://localhost:3000/login');
 
     // Ввести номер и пароль пользователя с ролью "banned"
-    await page.getByLabel('Телефон:').fill('89780434395'); // замените на тестовый номер заблокированного пользователя
+    await page.getByLabel('Телефон:').fill('9780801637'); // замените на тестовый номер заблокированного пользователя
     await page.getByLabel('Пароль:').fill('11jan1999'); // соответствующий пароль
 
     await page.getByRole('button', { name: 'Войти' }).click();
@@ -47,7 +47,7 @@ test('Переход по кнопке "Забыли пароль?"', async ({ p
     await page.goto('http://localhost:3000/login');
 
     // Ввести телефон (если требуется)
-    await page.getByLabel('Телефон:').fill('89786864118');
+    await page.getByLabel('Телефон:').fill('9786864118');
 
     // Клик по кнопке "Забыли пароль?"
     await page.getByRole('button', { name: 'Забыли пароль?' }).click();

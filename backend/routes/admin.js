@@ -43,7 +43,6 @@ router.put('/users/:id/verify', async (req, res) => {
     }
 });
 
-
 router.get('/user-documents/:userId', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { userId } = req.params;

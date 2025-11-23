@@ -1,9 +1,11 @@
+/* global cp */
+
 import { toast } from "react-toastify";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../utils/authContext";
 import axios from "axios";
-import "../styles/ProfilePage.css"; // Импортируем CSS файл
+import "../styles/ProfilePage.css";
 import AgreementModal from "../components/AgreementModal";
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -24,6 +26,7 @@ const ProfilePage = () => {
         const diff = expiration - now;
         return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
     };
+    const { user } = useAuth();
 
     useEffect(() => {
         let isMounted = true;
@@ -67,67 +70,130 @@ const ProfilePage = () => {
         };
     }, [isAuthenticated, navigate]);
 
-    const handleBuyPremium = async (days) => {
+    const handleBuyPremium = async (duration) => {
         const token = localStorage.getItem("authToken");
+        const { data } = await axios.get(`${apiUrl}/api/payments/public-id`);
 
-        try {
-            const response = await axios.post(`${apiUrl}/api/payment/init_premium_payment`, {
-                duration: `${days}d`,
-            }, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+        // серверные цены
+        const prices = { "7d": 2500, "30d": 9000 };
 
-            if (response.data.success) {
-                window.location.href = response.data.PaymentURL; // Перенаправление на оплату
-            } else {
-                toast.error("Ошибка: " + response.data.error);
-            }
-        } catch (error) {
-            console.error("Ошибка при запуске оплаты премиума:", error);
-            toast.error("Ошибка сервера при запуске оплаты");
+        const amount = prices[duration];
+        if (!amount) {
+            console.error("Неверная длительность, amount = undefined");
+            toast.error("Ошибка: неправильный тип премиума");
+            return;
         }
-    };
 
+        const widget = new cp.CloudPayments();
+
+        widget.charge(
+            {
+                publicId: data.publicId,
+                description: `Покупка премиума (${duration})`,
+                amount, // теперь корректно
+                currency: "RUB",
+                accountId: user.id,
+                skin: "mini",
+            },
+            async function (options) {
+                try {
+                    const response = await axios.post(
+                        `${apiUrl}/api/payments/premium`,
+                        {
+                            userId: user.id,
+                            duration,
+                            cardCryptogramPacket: options.cryptogram,
+                        },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+
+                    if (response.data.success) {
+                        toast.success("Премиум успешно оплачен!");
+                    } else {
+                        toast.error(response.data.error);
+                    }
+                } catch (err) {
+                    toast.error("Ошибка сервера");
+                }
+            },
+            () => toast.error("Платёж отменён")
+        );
+    };
 
     const handleBindCard = async () => {
         const token = localStorage.getItem("authToken");
-        try {
-            const response = await axios.post(`${apiUrl}/api/payment/bind-card`, {},{
-                headers: { Authorization: `Bearer ${token}` },
-            } );
 
-            if (response.data.paymentUrl) {
-                window.location.href = response.data.paymentUrl;
-            } else {
-                toast.error("Ошибка при получении ссылки для привязки карты");
+        const { data } = await axios.get(`${apiUrl}/api/payments/public-id`);
+
+        const widget = new cp.CloudPayments();
+
+        widget.charge(
+            {
+                publicId: data.publicId,
+                description: "Привязка карты",
+                amount: 1.00,         // НЕ менять, CloudPayments требует реальный чардж
+                currency: "RUB",
+                accountId: user.id,
+                skin: "mini"
+            },
+            async function (options) {
+                // успешная оплата → есть cryptogram
+                try {
+                    const response = await axios.post(
+                        `${apiUrl}/api/payments/card/bind`,
+                        {
+                            userId: user.id,
+                            cardCryptogramPacket: options.cryptogram
+                        },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+
+                    if (response.data.success) {
+                        toast.success("Карта успешно привязана!");
+                        window.location.reload();
+                    } else {
+                        toast.error(response.data.error);
+                    }
+                } catch (err) {
+                    toast.error("Ошибка привязки карты");
+                    console.error(err);
+                }
+            },
+            function () {
+                toast.error("Привязка отменена пользователем");
             }
-        } catch (error) {
-            toast.error("Ошибка при привязке карты");
-            console.error("Ошибка при привязке карты:", error);
-        }
+        );
     };
 
     const handleUnbindCard = async () => {
         const token = localStorage.getItem("authToken");
+
+        if (!token) {
+            toast.error("Вы не авторизованы");
+            return;
+        }
+
         try {
-            const response = await fetch(`${apiUrl}/api/payment/unbind-card`, {
+            const response = await fetch(`${apiUrl}/api/payments/card/unbind`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                 },
+                body: JSON.stringify({
+                    userId: user.id, // <-- обязательно отправляем userId
+                }),
             });
 
             const result = await response.json();
 
-            console.log(cardInfo);
-
-            if (response.ok) {
+            if (response.ok && result.success) {
                 toast.success("Карта успешно удалена");
+
                 setRebillId(null);
                 setCardInfo(null);
             } else {
-                toast.error(result.message || "Ошибка при удалении карты");
+                toast.error(result.error || result.message || "Ошибка при удалении карты");
             }
         } catch (error) {
             console.error("Ошибка при удалении карты:", error);
@@ -157,10 +223,6 @@ const ProfilePage = () => {
         const fullStar = "★";
         const emptyStar = "☆";
         return fullStar.repeat(Math.round(rating)) + emptyStar.repeat(maxStars - Math.round(rating));
-    };
-
-    const handleCardLinkClick = () => {
-        setShowAgreement(true);
     };
 
     const handleAgree = () => {
@@ -194,7 +256,6 @@ const ProfilePage = () => {
             toast.error("Ошибка загрузки документов");
         }
     };
-
 
     if (loading) {
         return <div className="loading-container">Загрузка данных профиля...</div>;
@@ -248,7 +309,7 @@ const ProfilePage = () => {
                                                 </button>
                                             </div>
                                         ) : (
-                                            <button className="bind-card-button" onClick={handleCardLinkClick}>
+                                            <button className="bind-card-button" onClick={handleBindCard}>
                                                 Привязать карту
                                             </button>
                                         )}
@@ -271,10 +332,10 @@ const ProfilePage = () => {
                                         )}
 
                                         <div className="subscription-buttons">
-                                            <button onClick={() => handleBuyPremium(7)} className="subscribe-button">
+                                            <button onClick={() => handleBuyPremium("7d")} className="subscribe-button">
                                                 Купить Премиум (7 дней)
                                             </button>
-                                            <button onClick={() => handleBuyPremium(30)} className="subscribe-button">
+                                            <button onClick={() => handleBuyPremium("30d")} className="subscribe-button">
                                                 Купить Премиум (30 дней)
                                             </button>
                                         </div>
