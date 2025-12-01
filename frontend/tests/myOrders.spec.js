@@ -1,8 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// Общий beforeEach для установки авторизации
 test.beforeEach(async ({ page }) => {
-    // Мокаем профиль авторизованного пользователя
     await page.route('**/auth/profile', async (route) => {
         await route.fulfill({
             status: 200,
@@ -14,7 +12,6 @@ test.beforeEach(async ({ page }) => {
         });
     });
 
-    // Сохраняем токен в localStorage
     await page.addInitScript(() => {
         localStorage.setItem('authToken', 'fake-token');
     });
@@ -31,11 +28,9 @@ test('1. отображение страницы и переход по кноп
 
     await page.goto('/my-orders/1');
 
-    // Ожидаем кнопку "Разместить заказ"
-    const createButton = page.getByRole('link', { name: 'Разместить заказ' });
+    const createButton = page.getByRole('button', { name: 'Разместить заказ' });
     await expect(createButton).toBeVisible();
 
-    // Переход по кнопке
     await createButton.click();
 });
 

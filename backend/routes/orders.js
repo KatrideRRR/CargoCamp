@@ -50,6 +50,28 @@ const geocoder = NodeGeocoder({
     lang: 'ru-RU'
 });
 
+function calculateCommissionRubles({ paymentType, proposedSum, isRecommended, isPremium }) {
+    if (isPremium) return 0;
+
+    let commission = 0;
+    const sum = Number(proposedSum) || 0;
+
+    if (paymentType === "cash") {
+        commission = 200;
+    } else if (paymentType === "guarantee") {
+        commission = Math.round(sum * 0.15);
+    } else if (paymentType === "installments") {
+        commission = Math.round(sum * 0.20);
+    }
+
+    if (isRecommended) {
+        commission -= 100;
+        if (commission < 0) commission = 0;
+    }
+
+    return commission; // в рублях
+}
+
 module.exports = (io) => {
 
     router.post('/:id/restore', authenticateToken, async (req, res) => {
@@ -275,7 +297,7 @@ module.exports = (io) => {
                 return res.status(404).json({ message: 'Пользователь не найден' });
             }
 
-            res.json({ has_debt: user.has_debt });
+            res.json({ debt: user.debt });  // ← ИСПРАВЛЕНО
         } catch (err) {
             console.error('Ошибка при проверке статуса пользователя:', err);
             res.status(500).json({ message: 'Ошибка сервера' });
@@ -481,14 +503,42 @@ module.exports = (io) => {
                     new Date(subscription_expires_at) > new Date();
             }
 
-            // Устанавливаем долг ТОЛЬКО если не премиум
-            if (!isPremium) {
-                await User.update({ has_debt: true }, { where: { id: executorId } });
-                console.log(`💸 Установлен флаг has_debt для пользователя ${executorId}`);
-            } else {
-                console.log(`✅ У пользователя ${executorId} активен Premium — долг не устанавливается`);
-            }
+            // ---- РАСЧЁТ И СОХРАНЕНИЕ ДОЛГА НА USER ----
+            // собираем входные данные для расчёта комиссии
+            const paymentType = order.paymentType || 'guarantee'; // fallback если пусто
+            const proposedSum = order.proposedSum || matchedRequest?.proposedSum || 0; // рубли
+            const isRecommended = !!order.is_recommended;
+            const isPremiumExecutor = isPremium;
 
+            // считаем комиссию в рублях (та же логика, что на фронте)
+            const commissionRub = calculateCommissionRubles({
+                paymentType,
+                proposedSum,
+                isRecommended,
+                isPremium: isPremiumExecutor
+            });
+
+            // сохраняем долг в копейках
+            const commissionKopecks = Math.round(Number(commissionRub) * 100);
+
+            if (commissionKopecks > 0) {
+                // сохраняем долг на исполнителе
+                await User.update(
+                    {
+                        debt: commissionKopecks, // поле debt — в копейках
+                        commissionDebtOrderId: order.id
+                    },
+                    { where: { id: executorId } }
+                );
+                console.log(`💸 Установлен долг ${commissionKopecks} коп. для пользователя ${executorId}`);
+            } else {
+                // если премиум или комиссия = 0 — обнуляем долг
+                await User.update(
+                    { debt: 0, commissionDebtOrderId: null },
+                    { where: { id: executorId } }
+                );
+                console.log(`✅ Для пользователя ${executorId} долг не установлен (премиум или 0 комиссия)`);
+            }
 
             order.requestedExecutors = []; // Очищаем массив запросов
             order.status = 'active'; // Устанавливаем статус заказа как активный

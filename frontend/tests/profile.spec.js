@@ -74,17 +74,10 @@ test.describe("Страница профиля", () => {
         const inputFile = page.locator('input[type="file"]');
         const uploadButton = page.locator('.upload-button-style');
 
-        // Мокаем успешную загрузку документа
-        await inputFile.setInputFiles('C:/Users/katriderrr/Desktop/CargoCamp/backend/uploads/upload-document/39_5.jpg');
+        await inputFile.setInputFiles('/Users/akimadzhiametov/CargoCamp/backend/uploads/upload-document/123_1.jpg');
 
-        // Проверяем, что кнопка доступна
         await expect(uploadButton).toBeVisible();
-
         await uploadButton.click();
-
-        // Ожидаем успешную загрузку (появление Toast)
-
-        // Проверяем текст о успешной загрузке
     });
 
 

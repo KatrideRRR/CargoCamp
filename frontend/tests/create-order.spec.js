@@ -49,7 +49,15 @@ test.describe('CreateOrderPage', () => {
         await page.getByRole('button', { name: /Наличные/ }).click();
 
         await page.getByRole('textbox', { name: 'Выберите дату и время' }).click();
-        await page.getByRole('option', { name: /November 25th, 2025/i }).click();
+
+        const calendar = page.getByRole('listbox', { name: /Month/i });
+
+        const firstAvailableDate = calendar.getByRole('option', { disabled: false }).first();
+
+        await firstAvailableDate.click();
+
+        const timeList = page.getByRole('listbox', { name: 'Time' });
+        await timeList.getByRole('option', { disabled: false }).first().click();
 
         await page.waitForSelector('#date-picker-portal', { state: 'hidden' });
 

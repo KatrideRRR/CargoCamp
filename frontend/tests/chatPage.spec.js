@@ -33,21 +33,24 @@ test.describe("ChatPage", () => {
         const message = {
             id: Date.now(),
             content: "Сообщение от второго пользователя",
-            senderId: 4,
+            senderId: 999, // важно: не currentUser
             receiverId: 6,
             orderId: 8,
         };
 
-        // Ждём появление socket
         await page.waitForFunction(
-            () => window.socket && window.socket.listeners?.("receiveMessage")?.length
+            () =>
+                window.socket &&
+                window.socket.listeners?.("receiveMessage")?.length
         );
 
-        // Пробрасываем сообщение вручную
         await page.evaluate((msg) => {
             const listeners = window.socket.listeners("receiveMessage");
-            if (listeners?.length) listeners.forEach(cb => cb(msg));
+            listeners.forEach(cb => cb(msg));
         }, message);
+
+        // даём React время перерендериться
+        await page.waitForTimeout(50);
 
         await expect(page.locator(".chat-message-received"))
             .toContainText(message.content);

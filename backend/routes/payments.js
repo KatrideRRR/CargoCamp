@@ -5,12 +5,6 @@ const router = express.Router();
 const { Order, User } = require('../models'); // sequelize models
 const authenticateToken = require('../middlewares/userAuth'); // если нужен
 
-const CLOUD_PUBLIC_ID = process.env.CLOUDPAYMENTS_PUBLIC_ID;
-const CLOUD_API_SECRET = process.env.CLOUDPAYMENTS_API_SECRET;
-if (!CLOUD_PUBLIC_ID || !CLOUD_API_SECRET) {
-    console.warn('CLOUDPAYMENTS_PUBLIC_ID or CLOUDPAYMENTS_API_SECRET not set');
-}
-
 function calculateCommissionKopecks(order, user) {
     const isPremium = user.subscription_type === 'premium' &&
         user.subscription_expires_at && new Date(user.subscription_expires_at) > new Date();
@@ -75,7 +69,9 @@ function rawBodyMiddleware(req, res, next) {
 router.post('/commission', authenticateToken, async (req, res) => {
     try {
         const { userId, orderId, cardCryptogramPacket } = req.body;
-        if (!userId || !orderId) return res.status(400).json({ success: false, error: 'userId и orderId обязательны' });
+
+        if (!userId || !orderId)
+            return res.status(400).json({ success: false, error: 'userId и orderId обязательны' });
 
         const order = await Order.findByPk(orderId);
         if (!order) return res.status(404).json({ success: false, error: 'Заказ не найден' });
@@ -83,13 +79,30 @@ router.post('/commission', authenticateToken, async (req, res) => {
         const user = await User.findByPk(userId);
         if (!user) return res.status(404).json({ success: false, error: 'Пользователь не найден' });
 
+        // Комиссия уже оплачена
         if (order.commissionPaid) {
             return res.status(409).json({ success: false, error: 'Комиссия уже оплачена' });
         }
 
-        const commissionKopecks = calculateCommissionKopecks(order, user);
+        // ---- НОВЫЙ РАСЧЁТ КОМИССИИ ----
+        const rawCommissionRub = calculateCommission({
+            paymentType: order.paymentType,          // "cash" | "guarantee" | "installments"
+            proposedSum: order.proposedSum,          // сумма заказа
+            isRecommended: order.isRecommended,      // true | false
+            isPremium: user.subscription_type === "premium"
+        });
+
+        // Переводим в копейки
+        const commissionKopecks = Math.round(rawCommissionRub * 100);
+
+        // Если комиссия = 0 → просто подтверждаем, что не требуется
         if (commissionKopecks <= 0) {
-            await order.update({ commissionPaid: true, commissionPaidAt: new Date(), commissionAmount: 0 });
+            await order.update({
+                commissionPaid: true,
+                commissionPaidAt: new Date(),
+                commissionAmount: 0
+            });
+
             return res.json({ success: true, noCommission: true, message: 'Комиссия отсутствует' });
         }
 
@@ -97,6 +110,7 @@ router.post('/commission', authenticateToken, async (req, res) => {
         let payload;
         let endpoint;
 
+        // ---- CloudPayments логика ----
         if (cardCryptogramPacket) {
             endpoint = '/payments/cards/charge';
             payload = {
@@ -110,8 +124,12 @@ router.post('/commission', authenticateToken, async (req, res) => {
         } else {
             const token = user.cardToken || user.card_token || user.RebillId || null;
             if (!token) {
-                return res.status(400).json({ success: false, error: 'Нет cardCryptogramPacket и у пользователя нет сохранённой карты' });
+                return res.status(400).json({
+                    success: false,
+                    error: 'Нет cardCryptogramPacket и у пользователя нет сохранённой карты'
+                });
             }
+
             endpoint = '/payments/charge';
             payload = {
                 Amount: parseFloat(amountRub),
@@ -123,15 +141,24 @@ router.post('/commission', authenticateToken, async (req, res) => {
             };
         }
 
+        // ---- Отправка в CloudPayments ----
         const resp = await cloudRequest(endpoint, payload);
 
         if (!resp || resp.Success !== true) {
             console.error('CloudPayments commission failed:', resp);
-            return res.status(400).json({ success: false, error: resp?.Message || 'Payment failed', raw: resp });
+            return res.status(400).json({
+                success: false,
+                error: resp?.Message || 'Payment failed',
+                raw: resp
+            });
         }
 
-        const transactionId = resp.Model && (resp.Model.TransactionId || resp.Model.Id || resp.Model.RecId) || null;
+        // ID транзакции
+        const transactionId =
+            resp.Model &&
+            (resp.Model.TransactionId || resp.Model.Id || resp.Model.RecId) || null;
 
+        // ---- Обновляем заказ ----
         await order.update({
             commissionPaid: true,
             commissionPaidAt: new Date(),
@@ -139,10 +166,39 @@ router.post('/commission', authenticateToken, async (req, res) => {
             paymentTransactionId: transactionId
         });
 
-        return res.json({ success: true, transactionId, raw: resp });
+        return res.json({
+            success: true,
+            transactionId,
+            raw: resp
+        });
+
     } catch (err) {
         console.error('Error /payment/commission:', err.response?.data || err.message || err);
         return res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+router.post('/commission/check', async (req, res) => {
+    try {
+        const { userId, orderId } = req.body;
+        if (!userId || !orderId) {
+            return res.status(400).json({ success: false, error: "userId и orderId обязательны" });
+        }
+
+        const order = await Order.findByPk(orderId);
+        const user = await User.findByPk(userId);
+
+        const commissionKopecks = calculateCommissionKopecks(order, user);
+        const amountRub = (commissionKopecks / 100).toFixed(2);
+
+        return res.json({
+            success: true,
+            commissionKopecks,
+            commissionRub: Number(amountRub),
+            isPremium: user.subscription_type === "premium"
+        });
+    } catch (e) {
+        return res.status(500).json({ success: false, error: "Internal error" });
     }
 });
 
@@ -157,12 +213,12 @@ router.post('/commission/pay-debt', authenticateToken, async (req, res) => {
         if (!user)
             return res.status(404).json({ success: false, error: 'Пользователь не найден' });
 
-        const debtKopecks = user.has_debt || 0;
+        const debtKopecks = Number(user.debt || 0); // теперь берём реальную сумму в копейках
 
         if (debtKopecks <= 0)
             return res.json({ success: true, noDebt: true, message: 'Долгов нет' });
 
-        const amountRub = (debtKopecks / 100).toFixed(2);
+        const amountRub = debtKopecks / 100;
 
         let payload;
         let endpoint;
@@ -171,11 +227,11 @@ router.post('/commission/pay-debt', authenticateToken, async (req, res) => {
         if (cardCryptogramPacket) {
             endpoint = '/payments/cards/charge';
             payload = {
-                Amount: parseFloat(amountRub),
+                Amount: amountRub,
                 Currency: "RUB",
                 AccountId: `pay_debt_${userId}`,
                 Description: `Погашение задолженности пользователя #${userId}`,
-                JsonData: { userId, type: 'has_debt' },
+                JsonData: { userId, type: 'debt' },
                 CardCryptogramPacket: cardCryptogramPacket
             };
         }
@@ -209,8 +265,8 @@ router.post('/commission/pay-debt', authenticateToken, async (req, res) => {
             });
         }
 
-        // 🟢 Обнуляем долг
-        user.has_debt = 0;
+        // Обнуляем долг и unlink order id
+        user.debt = 0;
         user.commissionDebtOrderId = null;
         await user.save();
 

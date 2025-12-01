@@ -27,7 +27,7 @@ test.describe('OrderHistoryPage', () => {
 
         await page.goto(pageUrl);
 
-        await expect(page.getByText('История завершенных заказов (1)')).toBeVisible();
+        await expect(page.getByRole('heading', { name: /История заказов/i })).toBeVisible();
         await expect(page.getByText('№ заказа: 123')).toBeVisible();
         await expect(page.getByText('Перевезти диван')).toBeVisible();
         await expect(page.getByText('г. Москва, ул. Примерная, 12')).toBeVisible();
@@ -45,7 +45,7 @@ test.describe('OrderHistoryPage', () => {
 
         await page.goto(pageUrl);
 
-        await expect(page.getByText('Завершенных заказов нет.')).toBeVisible();
+        await expect(page.getByText('Завершенных или просроченных заказов нет.')).toBeVisible();
     });
 
     test('показывает ошибку при сбое API', async ({ page }) => {

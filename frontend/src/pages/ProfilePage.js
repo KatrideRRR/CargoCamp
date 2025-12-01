@@ -1,5 +1,3 @@
-/* global cp */
-
 import { toast } from "react-toastify";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -90,72 +88,108 @@ const ProfilePage = () => {
     }, [isAuthenticated, navigate]);
 
     useEffect(() => {
-        loadDebtStatus();
-    }, []);
+        if (profile) {
+            loadDebtStatus();
+        }
+    }, [profile]);
 
     const loadDebtStatus = async () => {
         const token = localStorage.getItem("authToken");
 
         try {
-            const response = await axios.get(`${apiUrl}/orders/me/status`, {
+            const response = await axios.get(`${apiUrl}/api/orders/me/status`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            setHasDebt(response.data.has_debt);
-            setDebtAmount(response.data.debt_amount || 0);
+            setDebtAmount(response.data.debt || 0);
+            setHasDebt((response.data.debt || 0) > 0);
         } catch (e) {
             console.error("Ошибка проверки долга:", e);
         }
     };
 
     const handlePayDebt = async () => {
-        const token = localStorage.getItem("authToken");
-        const user = JSON.parse(localStorage.getItem("user"));
-
         try {
-            let cardCryptogramPacket = null;
+            const token = localStorage.getItem("authToken");
+            const currUser = user; // from useAuth()
 
-            if (!cardInfo) {
-                // если нет сохранённой карты — создаём криптограмму
-                cardCryptogramPacket = await createCryptogram();
+            if (!token || !currUser || !currUser.id) {
+                toast.error("Ошибка: пользователь не найден или не авторизован");
+                return;
             }
 
-            const response = await fetch(`${apiUrl}/api/payment/commission/pay-debt`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`
+            // если долга нет — ничего не делаем
+            if (!debtAmount || debtAmount <= 0) {
+                toast.info("Долгов нет");
+                return;
+            }
+
+            // 1) Получаем publicId для виджета
+            const pubRes = await axios.get(`${apiUrl}/api/payments/public-id`);
+            const publicId = pubRes?.data?.publicId;
+            if (!publicId) {
+                console.error("Не получили publicId:", pubRes);
+                toast.error("Ошибка инициализации платёжного виджета");
+                return;
+            }
+
+            // 2) Вызываем виджет CloudPayments — передаём сумму из debt (копейки -> рубли)
+            const amountRub = (debtAmount / 100);
+
+            const widget = new window.cp.CloudPayments();
+
+            widget.charge(
+                {
+                    publicId,
+                    description: `Погашение задолженности пользователя с ID ${currUser.id}`,
+                    amount: amountRub,
+                    currency: "RUB",
+                    accountId: currUser.id,
+                    skin: "mini",
                 },
-                body: JSON.stringify({
-                    userId: user.id,
-                    cardCryptogramPacket
-                })
-            });
+                // success callback
+                async function (options) {
+                    try {
+                        console.log("CloudPayments success cryptogram:", options);
 
-            const data = await response.json();
+                        // отправляем cryptogram на сервер для списания
+                        const res = await axios.post(
+                            `${apiUrl}/api/payments/commission/pay-debt`,
+                            {
+                                userId: currUser.id,
+                                cardCryptogramPacket: options.cryptogram,
+                            },
+                            { headers: { Authorization: `Bearer ${token}` } }
+                        );
 
-            if (data.success) {
-                toast.success("Задолженность успешно погашена!");
+                        console.log("pay-debt response:", res.data);
 
-                setHasDebt(false);
-                setDebtAmount(0);
-
-                // можно обновить данные о пользователе
-                loadDebtStatus();
-            } else {
-                toast.error(data.error || "Ошибка при оплате долга");
-            }
+                        if (res.data && res.data.success) {
+                            toast.success("Задолженность успешно погашена!");
+                            setDebtAmount(0);
+                            setHasDebt(false);
+                            // обновляем профиль/статус долга
+                            loadDebtStatus();
+                        } else {
+                            toast.error(res.data?.error || "Ошибка списания долга");
+                        }
+                    } catch (err) {
+                        console.error("Ошибка подтверждения платежа на сервере:", err);
+                        toast.error("Ошибка сервера при обработке платежа");
+                    }
+                },
+                // fail/cancel callback
+                function () {
+                    toast.error("Платёж отменён");
+                }
+            );
         } catch (err) {
-            console.error("Debt pay error:", err);
-            toast.error("Ошибка сервера при оплате долга");
+            console.error("handlePayDebt error:", err);
+            toast.error("Ошибка при инициализации оплаты");
         }
     };
 
     const handleBuyPremium = async (duration) => {
-        const token = localStorage.getItem("authToken");
-        const { data } = await axios.get(`${apiUrl}/api/payments/public-id`);
-
-        // серверные цены
         const prices = { "7d": 2500, "30d": 9000 };
 
         const amount = prices[duration];
@@ -165,85 +199,11 @@ const ProfilePage = () => {
             return;
         }
 
-        const widget = new cp.CloudPayments();
 
-        widget.charge(
-            {
-                publicId: data.publicId,
-                description: `Покупка премиума (${duration})`,
-                amount, // теперь корректно
-                currency: "RUB",
-                accountId: user.id,
-                skin: "mini",
-            },
-            async function (options) {
-                try {
-                    const response = await axios.post(
-                        `${apiUrl}/api/payments/premium`,
-                        {
-                            userId: user.id,
-                            duration,
-                            cardCryptogramPacket: options.cryptogram,
-                        },
-                        { headers: { Authorization: `Bearer ${token}` } }
-                    );
-
-                    if (response.data.success) {
-                        toast.success("Премиум успешно оплачен!");
-                    } else {
-                        toast.error(response.data.error);
-                    }
-                } catch (err) {
-                    toast.error("Ошибка сервера");
-                }
-            },
-            () => toast.error("Платёж отменён")
-        );
     };
 
     const handleBindCard = async () => {
-        const token = localStorage.getItem("authToken");
 
-        const { data } = await axios.get(`${apiUrl}/api/payments/public-id`);
-
-        const widget = new cp.CloudPayments();
-
-        widget.charge(
-            {
-                publicId: data.publicId,
-                description: "Привязка карты",
-                amount: 1.00,         // НЕ менять, CloudPayments требует реальный чардж
-                currency: "RUB",
-                accountId: user.id,
-                skin: "mini"
-            },
-            async function (options) {
-                // успешная оплата → есть cryptogram
-                try {
-                    const response = await axios.post(
-                        `${apiUrl}/api/payments/card/bind`,
-                        {
-                            userId: user.id,
-                            cardCryptogramPacket: options.cryptogram
-                        },
-                        { headers: { Authorization: `Bearer ${token}` } }
-                    );
-
-                    if (response.data.success) {
-                        toast.success("Карта успешно привязана!");
-                        window.location.reload();
-                    } else {
-                        toast.error(response.data.error);
-                    }
-                } catch (err) {
-                    toast.error("Ошибка привязки карты");
-                    console.error(err);
-                }
-            },
-            function () {
-                toast.error("Привязка отменена пользователем");
-            }
-        );
     };
 
     const handleUnbindCard = async () => {
@@ -351,6 +311,7 @@ const ProfilePage = () => {
     }
 
     return (
+
         <div className="profile">
 
             <div className="pageContainer-profile">
@@ -394,6 +355,7 @@ const ProfilePage = () => {
                                                 Привязать карту
                                             </button>
                                         )}
+
 
                                         {hasDebt && (
                                             <div className="debt-box">

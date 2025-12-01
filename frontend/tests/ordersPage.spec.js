@@ -88,7 +88,7 @@ test.describe('OrdersPage', () => {
     });
 
     test('клик на жалобы с переходом на страницу жалоб', async ({ page }) => {
-        const complaintsLink = page.getByRole('link', { name: /Жалобы на создателя/ });
+        const complaintsLink = page.getByRole('link', { name: /Жалобы/i });
         await expect(complaintsLink).toHaveAttribute('href', '/complaints/1');
         await complaintsLink.click();
         await expect(page).toHaveURL('/complaints/1');
