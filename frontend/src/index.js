@@ -20,6 +20,7 @@ import UserOrdersPage from './pages/UserOrdersPage';
 import MyOrdersPage from './pages/MyOrdersPage';
 import StartPage from './pages/StartPage';
 import ExpressOrderPage from "./pages/ExpressOrderPage";
+import ServiceInfoPage from './pages/ServiceInfoPage';
 import Modal from "react-modal";
 
 Modal.setAppElement = function (s) {
@@ -48,6 +49,7 @@ const App = () => {
                             <Route path="/user-orders/:userId" element={<UserOrdersPage />} />
                             <Route path="/my-orders/:userId" element={<MyOrdersPage />} />
                             <Route path="/express" element={<ExpressOrderPage />} />
+                            <Route path="/services" element={<ServiceInfoPage />} />
                         </Routes>
                         <BottomMenu />
             </UserProvider>

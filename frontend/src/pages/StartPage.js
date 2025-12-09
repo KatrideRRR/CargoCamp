@@ -40,8 +40,24 @@ export default function StartPage() {
                     </button>
                 </div>
 
+                <div className="mini-card" onClick={() => navigate('/services')}>
+                    <h3 className="mini-card-title">Услуги и цены CargoCamp</h3>
+                    <p className="mini-card-text">Посмотрите фиксированные тарифы сервиса и условия работы.</p>
+                </div>
+
+                <div className="mini-card mini-card-how">
+                    <h3 className="mini-card-title">Как работает CargoCamp</h3>
+                    <ol className="mini-card-list">
+                        <li>Заказчик размещает заказ с описанием задачи.</li>
+                        <li>Исполнители откликаются и предлагают свои условия.</li>
+                        <li>Стороны договариваются о стоимости и сроках работ.</li>
+                        <li>Сервис берёт оплату только за свои услуги (продвижение, сбор и т.д.).</li>
+                    </ol>
+                </div>
+
                 {/* Кнопки модалок */}
                 <div className="legal-buttons">
+
                     <button onClick={() => setShowPrivacy(true)} className="legal-link">
                         Политика конфиденциальности
                     </button>
