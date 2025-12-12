@@ -62,10 +62,6 @@ module.exports = (sequelize) => {
                 defaultValue: 'unverified',
                 allowNull: false
             },
-            cardNumber: {
-                type: DataTypes.STRING,
-                allowNull: true, // Пользователь может не привязывать карту
-            },
             cardLastFour: {
                 type: DataTypes.STRING(4),
                 allowNull: true,
@@ -73,10 +69,6 @@ module.exports = (sequelize) => {
             cardType: {
                 type: DataTypes.STRING,
                 allowNull: true,
-            },
-            RebillId: {
-                type: DataTypes.STRING,
-                allowNull: true
             },
             subscription_type: {
                 type: DataTypes.ENUM('standard', 'premium'),
@@ -89,8 +81,16 @@ module.exports = (sequelize) => {
             },
             debt: {
                 type: DataTypes.INTEGER,
-                primaryKey: true,
+                allowNull: false,
                 defaultValue: 0,
+            },
+            yookassa_payment_method_id: {
+                type: DataTypes.STRING,
+                allowNull: true,
+            },
+            yookassa_payment_method_saved_at: {
+                type: DataTypes.DATE,
+                allowNull: true,
             },
 
         },

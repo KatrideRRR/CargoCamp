@@ -12,10 +12,9 @@ const ProfilePage = () => {
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [rebillId, setRebillId] = useState(null); // Сохраняем ID привязанной карты
+    const [paymentMethodId, setPaymentMethodId] = useState(null);
     const navigate = useNavigate();
-    const { logout, isAuthenticated } = useAuth();
-    const [cardInfo, setCardInfo] = useState();
+    const { logout, isAuthenticated, user } = useAuth();    const [cardInfo, setCardInfo] = useState();
     const [showAgreement, setShowAgreement] = useState(false);
     const [hasDebt, setHasDebt] = useState(false);
     const [debtAmount, setDebtAmount] = useState(0);
@@ -25,24 +24,6 @@ const ProfilePage = () => {
         const expiration = new Date(expiresAt);
         const diff = expiration - now;
         return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-    };
-    const { user } = useAuth();
-
-    const createCryptogram = async () => {
-        if (!window.cp) throw new Error("CloudPayments не загружен");
-
-        return new Promise((resolve, reject) => {
-            const widget = new window.cp.CloudPayments();
-            widget.createCardCryptogram(
-                {
-                    cardNumber: cardInfo?.number, // если есть локальная форма
-                    expDate: cardInfo?.exp,
-                    cvv: cardInfo?.cvv
-                },
-                (cryptogram) => resolve(cryptogram),
-                (reason) => reject(reason)
-            );
-        });
     };
 
     useEffect(() => {
@@ -66,7 +47,7 @@ const ProfilePage = () => {
 
                 if (isMounted) {
                     setProfile(response.data);
-                    setRebillId(response.data.rebillId || null); // Загружаем ID карты, если есть
+                    setPaymentMethodId(response.data.yookassaPaymentMethodId || null);
                     setLoading(false);
                 }
             } catch (err) {
@@ -93,6 +74,13 @@ const ProfilePage = () => {
         }
     }, [profile]);
 
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("bindReturn") === "1" || params.get("debtReturn") === "1" || params.get("premiumReturn") === "1") {
+            setTimeout(() => window.location.reload(), 1500);
+        }
+    }, []);
+
     const loadDebtStatus = async () => {
         const token = localStorage.getItem("authToken");
 
@@ -111,133 +99,119 @@ const ProfilePage = () => {
     const handlePayDebt = async () => {
         try {
             const token = localStorage.getItem("authToken");
-            const currUser = user; // from useAuth()
-
-            if (!token || !currUser || !currUser.id) {
-                toast.error("Ошибка: пользователь не найден или не авторизован");
+            if (!token) {
+                toast.error("Вы не авторизованы");
                 return;
             }
 
-            // если долга нет — ничего не делаем
             if (!debtAmount || debtAmount <= 0) {
                 toast.info("Долгов нет");
                 return;
             }
 
-            // 1) Получаем publicId для виджета
-            const pubRes = await axios.get(`${apiUrl}/api/payments/public-id`);
-            const publicId = pubRes?.data?.publicId;
-            if (!publicId) {
-                console.error("Не получили publicId:", pubRes);
-                toast.error("Ошибка инициализации платёжного виджета");
+            const res = await axios.post(
+                `${apiUrl}/api/payments/debt/create`,
+                {},
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            if (!res.data?.success) {
+                toast.error(res.data?.error || "Ошибка создания платежа");
                 return;
             }
 
-            // 2) Вызываем виджет CloudPayments — передаём сумму из debt (копейки -> рубли)
-            const amountRub = (debtAmount / 100);
+            if (res.data.noDebt) {
+                toast.info("Долгов нет");
+                return;
+            }
 
-            const widget = new window.cp.CloudPayments();
-
-            widget.charge(
-                {
-                    publicId,
-                    description: `Погашение задолженности пользователя с ID ${currUser.id}`,
-                    amount: amountRub,
-                    currency: "RUB",
-                    accountId: currUser.id,
-                    skin: "mini",
-                },
-                // success callback
-                async function (options) {
-                    try {
-                        console.log("CloudPayments success cryptogram:", options);
-
-                        // отправляем cryptogram на сервер для списания
-                        const res = await axios.post(
-                            `${apiUrl}/api/payments/commission/pay-debt`,
-                            {
-                                userId: currUser.id,
-                                cardCryptogramPacket: options.cryptogram,
-                            },
-                            { headers: { Authorization: `Bearer ${token}` } }
-                        );
-
-                        console.log("pay-debt response:", res.data);
-
-                        if (res.data && res.data.success) {
-                            toast.success("Задолженность успешно погашена!");
-                            setDebtAmount(0);
-                            setHasDebt(false);
-                            // обновляем профиль/статус долга
-                            loadDebtStatus();
-                        } else {
-                            toast.error(res.data?.error || "Ошибка списания долга");
-                        }
-                    } catch (err) {
-                        console.error("Ошибка подтверждения платежа на сервере:", err);
-                        toast.error("Ошибка сервера при обработке платежа");
-                    }
-                },
-                // fail/cancel callback
-                function () {
-                    toast.error("Платёж отменён");
-                }
-            );
-        } catch (err) {
-            console.error("handlePayDebt error:", err);
-            toast.error("Ошибка при инициализации оплаты");
+            window.location.href = res.data.confirmationUrl;
+        } catch (e) {
+            console.error("handlePayDebt error:", e);
+            toast.error("Ошибка при оплате задолженности");
         }
     };
 
     const handleBuyPremium = async (duration) => {
-        const prices = { "7d": 2500, "30d": 9000 };
+        try {
+            const token = localStorage.getItem("authToken");
+            if (!token) {
+                toast.error("Вы не авторизованы");
+                return;
+            }
 
-        const amount = prices[duration];
-        if (!amount) {
-            console.error("Неверная длительность, amount = undefined");
-            toast.error("Ошибка: неправильный тип премиума");
-            return;
+            const res = await axios.post(
+                `${apiUrl}/api/payments/premium/create`,
+                { duration }, // "7d" | "30d"
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            if (!res.data?.success) {
+                toast.error(res.data?.error || "Ошибка создания платежа");
+                return;
+            }
+
+            window.location.href = res.data.confirmationUrl;
+        } catch (e) {
+            console.error(e);
+            toast.error("Ошибка при оплате Premium");
         }
-
-
     };
 
     const handleBindCard = async () => {
+        try {
+            const token = localStorage.getItem("authToken");
+            if (!token) {
+                toast.error("Вы не авторизованы");
+                return;
+            }
 
+            const res = await axios.post(
+                `${apiUrl}/api/payments/card/bind/create`,
+                {},
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            if (!res.data?.success) {
+                toast.error(res.data?.error || "Ошибка привязки карты");
+                return;
+            }
+
+            window.location.href = res.data.confirmationUrl;
+        } catch (e) {
+            console.error("bind card error:", e);
+            toast.error("Ошибка привязки карты");
+        }
     };
 
     const handleUnbindCard = async () => {
-        const token = localStorage.getItem("authToken");
-
-        if (!token) {
-            toast.error("Вы не авторизованы");
-            return;
-        }
-
         try {
-            const response = await fetch(`${apiUrl}/api/payments/card/unbind`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    userId: user.id, // <-- обязательно отправляем userId
-                }),
-            });
-
-            const result = await response.json();
-
-            if (response.ok && result.success) {
-                toast.success("Карта успешно удалена");
-
-                setRebillId(null);
-                setCardInfo(null);
-            } else {
-                toast.error(result.error || result.message || "Ошибка при удалении карты");
+            const token = localStorage.getItem("authToken");
+            if (!token) {
+                toast.error("Вы не авторизованы");
+                return;
             }
-        } catch (error) {
-            console.error("Ошибка при удалении карты:", error);
+
+            const res = await axios.post(
+                `${apiUrl}/api/payments/card/unbind`,
+                {},
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            if (res.data?.success) {
+                toast.success("Карта успешно удалена");
+                setPaymentMethodId(null);
+                setCardInfo(null);
+
+                // обновим профиль, чтобы подтянуть cardLastFour/cardType
+                // можешь просто вызвать fetchProfileData ещё раз, но у тебя оно внутри useEffect.
+                // проще:
+                window.location.reload();
+            } else {
+                toast.error(res.data?.error || "Ошибка при удалении карты");
+            }
+        } catch (e) {
+            console.error("unbind error:", e);
             toast.error("Сервер не отвечает");
         }
     };
@@ -341,7 +315,7 @@ const ProfilePage = () => {
                                     <div className="section1 card-section">
                                         <h2 className="subtitle">Ваша карта:</h2>
 
-                                        {rebillId ? (
+                                        {paymentMethodId ? (
                                             <div className="card-info">
                                                 <p className="info verified">
                                                     Карта привязана: {profile.cardType} •••• {profile.cardLastFour}

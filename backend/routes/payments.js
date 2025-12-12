@@ -1,492 +1,297 @@
 const express = require('express');
-const axios = require('axios');
-const crypto = require('crypto');
 const router = express.Router();
-const { Order, User } = require('../models'); // sequelize models
+const { User } = require('../models'); // sequelize models
 const authenticateToken = require('../middlewares/userAuth'); // если нужен
+const { v4: uuidv4 } = require('uuid');
+const yooKassa = require('../utils/yookassaClient');
 
-function calculateCommissionKopecks(order, user) {
-    const isPremium = user.subscription_type === 'premium' &&
-        user.subscription_expires_at && new Date(user.subscription_expires_at) > new Date();
-
-    let commission = 0;
-    if (!isPremium) {
-        if (order.paymentType === 'cash') {
-            commission = 200 * 100;
-        } else if (order.paymentType === 'guarantee') {
-            commission = Math.round((order.proposedSum || 0) * 100 * 0.15);
-        } else if (order.paymentType === 'installments') {
-            commission = Math.round((order.proposedSum || 0) * 100 * 0.20);
-        }
-
-        if (order.is_recommended) {
-            commission -= 100 * 100;
-            if (commission < 0) commission = 0;
-        }
+function verifyYookassaWebhook(req, res, next) {
+    const auth = req.headers['authorization'] || '';
+    if (!process.env.YOOKASSA_WEBHOOK_AUTH) {
+        console.warn('YOOKASSA_WEBHOOK_AUTH is not set');
+        return res.sendStatus(403);
     }
-    return commission; // в копейках
-}
-
-async function cloudRequest(endpoint, payload) {
-    const url = `https://api.cloudpayments.ru${endpoint}`;
-    const cfg = {
-        auth: { username: CLOUD_PUBLIC_ID, password: CLOUD_API_SECRET },
-        timeout: 20000
-    };
-    return axios.post(url, payload, cfg).then(r => r.data);
-}
-
-function verifyCloudWebhookSignature(rawBodyBuffer, headers) {
-    const secret = CLOUD_API_SECRET;
-    if (!secret) return false;
-
-    const body = rawBodyBuffer.toString('utf8');
-    const hmac = crypto.createHmac('sha256', secret).update(body).digest('base64');
-
-    // Возможные имена заголовка, встречающиеся в интеграциях
-    const headerSig = headers['content-hmac'] || headers['content-hmac'.toLowerCase()] ||
-        headers['x-hook-signature'] || headers['x-hook-signature'.toLowerCase()] ||
-        headers['signature'] || headers['signature'.toLowerCase()];
-
-    if (!headerSig) return false;
-    // иногда провайдер добавляет префикс типа "sha256=" — очищаем
-    const cleaned = headerSig.replace(/^sha256=|^SHA256=|^sha=|^SHA=/, '').trim();
-
-    return crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(cleaned));
-}
-
-function rawBodyMiddleware(req, res, next) {
-    // express.json already parsed body; we need raw for HMAC — use req.rawBody if available.
-    // To ensure raw body is available, in app.js mount bodyParser with verify option to save raw body:
-    // app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }));
-    if (!req.rawBody) {
-        // fallback: re-stringify parsed body (may change spacing/ordering) — less secure
-        req.rawBody = Buffer.from(JSON.stringify(req.body || {}), 'utf8');
+    if (auth !== process.env.YOOKASSA_WEBHOOK_AUTH) {
+        return res.sendStatus(403);
     }
     next();
 }
 
-router.post('/commission', authenticateToken, async (req, res) => {
+router.post('/premium/create', authenticateToken, async (req, res) => {
     try {
-        const { userId, orderId, cardCryptogramPacket } = req.body;
+        const userId = req.user.id;
+        const { duration } = req.body; // "7d" | "30d"
 
-        if (!userId || !orderId)
-            return res.status(400).json({ success: false, error: 'userId и orderId обязательны' });
-
-        const order = await Order.findByPk(orderId);
-        if (!order) return res.status(404).json({ success: false, error: 'Заказ не найден' });
+        const prices = { '7d': '2500.00', '30d': '9000.00' };
+        const amountValue = prices[duration];
+        if (!amountValue) return res.status(400).json({ success: false, error: 'Неверная длительность' });
 
         const user = await User.findByPk(userId);
         if (!user) return res.status(404).json({ success: false, error: 'Пользователь не найден' });
 
-        // Комиссия уже оплачена
-        if (order.commissionPaid) {
-            return res.status(409).json({ success: false, error: 'Комиссия уже оплачена' });
-        }
+        const addDays = duration === '7d' ? 7 : 30;
 
-        // ---- НОВЫЙ РАСЧЁТ КОМИССИИ ----
-        const rawCommissionRub = calculateCommission({
-            paymentType: order.paymentType,          // "cash" | "guarantee" | "installments"
-            proposedSum: order.proposedSum,          // сумма заказа
-            isRecommended: order.isRecommended,      // true | false
-            isPremium: user.subscription_type === "premium"
-        });
+        const idempotenceKey = require('uuid').v4();
 
-        // Переводим в копейки
-        const commissionKopecks = Math.round(rawCommissionRub * 100);
+        const payment = await yooKassa.createPayment({
+            amount: { value: amountValue, currency: 'RUB' },
+            capture: true,
+            confirmation: {
+                type: 'redirect',
+                return_url: `${process.env.FRONTEND_URL}/profile?premiumReturn=1`,
+            },
+            description: `Premium ${duration} для пользователя #${userId}`,
+            metadata: { type: 'premium', userId: String(userId), duration },
 
-        // Если комиссия = 0 → просто подтверждаем, что не требуется
-        if (commissionKopecks <= 0) {
-            await order.update({
-                commissionPaid: true,
-                commissionPaidAt: new Date(),
-                commissionAmount: 0
-            });
-
-            return res.json({ success: true, noCommission: true, message: 'Комиссия отсутствует' });
-        }
-
-        const amountRub = (commissionKopecks / 100).toFixed(2);
-        let payload;
-        let endpoint;
-
-        // ---- CloudPayments логика ----
-        if (cardCryptogramPacket) {
-            endpoint = '/payments/cards/charge';
-            payload = {
-                Amount: parseFloat(amountRub),
-                Currency: 'RUB',
-                Description: `Комиссия за заказ #${orderId}`,
-                AccountId: `commission_${orderId}`,
-                JsonData: { orderId, userId, type: 'commission' },
-                CardCryptogramPacket: cardCryptogramPacket
-            };
-        } else {
-            const token = user.cardToken || user.card_token || user.RebillId || null;
-            if (!token) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Нет cardCryptogramPacket и у пользователя нет сохранённой карты'
-                });
+            // ✅ чек обязателен при включенной фискализации
+            receipt: {
+                customer: {
+                    phone: String(user.phone || '').replace(/[^\d+]/g, ''),
+                    // если появится email — лучше добавить и его:
+                    // email: user.email
+                },
+                items: [
+                    {
+                        description: `Подписка Premium (${addDays} дней)`,
+                        quantity: 1,
+                        amount: { value: amountValue, currency: 'RUB' },
+                        vat_code: 1,                 // без НДС  [oai_citation:2‡ЮKassa](https://yookassa.ru/developers/payment-acceptance/receipts/54fz/yoomoney/parameters-values?utm_source=chatgpt.com)
+                        payment_mode: 'full_payment',
+                        payment_subject: 'service',
+                    }
+                ],
+                tax_system_code: 2, // ✅ УСН (доходы)  [oai_citation:3‡ЮKassa](https://yookassa.ru/developers/payment-acceptance/receipts/54fz/other-services/parameters-values?utm_source=chatgpt.com)
             }
-
-            endpoint = '/payments/charge';
-            payload = {
-                Amount: parseFloat(amountRub),
-                Currency: 'RUB',
-                Description: `Комиссия за заказ #${orderId}`,
-                AccountId: `commission_${orderId}`,
-                JsonData: { orderId, userId, type: 'commission' },
-                Token: token
-            };
-        }
-
-        // ---- Отправка в CloudPayments ----
-        const resp = await cloudRequest(endpoint, payload);
-
-        if (!resp || resp.Success !== true) {
-            console.error('CloudPayments commission failed:', resp);
-            return res.status(400).json({
-                success: false,
-                error: resp?.Message || 'Payment failed',
-                raw: resp
-            });
-        }
-
-        // ID транзакции
-        const transactionId =
-            resp.Model &&
-            (resp.Model.TransactionId || resp.Model.Id || resp.Model.RecId) || null;
-
-        // ---- Обновляем заказ ----
-        await order.update({
-            commissionPaid: true,
-            commissionPaidAt: new Date(),
-            commissionAmount: commissionKopecks,
-            paymentTransactionId: transactionId
-        });
+        }, idempotenceKey);
 
         return res.json({
             success: true,
-            transactionId,
-            raw: resp
-        });
-
-    } catch (err) {
-        console.error('Error /payment/commission:', err.response?.data || err.message || err);
-        return res.status(500).json({ success: false, error: 'Internal server error' });
-    }
-});
-
-router.post('/commission/check', async (req, res) => {
-    try {
-        const { userId, orderId } = req.body;
-        if (!userId || !orderId) {
-            return res.status(400).json({ success: false, error: "userId и orderId обязательны" });
-        }
-
-        const order = await Order.findByPk(orderId);
-        const user = await User.findByPk(userId);
-
-        const commissionKopecks = calculateCommissionKopecks(order, user);
-        const amountRub = (commissionKopecks / 100).toFixed(2);
-
-        return res.json({
-            success: true,
-            commissionKopecks,
-            commissionRub: Number(amountRub),
-            isPremium: user.subscription_type === "premium"
+            paymentId: payment.id,
+            confirmationUrl: payment.confirmation?.confirmation_url,
+            status: payment.status,
         });
     } catch (e) {
-        return res.status(500).json({ success: false, error: "Internal error" });
+        console.error('premium/create error:', e);
+        return res.status(500).json({ success: false, error: e?.message || 'Internal server error' });
     }
 });
 
-router.post('/commission/pay-debt', authenticateToken, async (req, res) => {
+router.post('/debt/create', authenticateToken, async (req, res) => {
     try {
-        const { userId, cardCryptogramPacket } = req.body;
-
-        if (!userId)
-            return res.status(400).json({ success: false, error: 'userId обязателен' });
+        const userId = req.user.id;
 
         const user = await User.findByPk(userId);
-        if (!user)
-            return res.status(404).json({ success: false, error: 'Пользователь не найден' });
+        if (!user) return res.status(404).json({ success: false, error: 'Пользователь не найден' });
 
-        const debtKopecks = Number(user.debt || 0); // теперь берём реальную сумму в копейках
-
-        if (debtKopecks <= 0)
-            return res.json({ success: true, noDebt: true, message: 'Долгов нет' });
-
-        const amountRub = debtKopecks / 100;
-
-        let payload;
-        let endpoint;
-
-        // 🔐 Оплата новой картой
-        if (cardCryptogramPacket) {
-            endpoint = '/payments/cards/charge';
-            payload = {
-                Amount: amountRub,
-                Currency: "RUB",
-                AccountId: `pay_debt_${userId}`,
-                Description: `Погашение задолженности пользователя #${userId}`,
-                JsonData: { userId, type: 'debt' },
-                CardCryptogramPacket: cardCryptogramPacket
-            };
+        const debtKopecks = Number(user.debt || 0);
+        if (debtKopecks <= 0) {
+            return res.json({ success: true, noDebt: true });
         }
 
-        // 💳 Оплата сохранённой картой
-        else {
-            const token = user.cardToken || user.card_token || user.RebillId || null;
+        const amountValue = (debtKopecks / 100).toFixed(2);
+        const idempotenceKey = uuidv4();
 
-            if (!token)
-                return res.status(400).json({ success: false, error: 'Нет сохраненной карты и нет криптограммы' });
+        const payment = await yooKassa.createPayment(
+            {
+                amount: { value: amountValue, currency: 'RUB' },
+                capture: true,
+                confirmation: {
+                    type: 'redirect',
+                    return_url: `${process.env.FRONTEND_URL}/profile?debtReturn=1`,
+                },
+                description: `Погашение задолженности по комиссии пользователя #${userId}`,
+                metadata: {
+                    type: 'debt',
+                    userId: String(userId),
+                    expectedKopecks: String(debtKopecks),
+                },
 
-            endpoint = '/payments/charge';
-            payload = {
-                Amount: parseFloat(amountRub),
-                Currency: "RUB",
-                AccountId: `pay_debt_${userId}`,
-                Description: `Погашение задолженности пользователя #${userId}`,
-                JsonData: { userId, type: 'has_debt' },
-                Token: token
-            };
-        }
-
-        const resp = await cloudRequest(endpoint, payload);
-
-        if (!resp || resp.Success !== true) {
-            console.error('CloudPayments debt payment failed:', resp);
-            return res.status(400).json({
-                success: false,
-                error: resp?.Message || 'Payment failed',
-                raw: resp
-            });
-        }
-
-        // Обнуляем долг и unlink order id
-        user.debt = 0;
-        user.commissionDebtOrderId = null;
-        await user.save();
+                // ✅ чек обязателен (у тебя включена фискализация), УСН доходы = tax_system_code 2
+                receipt: {
+                    customer: {
+                        phone: String(user.phone || '').replace(/[^\d+]/g, ''),
+                    },
+                    items: [
+                        {
+                            description: `Погашение задолженности по комиссии`,
+                            quantity: 1,
+                            amount: { value: amountValue, currency: 'RUB' },
+                            vat_code: 1, // без НДС
+                            payment_mode: 'full_payment',
+                            payment_subject: 'service',
+                        },
+                    ],
+                    tax_system_code: 2,
+                },
+            },
+            idempotenceKey
+        );
 
         return res.json({
             success: true,
-            transactionId: resp.Model?.TransactionId || null,
-            message: 'Долг успешно погашен',
-            raw: resp
+            paymentId: payment.id,
+            confirmationUrl: payment.confirmation?.confirmation_url,
         });
-
-    } catch (err) {
-        console.error('Error /payment/commission/pay-debt:', err);
-        return res.status(500).json({ success: false, error: 'Internal server error' });
+    } catch (e) {
+        console.error('debt/create error:', e);
+        return res.status(500).json({ success: false, error: e?.message || 'Internal server error' });
     }
 });
 
-router.post('/premium', authenticateToken, async (req, res) => {
+router.post('/card/bind/create', authenticateToken, async (req, res) => {
     try {
-        const { userId, duration, cardCryptogramPacket } = req.body;
-        if (!userId || !duration) return res.status(400).json({ success: false, error: 'userId и duration обязательны' });
-
-        const prices = { '7d': 2500.00, '30d': 9000.00 }; // рубли: 2500 = 2500.00 (из старого: 250000 коп)
-        // if your old values were in kopecks adjust accordingly. Here using rubles with decimals.
-        const amount = prices[duration];
-        if (!amount) return res.status(400).json({ success: false, error: 'Неверная длительность' });
+        const userId = req.user.id;
 
         const user = await User.findByPk(userId);
         if (!user) return res.status(404).json({ success: false, error: 'Пользователь не найден' });
 
-        let payload, endpoint;
-        const accountId = `premium_${userId}_${Date.now()}`;
+        const idempotenceKey = uuidv4();
+        const amountValue = '1.00';
 
-        if (cardCryptogramPacket) {
-            endpoint = '/payments/cards/charge';
-            payload = {
-                Amount: parseFloat(amount),
-                Currency: 'RUB',
-                Description: `Премиум ${duration} для пользователя ${userId}`,
-                AccountId: accountId,
-                JsonData: { userId, duration, type: 'premium' },
-                CardCryptogramPacket: cardCryptogramPacket,
-                SaveToken: true  // опционально: если хочешь сохранить карту при оплате премиума
-            };
-        } else {
-            const token = user.cardToken || user.card_token || user.RebillId || null;
-            if (!token) {
-                return res.status(400).json({ success: false, error: 'Нет cardCryptogramPacket и у пользователя нет сохранённой карты' });
-            }
-            endpoint = '/payments/charge';
-            payload = {
-                Amount: parseFloat(amount),
-                Currency: 'RUB',
-                Description: `Премиум ${duration} для пользователя ${userId}`,
-                AccountId: accountId,
-                JsonData: { userId, duration, type: 'premium' },
-                Token: token
-            };
-        }
+        const payment = await yooKassa.createPayment(
+            {
+                amount: { value: amountValue, currency: 'RUB' },
+                capture: true,
+                save_payment_method: true, // ✅ сохраняем метод оплаты
+                confirmation: {
+                    type: 'redirect',
+                    return_url: `${process.env.FRONTEND_URL}/profile?bindReturn=1`,
+                },
+                description: `Привязка карты пользователя #${userId}`,
+                metadata: {
+                    type: 'bind_card',
+                    userId: String(userId),
+                },
+                receipt: {
+                    customer: {
+                        phone: String(user.phone || '').replace(/[^\d+]/g, ''),
+                    },
+                    items: [
+                        {
+                            description: `Привязка карты (проверочный платеж)`,
+                            quantity: 1,
+                            amount: { value: amountValue, currency: 'RUB' },
+                            vat_code: 1, // без НДС
+                            payment_mode: 'full_payment',
+                            payment_subject: 'service',
+                        },
+                    ],
+                    tax_system_code: 2, // УСН доходы
+                },
+            },
+            idempotenceKey
+        );
 
-        const resp = await cloudRequest(endpoint, payload);
-        if (!resp || resp.Success !== true) {
-            console.error('CloudPayments premium failed:', resp);
-            return res.status(400).json({ success: false, error: resp?.Message || 'Payment failed', raw: resp });
-        }
-
-        // Применяем премиум локально
-        const now = new Date();
-        const addDays = duration === '7d' ? 7 : 30;
-        const newExpiration = user.subscription_type === 'premium' && user.subscription_expires_at && new Date(user.subscription_expires_at) > now
-            ? new Date(new Date(user.subscription_expires_at).getTime() + addDays * 24 * 3600 * 1000)
-            : new Date(now.getTime() + addDays * 24 * 3600 * 1000);
-
-        user.subscription_type = 'premium';
-        user.subscription_expires_at = newExpiration;
-        await user.save();
-
-        return res.json({ success: true, raw: resp });
-    } catch (err) {
-        console.error('Error /payment/premium:', err.response?.data || err.message || err);
-        return res.status(500).json({ success: false, error: 'Internal server error' });
-    }
-});
-
-router.post('/card/bind', authenticateToken, async (req, res) => {
-    try {
-        const { userId, cardCryptogramPacket } = req.body;
-        if (!userId || !cardCryptogramPacket) return res.status(400).json({ success: false, error: 'userId и cardCryptogramPacket обязательны' });
-
-        const user = await User.findByPk(userId);
-        if (!user) return res.status(404).json({ success: false, error: 'Пользователь не найден' });
-
-        const payload = {
-            Amount: 1.00,
-            Currency: 'RUB',
-            Description: `Привязка карты user ${userId}`,
-            AccountId: `bind_${userId}_${Date.now()}`,
-            JsonData: { userId, type: 'bind' },
-            CardCryptogramPacket: cardCryptogramPacket,
-            SaveToken: true
-        };
-
-        const resp = await cloudRequest('/payments/cards/charge', payload);
-        if (!resp || resp.Success !== true) {
-            console.error('CloudPayments bind failed:', resp);
-            return res.status(400).json({ success: false, error: resp?.Message || 'Bind failed', raw: resp });
-        }
-
-        const token = resp.Model && (resp.Model.Token || resp.Model.TokenValue || resp.Model.RecToken) || null;
-        const cardPan = resp.Model && resp.Model.CardPan || resp.Model && resp.Model.CardMask || null;
-        const last4 = cardPan ? cardPan.slice(-4) : null;
-
-        if (token) {
-            user.cardToken = token;
-            user.cardLastFour = last4;
-            user.cardType = resp.Model && resp.Model.CardType ? resp.Model.CardType : user.cardType || null;
-            await user.save();
-
-            return res.json({ success: true, token, raw: resp });
-        } else {
-            console.warn('Bind succeeded but token not found in resp:', resp);
-            return res.status(500).json({ success: false, error: 'Token not returned by provider', raw: resp });
-        }
-    } catch (err) {
-        console.error('Error /payment/card/bind:', err.response?.data || err.message || err);
-        return res.status(500).json({ success: false, error: 'Internal server error' });
+        return res.json({
+            success: true,
+            paymentId: payment.id,
+            confirmationUrl: payment.confirmation?.confirmation_url,
+            status: payment.status,
+        });
+    } catch (e) {
+        console.error('card/bind/create error:', e);
+        return res.status(500).json({ success: false, error: e?.message || 'Internal server error' });
     }
 });
 
 router.post('/card/unbind', authenticateToken, async (req, res) => {
     try {
-        const { userId } = req.body;
-        if (!userId) return res.status(400).json({ success: false, error: 'userId обязательный' });
+        const userId = req.user.id;
 
         const user = await User.findByPk(userId);
         if (!user) return res.status(404).json({ success: false, error: 'Пользователь не найден' });
 
-        const token = user.cardToken || user.card_token || user.RebillId || null;
-        if (!token) return res.status(400).json({ success: false, error: 'Карта не привязана' });
-
-        const resp = await cloudRequest('/payments/cards/unbind', { Token: token });
-
-        if (!resp || resp.Success !== true) {
-            console.error('CloudPayments unbind failed:', resp);
-            user.cardToken = null;
-            user.cardLastFour = null;
-            user.cardType = null;
-            await user.save();
-            return res.status(200).json({ success: false, message: 'Unbind on provider failed - token cleared locally', raw: resp });
-        }
-
-        user.cardToken = null;
-        user.cardLastFour = null;
-        user.cardType = null;
-        await user.save();
-
-        return res.json({ success: true, raw: resp });
-    } catch (err) {
-        console.error('Error /payment/card/unbind:', err.response?.data || err.message || err);
-        return res.status(500).json({ success: false, error: 'Internal server error' });
-    }
-});
-
-router.post('/cloud/callback', rawBodyMiddleware, async (req, res) => {
-    try {
-        // verify signature using raw body
-        const ok = verifyCloudWebhookSignature(req.rawBody, req.headers);
-        if (!ok) {
-            console.warn('Invalid cloud webhook signature', req.headers);
-            return res.status(403).send('Invalid signature');
-        }
-
-        const payload = req.body || {};
-        // payload structure varies; common fields: Type, Data, Object
-        console.log('CloudPayments webhook received:', JSON.stringify(payload).slice(0, 2000));
-
-        // Example: if payload.Data contains AccountId or JsonData.orderId, update order status
-        const data = payload.Data || payload.Object || payload.Model || payload;
-        // Try to extract orderId from known places
-        let accountId = data && (data.AccountId || data.accountId) || null;
-        let jsonData = data && (data.JsonData || data.jsonData) || null;
-
-        if (!accountId && jsonData && jsonData.orderId) {
-            accountId = `order_${jsonData.orderId}`;
-        }
-
-        // If AccountId has commission_123 etc. -> extract
-        if (accountId && typeof accountId === 'string') {
-            const m = accountId.match(/commission_(\d+)/);
-            if (m) {
-                const orderId = parseInt(m[1], 10);
-                // if payment succeeded, mark commission paid
-                if (payload && payload.EventType && payload.EventType === 'PaymentSucceeded' || (payload && payload.Type === 'payment' && payload.Status === 'Completed') || (data && data.Status && data.Status === 'Completed')) {
-                    await Order.update({ commissionPaid: true, commissionPaidAt: new Date() }, { where: { id: orderId } });
-                }
-            }
-            // handle premium_... similar if you used AccountId pattern
-            const m2 = accountId.match(/^premium_(\d+)_/);
-            if (m2) {
-                const userId = parseInt(m2[1], 10);
-                // apply premium (you may prefer to rely on your /payment/premium flow instead)
-                // ... omitted for brevity
-            }
-        }
-
-        // Always respond 200 OK
-        return res.send('OK');
-    } catch (err) {
-        console.error('Error /payment/cloud/callback:', err);
-        return res.status(500).send('ERROR');
-    }
-});
-
-router.get("/public-id", (req, res) => {
-    try {
-        res.json({
-            success: true,
-            publicId: process.env.CLOUDPAYMENTS_PUBLIC_ID
+        await user.update({
+            yookassa_payment_method_id: null,
+            yookassa_payment_method_saved_at: null,
+            cardLastFour: null,
+            cardType: null,
         });
+
+        return res.json({ success: true });
     } catch (e) {
-        res.status(500).json({ success: false, error: "Ошибка сервера" });
+        console.error('card/unbind error:', e);
+        return res.status(500).json({ success: false, error: e?.message || 'Internal server error' });
+    }
+});
+
+router.post('/yookassa/webhook',verifyYookassaWebhook, async (req, res) => {
+    try {
+        const event = req.body;
+        if (event?.event !== 'payment.succeeded') return res.sendStatus(200);
+
+        const payment = event.object;
+        const meta = payment?.metadata || {};
+
+        // ====== 1) Premium ======
+        if (meta.type === 'premium') {
+            const userId = Number(meta.userId);
+            const duration = meta.duration;
+            const addDays = duration === '7d' ? 7 : duration === '30d' ? 30 : 0;
+            if (!addDays) return res.sendStatus(200);
+
+            const user = await User.findByPk(userId);
+            if (!user) return res.sendStatus(200);
+
+            const now = new Date();
+            const currentExp = user.subscription_expires_at ? new Date(user.subscription_expires_at) : null;
+            const base = (user.subscription_type === 'premium' && currentExp && currentExp > now) ? currentExp : now;
+            const newExp = new Date(base.getTime() + addDays * 24 * 60 * 60 * 1000);
+
+            user.subscription_type = 'premium';
+            user.subscription_expires_at = newExp;
+            await user.save();
+
+            return res.sendStatus(200);
+        }
+
+        // ====== 2) Debt ======
+        if (meta.type === 'debt') {
+            const userId = Number(meta.userId);
+            const paidKopecks = Math.round(parseFloat(payment.amount.value) * 100);
+
+            const user = await User.findByPk(userId);
+            if (!user) return res.sendStatus(200);
+
+            const currentDebt = Number(user.debt || 0);
+            const newDebt = Math.max(0, currentDebt - paidKopecks);
+            await user.update({ debt: newDebt });
+
+            return res.sendStatus(200);
+        }
+
+        // ====== 3) Bind Card ======
+        if (meta.type === 'bind_card') {
+            const userId = Number(meta.userId);
+
+            const user = await User.findByPk(userId);
+            if (!user) return res.sendStatus(200);
+
+            // ЮKassa возвращает сохраненный метод оплаты внутри payment_method
+            const pm = payment.payment_method;
+            const pmId = pm?.id || null;
+            const last4 = pm?.card?.last4 || null;
+            const cardType = pm?.card?.card_type || null;
+
+            if (!pmId) {
+                console.warn('bind_card succeeded but payment_method.id missing', payment?.id);
+                return res.sendStatus(200);
+            }
+
+            await user.update({
+                yookassa_payment_method_id: pmId,
+                yookassa_payment_method_saved_at: new Date(),
+                cardLastFour: last4,
+                cardType: cardType,
+            });
+
+            return res.sendStatus(200);
+        }
+
+        return res.sendStatus(200);
+    } catch (e) {
+        console.error('yookassa webhook error:', e);
+        return res.sendStatus(200);
     }
 });
 

@@ -189,15 +189,23 @@ router.post('/login', async (req, res) => {
 router.get('/profile', authenticateToken, async (req, res) => {
     try {
         const user = await User.findByPk(req.user.id, {
-            attributes: ['id', 'username', 'phone','cardLastFour' ,'cardType' , 'rating', 'createdAt','complaints','complaintsCount', 'userStatus', 'cardLastFour', 'cardType', 'subscription_type', 'subscription_expires_at'],
+            attributes: [
+                'id', 'username', 'phone',
+                'debt',
+                'yookassa_payment_method_id',
+                'cardLastFour', 'cardType',
+                'rating', 'createdAt',
+                'complaints', 'complaintsCount',
+                'userStatus',
+                'subscription_type', 'subscription_expires_at'
+            ],
         });
 
-        if (!user) {
-            return res.status(405).json({ message: 'User not found' });
-        }
+        if (!user) return res.status(404).json({ message: 'User not found' });
 
+        // если премиум истёк — сбрасываем
         if (
-            user.subscription_type !== 'standard' &&
+            user.subscription_type === 'premium' &&
             user.subscription_expires_at &&
             new Date(user.subscription_expires_at) < new Date()
         ) {
@@ -206,15 +214,29 @@ router.get('/profile', authenticateToken, async (req, res) => {
             await user.save();
         }
 
-        res.json({
-            ...user.toJSON(),
-            isPremium: user.subscription_type === 'premium',
+        return res.json({
+            id: user.id,
+            username: user.username,
+            phone: user.phone,
+            rating: user.rating,
+            createdAt: user.createdAt,
+            complaints: user.complaints,
+            complaintsCount: user.complaintsCount,
+            userStatus: user.userStatus,
+
+            debt: user.debt,
+
             subscriptionType: user.subscription_type,
             subscriptionExpiresAt: user.subscription_expires_at,
+            isPremium: user.subscription_type === 'premium',
+
+            yookassaPaymentMethodId: user.yookassa_payment_method_id,
+            cardLastFour: user.cardLastFour,
+            cardType: user.cardType,
         });
     } catch (error) {
         console.error('Error fetching profile:', error);
-        res.status(500).json({ message: 'Server error' });
+        return res.status(500).json({ message: 'Server error' });
     }
 });
 
