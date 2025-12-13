@@ -138,6 +138,74 @@ router.post('/debt/create', authenticateToken, async (req, res) => {
     }
 });
 
+router.post('/debt/pay', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const user = await User.findByPk(userId);
+        if (!user) return res.status(404).json({ success: false, error: 'Пользователь не найден' });
+
+        const debtKopecks = Number(user.debt || 0);
+        if (debtKopecks <= 0) return res.json({ success: true, noDebt: true });
+
+        const amountValue = (debtKopecks / 100).toFixed(2);
+        const idempotenceKey = uuidv4();
+
+        const basePayload = {
+            amount: { value: amountValue, currency: 'RUB' },
+            capture: true,
+            description: `Оплата комиссии (задолженность) пользователя #${userId}`,
+            metadata: { type: 'debt', userId: String(userId), expectedKopecks: String(debtKopecks) },
+            receipt: {
+                customer: { phone: String(user.phone || '').replace(/[^\d+]/g, '') },
+                items: [{
+                    description: `Оплата комиссии (задолженность)`,
+                    quantity: 1,
+                    amount: { value: amountValue, currency: 'RUB' },
+                    vat_code: 1,
+                    payment_mode: 'full_payment',
+                    payment_subject: 'service',
+                }],
+                tax_system_code: 2,
+            },
+        };
+
+        // ✅ 1) Автосписание по сохраненной карте
+        if (user.yookassa_payment_method_id) {
+            const payment = await yooKassa.createPayment({
+                ...basePayload,
+                payment_method_id: user.yookassa_payment_method_id,
+            }, idempotenceKey);
+
+            return res.json({
+                success: true,
+                paidBySavedCard: true,
+                paymentId: payment.id,
+                status: payment.status, // succeeded / pending и т.д.
+            });
+        }
+
+        // ✅ 2) Редирект, если карты нет
+        const payment = await yooKassa.createPayment({
+            ...basePayload,
+            confirmation: {
+                type: 'redirect',
+                return_url: `${process.env.FRONTEND_URL}/profile?debtReturn=1`,
+            },
+        }, idempotenceKey);
+
+        return res.json({
+            success: true,
+            paidBySavedCard: false,
+            paymentId: payment.id,
+            confirmationUrl: payment.confirmation?.confirmation_url,
+        });
+    } catch (e) {
+        console.error('debt/pay error:', e);
+        return res.status(500).json({ success: false, error: e?.message || 'Internal server error' });
+    }
+});
+
 router.post('/card/bind/create', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
@@ -325,8 +393,16 @@ router.post('/yookassa/webhook',verifyYookassaWebhook, async (req, res) => {
             if (!user) return res.sendStatus(200);
 
             const currentDebt = Number(user.debt || 0);
+
+            // optional: защита, если пришел платеж "в никуда"
+            if (currentDebt <= 0) return res.sendStatus(200);
+
             const newDebt = Math.max(0, currentDebt - paidKopecks);
-            await user.update({ debt: newDebt });
+
+            await user.update({
+                debt: newDebt,
+                commissionDebtOrderId: newDebt === 0 ? null : user.commissionDebtOrderId,
+            });
 
             return res.sendStatus(200);
         }

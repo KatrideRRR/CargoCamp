@@ -515,26 +515,40 @@ module.exports = (io) => {
                 isPremium: isPremiumExecutor
             });
 
+            if (executor && Number(executor.debt || 0) > 0) {
+                return res.status(400).json({ message: 'У исполнителя есть задолженность, он не может брать новые заказы' });
+            }
+
             // сохраняем долг в копейках
             const commissionKopecks = Math.round(Number(commissionRub) * 100);
 
             if (commissionKopecks > 0) {
-                // сохраняем долг на исполнителе
-                await User.update(
-                    {
-                        debt: commissionKopecks, // поле debt — в копейках
-                        commissionDebtOrderId: order.id
-                    },
-                    { where: { id: executorId } }
-                );
-                console.log(`💸 Установлен долг ${commissionKopecks} коп. для пользователя ${executorId}`);
+                await executor.update({ debt: commissionKopecks, commissionDebtOrderId: order.id });
             } else {
-                // если премиум или комиссия = 0 — обнуляем долг
-                await User.update(
-                    { debt: 0, commissionDebtOrderId: null },
-                    { where: { id: executorId } }
-                );
-                console.log(`✅ Для пользователя ${executorId} долг не установлен (премиум или 0 комиссия)`);
+                await executor.update({ debt: 0, commissionDebtOrderId: null });
+            }
+
+            const { tryAutoPayDebtForUser } = require('../utils/payDebtWithSavedMethod'); // путь подгони
+
+            let autoPay = { attempted: false };
+
+            if (commissionKopecks > 0 && executor?.yookassa_payment_method_id) {
+                autoPay.attempted = true;
+
+                try {
+                    const result = await tryAutoPayDebtForUser(executor);
+
+                    autoPay = { ...autoPay, ...result };
+
+                    // ✅ если сразу succeeded — обнулим долг сразу (и webhook тоже придёт, но это не страшно)
+                    if (result.status === 'succeeded') {
+                        await executor.update({ debt: 0, commissionDebtOrderId: null });
+                    }
+                } catch (e) {
+                    console.error('Auto pay debt failed:', e);
+                    autoPay.ok = false;
+                    autoPay.error = e?.message || 'auto_pay_failed';
+                }
             }
 
             order.requestedExecutors = []; // Очищаем массив запросов
@@ -587,7 +601,11 @@ module.exports = (io) => {
             io.to(`user_${order.executorId}`).emit('orderApproved', {
                 orderId: order.id,
                 message: 'Ваш запрос на выполнение заказа одобрен!',
-                isPremium, // <-- добавлено
+                isPremium,
+                commissionAmount: commissionKopecks,
+                debt: finalDebt,
+                paid: finalDebt === 0,
+                autoPay,
             });
 
             // Уведомляем заказчика

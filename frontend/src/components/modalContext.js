@@ -58,106 +58,39 @@ export const ModalProvider = ({ children }) => {
         fetchUserData();
     }, []);
 
-    const fetchCommission = async (orderId) => {
+    const payDebtFromModal = async () => {
         try {
-            const res = await axiosInstance.post('/payments/commission/check', {
-                userId: currUser.id,
-                orderId
-            });
+            const res = await axiosInstance.post('/payments/debt/pay');
 
-            if (!res.data.success) {
-                throw new Error("Ошибка получения комиссии");
+            if (!res.data?.success) {
+                toast.error(res.data?.error || 'Ошибка оплаты');
+                return;
             }
 
-            return res.data; // { commissionRub, commissionKopecks, isPremium }
+            if (res.data.noDebt) {
+                toast.info('Долгов нет');
+                return;
+            }
+
+            // ✅ если автосписание
+            if (res.data.paidBySavedCard) {
+                toast.info('Пробуем списать с привязанной карты...');
+
+                const refreshed = await axiosInstance.get('/auth/profile');
+                setCurrUser(refreshed.data);
+
+                return;
+            }
+
+            // ✅ иначе редирект
+            window.location.href = res.data.confirmationUrl;
         } catch (e) {
-            console.error("Ошибка получения комиссии:", e);
-            toast.error("Не удалось получить комиссию");
-            return null;
-        }
-    };
-
-    const openCommissionWidget = async (orderId) => {
-        const info = await fetchCommission(orderId);
-        if (!info) return;
-
-        if (info.isPremium || info.commissionRub <= 0) {
-            toast.success("У вас Premium — комиссия не требуется 🎉");
-            return;
-        }
-
-        const amount = Number(info.commissionRub);
-        if (!amount || amount <= 0) {
-            toast.success("Комиссия отсутствует или Premium — оплата не требуется 🎉");
-            return;
-        }
-
-        if (!window.cp) {
-            console.error("CloudPayments widget not loaded");
-            return;
-        }
-
-        const widget = new window.cp.CloudPayments();
-
-        widget.charge(
-            {
-                publicId: cloudApi,
-                description: `Комиссия за заказ #${orderId}`,
-                amount,                        // <- число
-                currency: "RUB",
-                invoiceId: `commission_${orderId}`, // <- max 50 символов
-                accountId: String(currUser.id)      // <- лучше уникальный идентификатор платежа
-
-            },
-            async (options) => {
-                if (!options?.cardCryptogramPacket) {
-                    toast.error("Ошибка: не получена криптограмма карты");
-                    return;
-                }
-                await handlePayCommission(orderId, options.cardCryptogramPacket);
-            },
-            (reason) => {
-                console.error("Платёж отменён:", reason);
-            }
-        );
-    };
-
-    const handlePayCommission = async (orderId, cardCryptogramPacket) => {
-        try {
-            const res = await axiosInstance.post(`/payments/commission`, {
-                userId: currUser.id,
-                orderId,
-                cardCryptogramPacket,
-            });
-
-            if (res.data.success) {
-                console.log("Комиссия оплачена:", res.data);
-
-                // обновляем пользователя
-                setCurrUser(prev => ({ ...prev, debt: 0 }));
-
-                toast.success("Комиссия успешно оплачена!");
-
-                // закрываем модалку, если нужно
-                setModal(null);
-            } else {
-                console.error(res.data);
-                toast.error(res.data.error || "Ошибка оплаты");
-            }
-        } catch (err) {
-            console.error("Ошибка оплаты комиссии:", err);
-            toast.error("Ошибка оплаты");
+            console.error(e);
+            toast.error('Ошибка оплаты комиссии');
         }
     };
 
     const handleNotificationClose = () => {
-        // Если не премиум и не оплачено — создаём долг
-        if (notificationData && !notificationData.isPremium && !notificationData.paid) {
-            setCurrUser(prev => ({
-                ...prev,
-                debt: (prev.debt || 0) + notificationData.commissionAmount || 0
-            }));
-        }
         setNotificationData(null);
     };
 
@@ -287,7 +220,7 @@ export const ModalProvider = ({ children }) => {
                         <p>{notificationData.description}</p>
 
                         {!notificationData.isPremium && (
-                            <button onClick={() => openCommissionWidget(notificationData.orderId)} >
+                            <button onClick={payDebtFromModal}>
                                 Оплатить комиссию
                             </button>
 
