@@ -117,13 +117,6 @@ module.exports = (io) => {
         }
 
         try {
-            parsedPromotion = JSON.parse(req.body.promotion || "{}");
-        } catch (e) {
-            console.error("Ошибка парсинга promotion:", e);
-        }
-
-
-        try {
             if (!address) {
                 return res.status(400).json({ message: 'Адрес обязателен' });
             }
@@ -149,7 +142,6 @@ module.exports = (io) => {
                 0
             );
 
-            // 🟡 Выбираем статус: если есть стоимость — ждем оплаты
             const status = promotionTotal > 0 ? 'pending_payment' : 'pending';
 
             const newOrder = await Order.create({
@@ -160,18 +152,23 @@ module.exports = (io) => {
                 proposedSum,
                 coordinates,
                 createdAt: new Date().toISOString(),
-                images: photoUrls,  // Сохраняем массив ссылок на фото
+                images: photoUrls,
                 creatorId: userId,
                 status,
                 categoryId,
                 subcategoryId,
                 serviceId: serviceId && serviceId !== '0' ? serviceId : null,
                 paymentType,
-                is_highlighted: parsedPromotion.highlight ?? false,
-                is_recommended: parsedPromotion.recommended ?? false,
-                is_push_notified: parsedPromotion.push ?? false,
-                promotionCost: promotionTotal, // если есть такое поле в модели
 
+                promotionCost: promotionTotal,
+                promotionRequested: parsedPromotion, // ✅ сохраняем что выбрали
+
+                // ✅ включаем только если оплаты не требуется
+                is_highlighted: promotionTotal > 0 ? false : !!parsedPromotion.highlight,
+                is_recommended: promotionTotal > 0 ? false : !!parsedPromotion.recommended,
+                is_push_notified: promotionTotal > 0 ? false : !!parsedPromotion.push,
+
+                // остальное как было
             });
 
             io.emit('orderUpdated'); // Отправляем событие обновления заказов

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { User } = require('../models'); // sequelize models
+const { Order, User } = require('../models'); // sequelize models
 const authenticateToken = require('../middlewares/userAuth'); // если нужен
 const { v4: uuidv4 } = require('uuid');
 const yooKassa = require('../utils/yookassaClient');
@@ -215,6 +215,77 @@ router.post('/card/unbind', authenticateToken, async (req, res) => {
     }
 });
 
+router.post('/order/promotion/create', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { orderId } = req.body;
+        if (!orderId) return res.status(400).json({ success: false, error: 'orderId обязателен' });
+
+        const user = await User.findByPk(userId);
+        if (!user) return res.status(404).json({ success: false, error: 'Пользователь не найден' });
+
+        const order = await Order.findByPk(orderId);
+        if (!order) return res.status(404).json({ success: false, error: 'Заказ не найден' });
+
+        if (order.creatorId !== userId) {
+            return res.status(403).json({ success: false, error: 'Нет доступа к этому заказу' });
+        }
+
+        if (order.status !== 'pending_payment') {
+            return res.status(400).json({ success: false, error: 'Этот заказ не требует оплаты продвижения' });
+        }
+
+        const PROMOTION_PRICES = { highlight: 50, recommended: 100, push: 150 };
+        const pr = order.promotionRequested || {};
+        const total = Object.entries(pr).reduce((sum, [k, v]) => (v && PROMOTION_PRICES[k] ? sum + PROMOTION_PRICES[k] : sum), 0);
+
+        if (total <= 0) return res.status(400).json({ success: false, error: 'Продвижение не выбрано' });
+
+        const amountValue = total.toFixed(2);
+        const idempotenceKey = uuidv4();
+
+        const payment = await yooKassa.createPayment({
+            amount: { value: amountValue, currency: 'RUB' },
+            capture: true,
+            confirmation: {
+                type: 'redirect',
+                return_url: `${process.env.FRONTEND_URL}/orders?promoReturn=1`,
+            },
+            description: `Продвижение заказа #${orderId}`,
+            metadata: {
+                type: 'order_promotion',
+                orderId: String(orderId),
+                userId: String(userId),
+            },
+            receipt: {
+                customer: { phone: String(user.phone || '').replace(/[^\d+]/g, '') },
+                items: [
+                    {
+                        description: `Продвижение заказа #${orderId}`,
+                        quantity: 1,
+                        amount: { value: amountValue, currency: 'RUB' },
+                        vat_code: 1,
+                        payment_mode: 'full_payment',
+                        payment_subject: 'service',
+                    }
+                ],
+                tax_system_code: 2, // УСН доходы
+            },
+        }, idempotenceKey);
+
+        await order.update({ promotionPaymentId: payment.id });
+
+        return res.json({
+            success: true,
+            paymentId: payment.id,
+            confirmationUrl: payment.confirmation?.confirmation_url,
+        });
+    } catch (e) {
+        console.error('order/promotion/create error:', e);
+        return res.status(500).json({ success: false, error: e?.message || 'Internal server error' });
+    }
+});
+
 router.post('/yookassa/webhook',verifyYookassaWebhook, async (req, res) => {
     try {
         const event = req.body;
@@ -284,6 +355,32 @@ router.post('/yookassa/webhook',verifyYookassaWebhook, async (req, res) => {
                 cardLastFour: last4,
                 cardType: cardType,
             });
+
+            return res.sendStatus(200);
+        }
+
+        // ====== 4) promotion ======
+        if (meta.type === 'order_promotion') {
+            const orderId = Number(meta.orderId);
+            const order = await Order.findByPk(orderId);
+            if (!order) return res.sendStatus(200);
+
+            // защита от "чужого" платежа
+            if (order.promotionPaymentId && order.promotionPaymentId !== payment.id) {
+                return res.sendStatus(200);
+            }
+
+            const pr = order.promotionRequested || {};
+
+            await order.update({
+                status: 'pending',
+                is_highlighted: !!pr.highlight,
+                is_recommended: !!pr.recommended,
+                is_push_notified: !!pr.push,
+                promotionPaidAt: new Date(),
+            });
+
+            io.emit('orderUpdated');
 
             return res.sendStatus(200);
         }

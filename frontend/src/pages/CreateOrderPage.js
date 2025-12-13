@@ -37,7 +37,7 @@ function CreateOrderPage() {
     const paymentMethods = [
         { id: "cash", label: "Наличные", icon: "💵" },
         { id: "guarantee", label: "Гарантия", icon: "🛡️" },
-        { id: "installments", label: "Рассрочка", icon: "💳" },
+        { id: "installment", label: "Рассрочка", icon: "💳" },
     ];
     const [promotion, setPromotion] = useState({
         highlight: false,
@@ -247,14 +247,26 @@ function CreateOrderPage() {
             const orderId = response.data.id;
 
             if (promotionTotal > 0) {
-                // Шаг 2: перенаправляем на оплату
-                const payResp = await axios.post(`${apiUrl}/api/payment/start`, {
-                    orderId,
-                    amount: promotionTotal,
-                });
-                window.location.href = payResp.data.paymentUrl;
+                // ⬇️ НОВАЯ логика оплаты продвижения
+                const payResp = await axios.post(
+                    `${apiUrl}/api/payments/order/promotion/create`,
+                    { orderId },
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
+                );
+
+                if (!payResp.data?.success) {
+                    setError(payResp.data?.error || "Не удалось создать платёж за продвижение");
+                    setIsSubmitting(false);
+                    return;
+                }
+
+                // редирект в ЮKassa
+                window.location.href = payResp.data.confirmationUrl;
             } else {
-                // Шаг 3: обычный заказ без оплаты
                 alert("Заказ успешно создан");
                 navigate("/orders");
             }

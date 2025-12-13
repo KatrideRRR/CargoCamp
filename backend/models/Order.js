@@ -85,6 +85,25 @@ module.exports = (sequelize) => {
                 allowNull: false,
                 defaultValue: 0,
             },
+            promotionRequested: {
+                type: DataTypes.TEXT,
+                allowNull: true,
+                get() {
+                    const v = this.getDataValue("promotionRequested");
+                    return v ? JSON.parse(v) : { highlight: false, recommended: false, push: false };
+                },
+                set(value) {
+                    this.setDataValue("promotionRequested", JSON.stringify(value || {}));
+                }
+            },
+            promotionPaymentId: {
+                type: DataTypes.STRING,
+                allowNull: true,
+            },
+            promotionPaidAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
 
         },
         {
