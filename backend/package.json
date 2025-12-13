@@ -44,7 +44,7 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "styled-components": "^6.1.15",
-    "uuid": "^13.0.0",
+    "uuid": "^8.3.2",
     "ws": "^8.18.0",
     "yookassa": "^0.1.1"
   },
