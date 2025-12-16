@@ -4,12 +4,7 @@ import io from 'socket.io-client';
 import axiosInstance from '../utils/axiosInstance';
 import '../styles/modalContext.css'
 import axios from "axios";
-import {useAuth} from "../utils/authContext";
-const cloudApi = process.env.CLOUDPAYMENTS_PUBLIC_ID;
 
-const apiUrl = process.env.REACT_APP_API_URL;
-
-export const ModalContext = createContext();
 const socket = io(process.env.REACT_APP_SOCKET_URL, {
     transports: ['websocket'],
     withCredentials: true
@@ -23,24 +18,17 @@ export const ModalProvider = ({ children }) => {
     const [showRatingModal, setShowRatingModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [rating, setRating] = useState(0);
-    const [currUser, setCurrUser] = useState(null);
-    const auth = useAuth() || {};
-    const user = auth.user || null;
-    const [debtAmount, setDebtAmount] = useState(0);
-    const [hasDebt, setHasDebt] = useState(false);
-    const [profile, setProfile] = useState(null);
-    const { title = '', description = '', isPremium = false, onClose = () => {} } = notificationData || {};
-    const [modal, setModal] = useState(null);
+    const [setCurrUser] = useState(null);
 
     useEffect(() => {
         const fetchUserData = async () => {
             try {
                 const response = await axiosInstance.get('/auth/profile');
-                setCurrUser(response.data);     // <-- добавлено
+                setCurrUser(response.data);
                 setUserId(response.data.id);
                 socket.emit('register', response.data.id);
             } catch (error) {
-                console.log('⛔️ Ошибка поймана:', error); // <-- сюда попадает?
+                console.log('⛔️ Ошибка поймана:', error);
 
                 if (axios.isAxiosError(error)) {
                     if (error.response?.status === 401) {
@@ -60,7 +48,7 @@ export const ModalProvider = ({ children }) => {
 
     const payDebtFromModal = async () => {
         try {
-            const res = await axiosInstance.post('/payments/debt/pay');
+            const res = await axiosInstance.post('/payments/debt/create');
 
             if (!res.data?.success) {
                 toast.error(res.data?.error || 'Ошибка оплаты');
@@ -72,17 +60,22 @@ export const ModalProvider = ({ children }) => {
                 return;
             }
 
-            // ✅ если автосписание
             if (res.data.paidBySavedCard) {
                 toast.info('Пробуем списать с привязанной карты...');
 
-                const refreshed = await axiosInstance.get('/auth/profile');
-                setCurrUser(refreshed.data);
+                setTimeout(async () => {
+                    const refreshed = await axiosInstance.get('/auth/profile');
+                    setCurrUser(refreshed.data);
+
+                    if (Number(refreshed.data.debt || 0) === 0) {
+                        setNotificationData(null);
+                        toast.success("Комиссия оплачена ✅");
+                    }
+                }, 2500);
 
                 return;
             }
 
-            // ✅ иначе редирект
             window.location.href = res.data.confirmationUrl;
         } catch (e) {
             console.error(e);
@@ -99,32 +92,28 @@ export const ModalProvider = ({ children }) => {
         if (userId) {
             console.log("🔄 Подключаем WebSocket для пользователя:", userId);
 
-
-            // Слушаем уведомления для исполнителя
             socket.on('orderApproved', (data) => {
                 console.log("🔔 Заказ одобрен:", data);
 
-                // обновляем долг пользователя, если сервер прислал
                 if (typeof data.debt === "number") {
-                    setCurrUser(prev => ({ ...prev, debt: data.debt }));
+                    setCurrUser(prev => prev ? ({ ...prev, debt: data.debt }) : prev);
                 }
 
-                if (data.message.includes("Ваш запрос")) {
-                    const isPremiumUser = currUser?.subscription_type === "premium";
+                if (data.message?.includes("Ваш запрос")) {
+                    const isPremiumUser = !!data.isPremium;
 
                     setNotificationData({
                         title: "Ваш запрос одобрен!",
                         description: `Заказ номер ${data.orderId}: ${data.message}`,
                         isPremium: isPremiumUser,
                         orderId: data.orderId,
-                        commissionAmount: data.commissionAmount, // <<< ВАЖНО
-                        paid: data.paid || false,
-                        onClose: () => setNotificationData(null),
+                        debt: Number(data.debt || 0),
+                        needPay: !!data.needPay,
+                        paid: !!data.paid,
                     });
                 }
             });
 
-            // Слушаем уведомления о завершении заказа
             socket.on('orderCompleted', (data) => {
                 console.log("🔔 Уведомление о завершении заказа:", data);
 
@@ -219,19 +208,29 @@ export const ModalProvider = ({ children }) => {
                         <h2>{notificationData.title}</h2>
                         <p>{notificationData.description}</p>
 
-                        {!notificationData.isPremium && (
-                            <button onClick={payDebtFromModal}>
-                                Оплатить комиссию
-                            </button>
-
-                        )}
-                        {notificationData.isPremium && (
+                        {notificationData.isPremium ? (
                             <p className="text-green-600">
                                 У вас активен Premium — комиссия не требуется 🎉
                             </p>
-                        )}
+                        ) : notificationData.debt > 0 ? (
+                            <>
+                                <p style={{ marginTop: 8 }}>
+                                    Комиссия: <b>{Math.round(notificationData.debt / 100)} ₽</b>
+                                </p>
 
-                        <button onClick={handleNotificationClose}>Закрыть</button>
+                                <button onClick={payDebtFromModal}>
+                                    Оплатить сейчас
+                                </button>
+
+                                <button onClick={handleNotificationClose}>
+                                    Оплатить позже
+                                </button>
+                            </>
+                        ) : (
+                            <button onClick={handleNotificationClose}>
+                                Ок
+                            </button>
+                        )}
                     </div>
                 </div>
             )}

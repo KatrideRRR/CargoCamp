@@ -306,6 +306,24 @@ module.exports = (io) => {
         const { proposedSum, comment } = req.body;
         const executorId = req.user.id;
 
+        // ✅ запрет брать новые заказы, если есть долг
+        const executor = await User.findByPk(executorId, {
+            attributes: ['id', 'debt', 'subscription_type', 'subscription_expires_at']
+        });
+
+        if (!executor) return res.status(404).json({ message: "Пользователь не найден" });
+
+        const hasActivePremium =
+            executor.subscription_type === 'premium' &&
+            executor.subscription_expires_at &&
+            new Date(executor.subscription_expires_at) > new Date();
+
+        if (!hasActivePremium && Number(executor.debt || 0) > 0) {
+            return res.status(400).json({
+                message: "У вас есть задолженность по комиссии. Погасите её, чтобы брать новые заказы."
+            });
+        }
+
         try {
             const order = await Order.findByPk(id);
             if (!order) return res.status(404).json({ message: "Заказ не найден" });
@@ -427,149 +445,93 @@ module.exports = (io) => {
 
     router.post('/:id/approve', authenticateToken, async (req, res) => {
         const { id } = req.params;
-        const { executorId } = req.body;  // Получаем executorId из тела запроса
+        const { executorId } = req.body;
 
         try {
             console.log(`⚡ Одобрение заказа ID: ${id} для исполнителя ID: ${executorId} пользователем ID: ${req.user.id}`);
 
             const order = await Order.findByPk(id);
-
-            if (!order) {
-                console.log('❌ Заказ не найден');
-                return res.status(404).json({ message: 'Заказ не найден' });
-            }
+            if (!order) return res.status(404).json({ message: 'Заказ не найден' });
 
             if (order.creatorId !== req.user.id) {
-                console.log('❌ Попытка одобрения чужого заказа');
                 return res.status(403).json({ message: 'Вы не можете одобрить этот заказ' });
             }
 
             if (!order.requestedExecutors || order.requestedExecutors.length === 0) {
-                console.log('❌ Нет запросов от исполнителей');
                 return res.status(400).json({ message: 'Нет исполнителей, ожидающих одобрения' });
             }
 
-            // Проверка, что executorId выбранный заказчиком есть в requestedExecutors
-            // Преобразуем строку JSON в массив, если нужно
+            // requestedExecutors -> array
             let requestedExecutors = [];
             try {
                 requestedExecutors = JSON.parse(order.requestedExecutors);
-                if (!Array.isArray(requestedExecutors)) {
-                    requestedExecutors = [];
-                }
-            } catch (error) {
-                console.error('Ошибка парсинга requestedExecutors:', error);
+                if (!Array.isArray(requestedExecutors)) requestedExecutors = [];
+            } catch (e) {
+                requestedExecutors = [];
             }
 
             if (!requestedExecutors.includes(executorId)) {
-                console.log('❌ Исполнитель не найден среди запросивших');
                 return res.status(400).json({ message: 'Исполнитель не найден среди запросивших' });
             }
 
-            // Предположим, что заявки хранятся как строка JSON в order.requests
+            // requests -> array
             let requests = [];
             try {
                 requests = JSON.parse(order.requests);
                 if (!Array.isArray(requests)) requests = [];
-            } catch (error) {
-                console.error('Ошибка парсинга requests:', error);
+            } catch (e) {
+                requests = [];
             }
 
-            const matchedRequest = requests.find(r => r.executorId === executorId);
-
-            if (matchedRequest) {
-                order.proposedSum = matchedRequest.proposedSum; // 👈 Сюда пишем цену из заявки
+            const matchedRequest = requests.find(r => String(r.executorId) === String(executorId));
+            if (matchedRequest?.proposedSum) {
+                order.proposedSum = matchedRequest.proposedSum;
                 console.log(`💰 Установлена сумма заказа: ${matchedRequest.proposedSum} ₽`);
-            } else {
-                console.log('⚠️ Не найдена заявка исполнителя, сумма не будет обновлена');
             }
 
-            // Устанавливаем исполнителя и очищаем список запросов
+            // Назначаем исполнителя
             order.executorId = executorId;
 
-            // Получаем данные исполнителя
-            const executor = await User.findByPk(executorId);
+            // Активируем заказ
+            order.requestedExecutors = JSON.stringify([]); // чистим
+            order.status = 'active';
 
-
-            let isPremium = false;
-            if (executor) {
-                const { subscription_type, subscription_expires_at } = executor;
-
-                isPremium =
-                    subscription_type === 'premium' &&
-                    new Date(subscription_expires_at) > new Date();
-            }
-
-            // ---- РАСЧЁТ И СОХРАНЕНИЕ ДОЛГА НА USER ----
-            // собираем входные данные для расчёта комиссии
-            const paymentType = order.paymentType || 'guarantee'; // fallback если пусто
-            const proposedSum = order.proposedSum || matchedRequest?.proposedSum || 0; // рубли
-            const isRecommended = !!order.is_recommended;
-            const isPremiumExecutor = isPremium;
-
-            // считаем комиссию в рублях (та же логика, что на фронте)
-            const commissionRub = calculateCommissionRubles({
-                paymentType,
-                proposedSum,
-                isRecommended,
-                isPremium: isPremiumExecutor
-            });
-
-            if (executor && Number(executor.debt || 0) > 0) {
-                return res.status(400).json({ message: 'У исполнителя есть задолженность, он не может брать новые заказы' });
-            }
-
-            // сохраняем долг в копейках
-            const commissionKopecks = Math.round(Number(commissionRub) * 100);
-
-            if (commissionKopecks > 0) {
-                await executor.update({ debt: commissionKopecks, commissionDebtOrderId: order.id });
-            } else {
-                await executor.update({ debt: 0, commissionDebtOrderId: null });
-            }
-
-            const { tryAutoPayDebtForUser } = require('../utils/payDebtWithSavedMethod'); // путь подгони
-
-            let autoPay = { attempted: false };
-
-            if (commissionKopecks > 0 && executor?.yookassa_payment_method_id) {
-                autoPay.attempted = true;
-
-                try {
-                    const result = await tryAutoPayDebtForUser(executor);
-
-                    autoPay = { ...autoPay, ...result };
-
-                    // ✅ если сразу succeeded — обнулим долг сразу (и webhook тоже придёт, но это не страшно)
-                    if (result.status === 'succeeded') {
-                        await executor.update({ debt: 0, commissionDebtOrderId: null });
-                    }
-                } catch (e) {
-                    console.error('Auto pay debt failed:', e);
-                    autoPay.ok = false;
-                    autoPay.error = e?.message || 'auto_pay_failed';
-                }
-            }
-
-            order.requestedExecutors = []; // Очищаем массив запросов
-            order.status = 'active'; // Устанавливаем статус заказа как активный
-
-            await order.save(); // Сохраняем изменения в базе данных
-
-            console.log(`✅ Заказ ${order.id} одобрен, исполнитель выбран!`);
-
-            // ⬇️ Добавляем updatedAt (если нужно)
-            order.updatedAt = new Date();
             await order.save();
 
+            // исполнитель
+            const executor = await User.findByPk(executorId);
+            if (!executor) return res.status(404).json({ message: 'Исполнитель не найден' });
+
+            // premium?
+            const isPremium =
+                executor.subscription_type === 'premium' &&
+                executor.subscription_expires_at &&
+                new Date(executor.subscription_expires_at) > new Date();
+
+            // ✅ ДОЛГ ТОЛЬКО ЗА CASH, И ТОЛЬКО ЕСЛИ НЕ PREMIUM
+            const isCash = order.paymentType === 'cash';
+            const debtKopecks = (!isPremium && isCash) ? 200 * 100 : 0;
+
+            // записываем debt (или обнуляем)
+            if (debtKopecks > 0) {
+                await executor.update({
+                    debt: debtKopecks,
+                });
+            } else {
+                await executor.update({
+                    debt: 0,
+                });
+            }
+
+            // ===== договор как у тебя =====
             const contractData = {
                 orderId: order.id,
                 approvalDate: new Date().toLocaleDateString('ru-RU'),
-                city: 'Москва', // или из профиля
+                city: 'Москва',
                 customerId: order.creatorId,
                 performerId: executorId,
-                customerName: `Пользователь ${order.creatorId}`, // позже можно из Users
-                performerName: `Пользователь ${executorId}`,     // позже можно из Users
+                customerName: `Пользователь ${order.creatorId}`,
+                performerName: `Пользователь ${executorId}`,
                 category: order.category || 'Общая категория',
                 subcategory: order.subcategory || 'Общая подкатегория',
                 address: order.address || 'Адрес не указан',
@@ -582,42 +544,37 @@ module.exports = (io) => {
             };
 
             const filePath = path.join(__dirname, '..', 'contracts', `contract_${order.id}.pdf`);
-            console.log(filePath)
             try {
                 await generateContractPDF(contractData, filePath);
-                console.log(`📄 Договор сохранён: ${filePath}`);
-                order.contractPath = path.relative(path.join(__dirname, '..'), filePath); // например, "contracts/contract_123.pdf"
+                order.contractPath = path.relative(path.join(__dirname, '..'), filePath);
                 await order.save();
-                console.log(`💾 Путь к договору сохранён в БД: ${order.contractPath}`);
-
             } catch (err) {
                 console.error('❌ Ошибка генерации PDF договора:', err);
             }
 
-            // Обновление списка заказов
             io.emit('orderUpdated');
 
-            // Уведомляем исполнителя
+            // ✅ уведомление исполнителю (только факт debt/premium)
             io.to(`user_${order.executorId}`).emit('orderApproved', {
                 orderId: order.id,
                 message: 'Ваш запрос на выполнение заказа одобрен!',
                 isPremium,
-                commissionAmount: commissionKopecks,
-                debt: finalDebt,
-                paid: finalDebt === 0,
-                autoPay,
+                debt: debtKopecks,
+                needPay: debtKopecks > 0,
+                paid: debtKopecks === 0,
             });
 
-            // Уведомляем заказчика
+            // уведомление заказчику
             io.to(`user_${order.creatorId}`).emit('orderApproved', {
                 orderId: order.id,
                 message: 'Вы успешно одобрили заказ!',
             });
 
-            res.json({ message: 'Заказ одобрен и исполнитель выбран!', order });
+            return res.json({ message: 'Заказ одобрен и исполнитель выбран!', order });
+
         } catch (error) {
             console.error('❌ Ошибка при одобрении заказа:', error);
-            res.status(500).json({ message: 'Ошибка сервера' });
+            return res.status(500).json({ message: 'Ошибка сервера' });
         }
     });
 

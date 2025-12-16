@@ -84,68 +84,6 @@ router.post('/debt/create', authenticateToken, async (req, res) => {
         if (!user) return res.status(404).json({ success: false, error: 'Пользователь не найден' });
 
         const debtKopecks = Number(user.debt || 0);
-        if (debtKopecks <= 0) {
-            return res.json({ success: true, noDebt: true });
-        }
-
-        const amountValue = (debtKopecks / 100).toFixed(2);
-        const idempotenceKey = uuidv4();
-
-        const payment = await yooKassa.createPayment(
-            {
-                amount: { value: amountValue, currency: 'RUB' },
-                capture: true,
-                confirmation: {
-                    type: 'redirect',
-                    return_url: `${process.env.FRONTEND_URL}/profile?debtReturn=1`,
-                },
-                description: `Погашение задолженности по комиссии пользователя #${userId}`,
-                metadata: {
-                    type: 'debt',
-                    userId: String(userId),
-                    expectedKopecks: String(debtKopecks),
-                },
-
-                // ✅ чек обязателен (у тебя включена фискализация), УСН доходы = tax_system_code 2
-                receipt: {
-                    customer: {
-                        phone: String(user.phone || '').replace(/[^\d+]/g, ''),
-                    },
-                    items: [
-                        {
-                            description: `Погашение задолженности по комиссии`,
-                            quantity: 1,
-                            amount: { value: amountValue, currency: 'RUB' },
-                            vat_code: 1, // без НДС
-                            payment_mode: 'full_payment',
-                            payment_subject: 'service',
-                        },
-                    ],
-                    tax_system_code: 2,
-                },
-            },
-            idempotenceKey
-        );
-
-        return res.json({
-            success: true,
-            paymentId: payment.id,
-            confirmationUrl: payment.confirmation?.confirmation_url,
-        });
-    } catch (e) {
-        console.error('debt/create error:', e);
-        return res.status(500).json({ success: false, error: e?.message || 'Internal server error' });
-    }
-});
-
-router.post('/debt/pay', authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-
-        const user = await User.findByPk(userId);
-        if (!user) return res.status(404).json({ success: false, error: 'Пользователь не найден' });
-
-        const debtKopecks = Number(user.debt || 0);
         if (debtKopecks <= 0) return res.json({ success: true, noDebt: true });
 
         const amountValue = (debtKopecks / 100).toFixed(2);
