@@ -9,8 +9,8 @@ const path = require('path');
 const { Sequelize } = require('sequelize');
 const moment = require('moment');
 const { Order, User, Category, Subcategory, Service } = require('../models');
-const fs = require('fs');
 const generateContractPDF = require('../utils/generateContractPDF');
+const yooKassa = require('../config/yookassaClient');
 
 setInterval(async () => {
     try {
@@ -49,28 +49,6 @@ const geocoder = NodeGeocoder({
     apiKey: process.env.YANDEX_API_KEY, // Помести ключ в .env
     lang: 'ru-RU'
 });
-
-function calculateCommissionRubles({ paymentType, proposedSum, isRecommended, isPremium }) {
-    if (isPremium) return 0;
-
-    let commission = 0;
-    const sum = Number(proposedSum) || 0;
-
-    if (paymentType === "cash") {
-        commission = 200;
-    } else if (paymentType === "guarantee") {
-        commission = Math.round(sum * 0.15);
-    } else if (paymentType === "installments") {
-        commission = Math.round(sum * 0.20);
-    }
-
-    if (isRecommended) {
-        commission -= 100;
-        if (commission < 0) commission = 0;
-    }
-
-    return commission; // в рублях
-}
 
 module.exports = (io) => {
 
@@ -492,6 +470,28 @@ module.exports = (io) => {
             // Назначаем исполнителя
             order.executorId = executorId;
 
+            // финальная сумма в копейках (берем proposedSum)
+            const proposedRub = Number(order.proposedSum || 0);
+            order.finalPriceKopecks = Math.max(0, Math.round(proposedRub * 100));
+
+            // cash / guarantee / installment
+            if (order.paymentType === 'cash') {
+                order.status = 'active';
+                order.dealStatus = 'none';
+            }
+
+            if (order.paymentType === 'guarantee') {
+                // ждём, пока заказчик оплатит/захолдит деньги
+                order.status = 'pending';               // можно оставить pending
+                order.dealStatus = 'waiting_payment';   // вот ключевое поле
+            }
+
+            if (order.paymentType === 'installment') {
+                // пока не трогаем, позже
+                order.status = 'pending';
+                order.dealStatus = 'none';
+            }
+
             // Активируем заказ
             order.requestedExecutors = JSON.stringify([]); // чистим
             order.status = 'active';
@@ -570,42 +570,16 @@ module.exports = (io) => {
                 message: 'Вы успешно одобрили заказ!',
             });
 
-            return res.json({ message: 'Заказ одобрен и исполнитель выбран!', order });
+            return res.json({
+                success: true,
+                paymentType: 'guarantee',
+                confirmationUrl: payment.confirmation.confirmation_url,
+                orderId: order.id,
+            });
 
         } catch (error) {
             console.error('❌ Ошибка при одобрении заказа:', error);
             return res.status(500).json({ message: 'Ошибка сервера' });
-        }
-    });
-
-    router.post('/:id/reject', authenticateToken, async (req, res) => {
-        const { id } = req.params;
-
-        try {
-            const order = await Order.findByPk(id);
-
-            if (!order) {
-                return res.status(404).json({ message: 'Заказ не найден' });
-            }
-
-            if (order.creatorId !== req.user.id) {
-                return res.status(403).json({ message: 'Вы не можете отклонить этот заказ' });
-            }
-
-            if (!order.executorId) {
-                return res.status(400).json({ message: 'Нет исполнителя для отклонения' });
-            }
-
-            // Убираем исполнителя и оставляем заказ доступным
-            order.executorId = null;
-            await order.save();
-
-            io.emit('orderUpdated');
-
-            res.json({ message: 'Исполнитель отклонён', order });
-        } catch (error) {
-            console.error('Ошибка при отклонении заказа:', error);
-            res.status(500).json({ message: 'Ошибка сервера' });
         }
     });
 
@@ -642,6 +616,26 @@ module.exports = (io) => {
             if (order.completedBy.includes(order.creatorId) && order.completedBy.includes(order.executorId)) {
                 order.status = "completed";
                 order.completedAt = new Date();
+
+                // ✅ гарантия: списываем холд
+                if (order.paymentType === 'guarantee' && order.dealStatus === 'funds_held' && order.yookassa_payment_id) {
+                    const amountValue = (Number(order.finalPriceKopecks || 0) / 100).toFixed(2);
+
+                    try {
+                        const captured = await yooKassa.capturePayment(order.yookassa_payment_id, {
+                            amount: { value: amountValue, currency: 'RUB' }
+                        });
+
+                        order.yookassa_payment_status = captured.status;
+                        // dealStatus обновится вебхуком payment.succeeded, но можно и сразу:
+                        // order.dealStatus = 'captured';
+                        // order.captured_at = new Date();
+                    } catch (e) {
+                        console.error('capturePayment error:', e);
+                        // тут реши бизнес-логикой: заказ completed, но деньги не списались — это критично
+                        // можно поставить dealStatus=payment_failed и НЕ давать completed
+                    }
+                }
             }
 
             await order.save();

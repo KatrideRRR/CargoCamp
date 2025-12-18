@@ -6,69 +6,88 @@ import io from 'socket.io-client';
 import styles from '../styles/MyOrdersPage.module.css';
 import {AuthContext} from "../utils/authContext";
 import Modal from "react-modal";
+import { useLocation } from "react-router-dom";
 import {FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity} from "react-icons/fa";
-const apiUrl = process.env.REACT_APP_API_URL;
 
+const apiUrl = process.env.REACT_APP_API_URL;
 const socket = io(process.env.REACT_APP_SOCKET_URL);
 
 const MyOrdersPage = () => {
     const { userId } = useParams();
+    const location = useLocation();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const { hasNewRequests, setHasNewRequests } = useContext(AuthContext);
     const navigate = useNavigate();
-    const [isModalOpen, setIsModalOpen] = useState(false);  // Состояние для модального окна
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);  // Индекс текущего изображения
     const [currentImages, setCurrentImages] = useState([]);  // Массив изображений для отображения
     const paymentMethods = [
         { id: "cash", label: "Наличные", icon: "💵" },
         { id: "guarantee", label: "Гарантия", icon: "🛡️" },
-        { id: "installments", label: "Рассрочка", icon: "💳" },
+        { id: "installment", label: "Рассрочка", icon: "💳" },
     ];
+    const [approving, setApproving] = useState(false);
+
+
+    const fetchOrders = async () => {
+        try {
+            setLoading(true);
+            setError('');
+
+            const token = localStorage.getItem('authToken');
+            const response = await axiosInstance.get(`/orders/creator/${userId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const ordersData = response.data || [];
+
+            const ordersWithExecutors = await Promise.all(
+                ordersData.map(async (order) => {
+                    try {
+                        const executorsResponse = await axiosInstance.get(`/orders/${order.id}/requested-executors`,
+                            { headers: { Authorization: `Bearer ${token}` } }
+                        );
+                        return { ...order, requestedExecutors: Array.isArray(executorsResponse.data) ? executorsResponse.data : [] };
+                    } catch (error) {
+                        console.error(`Ошибка загрузки исполнителей для заказа ${order.id}:`, error);
+                        return { ...order, requestedExecutors: [] };
+                    }
+                })
+            );
+
+            setOrders(ordersWithExecutors);
+
+        } catch (err) {
+            if (err.response && err.response.status === 404) {
+                setOrders([]); // Просто ставим пустой массив, чтобы не было ошибки
+            } else {
+                console.error('Ошибка при загрузке заказов:', err);
+                setError('Ошибка загрузки данных');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchOrders = async () => {
-            try {
-                setLoading(true);
-                setError('');
 
-                const token = localStorage.getItem('authToken');
-                const response = await axiosInstance.get(`/orders/creator/${userId}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+        fetchOrders();
 
-                const ordersData = response.data || [];
-
-                const ordersWithExecutors = await Promise.all(
-                    ordersData.map(async (order) => {
-                        try {
-                            const executorsResponse = await axiosInstance.get(`/orders/${order.id}/requested-executors`,
-                                { headers: { Authorization: `Bearer ${token}` } }
-                            );
-                            return { ...order, requestedExecutors: Array.isArray(executorsResponse.data) ? executorsResponse.data : [] };
-                        } catch (error) {
-                            console.error(`Ошибка загрузки исполнителей для заказа ${order.id}:`, error);
-                            return { ...order, requestedExecutors: [] };
-                        }
-                    })
-                );
-
-                setOrders(ordersWithExecutors);
-
-            } catch (err) {
-                if (err.response && err.response.status === 404) {
-                    setOrders([]); // Просто ставим пустой массив, чтобы не было ошибки
-                } else {
-                    console.error('Ошибка при загрузке заказов:', err);
-                    setError('Ошибка загрузки данных');
-                }
-            } finally {
-                setLoading(false);
+        useEffect(() => {
+            const params = new URLSearchParams(location.search);
+            const guaranteeReturn = params.get("guaranteeReturn");
+            if (guaranteeReturn === "1") {
+                // обновляем заказы (чтобы подтянуть active / статус оплаты)
+                // и чистим query, чтобы не срабатывало снова
+                (async () => {
+                    await fetchOrders();
+                    navigate(location.pathname, { replace: true }); // убираем ?guaranteeReturn=1
+                })();
             }
-        };
-
-
+        }, [location.search]);
 
         const checkAuthUser = async () => {
             try {
@@ -112,20 +131,24 @@ const MyOrdersPage = () => {
     }, [userId, navigate, setHasNewRequests]);
 
     const approveExecutor = async (orderId, executorId) => {
-        try {
-            await axiosInstance.post(`/orders/${orderId}/approve`, { executorId });
-            alert('Исполнитель одобрен!');
-            setOrders((prevOrders) =>
-                prevOrders.map((order) =>
-                    order.id === orderId
-                        ? { ...order, requestedExecutors: order.requestedExecutors.filter((e) => e.id !== executorId) }
-                        : order
-                )
-            );
+        if (approving) return;
+        setApproving(true);
 
+        try {
+            const res = await axiosInstance.post(`/orders/${orderId}/approve`, { executorId });
+
+            if (res.data?.confirmationUrl) {
+                window.location.href = res.data.confirmationUrl;
+                return;
+            }
+
+            alert('Исполнитель одобрен!');
+            setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, requestedExecutors: o.requestedExecutors.filter((e) => e.id !== executorId) } : o)));
         } catch (error) {
-            console.error('Ошибка при одобрении исполнителя:', error);
-            alert('Не удалось одобрить исполнителя');
+            console.error(error);
+            alert(error.response?.data?.message || 'Не удалось одобрить исполнителя');
+        } finally {
+            setApproving(false);
         }
     };
 
@@ -135,7 +158,7 @@ const MyOrdersPage = () => {
                 return <FaUniversity title="Tinkoff" />;
             case 'cash':
                 return <FaMoneyBillWave title="Наличные" />;
-            case 'installments':
+            case 'installment':
                 return <FaCreditCard title="Карта" />;
             default:
                 return <FaQuestionCircle title="Неизвестно" />;
@@ -144,13 +167,13 @@ const MyOrdersPage = () => {
 
     const openModal = (images) => {
         setCurrentImages(images);
-        setCurrentImageIndex(0);  // Начать с первого изображения
-        setIsModalOpen(true);
+        setCurrentImageIndex(0);
+        setIsImageModalOpen(true);
     };
 
     const closeModal = () => {
-        setIsModalOpen(false);
-        setCurrentImageIndex(0);  // Сброс индекса при закрытии
+        setIsImageModalOpen(false);
+        setCurrentImageIndex(0);
         setCurrentImages([]);
     };
 
@@ -166,7 +189,7 @@ const MyOrdersPage = () => {
         <div className={styles.container}>
             <div className={styles.ordersWrapper}>
                 <button
-                    onClick={() => setIsModalOpen(true)}
+                    onClick={() => setIsCreateModalOpen(true)}
                     className={`${styles.createButton} ${hasNewRequests ? styles.newRequest : ''}`}
                 >
                     Разместить заказ
@@ -254,10 +277,11 @@ const MyOrdersPage = () => {
                                                             </button>
 
                                                             <button
+                                                                disabled={approving}
                                                                 onClick={() => approveExecutor(order.id, executor.id)}
                                                                 className={styles.approveButton}
                                                             >
-                                                                Одобрить
+                                                                {approving ? "Подтверждаем..." : "Одобрить"}
                                                             </button>
                                                         </div>
                                                     </li>
@@ -270,7 +294,7 @@ const MyOrdersPage = () => {
 
                                     <Modal
                                         appElement={document.getElementById('root')}
-                                        isOpen={isModalOpen}
+                                        isOpen={isImageModalOpen}
                                         onRequestClose={closeModal}
                                         contentLabel="Full Image Modal"
                                         className="custom-modal"
@@ -304,8 +328,8 @@ const MyOrdersPage = () => {
                 )}
             </div>
             <CreateOrderModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
             />
 
         </div>

@@ -281,11 +281,11 @@ function CreateOrderPage() {
     const getPaymentIcon = (type) => {
         switch (type) {
             case 'guarantee':
-                return <FaUniversity title="Tinkoff" />;
+                return <FaUniversity title="Гарантия" />;
             case 'cash':
                 return <FaMoneyBillWave title="Наличные" />;
-            case 'installments':
-                return <FaCreditCard title="Карта" />;
+            case 'installment':
+                return <FaCreditCard title="Рассрочка" />;
             default:
                 return <FaQuestionCircle title="Неизвестно" />;
         }

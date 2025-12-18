@@ -1,10 +1,8 @@
 const { Model, DataTypes } = require('sequelize');
-const Sequelize = require('sequelize'); // Добавляем импорт Sequelize
 
 module.exports = (sequelize) => {
     class User extends Model {
         static associate(models) {
-            // Связь с моделью Order
             User.hasMany(models.Order, { foreignKey: 'userId', as: 'orders' });
         }
     }

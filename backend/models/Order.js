@@ -104,7 +104,36 @@ module.exports = (sequelize) => {
                 type: DataTypes.DATE,
                 allowNull: true,
             },
-
+            dealStatus: {
+                type: DataTypes.ENUM('none','waiting_payment','funds_held','captured','cancelled','payment_failed'),
+                allowNull: false,
+                defaultValue: 'none',
+            },
+            yookassa_payment_id: {
+                type: DataTypes.STRING,
+                allowNull: true,
+            },
+            yookassa_payment_status: {
+                type: DataTypes.STRING,
+                allowNull: true,
+            },
+            funds_held_at: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
+            captured_at: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
+            payment_failed_at: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
+            finalPriceKopecks: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+                defaultValue: 0,
+            },
         },
         {
             sequelize,

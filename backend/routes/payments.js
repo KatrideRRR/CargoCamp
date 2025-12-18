@@ -2,8 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { Order, User } = require('../models'); // sequelize models
 const authenticateToken = require('../middlewares/userAuth'); // если нужен
-const { v4: uuidv4 } = require('uuid');
-const yooKassa = require('../utils/yookassaClient');
+const { randomUUID } = require('crypto');
+const idempotenceKey = randomUUID();
+const yooKassa = require('../config/yookassaClient');
 
 function verifyYookassaWebhook(req, res, next) {
     const auth = req.headers['authorization'] || '';
@@ -292,10 +293,101 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
     }
 });
 
+router.post('/guarantee/create', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { orderId } = req.body;
+
+        if (!orderId) return res.status(400).json({ success: false, error: 'orderId обязателен' });
+
+        const order = await Order.findByPk(orderId);
+        if (!order) return res.status(404).json({ success: false, error: 'Заказ не найден' });
+
+        if (order.creatorId !== userId) {
+            return res.status(403).json({ success: false, error: 'Нет доступа' });
+        }
+
+        if (order.paymentType !== 'guarantee') {
+            return res.status(400).json({ success: false, error: 'Этот заказ не в режиме гарантии' });
+        }
+
+        if (!order.executorId) {
+            return res.status(400).json({ success: false, error: 'Сначала выберите исполнителя' });
+        }
+
+        if (order.dealStatus !== 'waiting_payment') {
+            return res.status(400).json({ success: false, error: 'Этот заказ не ожидает оплату' });
+        }
+
+        const amountKopecks = Number(order.finalPriceKopecks || 0);
+        if (amountKopecks <= 0) {
+            return res.status(400).json({ success: false, error: 'Сумма заказа некорректна' });
+        }
+
+        const amountValue = (amountKopecks / 100).toFixed(2);
+
+        const customer = await User.findByPk(userId);
+        if (!customer) return res.status(404).json({ success: false, error: 'Пользователь не найден' });
+
+        const idempotenceKey = randomUUID();
+
+        const payment = await yooKassa.createPayment({
+            amount: { value: amountValue, currency: 'RUB' },
+
+            // ✅ ВАЖНО: холд
+            capture: false,
+
+            confirmation: {
+                type: 'redirect',
+                return_url: `${process.env.FRONTEND_URL}/my-orders/${userId}?guaranteeReturn=1`            },
+
+            description: `Гарантия по заказу #${orderId}`,
+            metadata: {
+                type: 'guarantee',
+                orderId: String(orderId),
+                creatorId: String(order.creatorId),
+                executorId: String(order.executorId),
+                expectedKopecks: String(amountKopecks),
+            },
+
+            // чек (как у тебя)
+            receipt: {
+                customer: { phone: String(customer.phone || '').replace(/[^\d+]/g, '') },
+                items: [{
+                    description: `Гарантия по заказу #${orderId}`,
+                    quantity: 1,
+                    amount: { value: amountValue, currency: 'RUB' },
+                    vat_code: 1,
+                    payment_mode: 'full_payment',
+                    payment_subject: 'service',
+                }],
+                tax_system_code: 2,
+            },
+        }, idempotenceKey);
+
+        await order.update({
+            yookassa_payment_id: payment.id,
+            yookassa_payment_status: payment.status,
+        });
+
+        return res.json({
+            success: true,
+            paymentId: payment.id,
+            status: payment.status,
+            confirmationUrl: payment.confirmation?.confirmation_url,
+        });
+
+    } catch (e) {
+        console.error('guarantee/create error:', e);
+        return res.status(500).json({ success: false, error: e?.message || 'Internal server error' });
+    }
+});
+
 router.post('/yookassa/webhook',verifyYookassaWebhook, async (req, res) => {
     try {
         const event = req.body;
-        if (event?.event !== 'payment.succeeded') return res.sendStatus(200);
+        const allowed = ['payment.waiting_for_capture', 'payment.succeeded', 'payment.canceled'];
+        if (!allowed.includes(event?.event)) return res.sendStatus(200);
 
         const payment = event.object;
         const meta = payment?.metadata || {};
@@ -395,6 +487,59 @@ router.post('/yookassa/webhook',verifyYookassaWebhook, async (req, res) => {
             });
 
             io.emit('orderUpdated');
+
+            return res.sendStatus(200);
+        }
+
+        // ====== 5) Guarantee (hold/capture) ======
+        if (meta.type === 'guarantee') {
+            const orderId = Number(meta.orderId);
+            const order = await Order.findByPk(orderId);
+            if (!order) return res.sendStatus(200);
+
+            // защита от "чужого" платежа
+            if (order.yookassa_payment_id && order.yookassa_payment_id !== payment.id) {
+                return res.sendStatus(200);
+            }
+
+            // 1) холд успешен (деньги заморожены)
+            if (event.event === 'payment.waiting_for_capture') {
+                await order.update({
+                    dealStatus: 'funds_held',
+                    yookassa_payment_status: payment.status,
+                    funds_held_at: new Date(),
+                });
+
+                // можно уведомить исполнителя "деньги в гарантии, можно ехать"
+                io.to(`user_${order.executorId}`).emit('guaranteeHeld', {
+                    orderId: order.id,
+                    message: 'Заказ оплачен по гарантии. Деньги заморожены ✅ Можно приступать.',
+                });
+
+                return res.sendStatus(200);
+            }
+
+            // 2) платеж отменен/не прошел
+            if (event.event === 'payment.canceled') {
+                await order.update({
+                    dealStatus: 'payment_failed',
+                    yookassa_payment_status: payment.status,
+                    payment_failed_at: new Date(),
+                });
+
+                return res.sendStatus(200);
+            }
+
+            // 3) финальное списание (после capture)
+            if (event.event === 'payment.succeeded') {
+                await order.update({
+                    dealStatus: 'captured',
+                    yookassa_payment_status: payment.status,
+                    captured_at: new Date(),
+                });
+
+                return res.sendStatus(200);
+            }
 
             return res.sendStatus(200);
         }
