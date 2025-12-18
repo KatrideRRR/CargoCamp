@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const NodeGeocoder = require("node-geocoder");
 
 const geocoder = NodeGeocoder({
-    provider: "openstreetmap", // Или другой сервис, который ты используешь
+    provider: "openstreetmap",
 });
 
 const router = express.Router();
