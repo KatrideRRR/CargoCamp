@@ -46,7 +46,7 @@ const upload = multer({ storage });
 
 const geocoder = NodeGeocoder({
     provider: 'yandex',
-    apiKey: process.env.YANDEX_API_KEY, // Помести ключ в .env
+    apiKey: process.env.YANDEX_API_KEY,
     lang: 'ru-RU'
 });
 

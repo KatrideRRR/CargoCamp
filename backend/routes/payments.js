@@ -334,7 +334,6 @@ router.post('/guarantee/create', authenticateToken, async (req, res) => {
         const payment = await yooKassa.createPayment({
             amount: { value: amountValue, currency: 'RUB' },
 
-            // ✅ ВАЖНО: холд
             capture: false,
 
             confirmation: {
