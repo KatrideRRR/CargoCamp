@@ -1,10 +1,11 @@
 import { toast } from "react-toastify";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../utils/authContext";
 import axios from "axios";
 import "../styles/ProfilePage.css";
 import AgreementModal from "../components/AgreementModal";
+
 const apiUrl = process.env.REACT_APP_API_URL;
 
 const ProfilePage = () => {
@@ -13,11 +14,13 @@ const ProfilePage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [paymentMethodId, setPaymentMethodId] = useState(null);
-    const navigate = useNavigate();
-    const { logout, isAuthenticated, user } = useAuth();    const [cardInfo, setCardInfo] = useState();
     const [showAgreement, setShowAgreement] = useState(false);
     const [hasDebt, setHasDebt] = useState(false);
     const [debtAmount, setDebtAmount] = useState(0);
+
+    const navigate = useNavigate();
+    const { logout, isAuthenticated } = useAuth();
+
     const getRemainingDays = (expiresAt) => {
         if (!expiresAt) return 0;
         const now = new Date();
@@ -26,13 +29,22 @@ const ProfilePage = () => {
         return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
     };
 
+    const subscriptionLabel = useMemo(() => {
+        if (!profile) return "";
+        if (profile.subscriptionType === "premium") {
+            return `Премиум активен • осталось ${getRemainingDays(profile.subscriptionExpiresAt)} дн.`;
+        }
+        if (profile.subscriptionType === "trial") {
+            return `Пробная подписка • осталось ${getRemainingDays(profile.subscriptionExpiresAt)} дн.`;
+        }
+        return "Обычный аккаунт";
+    }, [profile]);
+
     useEffect(() => {
         let isMounted = true;
 
         const fetchProfileData = async () => {
             const token = localStorage.getItem("authToken");
-            console.log("Токен на странице профиля:", token);
-
             if (!token) {
                 navigate("/login");
                 return;
@@ -42,8 +54,6 @@ const ProfilePage = () => {
                 const response = await axios.get(`${apiUrl}/api/auth/profile`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
-
-                console.log("Данные профиля:", response.data);
 
                 if (isMounted) {
                     setProfile(response.data);
@@ -61,8 +71,6 @@ const ProfilePage = () => {
         };
 
         fetchProfileData();
-
-
         return () => {
             isMounted = false;
         };
@@ -72,11 +80,16 @@ const ProfilePage = () => {
         if (profile) {
             loadDebtStatus();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [profile]);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        if (params.get("bindReturn") === "1" || params.get("debtReturn") === "1" || params.get("premiumReturn") === "1") {
+        if (
+            params.get("bindReturn") === "1" ||
+            params.get("debtReturn") === "1" ||
+            params.get("premiumReturn") === "1"
+        ) {
             setTimeout(() => window.location.reload(), 1500);
         }
     }, []);
@@ -86,7 +99,7 @@ const ProfilePage = () => {
 
         try {
             const response = await axios.get(`${apiUrl}/api/orders/me/status`, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { Authorization: `Bearer ${token}` },
             });
 
             setDebtAmount(response.data.debt || 0);
@@ -99,15 +112,8 @@ const ProfilePage = () => {
     const handlePayDebt = async () => {
         try {
             const token = localStorage.getItem("authToken");
-            if (!token) {
-                toast.error("Вы не авторизованы");
-                return;
-            }
-
-            if (!debtAmount || debtAmount <= 0) {
-                toast.info("Долгов нет");
-                return;
-            }
+            if (!token) return toast.error("Вы не авторизованы");
+            if (!debtAmount || debtAmount <= 0) return toast.info("Долгов нет");
 
             const res = await axios.post(
                 `${apiUrl}/api/payments/debt/create`,
@@ -115,15 +121,8 @@ const ProfilePage = () => {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            if (!res.data?.success) {
-                toast.error(res.data?.error || "Ошибка создания платежа");
-                return;
-            }
-
-            if (res.data.noDebt) {
-                toast.info("Долгов нет");
-                return;
-            }
+            if (!res.data?.success) return toast.error(res.data?.error || "Ошибка создания платежа");
+            if (res.data.noDebt) return toast.info("Долгов нет");
 
             window.location.href = res.data.confirmationUrl;
         } catch (e) {
@@ -135,21 +134,15 @@ const ProfilePage = () => {
     const handleBuyPremium = async (duration) => {
         try {
             const token = localStorage.getItem("authToken");
-            if (!token) {
-                toast.error("Вы не авторизованы");
-                return;
-            }
+            if (!token) return toast.error("Вы не авторизованы");
 
             const res = await axios.post(
                 `${apiUrl}/api/payments/premium/create`,
-                { duration }, // "7d" | "30d"
+                { duration },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            if (!res.data?.success) {
-                toast.error(res.data?.error || "Ошибка создания платежа");
-                return;
-            }
+            if (!res.data?.success) return toast.error(res.data?.error || "Ошибка создания платежа");
 
             window.location.href = res.data.confirmationUrl;
         } catch (e) {
@@ -161,10 +154,7 @@ const ProfilePage = () => {
     const handleBindCard = async () => {
         try {
             const token = localStorage.getItem("authToken");
-            if (!token) {
-                toast.error("Вы не авторизованы");
-                return;
-            }
+            if (!token) return toast.error("Вы не авторизованы");
 
             const res = await axios.post(
                 `${apiUrl}/api/payments/card/bind/create`,
@@ -172,10 +162,7 @@ const ProfilePage = () => {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            if (!res.data?.success) {
-                toast.error(res.data?.error || "Ошибка привязки карты");
-                return;
-            }
+            if (!res.data?.success) return toast.error(res.data?.error || "Ошибка привязки карты");
 
             window.location.href = res.data.confirmationUrl;
         } catch (e) {
@@ -187,10 +174,7 @@ const ProfilePage = () => {
     const handleUnbindCard = async () => {
         try {
             const token = localStorage.getItem("authToken");
-            if (!token) {
-                toast.error("Вы не авторизованы");
-                return;
-            }
+            if (!token) return toast.error("Вы не авторизованы");
 
             const res = await axios.post(
                 `${apiUrl}/api/payments/card/unbind`,
@@ -200,12 +184,6 @@ const ProfilePage = () => {
 
             if (res.data?.success) {
                 toast.success("Карта успешно удалена");
-                setPaymentMethodId(null);
-                setCardInfo(null);
-
-                // обновим профиль, чтобы подтянуть cardLastFour/cardType
-                // можешь просто вызвать fetchProfileData ещё раз, но у тебя оно внутри useEffect.
-                // проще:
                 window.location.reload();
             } else {
                 toast.error(res.data?.error || "Ошибка при удалении карты");
@@ -222,15 +200,11 @@ const ProfilePage = () => {
     };
 
     const handleMyComplaints = () => {
-        if (profile) {
-            navigate(`/complaints/${profile.id}`);
-        }
+        if (profile) navigate(`/complaints/${profile.id}`);
     };
 
     const handleOrderHistory = () => {
-        if (profile) {
-            navigate(`/orders-history/${profile.id}`);
-        }
+        if (profile) navigate(`/orders-history/${profile.id}`);
     };
 
     const renderStars = (rating) => {
@@ -242,229 +216,217 @@ const ProfilePage = () => {
 
     const handleAgree = () => {
         setShowAgreement(false);
-        handleBindCard(); // твоя функция
+        handleBindCard();
     };
 
     const handleAutoUpload = async (files) => {
         const token = localStorage.getItem("authToken");
-
         if (!files.length) return;
 
         const formData = new FormData();
-        for (let file of files) {
-            formData.append("documents", file);
-        }
+        for (let file of files) formData.append("documents", file);
 
         try {
-            const response = await axios.post(`${apiUrl}/api/auth/upload-documents`, formData, {
+            await axios.post(`${apiUrl}/api/auth/upload-documents`, formData, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                     "Content-Type": "multipart/form-data",
                 },
             });
-            console.log(response)
 
             toast.success("Документы успешно загружены");
-            // TODO: можно обновить профиль, если хочешь, чтобы верификация менялась на лету
         } catch (error) {
             console.error("Ошибка загрузки документов:", error);
             toast.error("Ошибка загрузки документов");
         }
     };
 
-    if (loading) {
-        return <div className="loading-container">Загрузка данных профиля...</div>;
-    }
+    const verificationText = useMemo(() => {
+        if (!profile) return "";
+        if (profile.userStatus === "pensioner") return "Пенсионер";
+        if (profile.userStatus === "verified") return "Пройдена";
+        return "Не пройдена";
+    }, [profile]);
 
-    if (error) {
+    if (loading) return <div className="profile-loading">Загрузка данных профиля...</div>;
+    if (error)
         return (
-            <div className="error-container">
-                <p className="error-text">{error}</p>
+            <div className="profile-loading">
+                <p className="profile-error">{error}</p>
             </div>
         );
-    }
 
     return (
-
-        <div className="profile">
-
-            <div className="pageContainer-profile">
-
-                <div className="container-p">
-                    <div className="contentWrapper">
-
-                        <div className="profile-container">
-                            {profile ? (
-                                <>
-                                    <div className="section username">
-                                        <h2 className="subtitle">Имя пользователя:</h2>
-                                        <p className="info">{profile.username}</p>
-                                    </div>
-                                    <div className="section user-id">
-                                        <h2 className="subtitle">ID пользователя:</h2>
-                                        <p className="info">{profile.id}</p>
-                                    </div>
-                                    <div className="section user-rating">
-                                        <h2 className="subtitle">Рейтинг:</h2>
-                                        <p className="info rating">
-                                            {profile.rating ? renderStars(profile.rating) : "Нет рейтинга"}
-                                        </p>
-                                    </div>
-
-
-                                    <div className="section1 card-section">
-                                        <h2 className="subtitle">Ваша карта:</h2>
-
-                                        {paymentMethodId ? (
-                                            <div className="card-info">
-                                                <p className="info verified">
-                                                    Карта привязана: {profile.cardType} •••• {profile.cardLastFour}
-                                                </p>
-                                                <button className="unbind-button" onClick={handleUnbindCard}>
-                                                    Удалить карту
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <button className="bind-card-button" onClick={handleBindCard}>
-                                                Привязать карту
-                                            </button>
-                                        )}
-
-
-                                        {hasDebt && (
-                                            <div className="debt-box">
-                                                <p className="text-red-600 font-semibold">
-                                                    У вас задолженность по комиссии: {(debtAmount / 100).toFixed(2)} ₽
-                                                </p>
-
-                                                <button className="btn btn-red" onClick={handlePayDebt}>
-                                                    Оплатить задолженность
-                                                </button>
-                                            </div>
-                                        )}
-
-                                    </div>
-
-
-                                    <div className="section premium-section">
-                                        {profile.subscriptionType === "premium" ? (
-                                            <p className="info premium-status">
-                                                Премиум активен
-                                                на {getRemainingDays(profile.subscriptionExpiresAt)} дней
-                                            </p>
-                                        ) : profile.subscriptionType === "trial" ? (
-                                            <p className="info trial-status">
-                                                🔄 Пробная подписка.
-                                                Осталось: {getRemainingDays(profile.subscriptionExpiresAt)} дней
-                                            </p>
-                                        ) : (
-                                            <p className="info">У вас обычный аккаунт.</p>
-                                        )}
-
-                                        <div className="subscription-buttons">
-                                            <button onClick={() => handleBuyPremium("7d")} className="subscribe-button">
-                                                Купить Премиум (7 дней)
-                                            </button>
-                                            <button onClick={() => handleBuyPremium("30d")} className="subscribe-button">
-                                                Купить Премиум (30 дней)
-                                            </button>
-                                        </div>
-                                    </div>
-
-
-                                    <div className="section verification-upload">
-                                        <div className="verification-header">
-                                            <h2 className="subtitle">Верификация:</h2>
-                                            <p className={`info verification-status ${profile.userStatus}`}>
-                                                {profile.userStatus === "pensioner"
-                                                    ? "Пенсионер"
-                                                    : profile.userStatus === "verified"
-                                                        ? "Пройдена"
-                                                        : "Не пройдена"}
-                                            </p>
-                                        </div>
-
-                                        <div className="verification-content">
-
-
-                                            <p className="verification-description">
-    <span className="verification-more-link" onClick={() => setShowVerificationModal(true)}>
-        Подробнее о верификации
-    </span>
-                                            </p>
-                                            <label className="upload-label">
-                                                <input
-                                                    type="file"
-                                                    multiple
-                                                    accept="image/*,.pdf"
-                                                    onChange={(e) => handleAutoUpload(e.target.files)}
-                                                    style={{display: "none"}}
-                                                />
-                                                <span className="upload-button-style">Загрузить документы</span>
-
-                                            </label>
-                                        </div>
-                                    </div>
-
-
-                                    {/* Кнопки навигации */}
-                                    <button onClick={handleMyComplaints} className="complaints-button">
-                                        Мои жалобы
-                                    </button>
-                                    <button onClick={handleOrderHistory} className="history-button">
-                                        История заказов
-                                    </button>
-                                    <button onClick={handleLogout} className="logout-button">
-                                        Выйти
-                                    </button>
-                                </>
-                            ) : (
-                                <p className="info">Загрузка данных профиля...</p>
-                            )}
+        <div className="profile-page">
+            <div className="profile-shell">
+                <div className="profile-header glass">
+                    <div className="profile-header-top">
+                        <div>
+                            <h1 className="profile-title">Профиль</h1>
+                            <p className="profile-subtitle">Управление аккаунтом и оплатой</p>
                         </div>
 
-                        {showAgreement && (
-                            <AgreementModal
-                                isOpen={showAgreement}
-                                onClose={() => setShowAgreement(false)}
-                                onAgree={handleAgree}
-                                onCancel={() => setShowAgreement(false)}
-                            />
-                        )}
-
+                        <button className="profile-chip" onClick={() => navigate("/info")}>
+                            Информация
+                        </button>
                     </div>
+
+                    {profile && (
+                        <div className="profile-identity">
+                            <div className="identity-row">
+                                <div className="identity-main">
+                                    <div className="identity-name">{profile.username}</div>
+                                    <div className="identity-meta">
+                                        <span className="identity-pill">ID: {profile.id}</span>
+                                        <span className="identity-pill">
+                      Рейтинг: {profile.rating ? renderStars(profile.rating) : "Нет"}
+                    </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
-            </div>
-            {showVerificationModal && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <h3>О верификации пользователя</h3>
-                        <p>
-                            Верификация необходима для повышения доверия к вам как к пользователю платформы.
-                            Мы просим загрузить скан паспорта или другого документа, удостоверяющего личность,
-                            чтобы подтвердить, что вы — реальный человек, а не фейковый аккаунт.
-                        </p>
-                        <p>
-                            <strong>Для пенсионеров:</strong> если вы подтвердите свой пенсионный статус,
-                            исполнители будут видеть соответствующую отметку и получать <strong>скидку на комиссию</strong>
-                            при выполнении ваших заказов. Это увеличивает шанс, что ваш заказ примут быстрее.
-                        </p>
-                        <p>
-                            🔒 Все документы обрабатываются вручную и хранятся в зашифрованном виде.
-                            Мы не передаем их третьим лицам.
-                        </p>
-                        <p className="warning">
-                            ⚠️ Попытка загрузки поддельных документов приведет к ограничению или блокировке аккаунта.
-                        </p>
-                        <button className="close-button" onClick={() => setShowVerificationModal(false)}>
-                            Закрыть
+
+                {/* Платежи */}
+                <div className="profile-card glass">
+                    <div className="card-head">
+                        <div>
+                            <h2 className="card-title">Платежи</h2>
+                            <p className="card-subtitle">Карта, комиссия и задолженность</p>
+                        </div>
+                    </div>
+
+                    {paymentMethodId ? (
+                        <div className="card-row">
+                            <div className="card-row-text">
+                                <div className="card-strong">Карта привязана</div>
+                                <div className="card-muted">
+                                    {profile?.cardType} •••• {profile?.cardLastFour}
+                                </div>
+                            </div>
+                            <button className="btn btn-ghost-danger" onClick={handleUnbindCard}>
+                                Удалить
+                            </button>
+                        </div>
+                    ) : (
+                        <button className="btn btn-primary" onClick={handleBindCard}>
+                            Привязать карту
+                        </button>
+                    )}
+
+                    {hasDebt && (
+                        <div className="alert alert-danger">
+                            <div>
+                                <div className="alert-title">Задолженность по комиссии</div>
+                                <div className="alert-text">{(debtAmount / 100).toFixed(2)} ₽</div>
+                            </div>
+                            <button className="btn btn-danger" onClick={handlePayDebt}>
+                                Оплатить
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Premium */}
+                <div className="profile-card glass">
+                    <div className="card-head">
+                        <div>
+                            <h2 className="card-title">Premium</h2>
+                            <p className="card-subtitle">{subscriptionLabel}</p>
+                        </div>
+                    </div>
+
+                    <div className="grid-2">
+                        <button className="btn btn-primary" onClick={() => handleBuyPremium("7d")}>
+                            Купить (7 дней)
+                        </button>
+                        <button className="btn btn-primary" onClick={() => handleBuyPremium("30d")}>
+                            Купить (30 дней)
                         </button>
                     </div>
                 </div>
+
+                {/* Верификация */}
+                <div className="profile-card glass">
+                    <div className="card-head">
+                        <div>
+                            <h2 className="card-title">Верификация</h2>
+                            <p className={`card-subtitle status-${profile?.userStatus || "unknown"}`}>
+                                {verificationText}
+                            </p>
+                        </div>
+
+                        <button className="profile-chip" onClick={() => setShowVerificationModal(true)}>
+                            Подробнее
+                        </button>
+                    </div>
+
+                    <label className="upload-glass">
+                        <input
+                            type="file"
+                            multiple
+                            accept="image/*,.pdf"
+                            onChange={(e) => handleAutoUpload(e.target.files)}
+                            style={{ display: "none" }}
+                        />
+                        <span>Загрузить документы</span>
+                    </label>
+                </div>
+
+                {/* Действия */}
+                <div className="profile-actions glass">
+                    <button onClick={handleMyComplaints} className="btn btn-ghost">
+                        Мои жалобы
+                    </button>
+                    <button onClick={handleOrderHistory} className="btn btn-ghost">
+                        История заказов
+                    </button>
+                    <button onClick={() => navigate("/info")} className="btn btn-ghost">
+                        Информация и документы
+                    </button>
+                    <button onClick={handleLogout} className="btn btn-ghost-danger">
+                        Выйти
+                    </button>
+                </div>
+            </div>
+
+            {showAgreement && (
+                <AgreementModal
+                    isOpen={showAgreement}
+                    onClose={() => setShowAgreement(false)}
+                    onAgree={handleAgree}
+                    onCancel={() => setShowAgreement(false)}
+                />
             )}
 
-        </div>
+            {showVerificationModal && (
+                <div className="modal-overlay" onClick={() => setShowVerificationModal(false)}>
+                    <div className="modal-window" onClick={(e) => e.stopPropagation()}>
+                        <h3>О верификации пользователя</h3>
+                        <div className="modal-content">
+                            <p>
+                                Верификация необходима для повышения доверия к вам как к пользователю платформы. Мы просим
+                                загрузить скан паспорта или другого документа, удостоверяющего личность, чтобы подтвердить,
+                                что вы — реальный человек.
+                            </p>
+                            <p>
+                                <strong>Для пенсионеров:</strong> если вы подтвердите пенсионный статус, исполнители будут
+                                видеть отметку и получать <strong>скидку на комиссию</strong>.
+                            </p>
+                            <p>🔒 Все документы обрабатываются вручную и хранятся в зашифрованном виде.</p>
+                            <p className="warning">
+                                ⚠️ Попытка загрузки поддельных документов приведет к ограничению или блокировке аккаунта.
+                            </p>
 
+                            <button className="btn btn-ghost" onClick={() => setShowVerificationModal(false)}>
+                                Закрыть
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };
 

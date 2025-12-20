@@ -73,21 +73,21 @@ const MyOrdersPage = () => {
     };
 
     useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const guaranteeReturn = params.get("guaranteeReturn");
+        if (guaranteeReturn === "1") {
+            // обновляем заказы (чтобы подтянуть active / статус оплаты)
+            // и чистим query, чтобы не срабатывало снова
+            (async () => {
+                await fetchOrders();
+                navigate(location.pathname, { replace: true }); // убираем ?guaranteeReturn=1
+            })();
+        }
+    }, [location.search]);
+
+    useEffect(() => {
 
         fetchOrders();
-
-        useEffect(() => {
-            const params = new URLSearchParams(location.search);
-            const guaranteeReturn = params.get("guaranteeReturn");
-            if (guaranteeReturn === "1") {
-                // обновляем заказы (чтобы подтянуть active / статус оплаты)
-                // и чистим query, чтобы не срабатывало снова
-                (async () => {
-                    await fetchOrders();
-                    navigate(location.pathname, { replace: true }); // убираем ?guaranteeReturn=1
-                })();
-            }
-        }, [location.search]);
 
         const checkAuthUser = async () => {
             try {

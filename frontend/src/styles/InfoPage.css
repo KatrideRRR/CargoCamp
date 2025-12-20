@@ -1,0 +1,115 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+.info-page {
+    min-height: 100vh;
+    padding: 24px;
+    background: linear-gradient(to bottom right, #e8f0ff, #ffffff);
+    font-family: 'Inter', sans-serif;
+}
+
+.info-wrap {
+    max-width: 560px;
+    margin: 0 auto;
+}
+
+.info-top {
+    text-align: left;
+    margin-bottom: 18px;
+}
+
+.info-back {
+    border: none;
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(14px);
+    padding: 10px 14px;
+    border-radius: 14px;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.35);
+}
+
+.info-title {
+    margin: 14px 0 6px;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #1f2937;
+}
+
+.info-subtitle {
+    margin: 0;
+    color: #4b5563;
+}
+
+.info-card {
+    margin-top: 14px;
+    padding: 18px 20px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.08);
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.info-card:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.75);
+    box-shadow: 0 12px 34px rgba(0,0,0,0.12);
+}
+
+.info-card-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 800;
+    color: #1f2937;
+}
+
+.info-card-text {
+    margin: 6px 0 0;
+    color: #4b5563;
+    font-size: 0.9rem;
+}
+
+.info-list {
+    margin: 10px 0 0;
+    padding-left: 18px;
+    color: #4b5563;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.info-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.info-btn {
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.35);
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.25s ease;
+}
+
+.info-btn:hover {
+    transform: translateY(-2px);
+    background: rgba(255,255,255,0.75);
+    box-shadow: 0 10px 26px rgba(0,0,0,0.12);
+}
+
+.info-footer {
+    margin-top: 22px;
+    color: #6b7280;
+    font-size: 0.85rem;
+    line-height: 1.55;
+}
+
+/* используем твои модалки со StartPage — классы те же */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display:flex; justify-content:center; align-items:center; z-index: 1000; }
+.modal-window { background:#fff; padding: 25px; border-radius: 18px; width: 92%; max-width: 720px; max-height: 80vh; overflow-y:auto; box-shadow: 0 8px 36px rgba(0,0,0,0.18); }
+.modal-content { margin-top: 12px; color: #4b5563; line-height: 1.55; }

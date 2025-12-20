@@ -4,6 +4,7 @@ import io from 'socket.io-client';
 import axiosInstance from '../utils/axiosInstance';
 import '../styles/modalContext.css'
 import axios from "axios";
+export const ModalContext = createContext(null);
 
 const socket = io(process.env.REACT_APP_SOCKET_URL, {
     transports: ['websocket'],
