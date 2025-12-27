@@ -1,138 +1,264 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap");
+
+:root {
+    --bm-bg: rgba(255, 255, 255, 0.58);
+    --bm-border: rgba(255, 255, 255, 0.38);
+    --bm-shadow: 0 -18px 40px rgba(0, 0, 0, 0.08);
+
+    --bm-text: rgba(15, 23, 42, 0.86);
+    --bm-muted: rgba(100, 116, 139, 0.9);
+    --bm-active: rgba(29, 78, 216, 0.95);
+    --bm-active-soft: rgba(29, 78, 216, 0.14);
+
+    --bm-radius: 22px;
+    --bm-h: 74px;
+
+    --badge-bg: rgba(239, 68, 68, 0.95);
+    --badge-border: rgba(255, 255, 255, 0.95);
+}
+
 .bottom-menu {
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 70px;
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(10px);
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    height: var(--bm-h);
+
     display: flex;
     justify-content: space-around;
     align-items: center;
-    border-top: 1px solid rgba(0, 0, 0, 0.1);
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    gap: 8px;
+
+    background: var(--bm-bg);
+    border: 1px solid var(--bm-border);
+    border-radius: var(--bm-radius);
+
+    backdrop-filter: blur(18px) saturate(180%);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+
+    box-shadow: var(--bm-shadow);
     z-index: 1000;
 }
 
-.menu-item, .navbar-item {
-    background: none;
+/* safe-area для iOS */
+@supports (padding: env(safe-area-inset-bottom)) {
+    .bottom-menu {
+        bottom: calc(12px + env(safe-area-inset-bottom));
+    }
+}
+
+/* Общие кнопки */
+.menu-item,
+.navbar-item {
+    appearance: none;
+    -webkit-tap-highlight-color: transparent;
+
+    background: transparent;
     border: none;
     outline: none;
+
+    width: 64px;
+    height: 56px;
+    border-radius: 16px;
+
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: #333;
-    transition: all 0.3s ease;
+    gap: 4px;
+
+    color: var(--bm-text);
     cursor: pointer;
+
+    transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease,
+    color 0.18s ease;
     position: relative;
-    font-size: 12px;
 }
 
-.menu-item:hover, .navbar-item:hover {
-    color: #1948df;
+/* hover для десктопа */
+@media (hover: hover) and (pointer: fine) {
+    .menu-item:hover,
+    .navbar-item:hover {
+        background: rgba(255, 255, 255, 0.52);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+        transform: translateY(-1px);
+        color: var(--bm-active);
+    }
 }
 
-.menu-icon, .menu-icon-center {
-    transition: transform 0.3s ease;
+/* tap feedback */
+.menu-item:active,
+.navbar-item:active {
+    transform: scale(0.98);
 }
 
-.menu-item:hover .menu-icon,
-.menu-item:hover .menu-icon-center,
-.navbar-item:hover .menu-icon {
-    transform: scale(1.1);
+/* Иконки */
+.menu-icon,
+.menu-icon-center {
+    transition: transform 0.2s ease, opacity 0.2s ease;
+    opacity: 0.92;
 }
 
 .menu-label {
-    margin-top: 2px;
+    font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 1;
+    color: var(--bm-muted);
 }
 
-/* Центр */
+/* Подсветка активного пункта (если захочешь добавить класс .is-active на кнопку) */
+.menu-item.is-active,
+.navbar-item.is-active {
+    background: var(--bm-active-soft);
+    border: 1px solid rgba(29, 78, 216, 0.22);
+    color: var(--bm-active);
+}
+
+.menu-item.is-active .menu-label,
+.navbar-item.is-active .menu-label {
+    color: var(--bm-active);
+}
+
+/* ===== Центральная кнопка (плавающая) ===== */
 .menu-center {
-    background: linear-gradient(180deg, #48A9FF 0%, #003366 100%);
-    color: white;
-    border-radius: 30%;
-    width: 72px;
-    height: 72px;
+    width: 74px;
+    height: 74px;
+    border-radius: 24px;
+
     margin-top: -30px;
-    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.5);
+
+    background: rgba(255, 255, 255, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+
+    backdrop-filter: blur(18px) saturate(200%);
+    -webkit-backdrop-filter: blur(18px) saturate(200%);
+
+    box-shadow:
+            0 18px 46px rgba(0, 0, 0, 0.12),
+            0 0 0 1px rgba(29, 78, 216, 0.10) inset;
+
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-.menu-icon-center {
-    margin: 0;
-}
-
-/* Эффект уведомления */
-.new-request {
-    animation: pulse 1.5s infinite;
-}
-
-.new-message .dot {
+.menu-center::before {
+    content: "";
     position: absolute;
-    top: 8px;
-    right: 10px;
-    width: 8px;
-    height: 8px;
-    background: #ef4444;
-    border-radius: 50%;
-    animation: pulseDot 1.5s infinite;
+    inset: -1px;
+    border-radius: 24px;
+    background: radial-gradient(
+            circle at 30% 20%,
+            rgba(29, 78, 216, 0.22),
+            rgba(255, 255, 255, 0) 60%
+    );
+    pointer-events: none;
 }
 
-/* Анимации */
-@keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
-    70% { box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+.menu-center .menu-icon-center {
+    opacity: 0.95;
 }
 
-@keyframes pulseDot {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.3); }
-    100% { transform: scale(1); }
+@media (hover: hover) and (pointer: fine) {
+    .menu-center:hover {
+        transform: translateY(-2px);
+        box-shadow:
+                0 22px 60px rgba(0, 0, 0, 0.14),
+                0 0 0 1px rgba(29, 78, 216, 0.12) inset;
+    }
+
+    .menu-center:hover .menu-icon-center {
+        transform: scale(1.06);
+    }
 }
 
-/* Мобильная версия */
+.menu-center:active {
+    transform: translateY(-1px) scale(0.985);
+}
+
+/* ===== badge ===== */
+.icon-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notification-badge {
+    position: absolute;
+    top: -7px;
+    right: -9px;
+
+    background: var(--badge-bg);
+    color: #fff;
+
+    font-size: 10px;
+    font-weight: 900;
+
+    padding: 2px 6px;
+    border-radius: 999px;
+
+    min-width: 18px;
+    height: 18px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    border: 2px solid var(--badge-border);
+    box-shadow: 0 10px 20px rgba(239, 68, 68, 0.25);
+
+    transform: translateZ(0);
+}
+
+/* ===== пульс, если хочешь снова включить new-request/new-message ===== */
+.new-request {
+    animation: bmPulse 1.6s infinite;
+}
+
+@keyframes bmPulse {
+    0% {
+        box-shadow:
+                0 18px 46px rgba(0, 0, 0, 0.12),
+                0 0 0 0 rgba(29, 78, 216, 0.28);
+    }
+    70% {
+        box-shadow:
+                0 18px 46px rgba(0, 0, 0, 0.12),
+                0 0 0 14px rgba(29, 78, 216, 0);
+    }
+    100% {
+        box-shadow:
+                0 18px 46px rgba(0, 0, 0, 0.12),
+                0 0 0 0 rgba(29, 78, 216, 0);
+    }
+}
+
+/* ===== Mobile: скрываем подписи ===== */
 @media (max-width: 768px) {
     .menu-label {
         display: none;
     }
 
+    .menu-item,
+    .navbar-item {
+        width: 62px;
+        height: 54px;
+    }
+
     .menu-center {
-        width: 64px;
-        height: 64px;
+        width: 68px;
+        height: 68px;
         margin-top: -28px;
+        border-radius: 22px;
     }
 }
 
-/* Десктоп */
+/* ===== Desktop: подписи видны ===== */
 @media (min-width: 769px) {
     .menu-label {
         display: block;
     }
-}
-.icon-wrapper {
-    position: relative;
-    display: inline-block;
-}
-
-.notification-badge {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    background-color: red;
-    color: white;
-    font-size: 10px;
-    font-weight: bold;
-    padding: 2px 5px;
-    border-radius: 12px;
-    min-width: 16px;
-    height: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid white;
-    z-index: 10;
 }

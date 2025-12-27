@@ -1,9 +1,9 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import '../styles/BottomMenu.css';
 import io from 'socket.io-client';
 import { AuthContext } from "../utils/authContext";
 import { ListTodo, Home, ClipboardList, ArrowUpCircle, UserRound } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const socket = io(process.env.REACT_APP_SOCKET_URL, {
     transports: ['websocket'],
@@ -15,6 +15,7 @@ const BottomMenu = () => {
     const { user } = useContext(AuthContext);
     const [requestCount, setRequestCount] = useState(0);
     const [messageCount, setMessageCount] = useState(0);
+    const location = useLocation();
 
     useEffect(() => {
         if (!user?.id) return;
@@ -43,6 +44,11 @@ const BottomMenu = () => {
         };
     }, [user]);
 
+    const isActive = (path) => {
+        return location.pathname === path ||
+            location.pathname.startsWith(path + "/");
+    };
+
     const handleMyOrdersClick = () => {
         navigate(`/my-orders/${user.id}`);
         setRequestCount(0); // Сбрасываем счетчик запросов
@@ -60,18 +66,25 @@ const BottomMenu = () => {
 
     return (
         <div className="bottom-menu">
-            <button className="navbar-item navbar-home" onClick={() => navigate('/')}>
-                <Home size={24} className="menu-icon"/>
+            <button
+                className={`navbar-item navbar-home ${isActive("/") ? "is-active" : ""}`}
+                onClick={() => navigate('/')}
+            >                <Home size={24} className="menu-icon"/>
                 <span className="menu-label">Старт</span>
             </button>
 
-            <button className="menu-item menu-left" onClick={() => navigate('/orders')}>
+            <button
+                className={`menu-item menu-left ${isActive("/orders") ? "is-active" : ""}`}
+                onClick={() => navigate('/orders')}
+            >
                 <ListTodo size={24} className="menu-icon"/>
                 <span className="menu-label">Заказы</span>
             </button>
 
-            <button className="menu-item menu-center" onClick={handleMyOrdersClick}>
-                <div className="icon-wrapper">
+            <button
+                className={`menu-item menu-center ${isActive("/my-orders") ? "is-active new-request" : ""}`}
+                onClick={handleMyOrdersClick}
+            >                <div className="icon-wrapper">
                     <ArrowUpCircle size={34} className="menu-icon-center"/>
                     {requestCount > 0 && (
                         <span className="notification-badge">{formatCount(requestCount)}</span>
@@ -79,8 +92,10 @@ const BottomMenu = () => {
                 </div>
             </button>
 
-            <button className="menu-item menu-right" onClick={handleOpenActive}>
-                <div className="icon-wrapper">
+            <button
+                className={`menu-item menu-right ${isActive("/active-orders") ? "is-active" : ""}`}
+                onClick={handleOpenActive}
+            >                <div className="icon-wrapper">
                     <ClipboardList size={24} className="menu-icon"/>
                     {messageCount > 0 && (
                         <span className="notification-badge">{formatCount(messageCount)}</span>
@@ -89,8 +104,10 @@ const BottomMenu = () => {
                 <span className="menu-label">Активные</span>
             </button>
 
-            <button className="navbar-item navbar-profile" onClick={() => navigate('/profile')}>
-                <UserRound size={24} className="menu-icon"/>
+            <button
+                className={`navbar-item navbar-profile ${isActive("/profile") ? "is-active" : ""}`}
+                onClick={() => navigate('/profile')}
+            >                <UserRound size={24} className="menu-icon"/>
                 <span className="menu-label">Профиль</span>
             </button>
         </div>

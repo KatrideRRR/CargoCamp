@@ -1,194 +1,785 @@
-/* MyOrdersPage.module.css */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap");
+
+:root {
+    --bg1: #e8f0ff;
+    --bg2: #ffffff;
+
+    --text: rgba(15, 23, 42, 0.92);
+    --muted: rgba(100, 116, 139, 0.95);
+
+    --glass: rgba(255, 255, 255, 0.56);
+    --glass-strong: rgba(255, 255, 255, 0.68);
+    --glass-border: rgba(255, 255, 255, 0.36);
+
+    --shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
+
+    --primary: rgba(29, 78, 216, 0.95);
+    --primary-soft: rgba(29, 78, 216, 0.14);
+
+    --danger: rgba(220, 38, 38, 0.95);
+    --danger-soft: rgba(220, 38, 38, 0.12);
+
+    --success: rgba(22, 163, 74, 0.95);
+    --success-soft: rgba(22, 163, 74, 0.12);
+
+    --radius-xl: 22px;
+    --radius-lg: 18px;
+    --radius-md: 14px;
+
+    /* под фиксированное нижнее меню */
+    --bottom-nav-h: 92px;
+}
+
+@keyframes iosIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.985);
+        filter: blur(2px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+    }
+}
 
 .container {
-    padding: 2rem;
     min-height: 100vh;
-    background: linear-gradient(to bottom right, #e8f0ff, #ffffff);
+    padding: 24px;
+    padding-bottom: calc(var(--bottom-nav-h) + 20px);
+    background: linear-gradient(to bottom right, var(--bg1), var(--bg2));
     display: flex;
     justify-content: center;
-    align-items: start;
-    overflow-y: auto;
-    margin-bottom: 50px;
+    align-items: flex-start;
+    overflow-x: hidden;
+    animation: iosIn 420ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+
+    font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    color: var(--text);
+}
+
+@supports (padding: env(safe-area-inset-bottom)) {
+    .container {
+        padding-bottom: calc(var(--bottom-nav-h) + 20px + env(safe-area-inset-bottom));
+    }
 }
 
 .ordersWrapper {
     width: 100%;
-    max-width: 1000px;
+    max-width: 920px;
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 14px;
 }
 
+/* ===== верхняя кнопка ===== */
 .createButton {
-    align-self: flex-end;
-    padding: 0.75rem 1.5rem;
-    background: linear-gradient(135deg, #4b6cb7, #182848);
-    color: #fff;
-    font-weight: bold;
-    border: none;
-    border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    text-decoration: none;
     width: 100%;
-    display: block;
-    text-align: center;
-}
-.paymentInfo {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.25rem;
-    margin-left: 0.25rem;
+    border: none;
+    cursor: pointer;
+
+    padding: 14px 14px;
+    border-radius: 18px;
+
+    background: var(--primary-soft);
+    border: 1px solid rgba(29, 78, 216, 0.22);
+    color: var(--primary);
+
+    font-weight: 900;
+    letter-spacing: -0.01em;
+    box-shadow: var(--shadow);
+
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 
 .createButton:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    transform: translateY(-1px);
+    background: rgba(29, 78, 216, 0.18);
+    box-shadow: 0 18px 46px rgba(0, 0, 0, 0.10);
 }
 
+.createButton:active {
+    transform: translateY(0) scale(0.988);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.07);
+}
+
+/* когда есть новые запросы */
 .newRequest {
-    background: linear-gradient(135deg, #ff7e5f, #feb47b);
+    background: rgba(245, 158, 11, 0.16);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    color: rgba(180, 83, 9, 0.95);
 }
 
+/* ===== список заказов ===== */
 .ordersList {
     list-style: none;
     padding: 0;
+    margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 12px;
 }
 
+/* ===== КАРТОЧКА ЗАКАЗА (починено) ===== */
 .orderCard {
-    background: rgba(255, 255, 255, 0.5);
-    backdrop-filter: blur(12px);
-    border-radius: 20px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
-    padding: 1.5rem;
-    transition: all 0.3s ease;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+
+    position: relative;
+
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+
+    box-shadow: var(--shadow);
+    padding: 16px;
+
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 
 .orderCard:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+    background: var(--glass-strong);
+    box-shadow: 0 20px 52px rgba(0, 0, 0, 0.11);
 }
 
 .orderContent {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 12px;
 }
 
-.orderHeader {
-    display: flex;
-    justify-content: space-between;
+/* ==== шапка карточки ==== */
+.cardTop {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: start;
+}
+
+.cardTop {
+    padding-right: 120px;
+}
+
+@media (max-width: 560px) {
+    .cardTop {
+        padding-right: 0;
+        padding-top: 40px; /* место под бейдж */
+    }
+}
+
+/* компактный финансовый бейдж */
+.financeBadge {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+
+    display: inline-flex;
     align-items: center;
+    gap: 6px;
+
+    padding: 6px 10px;
+    height: 32px;
+
+    border-radius: 999px;
+
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+
+    backdrop-filter: blur(14px) saturate(180%);
+    -webkit-backdrop-filter: blur(14px) saturate(180%);
+
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+
+    font-size: 13px;
+    font-weight: 800;
+    color: rgba(30, 41, 59, 0.95);
+
+    white-space: nowrap;
+}
+
+/* иконка оплаты */
+.financeIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    opacity: 0.9;
+}
+
+/* цена */
+.financePrice {
+    font-weight: 900;
+    color: rgba(29, 78, 216, 0.95);
+}
+
+/* точка-разделитель */
+.financeDot {
+    opacity: 0.6;
+    margin: 0 -2px;
+}
+
+/* тип оплаты */
+.financeType {
+    font-weight: 800;
+    color: rgba(71, 85, 105, 0.95);
+}
+
+.cardTopLeft {
+    min-width: 0; /* важно: чтобы текст не выталкивал payment */
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* строка: Заказ № + дата */
+.orderIdLine {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
     flex-wrap: wrap;
+    min-width: 0;
 }
 
-.orderTitle {
-    font-size: 1.1rem;
-    font-weight: 600;
+.orderId {
+    font-weight: 900;
+    letter-spacing: -0.01em;
+    color: rgba(15, 23, 42, 0.92);
 }
 
-.orderLeft p,
-.orderContent p {
-    margin: 0.25rem 0;
+.orderDate {
+    font-size: 12px;
+    font-weight: 800;
+    color: rgba(100, 116, 139, 0.95);
+    white-space: nowrap;
 }
 
-.image-stack-container {
-    margin-top: 1rem;
+/* строка: тип + цена */
+.titleRow {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+    min-width: 0;
 }
 
-.order-image {
-    width: 80px;
-    height: 80px;
-    object-fit: cover;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-    transition: transform 0.2s ease;
-    cursor: pointer;
+.orderType {
+    font-weight: 900;
+    color: rgba(15, 23, 42, 0.92);
+    min-width: 0;
+
+    /* аккуратно обрезаем длинное название */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.order-image:hover {
-    transform: scale(1.05);
+.priceChip {
+    padding: 8px 10px;
+    border-radius: 999px;
+    background: rgba(29, 78, 216, 0.14);
+    border: 1px solid rgba(29, 78, 216, 0.22);
+    color: rgba(29, 78, 216, 0.95);
+    font-weight: 900;
+    white-space: nowrap;
 }
 
-.executors-list {
-    margin-top: 1rem;
-    background: rgba(255, 255, 255, 0.35);
+/* payment pill */
+.paymentInfo {
+    justify-self: end;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 999px;
+
+    background: rgba(255, 255, 255, 0.58);
+    border: 1px solid rgba(255, 255, 255, 0.38);
+
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+
+    white-space: nowrap;
+    height: fit-content;
+}
+
+/* иконка/лейбл оплаты – глобальные классы из JSX */
+:global(.payment-icon) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    opacity: 0.95;
+}
+
+:global(.payment-label) {
+    font-size: 12px;
+    font-weight: 900;
+    color: rgba(51, 65, 85, 0.95);
+}
+
+/* ==== компактные мета ==== */
+.metaGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.metaItem {
+    padding: 10px 12px;
     border-radius: 16px;
-    padding: 1rem;
-    backdrop-filter: blur(8px);
-    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.34);
+    backdrop-filter: blur(14px) saturate(170%);
+    -webkit-backdrop-filter: blur(14px) saturate(170%);
+    min-width: 0;
 }
 
-.executorCard {
-    margin-top: 0.75rem;
-    padding: 0.75rem;
-    border-radius: 12px;
+.metaLabel {
+    display: block;
+    font-size: 12px;
+    font-weight: 900;
+    color: rgba(100, 116, 139, 0.95);
+    margin-bottom: 4px;
+}
+
+.metaValue {
+    font-weight: 900;
+    color: rgba(15, 23, 42, 0.92);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ===== изображения (stack) ===== */
+:global(.image-stack-container) {
+    margin-top: 2px;
+}
+
+:global(.image-stack) {
+    display: inline-flex;
+    position: relative;
+    cursor: pointer;
+    padding: 4px 2px;
+}
+
+:global(.order-image) {
+    width: 86px;
+    height: 86px;
+    object-fit: cover;
+    border-radius: 16px;
+
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.12);
+
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+:global(.image-stack:hover .order-image) {
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.14);
+}
+
+:global(.order-image:hover) {
+    transform: translateY(-1px) scale(1.02);
+}
+
+/* ===== описание / исполнители ===== */
+.descBlock,
+.execBlock {
+    padding: 12px;
+    border-radius: 18px;
     background: rgba(255, 255, 255, 0.45);
-    backdrop-filter: blur(6px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.34);
+    backdrop-filter: blur(14px) saturate(170%);
+    -webkit-backdrop-filter: blur(14px) saturate(170%);
+}
+
+.descHead,
+.execHead {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 10px;
+}
+
+.descHead {
+    justify-content: space-between;
+}
+
+.execHead {
+    justify-content: flex-start;
     flex-wrap: wrap;
+}
+
+.descTitle,
+.execTitle {
+    font-weight: 900;
+    color: rgba(15, 23, 42, 0.92);
+}
+
+.execCount {
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(29, 78, 216, 0.12);
+    border: 1px solid rgba(29, 78, 216, 0.18);
+    color: rgba(29, 78, 216, 0.95);
+    font-weight: 900;
+    font-size: 12px;
+}
+
+.linkButton {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-weight: 900;
+    color: rgba(29, 78, 216, 0.95);
+    padding: 6px 8px;
+    border-radius: 12px;
+}
+
+.linkButton:hover {
+    background: rgba(29, 78, 216, 0.12);
+}
+
+.descText {
+    margin: 10px 0 0;
+    color: rgba(30, 41, 59, 0.92);
+    line-height: 1.4;
+}
+
+.descCollapsed {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.descExpanded {
+    display: block;
+}
+
+/* ===== исполнители (глобальная обертка из JSX) ===== */
+:global(.executors-list) {
+    margin-top: 10px;
+    background: rgba(255, 255, 255, 0.42);
+    border: 1px solid rgba(255, 255, 255, 0.34);
+    border-radius: var(--radius-lg);
+    padding: 12px;
+
+    backdrop-filter: blur(14px) saturate(170%);
+    -webkit-backdrop-filter: blur(14px) saturate(170%);
+
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+
+:global(.executors-list > strong) {
+    display: block;
+    margin-bottom: 8px;
+    color: rgba(15, 23, 42, 0.92);
+    font-weight: 900;
+}
+
+:global(.executors-list ul) {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 10px;
+}
+
+/* карточка исполнителя */
+.executorCard {
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.36);
+    border-radius: var(--radius-lg);
+    padding: 12px;
+
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: start;
+
+    backdrop-filter: blur(14px) saturate(170%);
+    -webkit-backdrop-filter: blur(14px) saturate(170%);
+
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.executorCard:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.66);
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.08);
 }
 
 .executorInfo {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 6px;
+    min-width: 0;
 }
 
 .executorName {
-    font-weight: 500;
+    font-weight: 900;
+    color: rgba(15, 23, 42, 0.92);
+    margin: 0;
+}
+
+.executorMeta {
+    color: rgba(100, 116, 139, 0.95);
+    font-weight: 800;
+}
+
+.executorLine {
+    margin: 0;
+    color: rgba(30, 41, 59, 0.92);
 }
 
 .verifiedBadge {
-    color: #4caf50;
-    font-weight: bold;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+
+    padding: 6px 10px;
+    border-radius: 999px;
+
+    background: var(--success-soft);
+    border: 1px solid rgba(22, 163, 74, 0.22);
+    color: var(--success);
+
+    font-weight: 900;
+    width: fit-content;
 }
 
+/* кнопки справа */
 .buttonsContainer {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
+    display: inline-flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
 }
 
 .approveButton,
 .complaintButton {
-    background: #4b6cb7;
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 10px;
     border: none;
-    font-weight: 500;
     cursor: pointer;
-    transition: background 0.2s ease;
+    padding: 10px 12px;
+    border-radius: 14px;
+    font-weight: 900;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease,
+    opacity 0.18s ease;
+    white-space: nowrap;
 }
 
-.complaintButton {
-    background: #ff6b6b;
+.approveButton {
+    background: var(--primary-soft);
+    border: 1px solid rgba(29, 78, 216, 0.22);
+    color: var(--primary);
 }
 
 .approveButton:hover {
-    background: #3a56a1;
+    background: rgba(29, 78, 216, 0.18);
+    transform: translateY(-1px);
+    box-shadow: 0 14px 28px rgba(29, 78, 216, 0.12);
+}
+
+.approveButton:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.complaintButton {
+    background: var(--danger-soft);
+    border: 1px solid rgba(220, 38, 38, 0.22);
+    color: var(--danger);
 }
 
 .complaintButton:hover {
-    background: #e64545;
+    background: rgba(220, 38, 38, 0.16);
+    transform: translateY(-1px);
+    box-shadow: 0 14px 28px rgba(220, 38, 38, 0.10);
 }
 
-.errorMessage {
-    color: red;
-    font-weight: bold;
+/* состояния */
+.stateText {
     text-align: center;
+    color: rgba(51, 65, 85, 0.92);
+    font-weight: 800;
+    margin: 0;
+}
+
+.stateTextMuted {
+    text-align: center;
+    color: rgba(100, 116, 139, 0.95);
+    font-weight: 800;
+    margin: 0;
+}
+
+/* ошибки/пусто */
+.errorMessage {
+    color: rgba(220, 38, 38, 0.95);
+    font-weight: 900;
+    text-align: center;
+    padding: 12px;
+    border-radius: 16px;
+    background: rgba(220, 38, 38, 0.10);
+    border: 1px solid rgba(220, 38, 38, 0.18);
 }
 
 .noOrders {
     text-align: center;
-    font-size: 1.1rem;
-    color: #444;
+    font-size: 1rem;
+    color: rgba(51, 65, 85, 0.9);
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: var(--radius-xl);
+    padding: 16px;
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    box-shadow: var(--shadow);
+}
+
+/* ===== Модалка изображений (react-modal) ===== */
+:global(.custom-modal-overlay) {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+:global(.custom-modal) {
+    width: min(92vw, 820px);
+    max-height: 82vh;
+
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.42);
+    border-radius: 22px;
+
+    backdrop-filter: blur(18px) saturate(180%);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+
+    box-shadow: 0 26px 70px rgba(0, 0, 0, 0.22);
+    overflow: hidden;
+    outline: none;
+}
+
+:global(.custom-modal-content) {
+    position: relative;
+    padding: 14px;
+}
+
+:global(.custom-close-button) {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+
+    border: 1px solid rgba(255, 255, 255, 0.42);
+    background: rgba(255, 255, 255, 0.55);
+
+    cursor: pointer;
+    font-weight: 900;
+
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+
+    transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+:global(.custom-close-button:hover) {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.68);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.12);
+}
+
+:global(.custom-modal-image) {
+    width: 100%;
+    max-height: 68vh;
+    object-fit: contain;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.4);
+}
+
+:global(.custom-image-navigation) {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+:global(.custom-nav-button) {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.38);
+    background: rgba(255, 255, 255, 0.56);
+    cursor: pointer;
+    font-weight: 900;
+
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+
+    transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+:global(.custom-nav-button:hover) {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.10);
+}
+
+/* ===== адаптив ===== */
+@media (max-width: 560px) {
+    .container {
+        padding: 16px;
+        padding-bottom: calc(var(--bottom-nav-h) + 20px);
+    }
+
+    /* шапка в колонку (исправляет “кривизну”) */
+    .cardTop {
+        grid-template-columns: 1fr;
+    }
+
+    .paymentInfo {
+        justify-self: start;
+    }
+
+    .metaGrid {
+        grid-template-columns: 1fr;
+    }
+
+    :global(.order-image) {
+        width: 78px;
+        height: 78px;
+    }
+
+    /* исполнитель: кнопки вниз */
+    .executorCard {
+        grid-template-columns: 1fr;
+    }
+
+    .buttonsContainer {
+        justify-content: flex-start;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .container,
+    .orderCard,
+    .createButton,
+    .executorCard {
+        animation: none !important;
+        transition: none !important;
+    }
 }

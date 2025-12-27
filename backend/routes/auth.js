@@ -40,12 +40,14 @@ const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString(
 
 const smsCodes = new Map();
 
+const CODE_TTL_MS = 5 * 60 * 1000; // 5 минут
+
 router.post("/send-sms", async (req, res) => {
     const { phone } = req.body;
     if (!phone) return res.status(400).json({ message: "Введите номер телефона" });
 
     const code = generateCode();
-    smsCodes.set(phone, code); // Сохраняем код в памяти
+    smsCodes.set(phone, { code, expiresAt: Date.now() + CODE_TTL_MS });
 
     try {
         console.log("Отправка SMS на:", phone);
@@ -183,6 +185,51 @@ router.post('/login', async (req, res) => {
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ message: 'Server error' });
+    }
+});
+
+router.post("/login-sms", async (req, res) => {
+    const { phone, smsCode } = req.body;
+
+    try {
+        if (!phone) return res.status(400).json({ message: "Введите номер телефона" });
+        if (!smsCode) return res.status(400).json({ message: "Введите код из SMS" });
+
+        const entry = smsCodes.get(phone);
+        if (!entry) return res.status(401).json({ message: "Код не найден. Запросите новый." });
+
+        if (Date.now() > entry.expiresAt) {
+            smsCodes.delete(phone);
+            return res.status(401).json({ message: "Код истёк. Запросите новый." });
+        }
+
+        if (entry.code !== smsCode) {
+            return res.status(401).json({ message: "Неверный код" });
+        }
+
+        // одноразовость
+        smsCodes.delete(phone);
+
+        const user = await User.findOne({ where: { phone } });
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        if (user.role === "banned") {
+            return res.status(403).json({ message: "Ваш аккаунт заблокирован" });
+        }
+
+        const token = jwt.sign(
+            { id: user.id, phone: user.phone },
+            process.env.JWT_SECRET,
+            { expiresIn: "7d" }
+        );
+
+        res.json({
+            token,
+            user: { id: user.id, username: user.username, phone: user.phone, rating: user.rating || 5 }
+        });
+    } catch (error) {
+        console.error("Login SMS error:", error);
+        res.status(500).json({ message: "Server error" });
     }
 });
 
