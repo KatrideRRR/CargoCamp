@@ -211,49 +211,41 @@ const ActiveOrdersPage = () => {
         setCurrentImageIndex((prevIndex) => (prevIndex - 1 + currentImages.length) % currentImages.length);  // Переход к предыдущему изображению
     };
 
-    const handleCompleteOrder = async (orderId) => {
-        // Показываем модальное окно для оценки
-        const orderToComplete = orders.find(order => order.id === orderId);
-        setSelectedOrder(orderToComplete); // Устанавливаем выбранный заказ
-        setShowRatingModal(true); // Показываем модальное окно для оценки
-    };
-
-    const submitRating = async () => {
-        if (!selectedOrder || rating === 0) return;
-
+    const completeOrderRequest = async (orderId) => {
         try {
-            const token = localStorage.getItem('authToken');
+            const token = localStorage.getItem("authToken");
+            if (!token) {
+                alert("Вы не авторизованы");
+                navigate("/login");
+                return;
+            }
 
-            // 1. Отправляем оценку на сервер
-            await axios.post(`${apiUrl}/api/auth/rate`, {
-                userId: selectedOrder.executorId === user.id
-                    ? selectedOrder.creatorId
-                    : selectedOrder.executorId,
-                rating,
-            }, {
-                headers: {Authorization: `Bearer ${token}`},
-            });
-
-            // 2. Завершаем заказ
-            await axios.post(`${apiUrl}/api/orders/complete/${selectedOrder.id}`,
-                {}, // Тело запроса пустое
-                {headers: {Authorization: `Bearer ${token}`}}
+            await axiosInstance.post(
+                `/orders/complete/${orderId}`,
+                {},
+                { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            // 3. Обновляем состояние заказов в интерфейсе
-            setOrders((prevOrders) =>
-                prevOrders.map((order) =>
-                    order.id === selectedOrder.id ? {...order, completed: true} : order
+            // обновляем список (самый надежный вариант)
+            // просто повторно дерни fetchActiveOrders через socket событие или вынеси fetchActiveOrders наружу
+            // но для простоты — локально меняем completedBy:
+            setOrders((prev) =>
+                prev.map((o) =>
+                    o.id === orderId
+                        ? { ...o, completedBy: Array.isArray(o.completedBy) ? [...new Set([...o.completedBy, user.id])] : [user.id] }
+                        : o
                 )
             );
 
-            // 4. Закрываем модальное окно и сбрасываем состояния
-            setShowRatingModal(false);
-            setSelectedOrder(null);
-            setRating(0);
-        } catch (error) {
-            console.error("Ошибка при завершении заказа или отправке рейтинга", error);
+            alert("Подтверждение завершения отправлено ✅");
+        } catch (e) {
+            console.error(e);
+            alert(e.response?.data?.message || "Ошибка при завершении заказа");
         }
+    };
+
+    const handleCompleteOrder = async (orderId) => {
+        await completeOrderRequest(orderId);
     };
 
     const getUserPhone = async (userId) => {
@@ -269,39 +261,6 @@ const ActiveOrdersPage = () => {
                 console.error('Ошибка при получении телефона:', error);
             });
     };
-
-
-    const handleComplaint = (orderId) => {
-        setSelectedOrderId(orderId);
-        setShowComplaintModal(true);
-    };
-
-// Модальное окно для жалобы
-    const handleSubmitComplaint = async () => {
-        if (!complaintText) return;
-
-        const token = localStorage.getItem('authToken');
-        if (!token) {
-            alert('Вы не авторизованы!');
-            return;
-        }
-
-        try {
-            await axios.post(`${apiUrl}/api/orders/complain`, {
-                orderId: selectedOrderId,
-                complaintText,
-            }, {
-                headers: {Authorization: `Bearer ${token}`}, // Убедитесь, что токен передается в заголовке
-            });
-            alert('Жалоба отправлена');
-            setShowComplaintModal(false);
-            setComplaintText('');
-        } catch (error) {
-            console.error('Ошибка при отправке жалобы:', error);
-        }
-
-    };
-
 
     const handleRemoveOrder = (orderId) => {
         setRemovedOrders((prev) => {
@@ -349,7 +308,6 @@ const ActiveOrdersPage = () => {
         );
     };
 
-    // Проверка на наличие пользователя перед рендерингом
     if (!user || !user.id) {
         return <p>Загрузка...</p>;
     }
@@ -470,11 +428,6 @@ const ActiveOrdersPage = () => {
                                                         )}
 
 
-                                                        <button className="complain-button"
-                                                                onClick={() => handleComplaint(order.id)}>
-                                                            {isMobile ? <FaExclamationTriangle/> : "Пожаловаться"}
-                                                        </button>
-
                                                         {isCompletedByUser ? (
                                                             isWaitingForOther ? (
                                                                 <button
@@ -487,7 +440,10 @@ const ActiveOrdersPage = () => {
                                                         ) : (
                                                             <button
                                                                 className="complete-button"
-                                                                onClick={() => handleCompleteOrder(order.id)}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleCompleteOrder(order.id);
+                                                                }}
                                                             >
                                                                 {isMobile ? <FaCheck/> : "Завершить"}
                                                             </button>
@@ -590,34 +546,6 @@ const ActiveOrdersPage = () => {
                             </div>
                         </div>
                     </Modal>
-
-                    {/* Модальное окно для оценки */}
-                    {showRatingModal && (
-                        <div className="modal-overlay" onClick={() => setShowRatingModal(false)}>
-                            <div className="modal" onClick={(e) => e.stopPropagation()}>
-                                <h2>Оцените участника</h2>
-                                <div className="stars">
-                                    {[1, 2, 3, 4, 5].map((star) => (
-                                        <span key={star} className={star <= rating ? "star selected" : "star"}
-                                              onClick={() => setRating(star)}>★</span>
-                                    ))}
-                                </div>
-                                <button onClick={submitRating} disabled={rating === 0}>Завершить заказ</button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Модальное окно для жалобы */}
-                    {showComplaintModal && (
-                        <div className="modal-overlay" onClick={() => setShowComplaintModal(false)}>
-                            <div className="modal" onClick={(e) => e.stopPropagation()}>
-                                <h2>Напишите жалобу:</h2>
-                                <textarea value={complaintText} onChange={(e) => setComplaintText(e.target.value)}
-                                          rows="5" placeholder="Введите текст жалобы"/>
-                                <button onClick={handleSubmitComplaint}>Отправить</button>
-                            </div>
-                        </div>
-                    )}
 
                 </div>
             </div>

@@ -76,51 +76,106 @@ module.exports = (io) => {
         }
     });
 
-    router.post('/', authenticateToken, upload.array('images', 5), async (req, res) => {  // 'images' — это поле для загрузки
-        const { address, description, workTime, proposedSum,categoryId, subcategoryId, serviceId} = req.body;
-        const userId = req.user.id;
-        let parsedPromotion = {};
-        console.log(req.body); // Посмотреть входящие данные
-
-        const PROMOTION_PRICES = {
-            highlight: 50,
-            recommended: 100,
-            push: 150,
-        };
-
+    router.post("/", authenticateToken, upload.array("images", 5), async (req, res) => {
         try {
-            parsedPromotion = JSON.parse(req.body.promotion || "{}");
-        } catch (e) {
-            console.error("Ошибка парсинга promotion:", e);
-        }
+            let {
+                address,
+                description,
+                workTime,
+                proposedSum,
+                categoryId,
+                subcategoryId,
+                serviceId,
+                coordinates: incomingCoords,
+                promotion,
+                paymentType,
+            } = req.body;
 
-        try {
-            if (!address) {
-                return res.status(400).json({ message: 'Адрес обязателен' });
+            const userId = req.user.id;
+
+            const PROMOTION_PRICES = { highlight: 50, recommended: 100, push: 150 };
+
+            // promotion
+            let parsedPromotion = {};
+            try {
+                parsedPromotion = JSON.parse(promotion || "{}");
+            } catch (e) {
+                parsedPromotion = {};
             }
 
-            // Получаем координаты из геокодера
-            const geoData = await geocoder.geocode(address);
-            if (!geoData.length) {
-                return res.status(404).json({ message: 'Адрес не найден' });
+            // helpers
+            const looksLikeCoordsAddress = (v) => {
+                if (!v) return true;
+                const s = String(v).trim();
+                return s === "" || s.startsWith("Координаты:");
+            };
+
+            const parseLatLng = (v) => {
+                if (!v) return null;
+                // иногда прилетает массив
+                const raw = Array.isArray(v) ? v[0] : v;
+                if (typeof raw !== "string" || !raw.includes(",")) return null;
+                const [latStr, lngStr] = raw.split(",").map((x) => x.trim());
+                const lat = parseFloat(latStr);
+                const lng = parseFloat(lngStr);
+                if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+                return { lat, lng };
+            };
+
+            // 1) Координаты: либо с фронта, либо из геокодера по адресу
+            let coordinatesStr = null;
+            let latlng = parseLatLng(incomingCoords);
+
+            // 1а) если coords пришли — используем их
+            if (latlng) {
+                coordinatesStr = `${latlng.lat},${latlng.lng}`;
             }
 
-            const { latitude, longitude } = geoData[0];
-            const coordinates = `${latitude},${longitude}`;
+            // 1б) если coords НЕ пришли — геокодим address (как было)
+            if (!coordinatesStr) {
+                if (!address || !String(address).trim()) {
+                    return res.status(400).json({ message: "Адрес обязателен" });
+                }
 
-            // Собираем все фото в массив
-            const photoUrls = req.files ? req.files.map(file => `/uploads/orders/${file.filename}`) : [];
+                const geoData = await geocoder.geocode(address);
+                if (!geoData || !geoData.length) {
+                    return res.status(404).json({ message: "Адрес не найден" });
+                }
 
-            const paymentType = Array.isArray(req.body.paymentType) ? req.body.paymentType[0] : req.body.paymentType;
+                const { latitude, longitude } = geoData[0];
+                coordinatesStr = `${latitude},${longitude}`;
+                latlng = { lat: Number(latitude), lng: Number(longitude) };
+            }
 
-            // 🧠 Вычисляем стоимость продвижения
-            const promotionTotal = Object.entries(parsedPromotion).reduce(
-                (sum, [key, enabled]) =>
-                    enabled && PROMOTION_PRICES[key] ? sum + PROMOTION_PRICES[key] : sum,
-                0
-            );
+            // 2) Reverse-geocode: если адрес пустой/“Координаты: …” — получаем нормальный адрес
+            if (latlng && looksLikeCoordsAddress(address)) {
+                try {
+                    // ВНИМАНИЕ: у node-geocoder чаще всего reverse ждёт lat/lon (lon = долгота)
+                    const rev = await geocoder.reverse({ lat: latlng.lat, lon: latlng.lng });
+                    if (Array.isArray(rev) && rev[0]) {
+                        address =
+                            rev[0].formattedAddress ||
+                            rev[0].streetName ||
+                            rev[0].city ||
+                            `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
+                    }
+                } catch (e) {
+                    // если reverse не сработал — оставляем что было
+                }
+            }
 
-            const status = promotionTotal > 0 ? 'pending_payment' : 'pending';
+            // paymentType может прийти массивом
+            paymentType = Array.isArray(paymentType) ? paymentType[0] : paymentType;
+            if (!paymentType) return res.status(400).json({ message: "paymentType обязателен" });
+
+            // promotionTotal
+            const promotionTotal = Object.entries(parsedPromotion).reduce((sum, [key, enabled]) => {
+                return enabled && PROMOTION_PRICES[key] ? sum + PROMOTION_PRICES[key] : sum;
+            }, 0);
+
+            const status = promotionTotal > 0 ? "pending_payment" : "pending";
+
+            const photoUrls = req.files ? req.files.map((f) => `/uploads/orders/${f.filename}`) : [];
 
             const newOrder = await Order.create({
                 userId,
@@ -128,33 +183,29 @@ module.exports = (io) => {
                 description,
                 workTime,
                 proposedSum,
-                coordinates,
+                coordinates: coordinatesStr,
                 createdAt: new Date().toISOString(),
                 images: photoUrls,
                 creatorId: userId,
                 status,
                 categoryId,
                 subcategoryId,
-                serviceId: serviceId && serviceId !== '0' ? serviceId : null,
+                serviceId: serviceId && serviceId !== "0" ? serviceId : null,
                 paymentType,
 
                 promotionCost: promotionTotal,
-                promotionRequested: parsedPromotion, // ✅ сохраняем что выбрали
+                promotionRequested: parsedPromotion,
 
-                // ✅ включаем только если оплаты не требуется
                 is_highlighted: promotionTotal > 0 ? false : !!parsedPromotion.highlight,
                 is_recommended: promotionTotal > 0 ? false : !!parsedPromotion.recommended,
                 is_push_notified: promotionTotal > 0 ? false : !!parsedPromotion.push,
-
-                // остальное как было
             });
 
-            io.emit('orderUpdated'); // Отправляем событие обновления заказов
-
-            res.status(201).json(newOrder);
+            io.emit("orderUpdated");
+            return res.status(201).json(newOrder);
         } catch (error) {
-            console.error('Ошибка при создании заказа:', error);
-            res.status(500).json({ message: 'Ошибка сервера' });
+            console.error("Ошибка при создании заказа:", error);
+            return res.status(500).json({ message: "Ошибка сервера" });
         }
     });
 
@@ -177,6 +228,9 @@ module.exports = (io) => {
                     'images', 'proposedSum', 'creatorId', 'coordinates',
                     'executorId', 'status', 'paymentType',
                     'is_highlighted', 'is_recommended', 'is_push_notified', 'taxi_courier', 'serviceId',
+                    'categoryId',
+                    'subcategoryId',
+
                 ],
                 where: whereClause,
                 include: [
@@ -683,58 +737,6 @@ module.exports = (io) => {
         } catch (error) {
             console.error("Ошибка завершения заказа:", error);
             res.status(500).json({ message: "Ошибка сервера" });
-        }
-    });
-
-    router.post('/complain', authenticateToken, async (req, res) => {
-        const { orderId, complaintText } = req.body;
-        const userId = req.user?.id;
-
-        console.log('req.user:', req.user);
-        console.log('userId:', userId);
-
-        if (!userId) {
-            return res.status(400).json({ message: 'Невозможно извлечь userId из токена' });
-        }
-
-        try {
-            const order = await Order.findByPk(orderId);
-            if (!order) {
-                return res.status(404).json({ message: 'Заказ не найден' });
-            }
-
-            console.log('order:', order);
-            console.log('customerId:', order.creatorId, 'executorId:', order.executorId, 'userId:', userId);
-
-            let complainedUserId = null;
-            if (userId === order.creatorId) {
-                if (!order.executorId) {
-                    return res.status(400).json({ message: 'У заказа пока нет исполнителя' });
-                }
-                complainedUserId = order.executorId;
-            } else if (userId === order.executorId) {
-                complainedUserId = order.creatorId;
-            } else {
-                console.log(`❌ Ошибка: Пользователь ${userId} не является участником заказа`);
-                return res.status(403).json({ message: 'Вы не являетесь участником этого заказа' });
-            }
-
-            console.log(`Жалоба отправляется на userId: ${complainedUserId}`);
-
-            const complainedUser = await User.findByPk(complainedUserId);
-            const currentComplaints = complainedUser.complaints || [];
-            const updatedComplaints = [...currentComplaints, { userId, complaintText, date: new Date() }];
-
-            await User.update({
-                complaintsCount: (complainedUser.complaintsCount || 0) + 1,
-                complaints: updatedComplaints
-            }, { where: { id: complainedUserId } });
-
-            return res.status(200).json({ message: 'Жалоба отправлена успешно' });
-
-        } catch (error) {
-            console.error('Ошибка при отправке жалобы:', error);
-            return res.status(500).json({ message: 'Ошибка при отправке жалобы' });
         }
     });
 

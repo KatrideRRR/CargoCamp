@@ -10,29 +10,44 @@ export default function StartPage() {
     return (
         <div className="start-page-container">
             <div className="start-page-content animate-in">
-                <h1 className="title">Добро пожаловать!</h1>
-                <p className="subtitle">Кем вы хотите быть сегодня?</p>
+                <h1 className="title">CargoCamp</h1>
+                <p className="subtitle">Что вы хотите сделать?</p>
 
                 <div className="button-group">
                     <button
-                        onClick={() => navigate(`/my-orders/${user.id}`)}
+                        onClick={() => navigate("/create-order")}
                         className="role-button glassy"
                     >
-                        <div className="emoji">🧑‍💼</div>
+                        <div className="emoji">🧾</div>
                         <div className="text">
-                            <h2 className="role-title">Я заказчик</h2>
-                            <p className="role-subtitle">Создать или отслеживать заказы</p>
+                            <h2 className="role-title">Создать заказ</h2>
+                            <p className="role-subtitle">Обычный заказ на услугу</p>
                         </div>
                     </button>
 
-                    <button onClick={() => navigate("/orders")} className="role-button glassy">
-                        <div className="emoji">🔧</div>
+                    <button
+                        onClick={() => navigate("/express")}
+                        className="role-button glassy"
+                    >
+                        <div className="emoji">🚕</div>
                         <div className="text">
-                            <h2 className="role-title">Я исполнитель</h2>
-                            <p className="role-subtitle">Найти заказы и начать работу</p>
+                            <h2 className="role-title">Такси / Курьер</h2>
+                            <p className="role-subtitle">Быстрый заказ “здесь и сейчас”</p>
+                        </div>
+                    </button>
+
+                    <button
+                        onClick={() => navigate("/orders")}
+                        className="role-button glassy soft"
+                    >
+                        <div className="emoji">📋</div>
+                        <div className="text">
+                            <h2 className="role-title">Все заказы</h2>
+                            <p className="role-subtitle">Найти заказ и откликнуться</p>
                         </div>
                     </button>
                 </div>
+
             </div>
         </div>
     );

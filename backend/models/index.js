@@ -19,6 +19,7 @@ db.Category = require('./Category')(sequelize, DataTypes);
 db.Subcategory = require('./Subcategory')(sequelize, DataTypes);
 db.Service = require('./Service')(sequelize, DataTypes);
 db.Notification = require('./Notification')(sequelize, DataTypes);
+db.OrderReview = require('./OrderReview')(sequelize, DataTypes);
 
 // Ассоциации
 Object.values(db).forEach(model => {

@@ -13,7 +13,7 @@ import ChatPage from './pages/ChatPage';
 import { AuthProvider } from "./utils/authContext";
 import { UserProvider } from './utils/userContext';
 import { ModalProvider } from './components/modalContext';
-import UserComplaintsPage from './pages/UserComplaintsPage';
+import UserReviewsPage from './pages/UserReviewsPage';
 import OrderHistoryPage from "./pages/OrderHistoryPage";
 import OrderPage from './pages/OrderPage';
 import UserOrdersPage from './pages/UserOrdersPage';
@@ -42,7 +42,7 @@ const App = () => {
                             <Route path="/profile" element={<ProfilePage />}/>
                             <Route path="/orders" element={<OrdersPage />} />
                             <Route path="/active-orders" element={<ActiveOrdersPage />}/>
-                            <Route path="/complaints/:userId" element={<UserComplaintsPage />} />
+                            <Route path="/complaints/:userId" element={<UserReviewsPage />} />
                             <Route path="/orders-history/:userId" element={<OrderHistoryPage />} />
                             <Route path="/create-order" element={<CreateOrderPage />} />
                             <Route path="/messages/:orderId" element={<ChatPage/>} />

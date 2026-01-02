@@ -115,6 +115,20 @@ const OrderPage = () => {
         }
     };
 
+    const getPaymentLabel = (type) => {
+        switch (type) {
+            case "guarantee":
+                return "Гарантия";
+            case "cash":
+                return "Наличные";
+            case "installment":
+            case "installments":
+                return "Рассрочка";
+            default:
+                return "Неизвестно";
+        }
+    };
+
     if (error) {
         return <div className="error-message">Ошибка: {error}</div>;
     }
@@ -144,9 +158,14 @@ const OrderPage = () => {
                                                 <strong>Заказ
                                                     №{order.id}</strong> от {creator.username || "Неизвестно"}.
                                                 Создан {new Date(order.createdAt).toLocaleString()}.
-                                                <div className="order-payment-icon-container">
-                                                <span
-                                                    className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
+                                                <div className="order-meta">
+                                                    <div className="order-payment-icon-container">
+                                                        <span className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
+                                                        <span className="payment-label">{getPaymentLabel(order.paymentType)}</span>                                                    </div>
+
+                                                    <div className="price-badge">
+                                                        {order.proposedSum} ₽
+                                                    </div>
                                                 </div>
                                             </p>
 

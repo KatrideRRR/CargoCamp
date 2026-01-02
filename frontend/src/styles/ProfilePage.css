@@ -474,3 +474,484 @@
         padding: 9px 10px;
     }
 }
+
+/* ===== Docs viewer ===== */
+.docs-block {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.45);
+    border: 1px solid var(--glass-border);
+}
+
+.docs-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.docs-title {
+    font-weight: 900;
+}
+
+.docs-count {
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-weight: 800;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid var(--glass-border);
+}
+
+.docs-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+@media (max-width: 520px) {
+    .docs-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.doc-tile {
+    text-decoration: none;
+    color: inherit;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.44);
+    background: rgba(255,255,255,0.50);
+    backdrop-filter: blur(14px) saturate(170%);
+    -webkit-backdrop-filter: blur(14px) saturate(170%);
+    box-shadow: var(--shadow-soft);
+    transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.2s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.doc-tile:hover {
+    transform: translateY(-2px);
+    background: rgba(255,255,255,0.62);
+    box-shadow: 0 18px 46px rgba(15, 23, 42, 0.12);
+}
+
+.doc-img {
+    width: 100%;
+    height: 92px;
+    object-fit: cover;
+    display: block;
+}
+
+.doc-name {
+    padding: 10px 10px 11px;
+    font-size: 0.9rem;
+    color: rgba(15, 23, 42, 0.78);
+    font-weight: 800;
+}
+
+.doc-pdf {
+    height: 92px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 12px;
+    gap: 8px;
+    background: rgba(255,255,255,0.6);
+}
+
+.doc-pdf-badge {
+    width: fit-content;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-weight: 900;
+    font-size: 0.82rem;
+    border: 1px solid rgba(29,78,216,0.22);
+    background: rgba(29,78,216,0.12);
+    color: var(--primary);
+}
+
+.docs-empty {
+    margin-top: 10px;
+    color: var(--muted);
+    font-weight: 800;
+    font-size: 0.92rem;
+}
+
+/* ===== Location block ===== */
+.loc-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+}
+
+.loc-input {
+    width: 100%;
+    border-radius: 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.55);
+    outline: none;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.loc-input:focus {
+    border-color: rgba(29, 78, 216, 0.28);
+    box-shadow: 0 0 0 4px rgba(29, 78, 216, 0.10);
+}
+
+.loc-meta {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.loc-error {
+    margin-top: 10px;
+    color: var(--danger);
+    font-weight: 800;
+    background: rgba(220, 38, 38, 0.08);
+    border: 1px solid rgba(220, 38, 38, 0.18);
+    padding: 10px 12px;
+    border-radius: 16px;
+}
+
+/* ===== GPS confirm card ===== */
+.gps-confirm {
+    margin-top: 12px;
+    padding: 12px 12px;
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-soft);
+}
+
+.gps-title {
+    font-weight: 900;
+    color: var(--text);
+}
+
+.gps-sub {
+    margin-top: 6px;
+    color: var(--muted);
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+.gps-actions {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+@media (max-width: 520px) {
+    .gps-actions {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== Yandex map glass modal ===== */
+.glass-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(6px);
+    z-index: 2000;
+}
+
+.glass-modal {
+    width: min(980px, 94vw);
+    max-height: 86vh;
+    overflow: hidden;
+    border-radius: 22px;
+
+    background: rgba(255, 255, 255, 0.70);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+
+    backdrop-filter: blur(18px) saturate(180%);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+
+    box-shadow: 0 26px 90px rgba(0, 0, 0, 0.28);
+    animation: iosIn 240ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+
+.glass-modal-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 14px;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.glass-modal-title {
+    font-weight: 900;
+    font-size: 1.05rem;
+    color: var(--text);
+}
+
+.glass-modal-subtitle {
+    margin-top: 4px;
+    font-weight: 700;
+    color: var(--muted);
+    font-size: 0.92rem;
+}
+
+.glass-icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.55);
+    cursor: pointer;
+    font-weight: 900;
+}
+
+.glass-map-wrap {
+    position: relative;
+    height: min(54vh, 520px);
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.glass-map {
+    width: 100%;
+    height: 100%;
+}
+
+.glass-map-loading {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-weight: 900;
+    color: rgba(15, 23, 42, 0.75);
+}
+
+.glass-modal-footer {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.glass-picked {
+    min-width: 0;
+}
+
+.glass-picked-label {
+    font-weight: 900;
+    color: var(--text);
+}
+
+.glass-picked-value {
+    margin-top: 4px;
+    color: var(--muted);
+    font-weight: 700;
+    max-width: 58vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.glass-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.glass-error {
+    margin: 10px 14px 0;
+    color: var(--danger);
+    font-weight: 900;
+    background: rgba(220, 38, 38, 0.08);
+    border: 1px solid rgba(220, 38, 38, 0.18);
+    padding: 10px 12px;
+    border-radius: 16px;
+}
+
+/* ===== Yandex map modal (glass) ===== */
+.glass-modal-overlay{
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+/* само окно — колонка */
+.glass-modal{
+    width: min(920px, 100%);
+    max-height: calc(100vh - 32px);
+    overflow: hidden;
+
+    display: flex;
+    flex-direction: column;
+
+    border-radius: 22px;
+    background: rgba(255,255,255,0.88);
+    border: 1px solid rgba(255,255,255,0.35);
+    box-shadow: 0 20px 70px rgba(0,0,0,0.25);
+}
+
+/* header */
+.glass-modal-head{
+    flex: 0 0 auto;
+    padding: 14px 14px 10px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+
+    border-bottom: 1px solid rgba(15,23,42,0.08);
+    background: rgba(255,255,255,0.70);
+}
+
+/* тело — карта + loading */
+.glass-map-wrap{
+    flex: 1 1 auto;
+    position: relative;
+    padding: 12px 14px;
+    overflow: auto;
+
+    /* чтобы контент не прятался под нижней панелью телефона */
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+}
+
+.glass-map{
+    height: min(56vh, 520px);
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.45);
+    background: rgba(255,255,255,0.55);
+}
+
+.glass-map-loading{
+    position: absolute;
+    inset: 12px 14px auto 14px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.75);
+    border: 1px solid rgba(255,255,255,0.45);
+    backdrop-filter: blur(12px);
+}
+
+/* footer — всегда виден */
+.glass-modal-footer{
+    flex: 0 0 auto;
+    padding: 12px 14px;
+    border-top: 1px solid rgba(15,23,42,0.08);
+    background: rgba(255,255,255,0.70);
+
+    /* главное: footer не уезжает */
+    position: sticky;
+    bottom: 0;
+}
+
+.glass-picked{
+    margin-bottom: 10px;
+}
+.glass-picked-label{
+    font-weight: 800;
+    color: rgba(15,23,42,0.75);
+    margin-bottom: 4px;
+}
+.glass-picked-value{
+    color: rgba(15,23,42,0.92);
+    font-weight: 700;
+}
+
+.glass-actions{
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+/* иконка закрытия */
+.glass-icon-btn{
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.65);
+    border-radius: 12px;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-weight: 900;
+}
+.glass-modal-overlay{
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647; /* максимально поверх */
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+}
+
+.glass-modal{
+    width: min(920px, 100%);
+    max-height: calc(100vh - 28px - env(safe-area-inset-bottom));
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+
+    border-radius: 22px;
+    background: rgba(255,255,255,0.90);
+    border: 1px solid rgba(255,255,255,0.35);
+    box-shadow: 0 20px 70px rgba(0,0,0,0.25);
+}
+
+.glass-map-wrap{
+    flex: 1 1 auto;
+    padding: 12px 14px;
+    overflow: auto;
+}
+
+.glass-map{
+    height: min(58vh, 560px);
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.cat-grid{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.cat-pill{
+    border: 1px solid var(--glass-border);
+    background: rgba(255,255,255,0.55);
+    border-radius: 999px;
+    padding: 10px 12px;
+    cursor: pointer;
+    font-weight: 900;
+    color: var(--text);
+    transition: transform .18s ease, box-shadow .18s ease, background .18s ease, border-color .18s ease;
+}
+
+.cat-pill:hover{
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-soft);
+    background: rgba(255,255,255,0.75);
+}
+
+.cat-pill.active{
+    background: var(--primary-soft);
+    border-color: rgba(29, 78, 216, 0.22);
+    color: var(--primary);
+}

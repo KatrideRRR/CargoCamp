@@ -5,8 +5,32 @@ import { useAuth } from "../utils/authContext";
 import axios from "axios";
 import "../styles/ProfilePage.css";
 import AgreementModal from "../components/AgreementModal";
+import YandexMapModal from "../components/YandexMapModal";
 
 const apiUrl = process.env.REACT_APP_API_URL;
+
+function looksLikeCoordsString(v) {
+    if (!v) return false;
+    const s = String(v).trim();
+    return s.startsWith("Координаты:") || /^\d{1,3}\.\d+,\s*\d{1,3}\.\d+$/.test(s);
+}
+
+// reverse geocode через Yandex Geocoder: geocode=lng,lat
+async function reverseGeocodeYandex({ lat, lng, apiKey }) {
+    if (!apiKey) throw new Error("No Yandex API key");
+
+    const url = `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}&geocode=${lng},${lat}&format=json&results=1&kind=house`;
+    const r = await fetch(url);
+    const data = await r.json();
+
+    const first = data?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
+    const text =
+        first?.metaDataProperty?.GeocoderMetaData?.text ||
+        first?.name ||
+        null;
+
+    return text;
+}
 
 const ProfilePage = () => {
     const [showVerificationModal, setShowVerificationModal] = useState(false);
@@ -17,9 +41,20 @@ const ProfilePage = () => {
     const [showAgreement, setShowAgreement] = useState(false);
     const [hasDebt, setHasDebt] = useState(false);
     const [debtAmount, setDebtAmount] = useState(0);
+    const [locationDraft, setLocationDraft] = useState("");
+    const [locLoading, setLocLoading] = useState(false);
+    const [locError, setLocError] = useState(null);
+    const [gpsCandidate, setGpsCandidate] = useState(null); // {lat,lng,address}
+    const [showMapModal, setShowMapModal] = useState(false);
+
+    const [categories, setCategories] = useState([]);
+    const [categoryPick, setCategoryPick] = useState([]); // массив id
+    const [catSaving, setCatSaving] = useState(false);
 
     const navigate = useNavigate();
     const { logout, isAuthenticated } = useAuth();
+
+    const YM_KEY = process.env.REACT_APP_YANDEX_API_KEY;
 
     const getRemainingDays = (expiresAt) => {
         if (!expiresAt) return 0;
@@ -39,6 +74,12 @@ const ProfilePage = () => {
         }
         return "Обычный аккаунт";
     }, [profile]);
+
+    useEffect(() => {
+        axios.get(`${apiUrl}/api/category`)
+            .then(res => setCategories(res.data || []))
+            .catch(() => setCategories([]));
+    }, []);
 
     useEffect(() => {
         let isMounted = true;
@@ -77,6 +118,71 @@ const ProfilePage = () => {
     }, [isAuthenticated, navigate]);
 
     useEffect(() => {
+        if (!profile) return;
+        const ids = Array.isArray(profile.preferredCategoryIds) ? profile.preferredCategoryIds : [];
+        setCategoryPick(ids);
+    }, [profile]);
+
+    const savePreferredCategories = async () => {
+        const token = localStorage.getItem("authToken");
+        if (!token) return toast.error("Вы не авторизованы");
+
+        setCatSaving(true);
+        try {
+            const res = await axios.post(
+                `${apiUrl}/api/auth/categories/me`,
+                { categoryIds: categoryPick },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            toast.success("Профессии сохранены");
+            setProfile(p => ({ ...p, preferredCategoryIds: res.data.preferredCategoryIds }));
+        } catch (e) {
+            toast.error(e.response?.data?.message || "Не удалось сохранить");
+        } finally {
+            setCatSaving(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!profile) return;
+
+        (async () => {
+            const addr = profile.locationAddress;
+
+            const lat = Number(profile.locationLat);
+            const lng = Number(profile.locationLng);
+            const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+
+            // 1) если адрес нормальный — ставим его
+            if (addr && !looksLikeCoordsString(addr)) {
+                setLocationDraft(addr);
+                return;
+            }
+
+            // 2) если адреса нет/он "Координаты...", но есть координаты — reverse -> адрес
+            if (hasCoords) {
+                setLocLoading(true);
+                setLocError(null);
+                try {
+                    const resolved = await reverseGeocodeYandex({ lat, lng, apiKey: YM_KEY });
+                    if (resolved) setLocationDraft(resolved);
+                    else setLocError("Не удалось распознать адрес. Введите вручную или выберите на карте.");
+                } catch (e) {
+                    console.error(e);
+                    setLocError("Не удалось распознать адрес. Введите вручную или выберите на карте.");
+                } finally {
+                    setLocLoading(false);
+                }
+                return;
+            }
+
+            // 3) вообще ничего нет
+            setLocationDraft(addr || "");
+        })();
+    }, [profile, YM_KEY]);
+
+    useEffect(() => {
         if (profile) {
             loadDebtStatus();
         }
@@ -93,6 +199,70 @@ const ProfilePage = () => {
             setTimeout(() => window.location.reload(), 1500);
         }
     }, []);
+
+    const saveLocation = async ({ address, lat, lng, source }) => {
+        const token = localStorage.getItem("authToken");
+        setLocLoading(true);
+        setLocError(null);
+        try {
+            const res = await axios.post(
+                `${apiUrl}/api/auth/location/me`,
+                { address, lat, lng, source },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            toast.success("Местоположение сохранено");
+            setProfile((p) => ({ ...p, ...res.data.location }));
+        } catch (e) {
+            console.error(e);
+            setLocError(e.response?.data?.message || "Ошибка сохранения");
+        } finally {
+            setLocLoading(false);
+        }
+    };
+
+    const detectGps = () => {
+        if (!navigator.geolocation) {
+            toast.error("GPS недоступен в браузере");
+            return;
+        }
+
+        setLocLoading(true);
+        setLocError(null);
+
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+
+                try {
+                    const addr = await reverseGeocodeYandex({ lat, lng, apiKey: YM_KEY });
+
+                    if (!addr) {
+                        setLocError("Не удалось распознать адрес по GPS. Введите адрес вручную или выберите на карте.");
+                        setLocLoading(false);
+                        return;
+                    }
+
+                    // ✅ показываем пользователю сразу адрес
+                    setLocationDraft(addr);
+
+                    // ✅ кандидат для подтверждения уже с адресом (без координат в тексте)
+                    setGpsCandidate({ lat, lng, address: addr });
+                } catch (e) {
+                    console.error("reverse geocode error:", e);
+                    setLocError("Не удалось распознать адрес по GPS. Введите адрес вручную или выберите на карте.");
+                } finally {
+                    setLocLoading(false);
+                }
+            },
+            (err) => {
+                console.error(err);
+                setLocError("Не удалось определить местоположение по GPS. Введите адрес вручную или выберите на карте.");
+                setLocLoading(false);
+            },
+            { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+        );
+    };
 
     const loadDebtStatus = async () => {
         const token = localStorage.getItem("authToken");
@@ -219,6 +389,15 @@ const ProfilePage = () => {
         handleBindCard();
     };
 
+    const fetchProfileData = async () => {
+        const token = localStorage.getItem("authToken");
+        const response = await axios.get(`${apiUrl}/api/auth/profile`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        setProfile(response.data);
+        setPaymentMethodId(response.data.yookassaPaymentMethodId || null);
+    };
+
     const handleAutoUpload = async (files) => {
         const token = localStorage.getItem("authToken");
         if (!files.length) return;
@@ -235,6 +414,9 @@ const ProfilePage = () => {
             });
 
             toast.success("Документы успешно загружены");
+
+            // ✅ сразу подтянем изменения
+            await fetchProfileData();
         } catch (error) {
             console.error("Ошибка загрузки документов:", error);
             toast.error("Ошибка загрузки документов");
@@ -265,10 +447,6 @@ const ProfilePage = () => {
                             <h1 className="profile-title">Профиль</h1>
                             <p className="profile-subtitle">Управление аккаунтом и оплатой</p>
                         </div>
-
-                        <button className="profile-chip" onClick={() => navigate("/info")}>
-                            Информация
-                        </button>
                     </div>
 
                     {profile && (
@@ -372,18 +550,202 @@ const ProfilePage = () => {
                         />
                         <span>Загрузить документы</span>
                     </label>
+
+                    {Array.isArray(profile?.documentPhotos) && profile.documentPhotos.length > 0 ? (
+                        <div className="docs-block">
+                            <div className="docs-head">
+                                <div className="docs-title">Загруженные документы</div>
+                                <div className="docs-count">{profile.documentPhotos.length} шт.</div>
+                            </div>
+
+                            <div className="docs-grid">
+                                {profile.documentPhotos.map((p, idx) => {
+                                    const isPdf = String(p).toLowerCase().endsWith(".pdf");
+                                    const url = p.startsWith("http") ? p : `${apiUrl}${p}`;
+
+                                    return (
+                                        <a
+                                            key={idx}
+                                            className="doc-tile"
+                                            href={url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            title="Открыть"
+                                        >
+                                            {isPdf ? (
+                                                <div className="doc-pdf">
+                                                    <div className="doc-pdf-badge">PDF</div>
+                                                    <div className="doc-name">Документ {idx + 1}</div>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <img className="doc-img" src={url} alt={`doc-${idx}`} />
+                                                    <div className="doc-name">Фото {idx + 1}</div>
+                                                </>
+                                            )}
+                                        </a>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="docs-empty">Документы ещё не загружены</div>
+                    )}
+
+                </div>
+
+                <div className="profile-card glass">
+                    <div className="card-head">
+                        <div>
+                            <h2 className="card-title">Профессии</h2>
+                            <p className="card-subtitle">По ним будут фильтроваться заказы</p>
+                        </div>
+                    </div>
+
+                    <div className="cat-grid">
+                        {[...categories]
+                            .sort((a, b) => {
+                                const ap = (a.id === 12 || a.id === 13) ? 0 : 1;
+                                const bp = (b.id === 12 || b.id === 13) ? 0 : 1;
+                                if (ap !== bp) return ap - bp;
+                                return String(a.name).localeCompare(String(b.name), "ru");
+                            })
+                            .map((c) => {
+                                const active = categoryPick.includes(c.id);
+
+                                return (
+                                    <button
+                                        key={c.id}
+                                        type="button"
+                                        className={`cat-pill ${active ? "active" : ""}`}
+                                        onClick={() => {
+                                            setCategoryPick((prev) =>
+                                                prev.includes(c.id) ? prev.filter((x) => x !== c.id) : [...prev, c.id]
+                                            );
+                                        }}
+                                    >
+                                        {c.name}
+                                    </button>
+                                );
+                            })}
+                    </div>
+
+                    <div className="grid-2" style={{ marginTop: 12 }}>
+                        <button className="btn btn-primary" disabled={catSaving} onClick={savePreferredCategories}>
+                            {catSaving ? "Сохранение..." : "Сохранить"}
+                        </button>
+
+                        <button
+                            className="btn btn-ghost"
+                            type="button"
+                            onClick={() => setCategoryPick([])}
+                            disabled={catSaving}
+                        >
+                            Сбросить
+                        </button>
+                    </div>
+                </div>
+
+                <div className="profile-card glass">
+                    <div className="card-head">
+                        <div>
+                            <h2 className="card-title">Местоположение</h2>
+                            <p className="card-subtitle">
+                                Сохраняется для автоподстановки в заказах и фильтрации
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="loc-row">
+                        <input
+                            className="loc-input"
+                            value={locationDraft}
+                            onChange={(e) => setLocationDraft(e.target.value)}
+                            placeholder="Введите район/город/адрес (например: Крым, Белогорск)"
+                        />
+                        <button
+                            className="btn btn-primary"
+                            disabled={locLoading}
+                            onClick={() =>
+                                saveLocation({ address: locationDraft, lat: null, lng: null, source: "manual" })
+                            }
+                        >
+                            Сохранить
+                        </button>
+                    </div>
+
+                    <div className="grid-2" style={{ marginTop: 10 }}>
+                        <button className="btn btn-ghost" disabled={locLoading} onClick={detectGps}>
+                            Определить по GPS
+                        </button>
+
+                        <button className="btn btn-ghost" onClick={() => setShowMapModal(true)}>
+                            Выбрать на карте
+                        </button>
+                    </div>
+
+                    {/* ✅ Подтверждение GPS */}
+                    {gpsCandidate && (
+                        <div className="gps-confirm">
+                            <div className="gps-title">Мы определили координаты. Верно?</div>
+                            <div className="gps-sub">
+                                {gpsCandidate.address}
+                            </div>
+                            <div className="gps-actions">
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={() =>
+                                        saveLocation({
+                                            address: locationDraft || gpsCandidate.address,
+                                            lat: gpsCandidate.lat,
+                                            lng: gpsCandidate.lng,
+                                            source: "gps",
+                                        }).then(() => setGpsCandidate(null))
+                                    }
+                                >
+                                    Да, сохранить
+                                </button>
+
+                                <button className="btn btn-ghost" onClick={() => setGpsCandidate(null)}>
+                                    Нет, введу вручную
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ✅ Модалка карты */}
+                    <YandexMapModal
+                        isOpen={showMapModal}
+                        onClose={() => setShowMapModal(false)}
+                        initialLat={profile?.locationLat}
+                        initialLng={profile?.locationLng}
+                        onPick={(picked) => {
+                            // picked: {lat,lng,address}
+                            setLocationDraft(picked.address);
+                            saveLocation({ address: picked.address, lat: picked.lat, lng: picked.lng, source: "map" });
+                            setShowMapModal(false);
+                        }}
+                    />
+
+                    {profile?.locationSource && (
+                        <div className="loc-meta">
+                            <span className="identity-pill">Источник: {profile.locationSource}</span>
+                        </div>
+                    )}
+
+                    {locError && <div className="loc-error">{locError}</div>}
                 </div>
 
                 {/* Действия */}
                 <div className="profile-actions glass">
                     <button onClick={handleMyComplaints} className="btn btn-ghost">
-                        Мои жалобы
+                        Отзывы
                     </button>
                     <button onClick={handleOrderHistory} className="btn btn-ghost">
                         История заказов
                     </button>
                     <button onClick={() => navigate("/info")} className="btn btn-ghost">
-                        Информация и документы
+                        Информация и контакты
                     </button>
                     <button onClick={handleLogout} className="btn btn-ghost-danger">
                         Выйти

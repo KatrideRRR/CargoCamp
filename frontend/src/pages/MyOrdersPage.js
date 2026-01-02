@@ -210,7 +210,7 @@ const MyOrdersPage = () => {
             <div className={styles.ordersWrapper}>
 
                 <button
-                    onClick={() => setIsCreateModalOpen(true)}
+                    onClick={() => navigate('/create-order')}
                     className={`${styles.createButton} ${hasNewRequests ? styles.newRequest : ''}`}
                 >
                     Разместить заказ

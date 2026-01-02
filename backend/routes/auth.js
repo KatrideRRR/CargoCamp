@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { User } = require('../models');
+const { User, OrderReview, Order, Category } = require('../models');
 const authenticateToken = require('../middlewares/userAuth');
 const router = express.Router();
 const multer = require('multer');
@@ -242,9 +242,10 @@ router.get('/profile', authenticateToken, async (req, res) => {
                 'yookassa_payment_method_id',
                 'cardLastFour', 'cardType',
                 'rating', 'createdAt',
-                'complaints', 'complaintsCount',
-                'userStatus',
-                'subscription_type', 'subscription_expires_at'
+                'userStatus', 'documentPhotos',
+                'subscription_type', 'subscription_expires_at',
+                'preferredCategoryIds',
+                'locationAddress', 'locationLat', 'locationLng', 'locationSource', 'locationUpdatedAt'
             ],
         });
 
@@ -280,6 +281,13 @@ router.get('/profile', authenticateToken, async (req, res) => {
             yookassaPaymentMethodId: user.yookassa_payment_method_id,
             cardLastFour: user.cardLastFour,
             cardType: user.cardType,
+            preferredCategoryIds:user.preferredCategoryIds,
+
+            locationAddress: user.locationAddress,
+            locationLat: user.locationLat,
+            locationLng: user.locationLng,
+            locationSource: user.locationSource,
+            locationUpdatedAt: user.locationUpdatedAt,
         });
     } catch (error) {
         console.error('Error fetching profile:', error);
@@ -328,36 +336,19 @@ router.get('/:id', async (req, res) => {
 
 router.get('/user/:id', async (req, res) => {
     try {
-        const user = await User.findByPk(req.params.id, {
-            attributes: ['id', 'username', 'rating', 'complaintsCount', 'complaints', 'phone']
+        const userId = Number(req.params.id);
+
+        const user = await User.findByPk(userId, {
+            attributes: ['id', 'username', 'phone', 'rating', 'ratingCount', 'role', 'userStatus'],
         });
-        if (!user) return res.status(404).json({ message: "Пользователь не найден" });
-        res.json(user);
+        if (!user) return res.status(404).json({ message: 'Пользователь не найден' });
+
+        const reviewsCount = await OrderReview.count({ where: { toUserId: userId } });
+
+        return res.json({ ...user.toJSON(), reviewsCount });
     } catch (err) {
-        res.status(500).json({ message: "Ошибка сервера" });
-    }
-});
-
-router.post("/rate", authenticateToken,async (req, res) => {
-    try {
-        console.log('Получен запрос на рейтинг');
-
-        const { userId, rating } = req.body;
-
-        const user = await User.findByPk(userId);
-        if (!user) {
-            return res.status(404).json({ message: "Пользователь не найден" });
-        }
-
-        user.rating = (user.rating * user.ratingCount + rating) / (user.ratingCount + 1);
-        user.ratingCount += 1;
-
-        await user.save();
-
-        res.json({ message: "Рейтинг успешно обновлен" });
-    } catch (error) {
-        console.error("Ошибка обновления рейтинга", error);
-        res.status(500).json({ message: "Ошибка сервера" });
+        console.error('GET /auth/user/:id error:', err);
+        return res.status(500).json({ message: 'Ошибка сервера' });
     }
 });
 
@@ -402,37 +393,186 @@ router.post("/recover-password", async (req, res) => {
     }
 });
 
-router.post('/buy', authenticateToken, async (req, res) => {
-    const userId = req.user.id; // получен из токена
-    const { duration } = req.body; // '7d' или '30d'
-
-    const daysMap = {
-        '7d': 7,
-        '30d': 30,
-    };
-
-    const days = daysMap[duration];
-    if (!days) {
-        return res.status(400).json({ error: 'Неверная длительность подписки' });
-    }
-
+router.get("/reviews/user/:userId", async (req, res) => {
     try {
-        const executor = await User.findByPk(userId);
-        if (!executor) return res.status(404).json({ error: 'Пользователь не найден' });
+        const { userId } = req.params;
 
-        const now = new Date();
-        const newExpiration = executor.subscription_expires_at && executor.subscription_type === 'premium'
-            ? new Date(executor.subscription_expires_at.getTime() + days * 86400000) // продлеваем текущую
-            : new Date(now.getTime() + days * 86400000); // новая подписка
+        const reviews = await OrderReview.findAll({
+            where: { toUserId: userId },
+            order: [["createdAt", "DESC"]],
+        });
 
-        executor.subscription_type = 'premium';
-        executor.subscription_expires_at = newExpiration;
-        await executor.save();
+        return res.json({ reviews });
+    } catch (e) {
+        console.error(e);
+        return res.status(500).json({ message: "Ошибка сервера" });
+    }
+});
 
-        return res.json({ success: true, until: newExpiration });
-    } catch (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Ошибка сервера' });
+router.post("/review", authenticateToken, async (req, res) => {
+    try {
+        const fromUserId = req.user.id;
+        const { orderId, rating, text } = req.body;
+
+        if (!orderId) return res.status(400).json({ message: "orderId обязателен" });
+        const r = Number(rating);
+        if (!Number.isFinite(r) || r < 1 || r > 5) {
+            return res.status(400).json({ message: "rating должен быть от 1 до 5" });
+        }
+
+        const order = await Order.findByPk(orderId);
+        if (!order) return res.status(404).json({ message: "Заказ не найден" });
+
+        // ✅ только после полного завершения
+        if (order.status !== "completed") {
+            return res.status(400).json({ message: "Отзыв можно оставить только после полного завершения заказа" });
+        }
+
+        // ✅ только участник заказа
+        const isCreator = order.creatorId === fromUserId;
+        const isExecutor = order.executorId === fromUserId;
+        if (!isCreator && !isExecutor) {
+            return res.status(403).json({ message: "Вы не участник этого заказа" });
+        }
+
+        const toUserId = isCreator ? order.executorId : order.creatorId;
+        if (!toUserId) {
+            return res.status(400).json({ message: "Невозможно определить второго участника" });
+        }
+
+        // ✅ запрет “2 раза за один заказ” (уникальный ключ + проверка для норм сообщения)
+        const existing = await OrderReview.findOne({ where: { orderId, fromUserId } });
+        if (existing) {
+            return res.status(400).json({ message: "Вы уже оставляли отзыв по этому заказу" });
+        }
+
+        // Создаём отзыв
+        await OrderReview.create({
+            orderId,
+            fromUserId,
+            toUserId,
+            rating: r,
+            text: (text || "").trim() || null,
+        });
+
+        // Обновляем рейтинг пользователя (как у тебя сейчас)
+        const user = await User.findByPk(toUserId);
+        if (!user) return res.status(404).json({ message: "Пользователь для оценки не найден" });
+
+        const currentRating = Number(user.rating || 0);
+        const currentCount = Number(user.ratingCount || 0);
+        const newRating = (currentRating * currentCount + r) / (currentCount + 1);
+
+        user.rating = newRating;
+        user.ratingCount = currentCount + 1;
+        await user.save();
+
+        return res.json({ message: "Отзыв сохранён", toUserId, rating: user.rating, ratingCount: user.ratingCount });
+    } catch (e) {
+        console.error("review error:", e);
+        return res.status(500).json({ message: "Ошибка сервера" });
+    }
+});
+
+router.get("/reviews/my", authenticateToken, async (req, res) => {
+    try {
+        const fromUserId = req.user.id;
+
+        const reviews = await OrderReview.findAll({
+            where: { fromUserId },
+            attributes: ["id", "orderId", "toUserId", "rating", "createdAt"],
+            order: [["createdAt", "DESC"]],
+        });
+
+        return res.json({ reviews });
+    } catch (e) {
+        console.error(e);
+        return res.status(500).json({ message: "Ошибка сервера" });
+    }
+});
+
+router.get("/location/me", authenticateToken, async (req, res) => {
+    try {
+        const user = await User.findByPk(req.user.id, {
+            attributes: ["id", "locationAddress", "locationLat", "locationLng", "locationSource", "locationUpdatedAt"],
+        });
+        if (!user) return res.status(404).json({ message: "Пользователь не найден" });
+        return res.json({ location: user });
+    } catch (e) {
+        console.error(e);
+        return res.status(500).json({ message: "Ошибка сервера" });
+    }
+});
+
+router.post("/location/me", authenticateToken, async (req, res) => {
+    try {
+        const { address, lat, lng, source } = req.body;
+
+        const allowed = ["gps", "manual", "map"];
+        if (source && !allowed.includes(source)) {
+            return res.status(400).json({ message: "Некорректный source" });
+        }
+
+        // address можно без координат (чисто ручной ввод)
+        const latNum = lat === null || lat === undefined ? null : Number(lat);
+        const lngNum = lng === null || lng === undefined ? null : Number(lng);
+
+        if ((latNum !== null && !Number.isFinite(latNum)) || (lngNum !== null && !Number.isFinite(lngNum))) {
+            return res.status(400).json({ message: "lat/lng должны быть числами" });
+        }
+
+        await User.update(
+            {
+                locationAddress: address?.trim() || null,
+                locationLat: latNum,
+                locationLng: lngNum,
+                locationSource: source || null,
+                locationUpdatedAt: new Date(),
+            },
+            { where: { id: req.user.id } }
+        );
+
+        const updated = await User.findByPk(req.user.id, {
+            attributes: ["id", "locationAddress", "locationLat", "locationLng", "locationSource", "locationUpdatedAt"],
+        });
+
+        return res.json({ success: true, location: updated });
+    } catch (e) {
+        console.error(e);
+        return res.status(500).json({ message: "Ошибка сервера" });
+    }
+});
+
+router.post("/categories/me", authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { categoryIds } = req.body; // ожидаем массив чисел
+
+        if (!Array.isArray(categoryIds)) {
+            return res.status(400).json({ message: "categoryIds должен быть массивом" });
+        }
+
+        // чистим и валидируем
+        const cleaned = [...new Set(categoryIds)]
+            .map((x) => Number(x))
+            .filter((x) => Number.isFinite(x));
+
+        // проверим что такие категории существуют (важно!)
+        const cats = await Category.findAll({ where: { id: cleaned } });
+        if (cats.length !== cleaned.length) {
+            return res.status(400).json({ message: "Некоторые категории не найдены" });
+        }
+
+        await User.update(
+            { preferredCategoryIds: cleaned },
+            { where: { id: userId } }
+        );
+
+        const updated = await User.findByPk(userId);
+        return res.json({ success: true, preferredCategoryIds: updated.preferredCategoryIds });
+    } catch (e) {
+        console.error(e);
+        return res.status(500).json({ message: "Ошибка сервера" });
     }
 });
 

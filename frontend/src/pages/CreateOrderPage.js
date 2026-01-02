@@ -1,126 +1,110 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useNavigate } from "react-router-dom";
-import { YMaps, Map, Placemark } from "@pbe/react-yandex-maps";
+import { YMaps } from "@pbe/react-yandex-maps";
 import "../styles/CreateOrderPage.css";
 import imageCompression from "browser-image-compression";
-import {FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity} from "react-icons/fa";
+import { FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity } from "react-icons/fa";
 import PromotionOptions, { PROMOTION_PRICES } from "../components/PromotionOptions";
+import YandexMapModal from "../components/YandexMapModal";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
+function isCoordsString(v) {
+    if (!v) return false;
+    return String(v).trim().startsWith("Координаты:");
+}
+
+function looksLikeCoordsString(v) {
+    if (!v) return false;
+    const s = String(v).trim();
+    return s.startsWith("Координаты:") || /^\d{1,3}\.\d+,\s*\d{1,3}\.\d+$/.test(s);
+}
+
+// reverse geocode через Yandex Geocoder: geocode=lng,lat
+async function reverseGeocodeYandex({ lat, lng, apiKey }) {
+    if (!apiKey) throw new Error("No Yandex API key");
+
+    const url = `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}&geocode=${lng},${lat}&format=json&results=1&kind=house`;
+    const r = await fetch(url);
+    const data = await r.json();
+
+    const first = data?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
+    const text =
+        first?.metaDataProperty?.GeocoderMetaData?.text ||
+        first?.name ||
+        null;
+
+    return text; // строка адреса или null
+}
+
+function roundTo15(d) {
+    const x = new Date(d);
+    x.setSeconds(0, 0);
+    const m = x.getMinutes();
+    const add = (15 - (m % 15)) % 15;
+    x.setMinutes(m + add);
+    return x;
+}
+
 function CreateOrderPage() {
+    const navigate = useNavigate();
+    const currentDate = useMemo(() => new Date(), []);
+
+    const YM_KEY = process.env.REACT_APP_YANDEX_API_KEY;
+
     const [formData, setFormData] = useState({
         description: "",
         address: "",
         workTime: null,
-        photoUrl: null,
         proposedSum: "",
-        type: "",
-        paymentType: "",  // Добавлено для хранения типа оплаты
     });
+
     const [error, setError] = useState("");
-    const [markerPosition, setMarkerPosition] = useState(null);
-    const navigate = useNavigate();
-    const currentDate = new Date(); // Текущая дата и время
-    const [images, setImages] = useState([]); // Состояние для хранения выбранных изображений
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const [markerPosition, setMarkerPosition] = useState(null); // [lat, lng]
+    const [addressSuggestions, setAddressSuggestions] = useState([]);
+
+    const [images, setImages] = useState([]);
+
     const [category, setCategory] = useState([]);
     const [subcategory, setSubcategory] = useState([]);
-    const [selectedCategory, setSelectedCategory] = useState('');
-    const [selectedSubcategory, setSelectedSubcategory] = useState('');
-    const [addressSuggestions, setAddressSuggestions] = useState([]); // Подсказки для адреса
+    const [services, setServices] = useState([]);
+
+    const [selectedCategory, setSelectedCategory] = useState("");
+    const [selectedSubcategory, setSelectedSubcategory] = useState("");
+    const [selectedService, setSelectedService] = useState("");
+
+    const [promotion, setPromotion] = useState({ highlight: false, recommended: false, push: false });
+
+    // ✅ один источник правды
     const [paymentType, setPaymentType] = useState("");
     const [selectedMethod, setSelectedMethod] = useState(null);
-    const [isSubmitting, setIsSubmitting] = useState(false);
+
     const paymentMethods = [
-        { id: "cash", label: "Наличные", icon: "💵" },
-        { id: "guarantee", label: "Гарантия", icon: "🛡️" },
-        { id: "installment", label: "Рассрочка", icon: "💳" },
+        { id: "cash", label: "Наличные" },
+        { id: "guarantee", label: "Гарантия" },
+        { id: "installment", label: "Рассрочка" },
     ];
-    const [promotion, setPromotion] = useState({
-        highlight: false,
-        recommended: false,
-        push: false,
-    });
-    const [services, setServices] = useState([]);
-    const [selectedService, setSelectedService] = useState('');
 
-    const promotionTotal = Object.entries(promotion).reduce(
-        (sum, [key, enabled]) =>
-            enabled ? sum + PROMOTION_PRICES[key] : sum,
-        0
-    );
+    // адрес из профиля / кастом
+    const [profile, setProfile] = useState(null);
+    const [addressMode, setAddressMode] = useState("profile"); // profile | custom
+    const [showMapModal, setShowMapModal] = useState(false);
+    const [addrResolving, setAddrResolving] = useState(false);
+    const [addrResolveError, setAddrResolveError] = useState(null);
 
-    const handleImageChange = async (event) => {
-        const files = event.target.files;
-        const compressedImages = [];
+    // время
+    const [scheduleMode, setScheduleMode] = useState("asap"); // asap | scheduled
 
-        for (const file of files) {
-            const options = {
-                maxSizeMB: 0.5, // Максимальный размер 0.5MB
-                maxWidthOrHeight: 1024, // Максимальная ширина/высота 1024px
-                useWebWorker: true,
-            };
+    const promotionTotal = useMemo(() => {
+        return Object.entries(promotion).reduce((sum, [key, enabled]) => (enabled ? sum + PROMOTION_PRICES[key] : sum), 0);
+    }, [promotion]);
 
-            try {
-                const compressedFile = await imageCompression(file, options);
-                compressedImages.push(compressedFile);
-            } catch (error) {
-                console.error("Ошибка сжатия изображения:", error);
-            }
-        }
-
-        setImages(prevImages => [...prevImages, ...compressedImages]);
-    };
-
-    useEffect(() => {
-        // Получение списка категорий при загрузке компонента
-        axios.get(`${apiUrl}/api/category`)
-            .then(response => {
-                setCategory(response.data);
-            })
-            .catch(error => {
-                console.error('Ошибка при загрузке категорий', error);
-            });
-    }, []);
-
-    const handleCategoryChange = (event) => {
-        const categoryId = event.target.value;
-        setSelectedCategory(categoryId);
-
-        if (!categoryId) {
-            setSubcategory([]);
-            return;
-        }
-
-        // Получение подкатегорий для выбранной категории
-        axios.get(`${apiUrl}/api/category/subcategory/${categoryId}`)
-            .then(response => {
-                setSubcategory(response.data);
-            })
-            .catch(error => {
-                console.error('Ошибка при загрузке подкатегорий', error);
-            });
-    };
-
-    const getMinTime = (selectedDate) => {
-        if (!selectedDate || selectedDate.toDateString() === currentDate.toDateString()) {
-            // Если дата совпадает с сегодняшней или не выбрана, возвращаем текущее время
-            return new Date(
-                currentDate.getFullYear(),
-                currentDate.getMonth(),
-                currentDate.getDate(),
-                currentDate.getHours(),
-                currentDate.getMinutes()
-            );
-        } else {
-            // Для других дат минимальное время — начало суток
-            return new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0);
-        }
-    };
-
+    // auth guard
     useEffect(() => {
         const token = localStorage.getItem("authToken");
         if (!token) {
@@ -129,20 +113,157 @@ function CreateOrderPage() {
         }
     }, [navigate]);
 
+    // default workTime
+    useEffect(() => {
+        setFormData((p) => ({ ...p, workTime: roundTo15(new Date()) }));
+    }, []);
+
+    useEffect(() => {
+        const token = localStorage.getItem("authToken");
+        if (!token) return;
+
+        (async () => {
+            try {
+                const res = await axios.get(`${apiUrl}/api/auth/location/me`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+
+                const loc = res.data?.location;
+                if (!loc) return;
+
+                setProfile(loc);
+
+                const lat = Number(loc.locationLat);
+                const lng = Number(loc.locationLng);
+                const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+
+                // 1) Если в профиле нормальный адрес — используем его
+                if (loc.locationAddress && !looksLikeCoordsString(loc.locationAddress)) {
+                    setFormData((p) => ({ ...p, address: loc.locationAddress }));
+                    if (hasCoords) setMarkerPosition([lat, lng]);
+                    return;
+                }
+
+                // 2) Если адреса нет/он координатный, но координаты есть — reverse → адрес
+                if (hasCoords) {
+                    setMarkerPosition([lat, lng]);
+                    setAddrResolving(true);
+                    setAddrResolveError(null);
+
+                    const addr = await reverseGeocodeYandex({ lat, lng, apiKey: YM_KEY });
+                    if (addr) {
+                        setFormData((p) => ({ ...p, address: addr }));
+                    } else {
+                        setAddrResolveError("Не удалось распознать адрес по координатам. Введите адрес вручную или выберите на карте.");
+                    }
+
+                    setAddrResolving(false);
+                    return;
+                }
+
+                // 3) Вообще ничего нет — оставляем пустым
+                setAddrResolveError("В профиле нет адреса. Укажите адрес вручную или выберите на карте.");
+            } catch (e) {
+                console.error("location preload error:", e);
+                setAddrResolveError("Не удалось загрузить местоположение из профиля.");
+            } finally {
+                setAddrResolving(false);
+            }
+        })();
+    }, [YM_KEY]);
+
+    // load categories
+    useEffect(() => {
+        axios
+            .get(`${apiUrl}/api/category`)
+            .then((response) => setCategory(response.data))
+            .catch((e) => console.error("Ошибка при загрузке категорий", e));
+    }, []);
+
+    const handleImageChange = async (event) => {
+        const files = event.target.files;
+        const compressed = [];
+
+        for (const file of files) {
+            try {
+                const compressedFile = await imageCompression(file, {
+                    maxSizeMB: 0.5,
+                    maxWidthOrHeight: 1024,
+                    useWebWorker: true,
+                });
+                compressed.push(compressedFile);
+            } catch (e) {
+                console.error("Ошибка сжатия изображения:", e);
+            }
+        }
+
+        setImages((prev) => [...prev, ...compressed]);
+    };
+
+    const handleCategoryChange = async (event) => {
+        const categoryId = event.target.value;
+        setSelectedCategory(categoryId);
+        setSelectedSubcategory("");
+        setSelectedService("");
+        setServices([]);
+        setSubcategory([]);
+
+        if (!categoryId) return;
+
+        try {
+            const res = await axios.get(`${apiUrl}/api/category/subcategory/${categoryId}`);
+            setSubcategory(res.data);
+        } catch (e) {
+            console.error("Ошибка при загрузке подкатегорий", e);
+        }
+    };
+
+    const fetchServices = async (subcategoryId) => {
+        if (!subcategoryId) {
+            setServices([]);
+            return;
+        }
+        try {
+            const res = await axios.get(`${apiUrl}/api/category/services/${subcategoryId}`);
+            setServices(res.data);
+        } catch (e) {
+            console.error("Ошибка при загрузке услуг:", e);
+            setServices([]);
+        }
+    };
+
+    const handleSubcategoryChange = async (e) => {
+        const subId = e.target.value;
+        setSelectedSubcategory(subId);
+        setSelectedService("");
+        await fetchServices(subId);
+    };
+
+    const getMinTime = (selectedDate) => {
+        if (!selectedDate || selectedDate.toDateString() === currentDate.toDateString()) {
+            return new Date(
+                currentDate.getFullYear(),
+                currentDate.getMonth(),
+                currentDate.getDate(),
+                currentDate.getHours(),
+                currentDate.getMinutes()
+            );
+        }
+        return new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0);
+    };
+
     const handleAddressChange = async (e) => {
         const address = e.target.value;
-        setFormData({...formData, address});
+        setFormData((p) => ({ ...p, address }));
+        setAddressMode("custom"); // ✅ если правит руками — значит кастом
 
-        // Если вводим хотя бы 3 символа, начинаем запрашивать подсказки
         if (address.length > 3) {
             try {
-                const response = await fetch(
-                    `https://geocode-maps.yandex.ru/1.x/?apikey=bf97867b-5ffb-4fc4-9fd5-8997874b300e&geocode=${encodeURIComponent(
-                        address
-                    )}&format=json`
+                const r = await fetch(
+                    `https://geocode-maps.yandex.ru/1.x/?apikey=${YM_KEY}&geocode=${encodeURIComponent(address)}&format=json`
                 );
-                const data = await response.json();
-                const suggestions = data.response.GeoObjectCollection.featureMember.map(item => item.GeoObject.name);
+                const data = await r.json();
+                const suggestions = data.response.GeoObjectCollection.featureMember.map((item) => item.GeoObject.name);
                 setAddressSuggestions(suggestions);
             } catch (err) {
                 console.error("Ошибка геокодирования:", err);
@@ -154,108 +275,158 @@ function CreateOrderPage() {
     };
 
     const handleAddressSelect = async (address) => {
-        setFormData({...formData, address});
-        setAddressSuggestions([]); // Закрываем список подсказок
+        setFormData((p) => ({ ...p, address }));
+        setAddressSuggestions([]);
+        setAddressMode("custom");
 
         try {
-            const response = await fetch(
-                `https://geocode-maps.yandex.ru/1.x/?apikey=bf97867b-5ffb-4fc4-9fd5-8997874b300e&geocode=${encodeURIComponent(address)}&format=json`
+            const r = await fetch(
+                `https://geocode-maps.yandex.ru/1.x/?apikey=${YM_KEY}&geocode=${encodeURIComponent(address)}&format=json`
             );
-            const data = await response.json();
-            const coordinates = data.response.GeoObjectCollection.featureMember[0].GeoObject.Point.pos.split(' ');
-            const [longitude, latitude] = coordinates.map(coord => parseFloat(coord));
-            setMarkerPosition([latitude, longitude]); // Обновляем позицию маркера
+            const data = await r.json();
+            const pos = data.response.GeoObjectCollection.featureMember?.[0]?.GeoObject?.Point?.pos;
+            if (!pos) return;
+
+            const [lon, lat] = pos.split(" ").map((v) => parseFloat(v));
+            if (Number.isFinite(lat) && Number.isFinite(lon)) setMarkerPosition([lat, lon]);
         } catch (err) {
             console.error("Ошибка получения координат:", err);
         }
     };
 
-    useEffect(() => {
-        console.log('🔧 Услуги подкатегории:', services);
-    }, [services]);
+    const detectGps = () => {
+        if (!navigator.geolocation) {
+            setAddrResolveError("GPS недоступен в браузере");
+            return;
+        }
 
-    const handleSelect = (event, paymentId) => {
+        setAddrResolving(true);
+        setAddrResolveError(null);
+
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+
+                setMarkerPosition([lat, lng]);
+
+                try {
+                    const addr = await reverseGeocodeYandex({ lat, lng, apiKey: YM_KEY });
+                    if (!addr) {
+                        setAddrResolveError("Не удалось распознать ваш адрес по GPS. Введите адрес вручную или выберите на карте.");
+                        return;
+                    }
+                    setFormData((p) => ({ ...p, address: addr }));
+                } catch (e) {
+                    console.error("reverse geocode error:", e);
+                    setAddrResolveError("Не удалось распознать ваш адрес по GPS. Введите адрес вручную или выберите на карте.");
+                } finally {
+                    setAddrResolving(false);
+                }
+            },
+            (err) => {
+                console.error(err);
+                setAddrResolving(false);
+                setAddrResolveError("Не удалось определить координаты по GPS. Введите адрес вручную или выберите на карте.");
+            },
+            { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+        );
+    };
+
+    const handleSelectPayment = (event, id) => {
         event.preventDefault();
-        setSelectedMethod(paymentId);
-        setPaymentType(paymentId); // Обновляем состояние paymentType
-        setFormData(prevState => ({ ...prevState, paymentType: paymentId })); // Обновляем formData
+        setSelectedMethod(id);
+        setPaymentType(id);
+    };
+
+    const getPaymentIcon = (type) => {
+        switch (type) {
+            case "guarantee":
+                return <FaUniversity title="Гарантия" />;
+            case "cash":
+                return <FaMoneyBillWave title="Наличные" />;
+            case "installment":
+                return <FaCreditCard title="Рассрочка" />;
+            default:
+                return <FaQuestionCircle title="Неизвестно" />;
+        }
+    };
+
+    const handleDescriptionChange = (e) => {
+        const textarea = e.target;
+        textarea.style.height = "auto";
+        textarea.style.height = `${textarea.scrollHeight}px`;
+        setFormData((p) => ({ ...p, description: textarea.value }));
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setError("");
 
         if (!paymentType) {
             setError("Пожалуйста, выберите тип оплаты");
             return;
         }
+        if (!formData.address?.trim()) {
+            setError("Адрес обязателен");
+            return;
+        }
 
-        if (isSubmitting) return; // Предотвращаем повторное нажатие
+        if (isCoordsString(formData.address)) {
+            setError("Нужно указать адрес текстом (не координаты). Выберите адрес на карте или введите вручную.");
+            setIsSubmitting(false);
+            return;
+        }
+
+        if (!selectedCategory || !selectedSubcategory) {
+            setError("Выберите категорию и подкатегорию");
+            return;
+        }
+
+        if (isSubmitting) return;
         setIsSubmitting(true);
 
-        const orderData = {
-            promotion,
-            promotionCost: promotionTotal,
-            categoryId: selectedCategory,
-            subcategoryId: selectedSubcategory,
-            description: "Оплата за услугу",
-            paymentType: formData.paymentType,
-            serviceId:selectedService || null,
-        };
-        // Отправить данные на сервер
-        console.log('Создание заказа:', orderData);
-
-        // Создаем FormData
         const data = new FormData();
 
-        // Добавляем все поля из formData в FormData
-        Object.keys(formData).forEach((key) => {
-            if (formData[key] !== null && formData[key] !== undefined && key !== "images") {
-                data.append(key, formData[key]);
-            }
+        data.append("description", formData.description || "");
+        data.append("address", formData.address);
+        data.append("workTime", formData.workTime ? new Date(formData.workTime).toISOString() : "");
+        data.append("proposedSum", formData.proposedSum || "");
+        data.append("paymentType", paymentType);
 
-        });
         data.append("categoryId", Number(selectedCategory));
         data.append("subcategoryId", Number(selectedSubcategory));
-        data.append("serviceId", Number(selectedService));
-        data.append("promotion", JSON.stringify(promotion)); // <— ВАЖНО
 
-        // Добавляем изображения, если они есть
-        images.forEach((image) => {
-            data.append("images", image); // добавляем изображения в FormData
-        });
+        if (selectedService && Number(selectedService) > 0) data.append("serviceId", Number(selectedService));
 
-        // Добавляем координаты на карту
-        if (markerPosition) {
-            data.append("coordinates", markerPosition.join(","));
+        data.append("promotion", JSON.stringify(promotion));
+
+        images.forEach((img) => data.append("images", img));
+
+        // ✅ если есть маркер — отправляем coordinates
+        if (markerPosition?.length === 2) {
+            data.append("coordinates", `${markerPosition[0]},${markerPosition[1]}`); // lat,lng
         }
 
         const token = localStorage.getItem("authToken");
         if (!token) {
             setError("Вы не авторизованы! Пожалуйста, войдите в систему.");
+            setIsSubmitting(false);
             return;
         }
 
         try {
-            // Шаг 1: создаём заказ с статусом pending или pending_payment
             const response = await axios.post(`${apiUrl}/api/orders/`, data, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "multipart/form-data",
-                },
+                headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
             });
 
             const orderId = response.data.id;
 
             if (promotionTotal > 0) {
-                // ⬇️ НОВАЯ логика оплаты продвижения
                 const payResp = await axios.post(
                     `${apiUrl}/api/payments/order/promotion/create`,
                     { orderId },
-                    {
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                        },
-                    }
+                    { headers: { Authorization: `Bearer ${token}` } }
                 );
 
                 if (!payResp.data?.success) {
@@ -264,7 +435,12 @@ function CreateOrderPage() {
                     return;
                 }
 
-                // редирект в ЮKassa
+                if (looksLikeCoordsString(formData.address)) {
+                    setError("Укажите адрес текстом. Если адрес не определяется автоматически — введите вручную или выберите на карте.");
+                    setIsSubmitting(false);
+                    return;
+                }
+
                 window.location.href = payResp.data.confirmationUrl;
             } else {
                 alert("Заказ успешно создан");
@@ -272,282 +448,403 @@ function CreateOrderPage() {
             }
         } catch (err) {
             console.error("Ошибка при создании заказа:", err);
-            setError("Не удалось создать заказ. Попробуйте снова.");
+            setError(err.response?.data?.message || "Не удалось создать заказ. Попробуйте снова.");
+            setIsSubmitting(false);
         }
-
-        console.log(paymentType);
-    };
-
-    const getPaymentIcon = (type) => {
-        switch (type) {
-            case 'guarantee':
-                return <FaUniversity title="Гарантия" />;
-            case 'cash':
-                return <FaMoneyBillWave title="Наличные" />;
-            case 'installment':
-                return <FaCreditCard title="Рассрочка" />;
-            default:
-                return <FaQuestionCircle title="Неизвестно" />;
-        }
-    };
-
-    const fetchServices = async (subcategoryId) => {
-        if (!subcategoryId) {
-            setServices([]);
-            return;
-        }
-
-        try {
-            const response = await axios.get(`${apiUrl}/api/category/services/${subcategoryId}`);
-            setServices(response.data);
-        } catch (error) {
-            console.error("Ошибка при загрузке услуг:", error);
-            setServices([]);
-        }
-    };
-
-    const handleSubcategoryChange = async (e) => {
-        const subId = e.target.value;
-        setSelectedSubcategory(subId);
-        setSelectedService('');
-        await fetchServices(subId); // 👈 загружаем услуги
-    };
-
-    const handleDescriptionChange = (e) => {
-        const textarea = e.target;
-        textarea.style.height = "auto"; // Сброс высоты
-        textarea.style.height = `${textarea.scrollHeight}px`; // Установка высоты на основе контента
-        setFormData({...formData, description: textarea.value});
     };
 
     return (
-        <YMaps query={{apikey: "bf97867b-5ffb-4fc4-9fd5-8997874b300e"}}>
-            <div className="create-order-page">
-                <div className="container">
-                <div className="form-container">
-                        {error && <p className="error-text">{error}</p>}
-                        <form onSubmit={handleSubmit} className="form">
-                            <div className="input-group-responsive">
-                                <div>
-                                    <label>Выберите категорию:</label>
-                                    <select
-                                        className="select-responsive"
-                                        value={selectedCategory}
-                                        onChange={handleCategoryChange}
-                                    >
-                                        <option value="">Выберите категорию</option>
-                                        {category
-                                            .filter(cat => cat.id !== 12 && cat.id !== 13)
-                                            .map(cat => (
-                                                <option key={cat.id} value={cat.id}>
-                                                    {cat.name}
-                                                </option>
-                                            ))}
-                                    </select>
-                                </div>
+        <div className="create-page">
+            <div className="create-shell">
+                {/* Header как в профиле */}
+                <div className="create-header glass">
+                    <div className="create-header-top">
+                        <div>
+                            <h1 className="create-title">Создать заказ</h1>
+                            <p className="create-subtitle">Заполните детали — адрес и время подставятся автоматически</p>
+                        </div>
+                    </div>
 
-                                <div>
-                                    <label>Выберите подкатегорию:</label>
-                                    <select
-                                        className="select-responsive"
-                                        value={selectedSubcategory}
-                                        onChange={handleSubcategoryChange}
-                                        disabled={!selectedCategory}
-                                    >
-                                        <option value="">Выберите подкатегорию</option>
-                                        {subcategory.map(sub => (
-                                            <option key={sub.id} value={sub.id}>
-                                                {sub.name}{sub.price ? ` — ${sub.price} ₽` : ''}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {services.length > 0 && (
-                                    <div>
-                                        <label>Услуга:</label>
-                                        <select
-                                            className="select-responsive"
-                                            value={selectedService}
-                                            onChange={(e) => setSelectedService(e.target.value)}
-                                        >
-                                            <option value="">Выберите услугу</option>
-                                            {services.map(service => (
-                                                <option key={service.id} value={service.id}>
-                                                    {service.name} — {service.price} ₽
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-                            </div>
-
-
-                            <div className="input-group">
-                                <label className="label">Описание работы</label>
-                                <textarea
-                                    className="textarea"
-                                    placeholder="Введите описание работы"
-                                    value={formData.description}
-                                    onChange={handleDescriptionChange}
-                                    rows="3" // Начальная высота
-                                />
-                            </div>
-
-                            <div className="input-group">
-                                <label className="label">Адрес</label>
-                                <input
-                                    className="input"
-                                    type="text"
-                                    placeholder="Введите адрес"
-                                    value={formData.address}
-                                    onChange={handleAddressChange}
-                                    required
-                                />
-                                {addressSuggestions.length > 0 && (
-                                    <ul className="address-suggestions">
-                                        {addressSuggestions.map((address, index) => (
-                                            <li key={index} onClick={() => handleAddressSelect(address)}>
-                                                {address}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-
-                            </div>
-
-                            <div className="map-container">
-                                <Map
-                                    defaultState={{center: [44.9572, 34.1108], zoom: 10}}
-                                    style={{width: "100%", height: "300px"}}
-                                >
-                                    {markerPosition && <Placemark geometry={markerPosition}/>}
-                                </Map>
-                            </div>
-
-                            <div className="input-row">
-                                <div className="input-group date-picker">
-                                    <label className="label">Дата и время</label>
-                                    <DatePicker
-                                        selected={formData.workTime}
-                                        onChange={(date) => setFormData({...formData, workTime: date})}
-                                        showTimeSelect
-                                        timeFormat="HH:mm"
-                                        timeIntervals={15}
-                                        dateFormat="Pp"
-                                        placeholderText="Выберите дату и время"
-                                        minDate={new Date()}
-                                        minTime={getMinTime(formData.workTime)}
-                                        maxTime={new Date(0, 0, 0, 23, 59, 59)}
-                                        className="input"
-                                        portalId="date-picker-portal"
-                                        popperProps={{
-                                            modifiers: [
-                                                {
-                                                    name: "preventOverflow",
-                                                    options: {
-                                                        boundary: "viewport",
-                                                    },
-                                                },
-                                                {
-                                                    name: "offset",
-                                                    options: {
-                                                        offset: [0, 8],
-                                                    },
-                                                },
-                                            ],
-                                        }}
-                                    />
-
-
-                                </div>
-                                <div className="input-group">
-                                    <label className="label">Предложенная сумма</label>
-                                    <input
-                                        className="input"
-                                        type="number"
-                                        placeholder="Введите сумму"
-                                        value={formData.proposedSum}
-                                        onChange={(e) =>
-                                            setFormData({...formData, proposedSum: e.target.value})
-                                        }
-                                        required
-                                    />
-                                </div>
-                            </div>
-                            {/* Блок загрузки изображений */}
-                            <div className="file-upload-container">
-                                <label htmlFor="file-input" className="file-input-label">
-                                    Загрузить изображения
-                                </label>
-                                <input
-                                    id="file-input"
-                                    type="file"
-                                    className="file-input"
-                                    multiple
-                                    accept="image/*"
-                                    onChange={handleImageChange}
-                                />
-                            </div>
-
-                            {/* Область предпросмотра загруженных изображений */}
-                            <div className="image-preview">
-                                {images.length > 0 ? (
-                                    images.map((image, index) => (
-                                        <img key={index} src={URL.createObjectURL(image)} alt={`Preview ${index + 1}`}
-                                             className="image-preview-item"/>
-                                    ))
-                                ) : (
-                                    <p className="no-image-text">Изображения не выбраны</p>
-                                )}
-                            </div>
-
-                            <h3 className="payment-title">Выберите способ оплаты</h3>
-                            <div className="payment-selector">
-
-                                {paymentMethods.map((paymentType) => (
-                                    <button
-                                        key={paymentType.id}
-                                        className={`payment-option ${selectedMethod === paymentType.id ? "selected" : ""}`}
-                                        onClick={(event) => handleSelect(event, paymentType.id)}
-                                    >
-                                        <div className="payment-icon-container-create">
-        <span className="payment-icon">
-          {getPaymentIcon(paymentType.id)} {/* Используем функцию getPaymentIcon */}
-        </span>
-                                            <span className="payment-label-create">{paymentType.label}</span>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="promotion-options">
-
-                                {/* Блок продвижения */}
-                                <PromotionOptions value={promotion} onChange={setPromotion}/>
-
-                                <div className="mt-4 text-sm text-gray-600">
-                                    <p>Итоговая стоимость продвижения: <strong>{promotionTotal} ₽</strong></p>
-                                    <p className="text-xs text-gray-500 mt-2">
-                                        💡 Мы не гарантируем, что заказ будет принят исполнителем. Продвижение лишь
-                                        повышает шансы.
-                                    </p>
-                                    <p className="text-xs text-red-500 mt-1">
-                                        ⏰ Заказ будет автоматически перемещен в "историю заказов" через 24 часа, если
-                                        его никто не примет.
-                                    </p>
-                                </div>
-                            </div>
-
-
-                            <button type="submit" disabled={isSubmitting} className="submit-button">
-                                {isSubmitting ? "Создание..." : "Создать заказ"}
-                            </button>
-                        </form>
+                    {/* мини-плашка состояния адреса */}
+                    <div className="create-meta">
+          <span className="identity-pill">
+            Адрес: {formData.address ? "указан" : "не указан"}
+          </span>
+                        {addrResolving && <span className="identity-pill">Определяем адрес…</span>}
                     </div>
                 </div>
+
+                {error && (
+                    <div className="alert alert-danger glass">
+                        <div>
+                            <div className="alert-title">Ошибка</div>
+                            <div className="alert-text">{error}</div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 1) Категория */}
+                <div className="create-card glass">
+                    <div className="card-head">
+                        <div>
+                            <h2 className="card-title">Категория</h2>
+                            <p className="card-subtitle">Выберите категорию, подкатегорию и услугу (если есть)</p>
+                        </div>
+                    </div>
+
+                    <div className="create-grid-2">
+                        <div className="input-group">
+                            <label>Категория</label>
+                            <select className="input" value={selectedCategory} onChange={handleCategoryChange}>
+                                <option value="">Выберите категорию</option>
+                                {category
+                                    .filter((cat) => cat.id !== 12 && cat.id !== 13)
+                                    .map((cat) => (
+                                        <option key={cat.id} value={cat.id}>
+                                            {cat.name}
+                                        </option>
+                                    ))}
+                            </select>
+                        </div>
+
+                        <div className="input-group">
+                            <label>Подкатегория</label>
+                            <select
+                                className="input"
+                                value={selectedSubcategory}
+                                onChange={handleSubcategoryChange}
+                                disabled={!selectedCategory}
+                            >
+                                <option value="">Выберите подкатегорию</option>
+                                {subcategory.map((sub) => (
+                                    <option key={sub.id} value={sub.id}>
+                                        {sub.name}{sub.price ? ` — ${sub.price} ₽` : ""}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {services.length > 0 && (
+                        <div className="input-group" style={{ marginTop: 10 }}>
+                            <label>Услуга</label>
+                            <select className="input" value={selectedService} onChange={(e) => setSelectedService(e.target.value)}>
+                                <option value="">Выберите услугу</option>
+                                {services.map((s) => (
+                                    <option key={s.id} value={s.id}>
+                                        {s.name} — {s.price} ₽
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                </div>
+
+                {/* 2) Описание */}
+                <div className="create-card glass">
+                    <div className="card-head">
+                        <div>
+                            <h2 className="card-title">Описание</h2>
+                            <p className="card-subtitle">Опишите задачу — так исполнители быстрее поймут</p>
+                        </div>
+                    </div>
+
+                    <div className="input-group">
+                        <label>Описание работы</label>
+                        <textarea
+                            className="input create-textarea"
+                            placeholder="Введите описание работы"
+                            value={formData.description}
+                            onChange={handleDescriptionChange}
+                            rows="3"
+                        />
+                    </div>
+                </div>
+
+                {/* 3) Адрес */}
+                <div className="create-card glass">
+                    <div className="card-head">
+                        <div>
+                            <h2 className="card-title">Адрес</h2>
+                            <p className="card-subtitle">Подставляем адрес из профиля, либо выберите на карте</p>
+                        </div>
+                    </div>
+
+                    <div className="input-group">
+                        <label>Адрес</label>
+                        <input
+                            className="input"
+                            type="text"
+                            placeholder="Введите адрес"
+                            value={formData.address}
+                            onChange={handleAddressChange}
+                            required
+                        />
+
+                        {addrResolveError && <div className="loc-error">{addrResolveError}</div>}
+
+                        {addressSuggestions.length > 0 && (
+                            <ul className="address-suggestions">
+                                {addressSuggestions.map((a, i) => (
+                                    <li key={i} onClick={() => handleAddressSelect(a)}>
+                                        {a}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+
+                    <div className="address-confirm">
+                        <div className="address-question">Заказ будет выполняться по этому адресу?</div>
+
+                        <div className="address-actions">
+                            <button
+                                type="button"
+                                className={`btn btn-ghost ${addressMode === "profile" ? "btn-active" : ""}`}
+                                onClick={async () => {
+                                    setAddressMode("profile");
+                                    setAddrResolveError(null);
+
+                                    const addr = profile?.locationAddress;
+                                    const lat = Number(profile?.locationLat);
+                                    const lng = Number(profile?.locationLng);
+                                    const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+
+                                    if (addr && !looksLikeCoordsString(addr)) {
+                                        setFormData((p) => ({ ...p, address: addr }));
+                                        if (hasCoords) setMarkerPosition([lat, lng]);
+                                        return;
+                                    }
+
+                                    if (hasCoords) {
+                                        setMarkerPosition([lat, lng]);
+                                        setAddrResolving(true);
+                                        const resolved = await reverseGeocodeYandex({ lat, lng, apiKey: YM_KEY });
+                                        setAddrResolving(false);
+
+                                        if (resolved) setFormData((p) => ({ ...p, address: resolved }));
+                                        else setAddrResolveError("В профиле нет распознанного адреса. Введите адрес вручную или выберите на карте.");
+                                        return;
+                                    }
+
+                                    setAddrResolveError("В профиле нет адреса. Введите адрес вручную или выберите на карте.");
+                                }}
+                            >
+                                Да (из профиля)
+                            </button>
+
+                            <button
+                                type="button"
+                                className={`btn btn-ghost ${addressMode === "custom" ? "btn-active" : ""}`}
+                                onClick={() => setAddressMode("custom")}
+                            >
+                                Нет, изменить
+                            </button>
+                        </div>
+
+                        {addressMode === "custom" && (
+                            <div className="create-grid-2" style={{ marginTop: 10 }}>
+                                <button type="button" className="btn btn-ghost" onClick={() => setShowMapModal(true)}>
+                                    Выбрать на карте
+                                </button>
+
+                                <button type="button" className="btn btn-ghost" onClick={detectGps} disabled={addrResolving}>
+                                    Определить по GPS
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <YandexMapModal
+                        isOpen={showMapModal}
+                        onClose={() => setShowMapModal(false)}
+                        initialLat={markerPosition?.[0]}
+                        initialLng={markerPosition?.[1]}
+                        onPick={(picked) => {
+                            setFormData((p) => ({ ...p, address: picked.address }));
+                            setMarkerPosition([picked.lat, picked.lng]);
+                            setAddressMode("custom");
+                            setShowMapModal(false);
+                        }}
+                    />
+                </div>
+
+                {/* 4) Время + сумма */}
+                <div className="create-card glass">
+                    <div className="card-head">
+                        <div>
+                            <h2 className="card-title">Время и бюджет</h2>
+                            <p className="card-subtitle">Минималистично: тумблер “срочно / по расписанию”</p>
+                        </div>
+                    </div>
+
+                    <div className="create-grid-2">
+                        <div className="input-group">
+                            <label>Когда нужно</label>
+
+                            <div className="segmented">
+                                <button
+                                    type="button"
+                                    className={`seg-btn ${scheduleMode === "asap" ? "active" : ""}`}
+                                    onClick={() => {
+                                        setScheduleMode("asap");
+                                        setFormData((p) => ({ ...p, workTime: roundTo15(new Date()) }));
+                                    }}
+                                >
+                                    В ближайшее время
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={`seg-btn ${scheduleMode === "scheduled" ? "active" : ""}`}
+                                    onClick={() => setScheduleMode("scheduled")}
+                                >
+                                    Выбрать дату и время
+                                </button>
+                            </div>
+
+                            {scheduleMode === "asap" ? (
+                                <div className="asap-chip">
+                                    Ближайшее время:{" "}
+                                    <strong>{formData.workTime ? new Date(formData.workTime).toLocaleString() : "—"}</strong>
+                                </div>
+                            ) : (
+                                <DatePicker
+                                    selected={formData.workTime}
+                                    onChange={(date) => setFormData((p) => ({ ...p, workTime: date }))}
+                                    showTimeSelect
+                                    timeFormat="HH:mm"
+                                    timeIntervals={15}
+                                    dateFormat="Pp"
+                                    placeholderText="Выберите дату и время"
+                                    minDate={new Date()}
+                                    minTime={getMinTime(formData.workTime)}
+                                    maxTime={new Date(0, 0, 0, 23, 59, 59)}
+                                    className="input"
+                                    portalId="date-picker-portal"
+                                />
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* 5) Фото */}
+                <div className="create-card glass">
+                    <div className="card-head">
+                        <div>
+                            <h2 className="card-title">Фото</h2>
+                            <p className="card-subtitle">До 5 изображений, чтобы было понятнее</p>
+                        </div>
+                    </div>
+
+                    <label className="upload-glass">
+                        <input
+                            id="file-input"
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            onChange={handleImageChange}
+                            style={{ display: "none" }}
+                        />
+                        <span>Загрузить изображения</span>
+                    </label>
+
+                    {images.length > 0 ? (
+                        <div className="docs-grid" style={{ marginTop: 12 }}>
+                            {images.map((img, i) => (
+                                <div className="doc-tile" key={i}>
+                                    <img className="doc-img" src={URL.createObjectURL(img)} alt={`Preview ${i + 1}`} />
+                                    <div className="doc-name">Фото {i + 1}</div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="docs-empty" style={{ marginTop: 10 }}>Изображения не выбраны</div>
+                    )}
+                </div>
+
+                {/* 6) Оплата */}
+                <div className="create-card glass">
+                    <div className="card-head">
+                        <div>
+                            <h2 className="card-title">Оплата</h2>
+                            <p className="card-subtitle">Выберите способ оплаты</p>
+                        </div>
+                    </div>
+
+                    <div className="input-group" style={{ marginBottom: 12 }}>
+                        <label>Предложенная сумма</label>
+                        <input
+                            className="input"
+                            type="number"
+                            placeholder="Введите сумму"
+                            value={formData.proposedSum}
+                            onChange={(e) => setFormData((p) => ({ ...p, proposedSum: e.target.value }))}
+                            required
+                        />
+                    </div>
+
+                    <div className="payment-grid">
+                        {paymentMethods.map((m) => (
+                            <button
+                                key={m.id}
+                                className={`pay-tile ${selectedMethod === m.id ? "selected" : ""}`}
+                                onClick={(event) => handleSelectPayment(event, m.id)}
+                                type="button"
+                            >
+                                <div className="pay-tile-inner">
+                                    <span className="pay-ico">{getPaymentIcon(m.id)}</span>
+                                    <span className="pay-label">{m.label}</span>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="total-row">
+                        <div className="total-left">
+                            <div className="total-title">Итог к оплате сейчас</div>
+                            <div className="total-sub">Оплачивается только продвижение (если выбрано)</div>
+                        </div>
+                        <div className="total-amount">{promotionTotal} ₽</div>
+                    </div>
+
+                </div>
+
+                {/* 7) Продвижение */}
+                <div className="create-card glass">
+                    <div className="card-head">
+                        <div>
+                            <h2 className="card-title">Продвижение</h2>
+                            <p className="card-subtitle">Опционально: выделение, рекомендация, пуш</p>
+                        </div>
+                    </div>
+
+                    <PromotionOptions value={promotion} onChange={setPromotion} />
+
+                    <div className="docs-block" style={{ marginTop: 12 }}>
+                        <div className="docs-head">
+                            <div className="docs-title">Итог</div>
+                            <div className="docs-count">{promotionTotal} ₽</div>
+                        </div>
+                        <div className="card-muted">
+                            💡 Продвижение повышает шансы, но не гарантирует отклик.
+                            ⏰ Если никто не примет заказ — уйдёт в историю через 24 часа.
+                        </div>
+                    </div>
+                </div>
+
+                {/* submit */}
+                <div className="profile-actions glass">
+                    <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)}>
+                        Назад
+                    </button>
+
+                    <button type="submit" disabled={isSubmitting} className="btn btn-primary" onClick={handleSubmit}>
+                        {isSubmitting ? "Создание..." : "Создать заказ"}
+                    </button>
+                </div>
             </div>
-        </YMaps>
+        </div>
     );
 }
 

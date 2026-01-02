@@ -38,14 +38,6 @@ module.exports = (sequelize) => {
                 type: DataTypes.INTEGER,
                 defaultValue: 0,
             },
-            complaintsCount: {
-                type: DataTypes.INTEGER,
-                defaultValue: 0,
-            },
-            complaints: {
-                type: DataTypes.JSON,
-                defaultValue: [],
-            },
             documentPhotos: {
                 type: DataTypes.JSON, // Массив изображений
                 allowNull: true,
@@ -89,6 +81,37 @@ module.exports = (sequelize) => {
             yookassa_payment_method_saved_at: {
                 type: DataTypes.DATE,
                 allowNull: true,
+            },
+            locationAddress: {
+                type: DataTypes.TEXT,
+                allowNull: true,
+                field: "location_address",
+            },
+            locationLat: {
+                type: DataTypes.DECIMAL(10, 7),
+                allowNull: true,
+                field: "location_lat",
+            },
+            locationLng: {
+                type: DataTypes.DECIMAL(10, 7),
+                allowNull: true,
+                field: "location_lng",
+            },
+            locationSource: {
+                type: DataTypes.ENUM("gps", "manual", "map"),
+                allowNull: true,
+                field: "location_source",
+            },
+            locationUpdatedAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+                field: "location_updated_at",
+            },
+            preferredCategoryIds: {
+                type: DataTypes.JSON,
+                allowNull: false,
+                defaultValue: [],
+                field: "preferred_category_ids",
             },
 
         },

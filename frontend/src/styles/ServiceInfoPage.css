@@ -1,139 +1,253 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap");
 
-* {
-    box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
     margin: 0;
-    font-family: 'Inter', sans-serif;
+    font-family: "Inter", sans-serif;
     -webkit-font-smoothing: antialiased;
 }
 
-/* Контейнер страницы */
+/* ===== Page ===== */
 .info-page-container {
     min-height: 100vh;
-    padding: 24px;
+    padding: 22px;
+    padding-bottom: 110px; /* место под нижнее меню */
     display: flex;
     justify-content: center;
-    align-items: center;
-    background: linear-gradient(to bottom right, #e8f0ff, #ffffff);
+    align-items: flex-start;
+
+    background:
+            radial-gradient(1200px 600px at 10% 0%, rgba(59,130,246,0.18), transparent 60%),
+            radial-gradient(900px 500px at 90% 20%, rgba(99,102,241,0.16), transparent 55%),
+            linear-gradient(to bottom right, #e8f0ff, #ffffff);
+
+    color: #0f172a;
 }
 
-/* Основная карточка */
+/* ===== Main glass card ===== */
 .info-page-card {
-    max-width: 720px;
     width: 100%;
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    max-width: 760px;
+
     border-radius: 24px;
-    padding: 24px 24px 28px;
-    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
+    padding: 22px 22px 26px;
+
+    border: 1px solid rgba(255,255,255,0.40);
+    background: rgba(255,255,255,0.56);
+
+    backdrop-filter: blur(18px) saturate(190%);
+    -webkit-backdrop-filter: blur(18px) saturate(190%);
+
+    box-shadow:
+            0 22px 56px rgba(15, 23, 42, 0.10),
+            0 1px 0 rgba(255,255,255,0.22) inset;
+
+    position: relative;
+    overflow: hidden;
 }
 
-/* Заголовки */
+.info-page-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(900px 220px at 10% 0%, rgba(255,255,255,0.55), transparent 45%);
+    opacity: 0.65;
+}
+
+/* ===== Headings ===== */
 .info-title {
-    font-size: 1.8rem;
+    margin: 0 0 10px;
+    font-size: 1.75rem;
     font-weight: 800;
-    color: #111827;
-    margin: 0 0 0.75rem;
-    text-align: left;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+    position: relative;
+    z-index: 1;
 }
 
 .info-subtitle {
+    margin: 0 0 18px;
     font-size: 0.98rem;
-    color: #4b5563;
-    margin: 0 0 1.5rem;
-    line-height: 1.6;
+    line-height: 1.65;
+    color: rgba(15, 23, 42, 0.72);
+    position: relative;
+    z-index: 1;
 }
 
-/* Секции */
+/* ===== Sections ===== */
 .info-section {
-    margin-top: 1.5rem;
-    border-top: 1px solid rgba(209, 213, 219, 0.6);
-    padding-top: 1.25rem;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+    position: relative;
+    z-index: 1;
 }
 
 .info-section:first-of-type {
     border-top: none;
-    padding-top: 0.5rem;
+    padding-top: 6px;
+    margin-top: 10px;
 }
 
 .info-section-title {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #111827;
-    margin: 0 0 0.5rem;
+    margin: 0 0 8px;
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: rgba(15, 23, 42, 0.92);
 }
 
-/* Текст */
+/* ===== Text / lists ===== */
 .info-text {
+    margin: 0 0 10px;
     font-size: 0.95rem;
-    color: #4b5563;
-    margin: 0 0 0.75rem;
-    line-height: 1.6;
+    line-height: 1.65;
+    color: rgba(15, 23, 42, 0.72);
 }
 
-/* Списки */
 .info-list {
-    margin: 0.25rem 0 0.75rem;
-    padding-left: 1.2rem;
-    color: #4b5563;
+    margin: 8px 0 0;
+    padding-left: 18px;
     font-size: 0.95rem;
-    line-height: 1.6;
+    line-height: 1.65;
+    color: rgba(15, 23, 42, 0.72);
 }
 
-.info-list li + li {
-    margin-top: 0.25rem;
+.info-list li + li { margin-top: 6px; }
+
+/* inline code like `debt` */
+.info-page-card code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.9em;
+    padding: 2px 6px;
+    border-radius: 8px;
+    border: 1px solid rgba(15, 23, 42, 0.10);
+    background: rgba(255,255,255,0.55);
 }
 
-/* Тарифы */
+/* ===== Tariffs ===== */
 .tariff-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.9rem;
-    margin-top: 0.75rem;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: 10px;
 }
 
+/* premium tile */
 .tariff-item {
-    padding: 0.9rem 1rem;
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(209, 213, 219, 0.9);
+    border-radius: 18px;
+    padding: 14px 14px;
+
+    border: 1px solid rgba(255,255,255,0.42);
+    background: rgba(255,255,255,0.52);
+
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+
+    box-shadow:
+            0 16px 42px rgba(15, 23, 42, 0.08),
+            0 1px 0 rgba(255,255,255,0.20) inset;
+
+    transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.2s ease;
+    position: relative;
+    overflow: hidden;
 }
 
+.tariff-item::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(700px 180px at 10% 0%, rgba(255,255,255,0.50), transparent 50%);
+    opacity: 0.55;
+}
+
+.tariff-item:hover {
+    transform: translateY(-2px);
+    background: rgba(255,255,255,0.64);
+    box-shadow:
+            0 20px 52px rgba(15, 23, 42, 0.10),
+            0 1px 0 rgba(255,255,255,0.22) inset;
+}
+
+/* header row: name + price (right) */
 .tariff-name {
-    font-weight: 600;
-    color: #111827;
-    margin-bottom: 0.15rem;
+    margin: 0;
+    font-weight: 800;
+    color: rgba(15, 23, 42, 0.92);
+    font-size: 0.98rem;
+    line-height: 1.25;
+    position: relative;
+    z-index: 1;
 }
 
 .tariff-price {
-    font-weight: 600;
-    color: #2563eb;
-    font-size: 0.95rem;
-    margin-bottom: 0.25rem;
+    margin: 8px 0 8px;
+    width: fit-content;
+    font-weight: 800;
+    font-size: 0.85rem;
+
+    color: rgba(255,255,255,0.95);
+    border: 1px solid rgba(255,255,255,0.30);
+    border-radius: 999px;
+    padding: 7px 10px;
+
+    background: linear-gradient(135deg, rgba(59,130,246,0.95), rgba(99,102,241,0.95));
+    box-shadow: 0 14px 30px rgba(59,130,246,0.22);
+
+    position: relative;
+    z-index: 1;
 }
 
 .tariff-desc {
-    font-size: 0.9rem;
-    color: #4b5563;
     margin: 0;
-    line-height: 1.5;
+    font-size: 0.92rem;
+    line-height: 1.55;
+    color: rgba(15, 23, 42, 0.70);
+    position: relative;
+    z-index: 1;
 }
 
+/* make name+price look like one block on desktop */
+@media (min-width: 720px) {
+    .tariff-item {
+        padding: 16px 16px;
+    }
+
+    /* Place price to the right when enough space */
+    .tariff-item {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+      "name price"
+      "desc desc";
+        column-gap: 12px;
+        row-gap: 10px;
+        align-items: start;
+    }
+
+    .tariff-name { grid-area: name; margin: 0; }
+    .tariff-price { grid-area: price; margin: 0; justify-self: end; }
+    .tariff-desc { grid-area: desc; }
+}
+
+/* ===== Note ===== */
 .info-note {
-    margin-top: 1.5rem;
-    font-size: 0.85rem;
-    color: #6b7280;
+    margin: 18px 0 0;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    color: rgba(15, 23, 42, 0.62);
+    position: relative;
+    z-index: 1;
 }
 
-/* Адаптив */
+/* ===== Mobile ===== */
 @media (max-width: 640px) {
     .info-page-container {
         padding: 16px;
-        align-items: flex-start;
+        padding-bottom: 110px;
     }
 
     .info-page-card {
@@ -142,20 +256,25 @@ body {
     }
 
     .info-title {
-        font-size: 1.5rem;
+        font-size: 1.45rem;
     }
 
     .info-subtitle {
-        font-size: 0.9rem;
+        font-size: 0.92rem;
     }
 
     .info-section-title {
-        font-size: 1rem;
+        font-size: 1.0rem;
     }
 
     .info-text,
     .info-list,
     .tariff-desc {
-        font-size: 0.9rem;
+        font-size: 0.92rem;
+    }
+
+    .tariff-price {
+        font-size: 0.82rem;
+        padding: 6px 9px;
     }
 }
