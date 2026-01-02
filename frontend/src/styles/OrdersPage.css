@@ -1,7 +1,13 @@
-/* Liquid Glass base */
+/* ===== Page layout (keep above bottom menu) ===== */
+/* Поставь здесь высоту твоего нижнего меню. Если меню 64px — оставь так. */
+:root {
+    --bottom-menu-height: 92px;
+}
+
 .orders-page {
     min-height: 100vh;
     padding: 18px;
+    padding-bottom: calc(18px + var(--bottom-menu-height) + env(safe-area-inset-bottom));
     background: linear-gradient(to bottom right, #e8f0ff, #ffffff);
 }
 
@@ -13,6 +19,7 @@
     gap: 14px;
 }
 
+/* ===== Liquid Glass ===== */
 .glass {
     background: rgba(255, 255, 255, 0.62);
     border: 1px solid rgba(255, 255, 255, 0.55);
@@ -22,7 +29,7 @@
     border-radius: 18px;
 }
 
-/* Top bar */
+/* ===== Top bar ===== */
 .orders-top {
     display: flex;
     gap: 14px;
@@ -48,7 +55,56 @@
     color: #475569;
 }
 
-.orders-location {
+.orders-top-right {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+/* ===== Buttons ===== */
+.btn {
+    border: none;
+    border-radius: 14px;
+    padding: 10px 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform .06s ease, box-shadow .2s ease, opacity .2s ease, background .2s ease;
+    user-select: none;
+}
+
+.btn:active { transform: translateY(1px); }
+
+.btn-primary {
+    background: linear-gradient(135deg, rgba(37,99,235,1), rgba(99,102,241,1));
+    color: white;
+    box-shadow: 0 14px 28px rgba(37, 99, 235, 0.22);
+}
+
+.btn-ghost {
+    background: rgba(255, 255, 255, 0.82);
+    color: #0f172a;
+    border: 1px solid rgba(15, 23, 42, 0.10);
+}
+
+.btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.92);
+}
+
+.btn-ghost-danger {
+    background: rgba(248, 113, 113, 0.12);
+    color: #b91c1c;
+    border: 1px solid rgba(248, 113, 113, 0.22);
+}
+
+.btn-inline {
+    display: inline-flex;
+    align-items: center;
+}
+
+/* ===== Location row + dropdown (FIX: no see-through) ===== */
+.orders-location-row {
     margin-top: 10px;
     display: flex;
     gap: 10px;
@@ -56,7 +112,7 @@
     align-items: center;
 }
 
-.pill {
+.orders-location-pill {
     display: inline-flex;
     align-items: center;
     padding: 8px 10px;
@@ -68,21 +124,76 @@
     max-width: 100%;
 }
 
-.orders-top-right {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
-    justify-content: flex-end;
+.orders-location-text {
+    max-width: 520px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-/* Inputs */
+/* details dropdown */
+.loc-menu {
+    position: relative;
+}
+
+/* Делаем summary выглядящим как кнопка */
+.loc-menu > summary {
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 10px 12px;
+    border-radius: 14px;
+    font-weight: 900;
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+}
+
+.loc-menu > summary:hover {
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.loc-menu > summary::-webkit-details-marker { display: none; }
+
+/* стрелочка-индикатор */
+.loc-menu > summary::after {
+    content: "▾";
+    font-weight: 900;
+    opacity: 0.7;
+}
+
+/* панель — непрозрачная, чтобы было видно кнопки */
+.loc-menu-panel {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+    width: 260px;
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+
+    /* FIX: не просвечивает */
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+
+    /* FIX: поверх всего, включая карту */
+    z-index: 9999;
+}
+
+/* Чтобы при клике рядом не перекрывалось чужими блоками */
+.loc-menu[open] { z-index: 9999; }
+
+/* ===== Address input row ===== */
 .loc-input {
     width: 100%;
     padding: 12px 12px;
     border-radius: 14px;
     border: 1px solid rgba(59, 130, 246, 0.22);
-    background: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.86);
     outline: none;
 }
 
@@ -108,76 +219,51 @@
     border-radius: 14px;
 }
 
-/* Buttons (match your style system) */
-.btn {
-    border: none;
-    border-radius: 14px;
-    padding: 10px 12px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: transform .06s ease, box-shadow .2s ease, opacity .2s ease;
-}
-
-.btn:active { transform: translateY(1px); }
-
-.btn-primary {
-    background: linear-gradient(135deg, rgba(37,99,235,1), rgba(99,102,241,1));
-    color: white;
-    box-shadow: 0 14px 28px rgba(37, 99, 235, 0.22);
-}
-
-.btn-ghost {
-    background: rgba(255, 255, 255, 0.7);
-    color: #0f172a;
-    border: 1px solid rgba(15, 23, 42, 0.10);
-}
-
-.btn-ghost-danger {
-    background: rgba(248, 113, 113, 0.12);
-    color: #b91c1c;
-    border: 1px solid rgba(248, 113, 113, 0.22);
-}
-
-.btn-inline {
-    display: inline-flex;
-    align-items: center;
-}
-
-/* Map block */
-.orders-map {
+/* ===== Tabs row ===== */
+.orders-tabs-row {
     padding: 10px;
-    overflow: hidden;
-}
-
-/* Chips */
-.orders-chips {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
+    align-items: center;
 }
 
-.chip {
+.tab-pill {
     border-radius: 999px;
-    padding: 8px 12px;
+    padding: 9px 12px;
     border: 1px solid rgba(15, 23, 42, 0.10);
-    background: rgba(255,255,255,0.75);
+    background: rgba(255,255,255,0.82);
     cursor: pointer;
-    font-weight: 700;
+    font-weight: 900;
     font-size: 13px;
+    transition: transform .06s ease, box-shadow .2s ease, background .2s ease;
 }
 
-.chip.active {
+.tab-pill:active { transform: translateY(1px); }
+
+.tab-pill.active {
     background: rgba(37,99,235,0.12);
     border-color: rgba(37,99,235,0.22);
     color: #1e3a8a;
 }
 
-.chip.hint {
-    cursor: default;
-    opacity: 0.9;
+.tabs-hint {
+    margin-left: auto;
+    font-size: 12px;
+    color: #64748b;
+    padding: 8px 10px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.04);
+    border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
-/* Orders list */
+/* ===== Map block ===== */
+.orders-map {
+    padding: 10px;
+    overflow: hidden;
+}
+
+/* ===== Orders list ===== */
 .orders-list-wrap {
     display: flex;
     flex-direction: column;
@@ -206,6 +292,16 @@
     box-shadow: 0 18px 50px rgba(250, 204, 21, 0.12), 0 18px 50px rgba(15, 23, 42, 0.10);
 }
 
+.order-card.recommended {
+    border-color: rgba(99, 102, 241, 0.35);
+    box-shadow: 0 18px 50px rgba(99, 102, 241, 0.12), 0 18px 50px rgba(15, 23, 42, 0.10);
+}
+
+.order-card.courier {
+    border-color: rgba(245, 158, 11, 0.35);
+    box-shadow: 0 18px 50px rgba(245, 158, 11, 0.10), 0 18px 50px rgba(15, 23, 42, 0.10);
+}
+
 .order-head {
     display: flex;
     gap: 10px;
@@ -229,9 +325,9 @@
     padding: 6px 10px;
     border-radius: 999px;
     font-size: 12px;
-    font-weight: 800;
+    font-weight: 900;
     border: 1px solid rgba(15, 23, 42, 0.10);
-    background: rgba(255,255,255,0.70);
+    background: rgba(255,255,255,0.82);
 }
 
 .badge-priority {
@@ -244,6 +340,12 @@
     background: rgba(34, 197, 94, 0.12);
     border-color: rgba(34, 197, 94, 0.22);
     color: #166534;
+}
+
+.badge-courier {
+    background: rgba(245, 158, 11, 0.14);
+    border-color: rgba(245, 158, 11, 0.22);
+    color: #92400e;
 }
 
 .order-meta .muted {
@@ -263,7 +365,7 @@
     color: #1e3a8a;
 }
 
-/* Order content layout */
+/* content grid */
 .order-grid {
     margin-top: 12px;
     display: grid;
@@ -276,20 +378,17 @@
     gap: 10px;
 }
 
-.kv {
-    display: grid;
-    gap: 4px;
-}
+.kv { display: grid; gap: 4px; }
 
 .k {
     font-size: 12px;
     color: #64748b;
-    font-weight: 700;
+    font-weight: 800;
 }
 
 .v {
     color: #0f172a;
-    font-weight: 700;
+    font-weight: 800;
 }
 
 .v.price {
@@ -297,7 +396,7 @@
     font-weight: 900;
 }
 
-/* Thumbs */
+/* thumbs */
 .thumbs {
     margin-top: 12px;
     display: flex;
@@ -327,7 +426,7 @@
     color: #0f172a;
 }
 
-/* Description */
+/* description + actions */
 .order-desc {
     margin-top: 12px;
     display: grid;
@@ -343,7 +442,31 @@
     align-items: center;
 }
 
-/* Empty */
+/* ===== Notice / Empty ===== */
+.notice {
+    padding: 14px;
+    display: grid;
+    gap: 8px;
+}
+
+.notice-title {
+    font-size: 16px;
+    font-weight: 900;
+    color: #0f172a;
+}
+
+.notice-sub {
+    font-size: 13px;
+    color: #475569;
+}
+
+.notice-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+}
+
 .empty {
     padding: 16px;
     text-align: center;
@@ -369,7 +492,7 @@
     flex-wrap: wrap;
 }
 
-/* Drawer (Avito-like) */
+/* ===== Drawer ===== */
 .drawer-overlay {
     position: fixed;
     inset: 0;
@@ -417,14 +540,11 @@
     gap: 12px;
 }
 
-.field {
-    display: grid;
-    gap: 8px;
-}
+.field { display: grid; gap: 8px; }
 
 .field label {
     font-size: 13px;
-    font-weight: 800;
+    font-weight: 900;
     color: #0f172a;
 }
 
@@ -433,7 +553,7 @@
     padding: 12px 12px;
     border-radius: 14px;
     border: 1px solid rgba(59, 130, 246, 0.22);
-    background: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.86);
     outline: none;
 }
 
@@ -455,22 +575,6 @@
     flex-wrap: wrap;
 }
 
-.toggle {
-    display: inline-flex;
-    gap: 10px;
-    align-items: center;
-    padding: 10px 12px;
-    border-radius: 14px;
-    background: rgba(37, 99, 235, 0.08);
-    border: 1px solid rgba(37, 99, 235, 0.16);
-}
-
-.toggle label {
-    font-weight: 800;
-    font-size: 13px;
-    color: #1e3a8a;
-}
-
 .radius-pill {
     padding: 10px 12px;
     border-radius: 14px;
@@ -478,7 +582,7 @@
     border: 1px solid rgba(15, 23, 42, 0.08);
     font-size: 13px;
     color: #0f172a;
-    font-weight: 800;
+    font-weight: 900;
 }
 
 .drawer-foot {
@@ -489,7 +593,7 @@
     border-top: 1px solid rgba(15, 23, 42, 0.08);
 }
 
-/* Image modal controls */
+/* ===== Image modal controls ===== */
 .img-close {
     position: absolute;
     top: 10px;
@@ -528,40 +632,199 @@
     object-fit: contain;
 }
 
-/* Responsive */
+/* ===== Responsive ===== */
 @media (max-width: 860px) {
     .orders-top {
         flex-direction: column;
         align-items: stretch;
     }
+
     .orders-top-right {
         justify-content: flex-start;
     }
+
+    .orders-location-text {
+        max-width: 240px;
+    }
+
+    .tabs-hint {
+        margin-left: 0;
+        width: 100%;
+        border-radius: 14px;
+    }
+
+    .loc-menu-panel {
+        width: min(320px, calc(100vw - 40px));
+    }
+
     .order-grid {
         grid-template-columns: 1fr;
     }
 }
 
-.notice {
-    padding: 14px;
-    display: grid;
-    gap: 8px;
+/* === TOP: чтобы выпадашка не пряталась под следующими блоками === */
+.orders-top {
+    position: relative;
+    z-index: 20;
 }
 
-.notice-title {
-    font-size: 16px;
+/* На всякий случай: табы ниже по слою */
+.orders-tabs-row {
+    position: relative;
+    z-index: 5;
+}
+
+/* === DETAILS MENU === */
+.loc-menu {
+    position: relative;
+    z-index: 50; /* сам контейнер выше соседей */
+}
+
+.loc-summary {
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+
+    /* Liquid Glass как в проекте */
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    box-shadow: 0 18px 50px rgba(15, 23, 42, 0.10);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+
     font-weight: 900;
     color: #0f172a;
+    cursor: pointer;
+    user-select: none;
 }
 
-.notice-sub {
-    font-size: 13px;
-    color: #475569;
+.loc-summary::-webkit-details-marker { display: none; }
+
+.loc-summary::after {
+    content: "▾";
+    margin-left: 6px;
+    opacity: 0.65;
+    font-weight: 900;
 }
 
-.notice-actions {
-    display: flex;
+/* === САМА ПАНЕЛЬ: плотнее, чтобы кнопки были видны + кликабельна === */
+.loc-menu-panel {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+    width: 260px;
+
+    display: grid;
     gap: 10px;
-    flex-wrap: wrap;
-    justify-content: flex-start;
+    padding: 12px;
+
+    /* Liquid glass, но НЕ прозрачный */
+    background: rgba(255, 255, 255, 0.92); /* ключевой фикс “просветов” */
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 16px;
+
+    z-index: 9999;
 }
+
+/* Чтобы при открытом details никто не перехватывал клики */
+.loc-menu-panel,
+.loc-menu-panel * {
+    pointer-events: auto;
+}
+
+/* Чуть “плотнее” ghost-кнопки именно в выпадашке */
+.loc-menu-panel .btn-ghost {
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid rgba(15, 23, 42, 0.10);
+}
+
+/* ===== Map overlay UI (Liquid Glass) ===== */
+.swipe-map-root {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 18px; /* чтобы совпало с glass-контейнером */
+}
+
+/* Контейнер кнопок поверх карты */
+.map-ui {
+    position: absolute;
+    z-index: 50;
+    top: 12px;
+    right: 12px;
+    display: grid;
+    gap: 10px;
+    pointer-events: none; /* важно: чтобы карта скроллилась/зумалась */
+}
+
+/* Сами кнопки кликабельны */
+.map-ui .map-ui-btn {
+    pointer-events: auto;
+}
+
+/* Кнопки */
+.map-ui-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 10px 12px;
+    border-radius: 14px;
+
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.14);
+    color: #0f172a;
+
+    font-weight: 900;
+    font-size: 13px;
+    line-height: 1;
+
+    cursor: pointer;
+    user-select: none;
+
+    transition: transform .06s ease, box-shadow .2s ease, opacity .2s ease;
+}
+
+.map-ui-btn:hover {
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.map-ui-btn:active {
+    transform: translateY(1px);
+}
+
+.map-ui-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18), 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.map-ui-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+/* Мобилка: чуть компактнее */
+@media (max-width: 860px) {
+    .map-ui {
+        top: 10px;
+        right: 10px;
+        gap: 8px;
+    }
+
+    .map-ui-btn {
+        padding: 9px 11px;
+        font-size: 12px;
+        border-radius: 13px;
+    }
+}
+

@@ -1,4 +1,3 @@
-/* global cp */
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -29,7 +28,6 @@ function looksLikeCoordsString(v) {
     return s.startsWith("Координаты:") || /^\d{1,3}\.\d+,\s*\d{1,3}\.\d+$/.test(s);
 }
 
-// reverse geocode через Yandex Geocoder: geocode=lng,lat
 async function reverseGeocodeYandex({ lat, lng, apiKey }) {
     if (!apiKey) throw new Error("No Yandex API key");
     const url = `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}&geocode=${lng},${lat}&format=json&results=1&kind=house`;
@@ -52,9 +50,9 @@ function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
     const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(lat1 * (Math.PI / 180)) *
-        Math.cos(lat2 * (Math.PI / 180)) *
         Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+        Math.sin(dLon / 2) *
+        Math.cos(lat2 * (Math.PI / 180));
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 }
@@ -72,7 +70,7 @@ const OrdersPage = () => {
 
     // auth/profile
     const [userId, setUserId] = useState(null);
-    const [profile, setProfile] = useState(null); // { preferredCategoryIds, locationLat, locationLng, locationAddress... }
+    const [profile, setProfile] = useState(null);
 
     // location
     const [userLocation, setUserLocation] = useState(null); // {latitude, longitude}
@@ -82,12 +80,14 @@ const OrdersPage = () => {
     const [isGeolocationDenied, setIsGeolocationDenied] = useState(false);
     const [showMapPick, setShowMapPick] = useState(false);
 
-    // UI (avito-like)
+    // UI
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [isMapVisible, setIsMapVisible] = useState(false);
-    const [onlyRecommended, setOnlyRecommended] = useState(false);
 
-    // filter state (drawer)
+    // tabs
+    const [activeTab, setActiveTab] = useState("all"); // all | recommended | courier
+
+    // drawer filters
     const [selectedCategory, setSelectedCategory] = useState("");
     const [selectedSubcategory, setSelectedSubcategory] = useState("");
     const [selectedService, setSelectedService] = useState("");
@@ -97,7 +97,6 @@ const OrdersPage = () => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [currentImages, setCurrentImages] = useState([]);
 
-    // prevent refetch storms
     const creatorsCacheRef = useRef({});
 
     const preferredCategoryIds = useMemo(() => {
@@ -132,7 +131,6 @@ const OrdersPage = () => {
 
     // ---------- API: fetch base data ----------
     useEffect(() => {
-        // categories
         axios
             .get(`${apiUrl}/api/category`)
             .then((res) => setCategories(res.data || []))
@@ -147,18 +145,16 @@ const OrdersPage = () => {
                 setUserId(res.data?.id || null);
                 socket.emit("register", res.data?.id);
             } catch (e) {
-                // не авторизован — просто оставим страницу доступной, но без профессий/локации профиля
                 console.info("OrdersPage: profile not loaded (maybe not logged in).");
             }
         };
-
         fetchProfile();
     }, []);
 
     useEffect(() => {
         const fetchOrders = async () => {
             try {
-                const res = await axiosInstance.get("/orders/all"); // ✅ тянем всё pending
+                const res = await axiosInstance.get("/orders/all");
                 setOrdersRaw(res.data || []);
             } catch (e) {
                 console.error(e);
@@ -167,12 +163,11 @@ const OrdersPage = () => {
         };
 
         fetchOrders();
-
         socket.on("orderUpdated", fetchOrders);
         return () => socket.off("orderUpdated", fetchOrders);
     }, []);
 
-    // ---------- creators info (cache + parallel) ----------
+    // ---------- creators info ----------
     useEffect(() => {
         const ids = [...new Set((ordersRaw || []).map((o) => o.creatorId).filter(Boolean))];
         if (!ids.length) return;
@@ -193,13 +188,11 @@ const OrdersPage = () => {
                     if (r.status === "fulfilled") creatorsCacheRef.current[id] = r.value.data;
                 });
                 setCreatorsInfo({ ...creatorsCacheRef.current });
-            } catch (e) {
-                // тихо
-            }
+            } catch {}
         })();
     }, [ordersRaw]);
 
-    // ---------- location: priority = profile -> browser gps -> manual/map ----------
+    // ---------- location: profile -> gps -> manual/map ----------
     useEffect(() => {
         if (!profile) return;
 
@@ -207,11 +200,9 @@ const OrdersPage = () => {
         const lng = Number(profile.locationLng);
         const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
 
-        // 1) если в профиле есть координаты — используем как “истину”
         if (hasCoords) {
             setUserLocation({ latitude: lat, longitude: lng });
 
-            // для UI адреса — если адрес норм, используем, иначе reverse
             const addr = profile.locationAddress;
             if (addr && !looksLikeCoordsString(addr)) {
                 setLocationDraft(addr);
@@ -223,9 +214,8 @@ const OrdersPage = () => {
                 setLocError(null);
                 try {
                     const resolved = await reverseGeocodeYandex({ lat, lng, apiKey: YM_KEY });
-                    if (resolved) setLocationDraft(resolved);
-                    else setLocationDraft(addr || "");
-                } catch (e) {
+                    setLocationDraft(resolved || addr || "");
+                } catch {
                     setLocationDraft(addr || "");
                 } finally {
                     setLocLoading(false);
@@ -235,7 +225,6 @@ const OrdersPage = () => {
             return;
         }
 
-        // 2) если нет координат в профиле — пробуем gps браузера
         if (!navigator.geolocation) {
             setIsGeolocationDenied(true);
             return;
@@ -248,7 +237,6 @@ const OrdersPage = () => {
                 const longitude = pos.coords.longitude;
                 setUserLocation({ latitude, longitude });
 
-                // красивый адрес в UI
                 try {
                     const addr = await reverseGeocodeYandex({ lat: latitude, lng: longitude, apiKey: YM_KEY });
                     if (addr) setLocationDraft(addr);
@@ -271,7 +259,6 @@ const OrdersPage = () => {
 
         setUserLocation({ latitude: lat, longitude: lng });
 
-        // красивый адрес в UI: используем profile.locationAddress, либо reverse
         const addr = profile.locationAddress;
         if (addr && !looksLikeCoordsString(addr)) {
             setLocationDraft(addr);
@@ -291,38 +278,53 @@ const OrdersPage = () => {
         }
     };
 
-    const detectGpsNow = () => {
-        if (!navigator.geolocation) {
-            toast.error("GPS недоступен в браузере");
-            return;
-        }
-
-        setLocLoading(true);
-        setLocError(null);
-
-        navigator.geolocation.getCurrentPosition(
-            async (pos) => {
-                const latitude = pos.coords.latitude;
-                const longitude = pos.coords.longitude;
-
-                setUserLocation({ latitude, longitude });
-
-                try {
-                    const addr = await reverseGeocodeYandex({ lat: latitude, lng: longitude, apiKey: YM_KEY });
-                    if (addr) setLocationDraft(addr);
-                } catch {}
-
-                setLocLoading(false);
-                toast.success("Местоположение обновлено по GPS");
-            },
-            (err) => {
-                console.error(err);
-                setLocLoading(false);
-                toast.error("Не удалось определить местоположение по GPS");
+    const detectGpsNow = () =>
+        new Promise((resolve) => {
+            if (!navigator.geolocation) {
+                toast.error("GPS недоступен в браузере");
                 setIsGeolocationDenied(true);
-            },
-            { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
-        );
+                return resolve(false);
+            }
+
+            setLocLoading(true);
+            setLocError(null);
+
+            navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                    const latitude = pos.coords.latitude;
+                    const longitude = pos.coords.longitude;
+
+                    setUserLocation({ latitude, longitude });
+                    setIsGeolocationDenied(false);
+
+                    try {
+                        const addr = await reverseGeocodeYandex({ lat: latitude, lng: longitude, apiKey: YM_KEY });
+                        if (addr) setLocationDraft(addr);
+                    } catch {}
+
+                    setLocLoading(false);
+                    toast.success("Местоположение обновлено по GPS");
+                    resolve(true);
+                },
+                (err) => {
+                    console.error(err);
+                    setLocLoading(false);
+                    toast.error("Не удалось определить местоположение по GPS");
+                    setIsGeolocationDenied(true);
+                    resolve(false);
+                },
+                { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+            );
+        });
+
+    const toggleMap = async () => {
+        if (!isMapVisible) {
+            setIsMapVisible(true);
+            // при открытии карты — попробуем подтянуть актуальный GPS (если доступен)
+            await detectGpsNow();
+        } else {
+            setIsMapVisible(false);
+        }
     };
 
     const saveLocationToProfile = async ({ address, lat, lng, source }) => {
@@ -342,7 +344,6 @@ const OrdersPage = () => {
             );
 
             toast.success("Местоположение сохранено");
-            // обновим локально profile-поля, чтобы дальше всё считалось “из профиля”
             setProfile((p) => ({ ...p, ...res.data.location }));
         } catch (e) {
             setLocError(e.response?.data?.message || "Ошибка сохранения");
@@ -368,7 +369,6 @@ const OrdersPage = () => {
             const [lng, lat] = pos.split(" ").map(Number);
             setUserLocation({ latitude: lat, longitude: lng });
 
-            // сохраняем в профиль (если авторизован)
             await saveLocationToProfile({ address, lat, lng, source: "manual" });
             setLocationDraft(address);
         } catch (e) {
@@ -406,21 +406,31 @@ const OrdersPage = () => {
         }
     };
 
-    // ---------- core filtering ----------
+    // ---------- core filtering (tabs + drawer + geo) ----------
     const visibleOrders = useMemo(() => {
         const base = Array.isArray(ordersRaw) ? ordersRaw : [];
 
-        // 1) profession filter (from profile) — if empty, do not restrict
+        // 0) табы
+        const tabFiltered =
+            activeTab === "recommended"
+                ? base.filter((o) => !!o.is_recommended)
+                : activeTab === "courier"
+                    ? base.filter((o) => !!o.taxi_courier)
+                    : base;
+
+        // 1) профессии из профиля: если выбраны — фильтруем,
+        // но taxi_courier НЕ режем (чтобы в "Все" они могли быть видны и подсвечены)
         const professionFiltered =
             preferredCategoryIds.length > 0
-                ? base.filter((o) => {
+                ? tabFiltered.filter((o) => {
+                    if (o.taxi_courier) return true;
                     const catId = Number(o.categoryId ?? o.category?.id);
                     if (!catId) return false;
                     return preferredCategoryIds.includes(catId);
                 })
-                : base;
+                : tabFiltered;
 
-        // 2) drawer filters (optional, user-selected)
+        // 2) drawer filters
         const byCategory = selectedCategory
             ? professionFiltered.filter((o) => Number(o.categoryId ?? o.category?.id) === Number(selectedCategory))
             : professionFiltered;
@@ -433,17 +443,14 @@ const OrdersPage = () => {
             ? bySubcategory.filter((o) => Number(o.serviceId ?? o.service?.id) === Number(selectedService))
             : bySubcategory;
 
-        // 3) geo 50km ALWAYS (if location missing — show empty + prompt)
-        if (!userLocation?.latitude || !userLocation?.longitude) {
-            return [];
-        }
+        // 3) geo 50km always
+        if (!userLocation?.latitude || !userLocation?.longitude) return [];
 
         const geoFiltered = byService
             .map((order) => {
                 const [lat, lon] = String(order.coordinates || "")
                     .split(",")
                     .map((x) => Number(String(x).trim()));
-
                 if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
 
                 const distance = getDistanceFromLatLonInKm(
@@ -457,15 +464,11 @@ const OrdersPage = () => {
             })
             .filter((o) => o && o._distance <= RADIUS_KM);
 
-        // 4) only recommended chip
-        const finalList = onlyRecommended ? geoFiltered.filter((o) => !!o.is_recommended) : geoFiltered;
-
-        // 5) sorting: recommended first, then nearest, then newest
-        finalList.sort((a, b) => {
-            const ar = a.is_recommended ? 1 : 0;
-            const br = b.is_recommended ? 1 : 0;
-            if (br !== ar) return br - ar;
-
+        // 4) sorting:
+        // - "Все": расстояние ↑, затем дата ↓ (НО recommended НЕ поднимаем)
+        // - "В приоритете": расстояние ↑, затем дата ↓
+        // - "Курьер/Такси": расстояние ↑, затем дата ↓
+        geoFiltered.sort((a, b) => {
             const ad = Number.isFinite(a._distance) ? a._distance : 1e9;
             const bd = Number.isFinite(b._distance) ? b._distance : 1e9;
             if (ad !== bd) return ad - bd;
@@ -473,15 +476,15 @@ const OrdersPage = () => {
             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
 
-        return finalList;
+        return geoFiltered;
     }, [
         ordersRaw,
+        activeTab,
         preferredCategoryIds,
         selectedCategory,
         selectedSubcategory,
         selectedService,
         userLocation,
-        onlyRecommended,
     ]);
 
     const locationStatusText = useMemo(() => {
@@ -490,34 +493,42 @@ const OrdersPage = () => {
         return "Не задано";
     }, [locLoading, userLocation, locationDraft]);
 
-    // ---------- render ----------
     return (
         <div className="orders-page">
             <div className="orders-shell">
                 {/* Top bar */}
+                {/* Top bar (compact) */}
                 <div className="orders-top glass">
                     <div className="orders-top-left">
-                        <div className="orders-title">Заказы рядом</div>
+                        <div className="orders-title">Все заказы</div>
                         <div className="orders-subtitle">
-                            Радиус: <b>{RADIUS_KM} км</b> • {preferredCategoryIds.length ? "по вашим профессиям" : "все категории"}
+                            Радиус: <b>{RADIUS_KM} км</b> • {preferredCategoryIds.length ? "по вашим профессиям" : "все категории"} •
+                            {" "}Найдено: <b>{visibleOrders.length}</b>
                         </div>
 
-                        <div className="orders-location">
-              <span className="pill">
-                <FaLocationArrow style={{ marginRight: 8 }} />
-                  {locationStatusText}
-              </span>
-                            <button className="btn btn-ghost" onClick={pullLocationFromProfile} disabled={locLoading}>
-                                Из профиля
-                            </button>
+                        <div className="orders-location-row">
+                            <div className="orders-location-pill">
+                                <FaLocationArrow style={{ marginRight: 8 }} />
+                                <span className="orders-location-text">{locationStatusText}</span>
+                            </div>
 
-                            <button className="btn btn-ghost" onClick={detectGpsNow} disabled={locLoading}>
-                                GPS
-                            </button>
+                            <details className="loc-menu">
+                                <summary className="loc-summary">
+                                    <FaLocationArrow /> Местоположение
+                                </summary>
 
-                            <button className="btn btn-ghost" onClick={() => setShowMapPick(true)}>
-                                Выбрать на карте
-                            </button>
+                                <div className="loc-menu-panel">
+                                    <button className="btn btn-ghost" onClick={pullLocationFromProfile} disabled={locLoading}>
+                                        Из профиля
+                                    </button>
+                                    <button className="btn btn-ghost" onClick={detectGpsNow} disabled={locLoading}>
+                                        GPS
+                                    </button>
+                                    <button className="btn btn-ghost" onClick={() => setShowMapPick(true)}>
+                                        Выбрать на карте
+                                    </button>
+                                </div>
+                            </details>
                         </div>
 
                         {(isGeolocationDenied || (!profile?.locationLat && !profile?.locationLng)) && (
@@ -542,9 +553,9 @@ const OrdersPage = () => {
                     </div>
 
                     <div className="orders-top-right">
-                        <button className="btn btn-ghost" onClick={() => setIsMapVisible((p) => !p)}>
+                        <button className="btn btn-ghost" onClick={toggleMap}>
                             <FaMapMarkedAlt style={{ marginRight: 8 }} />
-                            {isMapVisible ? "Скрыть карту" : "Показать карту"}
+                            {isMapVisible ? "Карта" : "Карта"}
                         </button>
 
                         <button className="btn btn-primary" onClick={() => setDrawerOpen(true)}>
@@ -554,44 +565,50 @@ const OrdersPage = () => {
                     </div>
                 </div>
 
-                {/* Map (hidden by default) */}
-                {isMapVisible && (
-                    <div className="orders-map glass">
-                        <SwipeableMap orders={visibleOrders} userLocation={userLocation} />
-                    </div>
-                )}
-
-                {/* Quick chips (avito-like) */}
-                <div className="orders-chips">
+                {/* Tabs (separate row under top) */}
+                <div className="orders-tabs-row glass">
                     <button
-                        className={`chip ${onlyRecommended ? "" : "active"}`}
-                        onClick={() => setOnlyRecommended(false)}
+                        className={`tab-pill ${activeTab === "all" ? "active" : ""}`}
+                        onClick={() => setActiveTab("all")}
                     >
                         Все
                     </button>
+
                     <button
-                        className={`chip ${onlyRecommended ? "active" : ""}`}
-                        onClick={() => setOnlyRecommended(true)}
+                        className={`tab-pill ${activeTab === "recommended" ? "active" : ""}`}
+                        onClick={() => setActiveTab("recommended")}
                     >
                         В приоритете
                     </button>
 
-                    {!!preferredCategoryIds.length && (
-                        <span className="chip hint">
-              Профессии: <b>{preferredCategoryIds.length}</b>
-            </span>
-                    )}
+                    <button
+                        className={`tab-pill ${activeTab === "courier" ? "active" : ""}`}
+                        onClick={() => setActiveTab("courier")}
+                    >
+                        Курьер / Такси
+                    </button>
 
-                    <span className="chip hint">
-            Найдено: <b>{visibleOrders.length}</b>
-          </span>
+                    <span className="tabs-hint">
+    Во вкладке <b>Все</b> приоритетные не поднимаются, только подсвечиваются
+  </span>
                 </div>
+
+                {/* Map */}
+                {isMapVisible && (
+                    <div className="orders-map glass">
+                        <SwipeableMap
+                            orders={visibleOrders}
+                            userLocation={userLocation}
+                            isOpen={isMapVisible}
+                        />
+                    </div>
+                )}
 
                 {profile && preferredCategoryIds.length === 0 && (
                     <div className="notice glass">
                         <div className="notice-title">Выберите профессии в профиле</div>
                         <div className="notice-sub">
-                            Тогда мы будем показывать заказы только по вашим направлениям. Сейчас отображаются все категории.
+                            Тогда мы будем показывать заказы только по вашим направлениям. Сейчас отображаются все категории (и курьер/такси тоже).
                         </div>
                         <div className="notice-actions">
                             <button className="btn btn-primary" onClick={() => navigate("/profile")}>
@@ -621,18 +638,27 @@ const OrdersPage = () => {
                                 const creator = creatorsInfo[order.creatorId] || {};
                                 const isCreator = order.creatorId === userId;
 
+                                const cardClass = [
+                                    "order-card",
+                                    "glass",
+                                    isCreator ? "creator" : "",
+                                    order.is_highlighted ? "highlighted" : "",
+                                    order.is_recommended ? "recommended" : "",
+                                    order.taxi_courier ? "courier" : "",
+                                ]
+                                    .filter(Boolean)
+                                    .join(" ");
+
                                 return (
-                                    <li
-                                        key={order.id}
-                                        className={`order-card glass ${isCreator ? "creator" : ""} ${
-                                            order.is_highlighted ? "highlighted" : ""
-                                        }`}
-                                    >
+                                    <li key={order.id} className={cardClass}>
                                         <div className="order-head">
                                             <div className="order-head-left">
                                                 <div className="order-title-row">
                                                     <span className="order-number">Заказ №{order.id}</span>
+
+                                                    {/* бейджи, но НЕ сортировка */}
                                                     {order.is_recommended && <span className="badge badge-priority">В приоритете</span>}
+                                                    {order.taxi_courier && <span className="badge badge-courier">Курьер / Такси</span>}
                                                     {Number.isFinite(order._distance) && (
                                                         <span className="badge badge-distance">{order._distance.toFixed(1)} км</span>
                                                     )}
@@ -682,12 +708,7 @@ const OrdersPage = () => {
                                         {Array.isArray(order.images) && order.images.length > 0 && (
                                             <div className="thumbs" onClick={() => openModal(order.images)}>
                                                 {order.images.slice(0, 4).map((img, idx) => (
-                                                    <img
-                                                        key={idx}
-                                                        className="thumb"
-                                                        src={`${apiUrl}${img}`}
-                                                        alt={`img-${idx}`}
-                                                    />
+                                                    <img key={idx} className="thumb" src={`${apiUrl}${img}`} alt={`img-${idx}`} />
                                                 ))}
                                                 {order.images.length > 4 && <div className="thumb-more">+{order.images.length - 4}</div>}
                                             </div>
@@ -720,7 +741,6 @@ const OrdersPage = () => {
                                                         }
 
                                                         try {
-                                                            // статус (долг)
                                                             const statusRes = await axiosInstance.get("/orders/me/status", {
                                                                 headers: { Authorization: `Bearer ${token}` },
                                                             });
@@ -762,7 +782,7 @@ const OrdersPage = () => {
                         <div className="empty glass">
                             <div className="empty-title">Нет доступных заказов</div>
                             <div className="empty-sub">
-                                В радиусе {RADIUS_KM} км и по выбранным профессиям сейчас пусто. Попробуй изменить фильтры или место.
+                                В радиусе {RADIUS_KM} км и по выбранным условиям сейчас пусто. Попробуй изменить фильтры или место.
                             </div>
                             <div className="empty-actions">
                                 <button className="btn btn-ghost" onClick={() => setDrawerOpen(true)}>
@@ -776,7 +796,7 @@ const OrdersPage = () => {
                     )}
                 </div>
 
-                {/* Drawer (filters like Avito) */}
+                {/* Drawer */}
                 {drawerOpen && (
                     <>
                         <div className="drawer-overlay" onClick={() => setDrawerOpen(false)} />
@@ -812,7 +832,7 @@ const OrdersPage = () => {
                                             </option>
                                         ))}
                                     </select>
-                                    <div className="hint-text">Покажем только внутри ваших профессий (если они выбраны)</div>
+                                    <div className="hint-text">Фильтры применяются поверх текущей вкладки</div>
                                 </div>
 
                                 <div className="field">
@@ -853,16 +873,6 @@ const OrdersPage = () => {
                                 </div>
 
                                 <div className="field-inline">
-                                    <div className="toggle">
-                                        <input
-                                            id="onlyRec"
-                                            type="checkbox"
-                                            checked={onlyRecommended}
-                                            onChange={(e) => setOnlyRecommended(e.target.checked)}
-                                        />
-                                        <label htmlFor="onlyRec">Только “в приоритете”</label>
-                                    </div>
-
                                     <div className="radius-pill">
                                         Радиус фиксированный: <b>{RADIUS_KM} км</b>
                                     </div>
@@ -878,7 +888,6 @@ const OrdersPage = () => {
                                         setSelectedService("");
                                         setSubcategories([]);
                                         setServices([]);
-                                        setOnlyRecommended(false);
                                     }}
                                 >
                                     Сбросить
@@ -892,14 +901,13 @@ const OrdersPage = () => {
                     </>
                 )}
 
-                {/* Map picker modal (YandexMapModal) */}
+                {/* Map picker */}
                 <YandexMapModal
                     isOpen={showMapPick}
                     onClose={() => setShowMapPick(false)}
                     initialLat={profile?.locationLat}
                     initialLng={profile?.locationLng}
                     onPick={async (picked) => {
-                        // picked: {lat,lng,address}
                         setLocationDraft(picked.address);
                         setUserLocation({ latitude: picked.lat, longitude: picked.lng });
                         await saveLocationToProfile({
@@ -951,24 +959,16 @@ const OrdersPage = () => {
 
                     <button
                         className="img-nav left"
-                        onClick={() =>
-                            setCurrentImageIndex((prev) => (prev === 0 ? currentImages.length - 1 : prev - 1))
-                        }
+                        onClick={() => setCurrentImageIndex((prev) => (prev === 0 ? currentImages.length - 1 : prev - 1))}
                     >
                         ‹
                     </button>
 
-                    <img
-                        src={`${apiUrl}${currentImages[currentImageIndex]}`}
-                        alt="full"
-                        className="img-full"
-                    />
+                    <img src={`${apiUrl}${currentImages[currentImageIndex]}`} alt="full" className="img-full" />
 
                     <button
                         className="img-nav right"
-                        onClick={() =>
-                            setCurrentImageIndex((prev) => (prev === currentImages.length - 1 ? 0 : prev + 1))
-                        }
+                        onClick={() => setCurrentImageIndex((prev) => (prev === currentImages.length - 1 ? 0 : prev + 1))}
                     >
                         ›
                     </button>
