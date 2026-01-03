@@ -7,11 +7,11 @@
     --text: rgba(15, 23, 42, 0.92);
     --muted: rgba(100, 116, 139, 0.95);
 
-    --glass: rgba(255, 255, 255, 0.56);
-    --glass-strong: rgba(255, 255, 255, 0.68);
-    --glass-border: rgba(255, 255, 255, 0.36);
+    --glass: rgba(255, 255, 255, 0.62);
+    --glass-strong: rgba(255, 255, 255, 0.74);
+    --glass-border: rgba(255, 255, 255, 0.42);
 
-    --shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
+    --shadow: 0 16px 44px rgba(15, 23, 42, 0.10);
 
     --primary: rgba(29, 78, 216, 0.95);
     --primary-soft: rgba(29, 78, 216, 0.14);
@@ -19,40 +19,28 @@
     --danger: rgba(220, 38, 38, 0.95);
     --danger-soft: rgba(220, 38, 38, 0.12);
 
+    --warn: rgba(180, 83, 9, 0.95);
+    --warn-soft: rgba(245, 158, 11, 0.16);
+
     --success: rgba(22, 163, 74, 0.95);
     --success-soft: rgba(22, 163, 74, 0.12);
 
-    --radius-xl: 22px;
-    --radius-lg: 18px;
-    --radius-md: 14px;
+    --r-xl: 20px;
+    --r-lg: 16px;
+    --r-md: 12px;
 
-    /* под фиксированное нижнее меню */
     --bottom-nav-h: 92px;
-}
-
-@keyframes iosIn {
-    from {
-        opacity: 0;
-        transform: translateY(12px) scale(0.985);
-        filter: blur(2px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-        filter: blur(0);
-    }
 }
 
 .container {
     min-height: 100vh;
-    padding: 24px;
-    padding-bottom: calc(var(--bottom-nav-h) + 20px);
+    padding: 14px;
+    padding-bottom: calc(var(--bottom-nav-h) + 18px);
     background: linear-gradient(to bottom right, var(--bg1), var(--bg2));
     display: flex;
     justify-content: center;
     align-items: flex-start;
     overflow-x: hidden;
-    animation: iosIn 420ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
 
     font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     color: var(--text);
@@ -60,7 +48,7 @@
 
 @supports (padding: env(safe-area-inset-bottom)) {
     .container {
-        padding-bottom: calc(var(--bottom-nav-h) + 20px + env(safe-area-inset-bottom));
+        padding-bottom: calc(var(--bottom-nav-h) + 18px + env(safe-area-inset-bottom));
     }
 }
 
@@ -69,362 +57,380 @@
     max-width: 920px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 10px;
 }
 
-/* ===== верхняя кнопка ===== */
-.createButton {
-    width: 100%;
-    border: none;
-    cursor: pointer;
+/* ===== top bar ===== */
+.topBar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
 
-    padding: 14px 14px;
-    border-radius: 18px;
+    padding: 12px;
+    border-radius: var(--r-xl);
 
-    background: var(--primary-soft);
-    border: 1px solid rgba(29, 78, 216, 0.22);
-    color: var(--primary);
-
-    font-weight: 900;
-    letter-spacing: -0.01em;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
     box-shadow: var(--shadow);
 
-    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    backdrop-filter: blur(14px) saturate(180%);
+    -webkit-backdrop-filter: blur(14px) saturate(180%);
+}
+
+.topLeft {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.pageTitle {
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+}
+
+.pageSub {
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(71, 85, 105, 0.95);
+}
+
+.createButton {
+    border: none;
+    cursor: pointer;
+    padding: 10px 12px;
+    border-radius: 14px;
+
+    background: rgba(29, 78, 216, 0.16);
+    border: 1px solid rgba(29, 78, 216, 0.22);
+    color: rgba(29, 78, 216, 0.98);
+
+    font-weight: 900;
+    white-space: nowrap;
+
+    backdrop-filter: blur(10px) saturate(160%);
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
+
+    transition: transform 0.08s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
 
 .createButton:hover {
-    transform: translateY(-1px);
-    background: rgba(29, 78, 216, 0.18);
-    box-shadow: 0 18px 46px rgba(0, 0, 0, 0.10);
+    background: rgba(29, 78, 216, 0.20);
+    box-shadow: 0 14px 28px rgba(29, 78, 216, 0.12);
 }
 
 .createButton:active {
-    transform: translateY(0) scale(0.988);
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.07);
+    transform: translateY(1px);
 }
 
-/* когда есть новые запросы */
 .newRequest {
-    background: rgba(245, 158, 11, 0.16);
-    border: 1px solid rgba(245, 158, 11, 0.25);
-    color: rgba(180, 83, 9, 0.95);
+    background: rgba(245, 158, 11, 0.18);
+    border: 1px solid rgba(245, 158, 11, 0.26);
+    color: rgba(180, 83, 9, 0.98);
 }
 
-/* ===== список заказов ===== */
+/* states */
+.stateText {
+    text-align: center;
+    color: rgba(51, 65, 85, 0.92);
+    font-weight: 800;
+    margin: 0;
+    font-size: 13px;
+}
+
+.errorMessage {
+    color: rgba(220, 38, 38, 0.95);
+    font-weight: 900;
+    text-align: center;
+    padding: 12px;
+    border-radius: 14px;
+    background: rgba(220, 38, 38, 0.10);
+    border: 1px solid rgba(220, 38, 38, 0.18);
+    font-size: 13px;
+}
+
+.noOrders {
+    text-align: center;
+    font-size: 13px;
+    color: rgba(51, 65, 85, 0.9);
+
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--r-xl);
+    padding: 14px;
+
+    backdrop-filter: blur(14px) saturate(180%);
+    -webkit-backdrop-filter: blur(14px) saturate(180%);
+    box-shadow: var(--shadow);
+}
+
+/* ===== list ===== */
 .ordersList {
     list-style: none;
     padding: 0;
     margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+    display: grid;
+    gap: 10px;
 }
 
-/* ===== КАРТОЧКА ЗАКАЗА (починено) ===== */
+/* ===== card ===== */
 .orderCard {
     background: var(--glass);
     border: 1px solid var(--glass-border);
-    border-radius: var(--radius-xl);
-
-    position: relative;
-
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
-
+    border-radius: var(--r-xl);
     box-shadow: var(--shadow);
-    padding: 16px;
 
-    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    backdrop-filter: blur(14px) saturate(180%);
+    -webkit-backdrop-filter: blur(14px) saturate(180%);
+
+    padding: 12px;
+    transition: transform 0.08s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 
 .orderCard:hover {
-    transform: translateY(-2px);
     background: var(--glass-strong);
-    box-shadow: 0 20px 52px rgba(0, 0, 0, 0.11);
+    box-shadow: 0 22px 60px rgba(15, 23, 42, 0.14);
 }
 
 .orderContent {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
 }
 
-/* ==== шапка карточки ==== */
+/* header row */
 .cardTop {
     display: grid;
     grid-template-columns: 1fr auto;
-    gap: 12px;
+    gap: 10px;
     align-items: start;
 }
 
-.cardTop {
-    padding-right: 120px;
-}
-
-@media (max-width: 560px) {
-    .cardTop {
-        padding-right: 0;
-        padding-top: 40px; /* место под бейдж */
-    }
-}
-
-/* компактный финансовый бейдж */
-.financeBadge {
-    position: absolute;
-    top: 14px;
-    right: 14px;
-
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-
-    padding: 6px 10px;
-    height: 32px;
-
-    border-radius: 999px;
-
-    background: rgba(255, 255, 255, 0.72);
-    border: 1px solid rgba(255, 255, 255, 0.45);
-
-    backdrop-filter: blur(14px) saturate(180%);
-    -webkit-backdrop-filter: blur(14px) saturate(180%);
-
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
-
-    font-size: 13px;
-    font-weight: 800;
-    color: rgba(30, 41, 59, 0.95);
-
-    white-space: nowrap;
-}
-
-/* иконка оплаты */
-.financeIcon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 15px;
-    opacity: 0.9;
-}
-
-/* цена */
-.financePrice {
-    font-weight: 900;
-    color: rgba(29, 78, 216, 0.95);
-}
-
-/* точка-разделитель */
-.financeDot {
-    opacity: 0.6;
-    margin: 0 -2px;
-}
-
-/* тип оплаты */
-.financeType {
-    font-weight: 800;
-    color: rgba(71, 85, 105, 0.95);
-}
-
 .cardTopLeft {
-    min-width: 0; /* важно: чтобы текст не выталкивал payment */
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
+    min-width: 0;
 }
 
-/* строка: Заказ № + дата */
 .orderIdLine {
     display: flex;
     align-items: baseline;
-    gap: 10px;
+    gap: 8px;
     flex-wrap: wrap;
-    min-width: 0;
 }
 
 .orderId {
     font-weight: 900;
     letter-spacing: -0.01em;
     color: rgba(15, 23, 42, 0.92);
+    font-size: 14px;
 }
 
 .orderDate {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 800;
     color: rgba(100, 116, 139, 0.95);
     white-space: nowrap;
 }
 
-/* строка: тип + цена */
 .titleRow {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 10px;
+    display: flex;
     align-items: center;
+    gap: 10px;
     min-width: 0;
 }
 
 .orderType {
     font-weight: 900;
     color: rgba(15, 23, 42, 0.92);
-    min-width: 0;
-
-    /* аккуратно обрезаем длинное название */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 13px;
 }
 
-.priceChip {
-    padding: 8px 10px;
-    border-radius: 999px;
-    background: rgba(29, 78, 216, 0.14);
-    border: 1px solid rgba(29, 78, 216, 0.22);
-    color: rgba(29, 78, 216, 0.95);
-    font-weight: 900;
-    white-space: nowrap;
-}
-
-/* payment pill */
-.paymentInfo {
-    justify-self: end;
-    display: inline-flex;
+.subRow {
+    display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 10px;
-    border-radius: 999px;
-
-    background: rgba(255, 255, 255, 0.58);
-    border: 1px solid rgba(255, 255, 255, 0.38);
-
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-
-    white-space: nowrap;
-    height: fit-content;
 }
 
-/* иконка/лейбл оплаты – глобальные классы из JSX */
-:global(.payment-icon) {
+/* status pill */
+.statusPill {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 9px;
+    border-radius: 999px;
+    font-weight: 900;
+    font-size: 11px;
+
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    background: rgba(255, 255, 255, 0.58);
+
+    backdrop-filter: blur(10px) saturate(160%);
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
+
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.status_warn {
+    color: var(--warn);
+    background: var(--warn-soft);
+    border: 1px solid rgba(245, 158, 11, 0.22);
+}
+
+.status_ok {
+    color: var(--success);
+    background: var(--success-soft);
+    border: 1px solid rgba(22, 163, 74, 0.22);
+}
+
+/* finance pill */
+.financeBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 9px;
+    border-radius: 999px;
+
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.10);
+
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 900;
+    color: rgba(30, 41, 59, 0.95);
+}
+
+.financeIcon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
-    opacity: 0.95;
+    font-size: 14px;
+    opacity: 0.9;
 }
 
-:global(.payment-label) {
-    font-size: 12px;
+.financePrice {
     font-weight: 900;
-    color: rgba(51, 65, 85, 0.95);
+    color: rgba(29, 78, 216, 0.95);
 }
 
-/* ==== компактные мета ==== */
+.financeDot {
+    opacity: 0.5;
+    margin: 0 -2px;
+}
+
+.financeType {
+    font-weight: 800;
+    color: rgba(71, 85, 105, 0.95);
+}
+
+/* meta grid */
 .metaGrid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    gap: 8px;
 }
 
 .metaItem {
-    padding: 10px 12px;
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.45);
+    padding: 9px 10px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.46);
     border: 1px solid rgba(255, 255, 255, 0.34);
-    backdrop-filter: blur(14px) saturate(170%);
-    -webkit-backdrop-filter: blur(14px) saturate(170%);
+    backdrop-filter: blur(12px) saturate(170%);
+    -webkit-backdrop-filter: blur(12px) saturate(170%);
     min-width: 0;
 }
 
 .metaLabel {
     display: block;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 900;
     color: rgba(100, 116, 139, 0.95);
-    margin-bottom: 4px;
+    margin-bottom: 3px;
 }
 
 .metaValue {
     font-weight: 900;
     color: rgba(15, 23, 42, 0.92);
-    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 12px;
 }
 
-/* ===== изображения (stack) ===== */
-:global(.image-stack-container) {
+/* images */
+.imagesRow {
     margin-top: 2px;
 }
 
-:global(.image-stack) {
+.imageStack {
     display: inline-flex;
-    position: relative;
+    align-items: center;
+    gap: 8px;
     cursor: pointer;
-    padding: 4px 2px;
 }
 
-:global(.order-image) {
-    width: 86px;
-    height: 86px;
+.thumb {
+    width: 56px;
+    height: 56px;
     object-fit: cover;
-    border-radius: 16px;
+    border-radius: 14px;
 
     border: 1px solid rgba(255, 255, 255, 0.55);
-    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
 
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
-    background: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.55);
 }
 
-:global(.image-stack:hover .order-image) {
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.14);
+.moreThumb {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    font-weight: 900;
+    font-size: 12px;
+
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+
+    backdrop-filter: blur(10px) saturate(160%);
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
 }
 
-:global(.order-image:hover) {
-    transform: translateY(-1px) scale(1.02);
-}
-
-/* ===== описание / исполнители ===== */
-.descBlock,
-.execBlock {
-    padding: 12px;
-    border-radius: 18px;
-    background: rgba(255, 255, 255, 0.45);
+/* section block */
+.section {
+    padding: 10px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.46);
     border: 1px solid rgba(255, 255, 255, 0.34);
-    backdrop-filter: blur(14px) saturate(170%);
-    -webkit-backdrop-filter: blur(14px) saturate(170%);
+    backdrop-filter: blur(12px) saturate(170%);
+    -webkit-backdrop-filter: blur(12px) saturate(170%);
 }
 
-.descHead,
-.execHead {
+.sectionHead {
     display: flex;
     align-items: center;
-    gap: 10px;
-}
-
-.descHead {
     justify-content: space-between;
-}
-
-.execHead {
-    justify-content: flex-start;
+    gap: 8px;
     flex-wrap: wrap;
 }
 
-.descTitle,
-.execTitle {
+.sectionTitle {
     font-weight: 900;
     color: rgba(15, 23, 42, 0.92);
-}
-
-.execCount {
-    padding: 6px 10px;
-    border-radius: 999px;
-    background: rgba(29, 78, 216, 0.12);
-    border: 1px solid rgba(29, 78, 216, 0.18);
-    color: rgba(29, 78, 216, 0.95);
-    font-weight: 900;
     font-size: 12px;
 }
 
@@ -436,16 +442,19 @@
     color: rgba(29, 78, 216, 0.95);
     padding: 6px 8px;
     border-radius: 12px;
+    font-size: 12px;
 }
 
 .linkButton:hover {
-    background: rgba(29, 78, 216, 0.12);
+    background: rgba(29, 78, 216, 0.10);
 }
 
 .descText {
-    margin: 10px 0 0;
+    margin: 8px 0 0;
     color: rgba(30, 41, 59, 0.92);
-    line-height: 1.4;
+    line-height: 1.45;
+    font-weight: 700;
+    font-size: 12px;
 }
 
 .descCollapsed {
@@ -459,80 +468,117 @@
     display: block;
 }
 
-/* ===== исполнители (глобальная обертка из JSX) ===== */
-:global(.executors-list) {
-    margin-top: 10px;
-    background: rgba(255, 255, 255, 0.42);
-    border: 1px solid rgba(255, 255, 255, 0.34);
-    border-radius: var(--radius-lg);
-    padding: 12px;
-
-    backdrop-filter: blur(14px) saturate(170%);
-    -webkit-backdrop-filter: blur(14px) saturate(170%);
-
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+/* pending payment actions */
+.cardActions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
-:global(.executors-list > strong) {
-    display: block;
-    margin-bottom: 8px;
-    color: rgba(15, 23, 42, 0.92);
+.pillWarn {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 9px;
+    border-radius: 999px;
     font-weight: 900;
+    font-size: 11px;
+
+    color: var(--warn);
+    background: var(--warn-soft);
+    border: 1px solid rgba(245, 158, 11, 0.22);
 }
 
-:global(.executors-list ul) {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+.primaryBtn {
+    border: none;
+    cursor: pointer;
+    padding: 10px 12px;
+    border-radius: 14px;
+    font-weight: 900;
+    color: #fff;
+    font-size: 12px;
+
+    background: linear-gradient(135deg, rgba(37, 99, 235, 1), rgba(99, 102, 241, 1));
+    box-shadow: 0 14px 26px rgba(37, 99, 235, 0.20);
+    transition: transform 0.08s ease, opacity 0.2s ease;
+    white-space: nowrap;
+}
+
+.primaryBtn:active {
+    transform: translateY(1px);
+}
+
+/* count pill */
+.countPill {
+    padding: 6px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 900;
+
+    background: rgba(29, 78, 216, 0.10);
+    border: 1px solid rgba(29, 78, 216, 0.16);
+    color: rgba(29, 78, 216, 0.95);
+}
+
+/* executors list */
+.execList {
+    margin-top: 10px;
     display: grid;
     gap: 10px;
 }
 
-/* карточка исполнителя */
-.executorCard {
-    background: rgba(255, 255, 255, 0.55);
-    border: 1px solid rgba(255, 255, 255, 0.36);
-    border-radius: var(--radius-lg);
-    padding: 12px;
+.execCard {
+    background: rgba(255, 255, 255, 0.60);
+    border: 1px solid rgba(255, 255, 255, 0.40);
+    border-radius: 16px;
+    padding: 10px;
 
     display: grid;
     grid-template-columns: 1fr auto;
-    gap: 12px;
+    gap: 10px;
     align-items: start;
 
-    backdrop-filter: blur(14px) saturate(170%);
-    -webkit-backdrop-filter: blur(14px) saturate(170%);
-
-    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    backdrop-filter: blur(12px) saturate(170%);
+    -webkit-backdrop-filter: blur(12px) saturate(170%);
 }
 
-.executorCard:hover {
-    transform: translateY(-1px);
-    background: rgba(255, 255, 255, 0.66);
-    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.08);
-}
-
-.executorInfo {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+.execInfo {
     min-width: 0;
 }
 
-.executorName {
+.execName {
     font-weight: 900;
     color: rgba(15, 23, 42, 0.92);
-    margin: 0;
+    font-size: 12px;
+    margin-bottom: 6px;
 }
 
-.executorMeta {
+.execMeta {
     color: rgba(100, 116, 139, 0.95);
     font-weight: 800;
+    font-size: 11px;
 }
 
-.executorLine {
-    margin: 0;
+.execLine {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.k {
+    font-size: 11px;
+    font-weight: 900;
+    color: rgba(100, 116, 139, 0.95);
+}
+
+.v {
+    font-size: 11px;
+    font-weight: 700;
     color: rgba(30, 41, 59, 0.92);
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .verifiedBadge {
@@ -540,7 +586,8 @@
     align-items: center;
     gap: 6px;
 
-    padding: 6px 10px;
+    margin-top: 8px;
+    padding: 6px 9px;
     border-radius: 999px;
 
     background: var(--success-soft);
@@ -548,101 +595,56 @@
     color: var(--success);
 
     font-weight: 900;
+    font-size: 11px;
     width: fit-content;
 }
 
-/* кнопки справа */
-.buttonsContainer {
+.execActions {
     display: inline-flex;
-    gap: 10px;
+    gap: 8px;
     flex-wrap: wrap;
     justify-content: flex-end;
     align-items: center;
 }
 
-.approveButton,
-.complaintButton {
+/* minimal ghost buttons */
+.ghostBtn,
+.ghostBtnDanger {
     border: none;
     cursor: pointer;
-    padding: 10px 12px;
+    padding: 9px 10px;
     border-radius: 14px;
     font-weight: 900;
-    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease,
-    opacity 0.18s ease;
+    font-size: 12px;
     white-space: nowrap;
+
+    background: rgba(255, 255, 255, 0.56);
+    border: 1px solid rgba(255, 255, 255, 0.42);
+    backdrop-filter: blur(10px) saturate(160%);
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
 }
 
-.approveButton {
-    background: var(--primary-soft);
-    border: 1px solid rgba(29, 78, 216, 0.22);
-    color: var(--primary);
+.ghostBtn {
+    color: rgba(29, 78, 216, 0.95);
 }
 
-.approveButton:hover {
-    background: rgba(29, 78, 216, 0.18);
-    transform: translateY(-1px);
-    box-shadow: 0 14px 28px rgba(29, 78, 216, 0.12);
-}
-
-.approveButton:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-}
-
-.complaintButton {
-    background: var(--danger-soft);
-    border: 1px solid rgba(220, 38, 38, 0.22);
-    color: var(--danger);
-}
-
-.complaintButton:hover {
-    background: rgba(220, 38, 38, 0.16);
-    transform: translateY(-1px);
-    box-shadow: 0 14px 28px rgba(220, 38, 38, 0.10);
-}
-
-/* состояния */
-.stateText {
-    text-align: center;
-    color: rgba(51, 65, 85, 0.92);
-    font-weight: 800;
-    margin: 0;
-}
-
-.stateTextMuted {
-    text-align: center;
-    color: rgba(100, 116, 139, 0.95);
-    font-weight: 800;
-    margin: 0;
-}
-
-/* ошибки/пусто */
-.errorMessage {
+.ghostBtnDanger {
     color: rgba(220, 38, 38, 0.95);
-    font-weight: 900;
-    text-align: center;
-    padding: 12px;
-    border-radius: 16px;
-    background: rgba(220, 38, 38, 0.10);
-    border: 1px solid rgba(220, 38, 38, 0.18);
 }
 
-.noOrders {
-    text-align: center;
-    font-size: 1rem;
-    color: rgba(51, 65, 85, 0.9);
-    background: rgba(255, 255, 255, 0.55);
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    border-radius: var(--radius-xl);
-    padding: 16px;
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
-    box-shadow: var(--shadow);
+.ghostBtn:active,
+.ghostBtnDanger:active {
+    transform: translateY(1px);
 }
 
-/* ===== Модалка изображений (react-modal) ===== */
+.mutedText {
+    margin-top: 8px;
+    font-size: 12px;
+    font-weight: 800;
+    color: rgba(100, 116, 139, 0.95);
+}
+
+/* ===== react-modal ===== */
 :global(.custom-modal-overlay) {
     position: fixed;
     inset: 0;
@@ -659,7 +661,7 @@
     width: min(92vw, 820px);
     max-height: 82vh;
 
-    background: rgba(255, 255, 255, 0.72);
+    background: rgba(255, 255, 255, 0.74);
     border: 1px solid rgba(255, 255, 255, 0.42);
     border-radius: 22px;
 
@@ -687,20 +689,11 @@
 
     border: 1px solid rgba(255, 255, 255, 0.42);
     background: rgba(255, 255, 255, 0.55);
-
     cursor: pointer;
     font-weight: 900;
 
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
-
-    transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
-}
-
-:global(.custom-close-button:hover) {
-    transform: translateY(-1px);
-    background: rgba(255, 255, 255, 0.68);
-    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.12);
 }
 
 :global(.custom-modal-image) {
@@ -729,29 +722,29 @@
 
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
-
-    transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
 
-:global(.custom-nav-button:hover) {
-    transform: translateY(-1px);
-    background: rgba(255, 255, 255, 0.7);
-    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.10);
-}
-
-/* ===== адаптив ===== */
-@media (max-width: 560px) {
+/* responsive */
+@media (max-width: 640px) {
     .container {
-        padding: 16px;
-        padding-bottom: calc(var(--bottom-nav-h) + 20px);
+        padding: 12px;
+        padding-bottom: calc(var(--bottom-nav-h) + 18px);
     }
 
-    /* шапка в колонку (исправляет “кривизну”) */
+    .topBar {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .createButton {
+        width: 100%;
+    }
+
     .cardTop {
         grid-template-columns: 1fr;
     }
 
-    .paymentInfo {
+    .financeBadge {
         justify-self: start;
     }
 
@@ -759,27 +752,35 @@
         grid-template-columns: 1fr;
     }
 
-    :global(.order-image) {
-        width: 78px;
-        height: 78px;
+    .thumb,
+    .moreThumb {
+        width: 52px;
+        height: 52px;
     }
 
-    /* исполнитель: кнопки вниз */
-    .executorCard {
+    .execCard {
         grid-template-columns: 1fr;
     }
 
-    .buttonsContainer {
+    .execActions {
         justify-content: flex-start;
+    }
+
+    .primaryBtn {
+        width: 100%;
+    }
+
+    .cardActions {
+        justify-content: stretch;
+    }
+
+    .execLine {
+        grid-template-columns: 96px 1fr;
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .container,
-    .orderCard,
-    .createButton,
-    .executorCard {
-        animation: none !important;
+    * {
         transition: none !important;
     }
 }

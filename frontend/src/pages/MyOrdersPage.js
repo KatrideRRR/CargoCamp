@@ -1,9 +1,9 @@
-import CreateOrderModal from '../components/CreateOrderModal';
-import React, { useState, useEffect, useContext, useMemo } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import axiosInstance from '../utils/axiosInstance';
-import io from 'socket.io-client';
-import styles from '../styles/MyOrdersPage.module.css';
+import CreateOrderModal from "../components/CreateOrderModal";
+import React, { useState, useEffect, useContext, useMemo } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import axiosInstance from "../utils/axiosInstance";
+import io from "socket.io-client";
+import styles from "../styles/MyOrdersPage.module.css";
 import { AuthContext } from "../utils/authContext";
 import Modal from "react-modal";
 import { FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity } from "react-icons/fa";
@@ -19,7 +19,7 @@ const MyOrdersPage = () => {
 
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const [error, setError] = useState("");
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
@@ -30,23 +30,37 @@ const MyOrdersPage = () => {
     const [approving, setApproving] = useState(false);
 
     // UI состояния
-    const [expandedDesc, setExpandedDesc] = useState(() => ({}));      // orderId -> bool
-    const [expandedExec, setExpandedExec] = useState(() => ({}));      // orderId -> bool
+    const [expandedDesc, setExpandedDesc] = useState(() => ({})); // orderId -> bool
+    const [expandedExec, setExpandedExec] = useState(() => ({})); // orderId -> bool
 
-    const paymentMethods = useMemo(() => ([
-        { id: "cash", label: "Наличные", icon: "💵" },
-        { id: "guarantee", label: "Гарантия", icon: "🛡️" },
-        { id: "installment", label: "Рассрочка", icon: "💳" },
-    ]), []);
+    const paymentMethods = useMemo(
+        () => [
+            { id: "cash", label: "Наличные" },
+            { id: "guarantee", label: "Гарантия" },
+            { id: "installment", label: "Рассрочка" },
+        ],
+        []
+    );
+
+    const getStatusLabel = (status) => {
+        switch (status) {
+            case "pending_payment":
+                return { text: "Ожидает оплаты", tone: "warn" };
+            case "pending":
+                return { text: "Опубликован", tone: "ok" };
+            default:
+                return null; // тут других статусов быть не должно
+        }
+    };
 
     const fetchOrders = async () => {
         try {
             setLoading(true);
-            setError('');
+            setError("");
 
-            const token = localStorage.getItem('authToken');
+            const token = localStorage.getItem("authToken");
             const response = await axiosInstance.get(`/orders/creator/${userId}`, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { Authorization: `Bearer ${token}` },
             });
 
             const ordersData = response.data || [];
@@ -60,7 +74,9 @@ const MyOrdersPage = () => {
                         );
                         return {
                             ...order,
-                            requestedExecutors: Array.isArray(executorsResponse.data) ? executorsResponse.data : []
+                            requestedExecutors: Array.isArray(executorsResponse.data)
+                                ? executorsResponse.data
+                                : [],
                         };
                     } catch (error) {
                         console.error(`Ошибка загрузки исполнителей для заказа ${order.id}:`, error);
@@ -69,13 +85,18 @@ const MyOrdersPage = () => {
                 })
             );
 
-            setOrders(ordersWithExecutors);
+            // ✅ только pending / pending_payment
+            setOrders(
+                ordersWithExecutors.filter(
+                    (o) => o.status === "pending" || o.status === "pending_payment"
+                )
+            );
         } catch (err) {
             if (err.response && err.response.status === 404) {
                 setOrders([]);
             } else {
-                console.error('Ошибка при загрузке заказов:', err);
-                setError('Ошибка загрузки данных');
+                console.error("Ошибка при загрузке заказов:", err);
+                setError("Ошибка загрузки данных");
             }
         } finally {
             setLoading(false);
@@ -91,6 +112,7 @@ const MyOrdersPage = () => {
                 navigate(location.pathname, { replace: true });
             })();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.search]);
 
     useEffect(() => {
@@ -98,40 +120,36 @@ const MyOrdersPage = () => {
 
         const checkAuthUser = async () => {
             try {
-                const token = localStorage.getItem('authToken');
-                const profileResponse = await axiosInstance.get('/auth/profile', {
-                    headers: { Authorization: `Bearer ${token}` }
+                const token = localStorage.getItem("authToken");
+                const profileResponse = await axiosInstance.get("/auth/profile", {
+                    headers: { Authorization: `Bearer ${token}` },
                 });
 
                 if (profileResponse.data.id !== Number(userId)) {
-                    navigate('/');
+                    navigate("/");
                     return;
                 }
 
-                // Подписка на запросы
                 socket.on(`orderRequest-${userId}`, () => {
                     setHasNewRequests(true);
                     fetchOrders();
                 });
-
             } catch (err) {
-                console.error('Ошибка проверки пользователя:', err);
-                navigate('/login');
+                console.error("Ошибка проверки пользователя:", err);
+                navigate("/login");
             }
         };
 
         checkAuthUser();
 
-        const handleOrderRequest = () => {
-            fetchOrders();
-        };
+        const handleOrderRequest = () => fetchOrders();
 
-        socket.on('orderRequest', handleOrderRequest);
-        socket.on('orderUpdated', fetchOrders);
+        socket.on("orderRequest", handleOrderRequest);
+        socket.on("orderUpdated", fetchOrders);
 
         return () => {
-            socket.off('orderRequest', handleOrderRequest);
-            socket.off('orderUpdated', fetchOrders);
+            socket.off("orderRequest", handleOrderRequest);
+            socket.off("orderUpdated", fetchOrders);
             socket.off(`orderRequest-${userId}`);
         };
     }, [userId, navigate, setHasNewRequests]);
@@ -148,17 +166,20 @@ const MyOrdersPage = () => {
                 return;
             }
 
-            alert('Исполнитель одобрен!');
+            alert("Исполнитель одобрен!");
             setOrders((prev) =>
                 prev.map((o) =>
                     o.id === orderId
-                        ? { ...o, requestedExecutors: o.requestedExecutors.filter((e) => e.id !== executorId) }
+                        ? {
+                            ...o,
+                            requestedExecutors: o.requestedExecutors.filter((e) => e.id !== executorId),
+                        }
                         : o
                 )
             );
         } catch (error) {
             console.error(error);
-            alert(error.response?.data?.message || 'Не удалось одобрить исполнителя');
+            alert(error.response?.data?.message || "Не удалось одобрить исполнителя");
         } finally {
             setApproving(false);
         }
@@ -166,19 +187,19 @@ const MyOrdersPage = () => {
 
     const getPaymentIcon = (type) => {
         switch (type) {
-            case 'guarantee':
-                return <FaUniversity title="Tinkoff" />;
-            case 'cash':
+            case "guarantee":
+                return <FaUniversity title="Гарантия" />;
+            case "cash":
                 return <FaMoneyBillWave title="Наличные" />;
-            case 'installment':
-                return <FaCreditCard title="Карта" />;
+            case "installment":
+                return <FaCreditCard title="Рассрочка" />;
             default:
                 return <FaQuestionCircle title="Неизвестно" />;
         }
     };
 
     const openModal = (images) => {
-        setCurrentImages(images);
+        setCurrentImages(images || []);
         setCurrentImageIndex(0);
         setIsImageModalOpen(true);
     };
@@ -208,32 +229,44 @@ const MyOrdersPage = () => {
     return (
         <div className={styles.container}>
             <div className={styles.ordersWrapper}>
+                {/* Top bar */}
+                <div className={styles.topBar}>
+                    <div className={styles.topLeft}>
+                        <div className={styles.pageTitle}>Мои заказы</div>
+                        <div className={styles.pageSub}>
+                            Всего: <b>{orders.length}</b>
+                        </div>
+                    </div>
 
-                <button
-                    onClick={() => navigate('/create-order')}
-                    className={`${styles.createButton} ${hasNewRequests ? styles.newRequest : ''}`}
-                >
-                    Разместить заказ
-                </button>
+                    <button
+                        onClick={() => navigate("/create-order")}
+                        className={`${styles.createButton} ${hasNewRequests ? styles.newRequest : ""}`}
+                    >
+                        Разместить
+                    </button>
+                </div>
 
                 {loading ? (
-                    <p className={styles.stateText}>Загрузка заказов...</p>
+                    <p className={styles.stateText}>Загрузка…</p>
                 ) : error ? (
                     <p className={styles.errorMessage}>{error}</p>
                 ) : orders.length > 0 ? (
                     <ul className={styles.ordersList}>
                         {orders.map((order) => {
-                            const paymentLabel = paymentMethods.find(m => m.id === order.paymentType)?.label || "—";
+                            const st = getStatusLabel(order.status);
+                            const paymentLabel =
+                                paymentMethods.find((m) => m.id === order.paymentType)?.label || "—";
+
                             const isDescExpanded = !!expandedDesc[order.id];
                             const isExecExpanded = !!expandedExec[order.id];
                             const hasImages = Array.isArray(order.images) && order.images.length > 0;
-                            const hasExecutors = Array.isArray(order.requestedExecutors) && order.requestedExecutors.length > 0;
+                            const hasExecutors =
+                                Array.isArray(order.requestedExecutors) && order.requestedExecutors.length > 0;
 
                             return (
                                 <li className={styles.orderCard} key={order.id}>
                                     <div className={styles.orderContent}>
-
-                                        {/* ШАПКА */}
+                                        {/* Header row */}
                                         <div className={styles.cardTop}>
                                             <div className={styles.cardTopLeft}>
                                                 <div className={styles.orderIdLine}>
@@ -246,62 +279,66 @@ const MyOrdersPage = () => {
                                                 <div className={styles.titleRow}>
                                                     <span className={styles.orderType}>{order.type}</span>
                                                 </div>
+
+                                                {/* Status pill */}
+                                                {st && (
+                                                    <div className={styles.subRow}>
+                            <span className={`${styles.statusPill} ${styles[`status_${st.tone}`]}`}>
+                              {st.text}
+                            </span>
+                                                    </div>
+                                                )}
                                             </div>
 
+                                            {/* Finance pill */}
                                             <div className={styles.financeBadge}>
-  <span className={styles.financeIcon}>
-    {getPaymentIcon(order.paymentType)}
-  </span>
-
-                                                <span className={styles.financePrice}>
-    {order.proposedSum} ₽
-  </span>
-
+                                                <span className={styles.financeIcon}>{getPaymentIcon(order.paymentType)}</span>
+                                                <span className={styles.financePrice}>{order.proposedSum} ₽</span>
                                                 <span className={styles.financeDot}>•</span>
-
-                                                <span className={styles.financeType}>
-    {paymentLabel}
-  </span>
+                                                <span className={styles.financeType}>{paymentLabel}</span>
                                             </div>
                                         </div>
 
-                                        {/* КОМПАКТНЫЕ ДЕТАЛИ */}
+                                        {/* Meta */}
                                         <div className={styles.metaGrid}>
                                             <div className={styles.metaItem}>
                                                 <span className={styles.metaLabel}>Категория</span>
-                                                <span className={styles.metaValue}>{order.category?.name || 'Не указано'}</span>
+                                                <span className={styles.metaValue}>{order.category?.name || "—"}</span>
                                             </div>
 
                                             <div className={styles.metaItem}>
                                                 <span className={styles.metaLabel}>Подкатегория</span>
-                                                <span className={styles.metaValue}>{order.subcategory?.name || 'Не указано'}</span>
+                                                <span className={styles.metaValue}>{order.subcategory?.name || "—"}</span>
                                             </div>
                                         </div>
 
-                                        {/* ИЗОБРАЖЕНИЯ */}
+                                        {/* Images (compact) */}
                                         {hasImages ? (
-                                            <div className="image-stack-container">
-                                                <div className="image-stack" onClick={() => openModal(order.images)}>
-                                                    {order.images.map((image, index) => {
+                                            <div className={styles.imagesRow}>
+                                                <div className={styles.imageStack} onClick={() => openModal(order.images)}>
+                                                    {order.images.slice(0, 4).map((image, index) => {
                                                         const imageUrl = `${apiUrl}${image}`;
                                                         return (
                                                             <img
                                                                 key={index}
                                                                 src={imageUrl}
                                                                 alt={`Order pic ${index + 1}`}
-                                                                className="order-image"
-                                                                style={{ transform: `translateX(${index * 10}px)` }}
+                                                                className={styles.thumb}
                                                             />
                                                         );
                                                     })}
+                                                    {order.images.length > 4 && (
+                                                        <div className={styles.moreThumb}>+{order.images.length - 4}</div>
+                                                    )}
                                                 </div>
                                             </div>
                                         ) : null}
 
-                                        {/* ОПИСАНИЕ (Подробнее/Свернуть) */}
-                                        <div className={styles.descBlock}>
-                                            <div className={styles.descHead}>
-                                                <span className={styles.descTitle}>Описание</span>
+                                        {/* Description */}
+                                        <div className={styles.section}>
+                                            <div className={styles.sectionHead}>
+                                                <span className={styles.sectionTitle}>Описание</span>
+
                                                 {order.description && order.description.length > 120 && (
                                                     <button
                                                         type="button"
@@ -318,56 +355,81 @@ const MyOrdersPage = () => {
                                             </p>
                                         </div>
 
-                                        {/* ИСПОЛНИТЕЛИ */}
-                                        <div className={styles.execBlock}>
-                                            <div className={styles.execHead}>
-                                                <span className={styles.execTitle}>Запросы исполнителей</span>
-                                                <span className={styles.execCount}>
-                          {hasExecutors ? order.requestedExecutors.length : 0}
-                        </span>
+                                        {/* Pending payment actions */}
+                                        {order.status === "pending_payment" ? (
+                                            <div className={styles.cardActions}>
+                                                <span className={styles.pillWarn}>Продвижение не оплачено</span>
 
                                                 <button
-                                                    type="button"
-                                                    onClick={() => toggleExec(order.id)}
-                                                    className={styles.linkButton}
+                                                    className={styles.primaryBtn}
+                                                    onClick={async () => {
+                                                        try {
+                                                            const res = await axiosInstance.post(
+                                                                "/payments/order/promotion/create",
+                                                                { orderId: order.id }
+                                                            );
+                                                            const url = res.data?.confirmationUrl;
+                                                            if (url) window.location.href = url;
+                                                            else alert("Не удалось получить ссылку на оплату");
+                                                        } catch (e) {
+                                                            alert(e.response?.data?.error || "Ошибка при создании оплаты");
+                                                        }
+                                                    }}
                                                 >
-                                                    {isExecExpanded ? "Скрыть" : "Показать"}
+                                                    Оплатить
                                                 </button>
                                             </div>
+                                        ) : (
+                                            /* Executors accordion (only for pending) */
+                                            <div className={styles.section}>
+                                                <div className={styles.sectionHead}>
+                                                    <span className={styles.sectionTitle}>Запросы исполнителей</span>
 
-                                            {isExecExpanded ? (
-                                                hasExecutors ? (
-                                                    <div className="executors-list">
-                                                        <ul>
+                                                    <span className={styles.countPill}>{hasExecutors ? order.requestedExecutors.length : 0}</span>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleExec(order.id)}
+                                                        className={styles.linkButton}
+                                                    >
+                                                        {isExecExpanded ? "Скрыть" : "Показать"}
+                                                    </button>
+                                                </div>
+
+                                                {isExecExpanded ? (
+                                                    hasExecutors ? (
+                                                        <div className={styles.execList}>
                                                             {order.requestedExecutors.map((executor) => (
-                                                                <li key={executor.id} className={styles.executorCard}>
-                                                                    <div className={styles.executorInfo}>
-                                                                        <p className={styles.executorName}>
-                                                                            {executor.username} {executor.id}{" "}
-                                                                            <span className={styles.executorMeta}>
-                                        (Рейтинг: {executor.rating ? executor.rating.toFixed(1) : "—"} ⭐, Оценок: {executor.ratingCount || 0})
+                                                                <div key={executor.id} className={styles.execCard}>
+                                                                    <div className={styles.execInfo}>
+                                                                        <div className={styles.execName}>
+                                                                            {executor.username}{" "}
+                                                                            <span className={styles.execMeta}>
+                                        • {executor.rating ? executor.rating.toFixed(1) : "—"} ⭐ • {executor.ratingCount || 0}
                                       </span>
-                                                                        </p>
+                                                                        </div>
 
-                                                                        <p className={styles.executorLine}>
-                                                                            <strong>Цена:</strong> {executor.proposedSum ? `${executor.proposedSum} ₽` : "—"}
-                                                                        </p>
+                                                                        <div className={styles.execLine}>
+                                                                            <span className={styles.k}>Цена</span>
+                                                                            <span className={styles.v}>
+                                        {executor.proposedSum ? `${executor.proposedSum} ₽` : "—"}
+                                      </span>
+                                                                        </div>
 
-                                                                        {executor.comment && (
-                                                                            <p className={styles.executorLine}>
-                                                                                <strong>Комментарий:</strong> {executor.comment}
-                                                                            </p>
-                                                                        )}
+                                                                        {executor.comment ? (
+                                                                            <div className={styles.execLine}>
+                                                                                <span className={styles.k}>Комментарий</span>
+                                                                                <span className={styles.v}>{executor.comment}</span>
+                                                                            </div>
+                                                                        ) : null}
 
-                                                                        {executor.isVerified && (
-                                                                            <span className={styles.verifiedBadge}>✔ Верифицирован</span>
-                                                                        )}
+                                                                        {executor.isVerified && <span className={styles.verifiedBadge}>✔ Верифицирован</span>}
                                                                     </div>
 
-                                                                    <div className={styles.buttonsContainer}>
+                                                                    <div className={styles.execActions}>
                                                                         <button
                                                                             onClick={() => navigate(`/complaints/${executor.id}`)}
-                                                                            className={styles.complaintButton}
+                                                                            className={styles.ghostBtnDanger}
                                                                         >
                                                                             Жалобы
                                                                         </button>
@@ -375,28 +437,28 @@ const MyOrdersPage = () => {
                                                                         <button
                                                                             disabled={approving}
                                                                             onClick={() => approveExecutor(order.id, executor.id)}
-                                                                            className={styles.approveButton}
+                                                                            className={styles.ghostBtn}
                                                                         >
-                                                                            {approving ? "Подтверждаем..." : "Одобрить"}
+                                                                            {approving ? "..." : "Одобрить"}
                                                                         </button>
                                                                     </div>
-                                                                </li>
+                                                                </div>
                                                             ))}
-                                                        </ul>
-                                                    </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className={styles.mutedText}>Пока нет запросов</div>
+                                                    )
                                                 ) : (
-                                                    <p className={styles.stateText}>Нет запросов на выполнение</p>
-                                                )
-                                            ) : (
-                                                <p className={styles.stateTextMuted}>
-                                                    {hasExecutors ? "Список скрыт" : "Пока нет запросов"}
-                                                </p>
-                                            )}
-                                        </div>
+                                                    <div className={styles.mutedText}>
+                                                        {hasExecutors ? "Список скрыт" : "Пока нет запросов"}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
 
-                                        {/* МОДАЛКА КАРТИНОК */}
+                                        {/* Images modal */}
                                         <Modal
-                                            appElement={document.getElementById('root')}
+                                            appElement={document.getElementById("root")}
                                             isOpen={isImageModalOpen}
                                             onRequestClose={closeModal}
                                             contentLabel="Full Image Modal"
@@ -404,7 +466,9 @@ const MyOrdersPage = () => {
                                             overlayClassName="custom-modal-overlay"
                                         >
                                             <div className="custom-modal-content">
-                                                <button onClick={closeModal} className="custom-close-button">✖</button>
+                                                <button onClick={closeModal} className="custom-close-button">
+                                                    ✖
+                                                </button>
 
                                                 <img
                                                     src={`${apiUrl}${currentImages[currentImageIndex]}`}
@@ -413,26 +477,26 @@ const MyOrdersPage = () => {
                                                 />
 
                                                 <div className="custom-image-navigation">
-                                                    <button onClick={prevImage} className="custom-nav-button">◀</button>
-                                                    <button onClick={nextImage} className="custom-nav-button">▶</button>
+                                                    <button onClick={prevImage} className="custom-nav-button">
+                                                        ◀
+                                                    </button>
+                                                    <button onClick={nextImage} className="custom-nav-button">
+                                                        ▶
+                                                    </button>
                                                 </div>
                                             </div>
                                         </Modal>
-
                                     </div>
                                 </li>
                             );
                         })}
                     </ul>
                 ) : (
-                    <p className={styles.noOrders}>Вы пока не размещали заказы.</p>
+                    <p className={styles.noOrders}>Пока нет заказов.</p>
                 )}
             </div>
 
-            <CreateOrderModal
-                isOpen={isCreateModalOpen}
-                onClose={() => setIsCreateModalOpen(false)}
-            />
+            <CreateOrderModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
         </div>
     );
 };

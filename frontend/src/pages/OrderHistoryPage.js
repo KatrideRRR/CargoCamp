@@ -1,7 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import axiosInstance from "../utils/axiosInstance";
 import "../styles/OrderHistotyPage.css";
+
+import { FiFileText, FiStar, FiCheckCircle } from "react-icons/fi";
+import { FaRegMoneyBillAlt } from "react-icons/fa";
+
+const apiUrl = process.env.REACT_APP_API_URL;
 
 const OrderHistoryPage = () => {
     const { userId } = useParams();
@@ -19,16 +24,19 @@ const OrderHistoryPage = () => {
     const [reviewText, setReviewText] = useState("");
     const [reviewSending, setReviewSending] = useState(false);
 
+    // UI
+    const [expandedDesc, setExpandedDesc] = useState(() => ({})); // orderId -> bool
+
     const fetchCompletedOrders = async () => {
         try {
             const response = await axiosInstance.get(`/orders/completed/${userId}`);
-            const formattedOrders = (response.data || []).map((order) => ({
+            const formatted = (response.data || []).map((order) => ({
                 ...order,
                 completedAt: order.completedAt
                     ? new Date(order.completedAt).toLocaleDateString()
                     : "Не указана",
             }));
-            setOrders(formattedOrders);
+            setOrders(formatted);
         } catch (err) {
             setError(err.response?.data?.message || "Ошибка загрузки заказов");
         }
@@ -54,33 +62,14 @@ const OrderHistoryPage = () => {
                 setLoading(false);
             }
         })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userId]);
 
-    const handleRestore = async (orderId) => {
-        try {
-            const response = await axiosInstance.post(`/orders/${orderId}/restore`);
-            if (response.data.success) {
-                alert("Заказ восстановлен!");
-                await fetchCompletedOrders();
-            } else {
-                alert("Не удалось восстановить заказ");
-            }
-        } catch (error) {
-            console.error("Ошибка при восстановлении:", error);
-            alert("Ошибка при восстановлении заказа");
-        }
-    };
+    const canReview = (order) =>
+        order.status === "completed" && !!order.executorId && !myReviewedOrderIds.has(order.id);
 
-    const handlePay = async (orderId) => {
-        try {
-            const response = await axiosInstance.post(`/payment/pay-pending/${orderId}`);
-            const { paymentUrl } = response.data;
-            if (paymentUrl) window.location.href = paymentUrl;
-            else alert("Не удалось получить ссылку на оплату");
-        } catch (error) {
-            console.error("Ошибка при оплате:", error);
-            alert("Ошибка при попытке оплаты");
-        }
+    const toggleDesc = (orderId) => {
+        setExpandedDesc((prev) => ({ ...prev, [orderId]: !prev[orderId] }));
     };
 
     const submitReview = async () => {
@@ -118,72 +107,117 @@ const OrderHistoryPage = () => {
         }
     };
 
-    if (loading) return <div className="loading-message">Загрузка истории заказов...</div>;
-    if (error) return <div className="error-message">Ошибка: {error}</div>;
+    const sortedOrders = useMemo(() => [...orders].reverse(), [orders]);
+
+    if (loading) return <div className="oh-state">Загрузка истории заказов…</div>;
+    if (error) return <div className="oh-state oh-state--error">Ошибка: {error}</div>;
 
     return (
-        <div className="order-history">
-            <div className="pageContainer">
-                <div className="contentWrapper">
-                    <h1>История заказов ({orders.length})</h1>
+        <div className="oh-page">
+            <div className="oh-shell">
+                <div className="oh-header glass">
+                    <div className="oh-title-row">
+                        <div className="oh-title">История заказов</div>
+                        <span className="oh-count">{orders.length}</span>
+                    </div>
+                    <div className="oh-subtitle">Здесь отображаются завершённые заказы</div>
+                </div>
 
-                    {orders.length > 0 ? (
-                        <ul className="order-list">
-                            {[...orders].reverse().map((order) => {
-                                const canReview =
-                                    order.status === "completed" &&
-                                    !!order.executorId &&
-                                    !myReviewedOrderIds.has(order.id);
+                {orders.length > 0 ? (
+                    <ul className="oh-list">
+                        {sortedOrders.map((order) => {
+                            const isDescExpanded = !!expandedDesc[order.id];
+                            const desc = order.description || "—";
+                            const shouldClamp = desc && desc.length > 140;
 
-                                return (
-                                    <li key={order.id} className="order-item">
-                                        <p><strong>№ заказа:</strong> {order.id}</p>
-                                        <p><strong>Тип заказа:</strong> {order.type}</p>
-                                        <p><strong>Описание:</strong> {order.description}</p>
-                                        <p><strong>Адрес:</strong> {order.address}</p>
-                                        <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
+                            return (
+                                <li key={order.id} className="oh-card glass">
+                                    <div className="oh-card-head">
+                                        <div className="oh-card-head-left">
+                                            <div className="oh-order-num">Заказ №{order.id}</div>
 
-                                        <p>
-                                            <strong>Статус:</strong>{" "}
-                                            {order.status === "expired"
-                                                ? "Просрочен"
-                                                : order.status === "pending_payment"
-                                                    ? "Ожидает оплаты"
-                                                    : "Завершён"}
-                                        </p>
+                                            <div className="oh-meta">
+                        <span className="oh-pill oh-pill--done">
+                          <FiCheckCircle style={{ marginRight: 6 }} />
+                          Завершён
+                        </span>
 
-                                        <p><strong>ID создателя:</strong> {order.creatorId}</p>
-                                        <p><strong>ID исполнителя:</strong> {order.executorId}</p>
-                                        <p><strong>Дата завершения:</strong> {order.completedAt}</p>
+                                                <span className="oh-dot">•</span>
+                                                <span className="oh-muted">Дата: {order.completedAt}</span>
+                                            </div>
+                                        </div>
 
+                                        <div className="oh-price">
+                                            <FaRegMoneyBillAlt style={{ marginRight: 8 }} />
+                                            <span className="oh-price-val">{order.proposedSum} ₽</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="oh-grid">
+                                        <div className="oh-kv">
+                                            <span className="oh-k">Тип</span>
+                                            <span className="oh-v">{order.type || "—"}</span>
+                                        </div>
+
+                                        <div className="oh-kv">
+                                            <span className="oh-k">Адрес</span>
+                                            <span className="oh-v">{order.address || "—"}</span>
+                                        </div>
+
+                                        <div className="oh-kv oh-kv--wide">
+                                            <div className="oh-desc-head">
+                                                <span className="oh-k">Описание</span>
+
+                                                {shouldClamp && (
+                                                    <button
+                                                        type="button"
+                                                        className="oh-link-btn"
+                                                        onClick={() => toggleDesc(order.id)}
+                                                    >
+                                                        {isDescExpanded ? "Свернуть" : "Подробнее"}
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            <span
+                                                className={`oh-v oh-desc ${shouldClamp ? "clampable" : ""} ${
+                                                    isDescExpanded ? "expanded" : "collapsed"
+                                                }`}
+                                            >
+                        {desc}
+                      </span>
+                                        </div>
+
+                                        <div className="oh-kv">
+                                            <span className="oh-k">ID создателя</span>
+                                            <span className="oh-v">{order.creatorId || "—"}</span>
+                                        </div>
+
+                                        <div className="oh-kv">
+                                            <span className="oh-k">ID исполнителя</span>
+                                            <span className="oh-v">{order.executorId || "—"}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="oh-actions">
                                         {order.contractPath && (
                                             <a
-                                                href={`http://localhost:5001/${order.contractPath.replace(
+                                                className="btn btn-ghost"
+                                                href={`${apiUrl || "http://localhost:5001"}/${order.contractPath.replace(
                                                     /^.*contracts[\\/]/,
                                                     "contracts/"
                                                 )}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                             >
+                                                <FiFileText style={{ marginRight: 8 }} />
                                                 Скачать договор (PDF)
                                             </a>
                                         )}
 
-                                        {order.status === "pending_payment" && (
-                                            <button onClick={() => handlePay(order.id)} className="pay-button">
-                                                Оплатить и разместить
-                                            </button>
-                                        )}
-
-                                        {order.status === "expired" && (
-                                            <button onClick={() => handleRestore(order.id)} className="restore-button">
-                                                Восстановить заказ
-                                            </button>
-                                        )}
-
-                                        {canReview && (
+                                        {canReview(order) ? (
                                             <button
-                                                className="review-button"
+                                                className="btn btn-primary"
                                                 onClick={() => {
                                                     setReviewOrder(order);
                                                     setReviewRating(0);
@@ -191,38 +225,61 @@ const OrderHistoryPage = () => {
                                                     setReviewModalOpen(true);
                                                 }}
                                             >
+                                                <FiStar style={{ marginRight: 8 }} />
                                                 Оставить отзыв
                                             </button>
+                                        ) : (
+                                            <span className="oh-pill oh-pill--muted">
+                        <FiCheckCircle style={{ marginRight: 6 }} />
+                        Отзыв недоступен
+                      </span>
                                         )}
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    ) : (
-                        <p>Завершенных или просроченных заказов нет.</p>
-                    )}
-                </div>
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                ) : (
+                    <div className="oh-empty glass">
+                        <div className="oh-empty-title">Пока пусто</div>
+                        <div className="oh-empty-sub">Завершённых заказов ещё нет.</div>
+                    </div>
+                )}
             </div>
 
-            {/* Review modal (простая версия, потом сделаем glass красиво) */}
+            {/* Review modal (glass) */}
             {reviewModalOpen && reviewOrder && (
-                <div className="modal-overlay" onClick={() => !reviewSending && setReviewModalOpen(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <h2>Отзыв по заказу #{reviewOrder.id}</h2>
+                <div
+                    className="oh-modal-overlay"
+                    onClick={() => !reviewSending && setReviewModalOpen(false)}
+                >
+                    <div className="oh-modal glass" onClick={(e) => e.stopPropagation()}>
+                        <div className="oh-modal-head">
+                            <div className="oh-modal-title">Отзыв по заказу #{reviewOrder.id}</div>
+                            <button
+                                className="btn btn-ghost"
+                                onClick={() => !reviewSending && setReviewModalOpen(false)}
+                            >
+                                Закрыть
+                            </button>
+                        </div>
 
-                        <div className="stars">
+                        <div className="oh-stars">
                             {[1, 2, 3, 4, 5].map((star) => (
-                                <span
+                                <button
                                     key={star}
-                                    className={star <= reviewRating ? "star selected" : "star"}
+                                    type="button"
+                                    className={`oh-star ${star <= reviewRating ? "selected" : ""}`}
                                     onClick={() => !reviewSending && setReviewRating(star)}
+                                    aria-label={`Поставить ${star}`}
                                 >
-                  ★
-                </span>
+                                    ★
+                                </button>
                             ))}
                         </div>
 
                         <textarea
+                            className="oh-textarea"
                             value={reviewText}
                             onChange={(e) => setReviewText(e.target.value)}
                             rows="4"
@@ -230,9 +287,23 @@ const OrderHistoryPage = () => {
                             disabled={reviewSending}
                         />
 
-                        <button onClick={submitReview} disabled={reviewSending || reviewRating === 0}>
-                            {reviewSending ? "Отправляем..." : "Отправить отзыв"}
-                        </button>
+                        <div className="oh-modal-actions">
+                            <button
+                                className="btn btn-ghost"
+                                onClick={() => setReviewText("")}
+                                disabled={reviewSending}
+                            >
+                                Очистить
+                            </button>
+
+                            <button
+                                className="btn btn-primary"
+                                onClick={submitReview}
+                                disabled={reviewSending || reviewRating === 0}
+                            >
+                                {reviewSending ? "Отправляем…" : "Отправить отзыв"}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

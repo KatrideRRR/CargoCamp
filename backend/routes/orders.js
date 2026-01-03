@@ -12,27 +12,6 @@ const { Order, User, Category, Subcategory, Service } = require('../models');
 const generateContractPDF = require('../utils/generateContractPDF');
 const yooKassa = require('../config/yookassaClient');
 
-setInterval(async () => {
-    try {
-        const expiredOrders = await Order.findAll({
-            where: {
-                status: 'pending',
-                createdAt: {
-                    [Sequelize.Op.lt]: moment().subtract(24, 'hours').toDate(),
-                },
-            },
-        });
-
-        for (const order of expiredOrders) {
-            order.status = 'expired';
-            await order.save();
-            console.log(`Заказ ${order.id} переведен в статус "expired".`);
-        }
-    } catch (error) {
-        console.error("Ошибка при архивировании старых заказов:", error);
-    }
-}, 60 * 60 * 1000); // каждые 60 минут
-
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, 'uploads/orders');
@@ -753,7 +732,7 @@ module.exports = (io) => {
             const completedOrders = await Order.findAll({
                 where: {
                     status: {
-                        [Op.in]: ['completed', 'expired', 'pending_payment'], // ⬅️ Теперь ищем оба статуса
+                        [Op.in]: ['completed'],
                     },
                     [Op.or]: [
                         { creatorId: userId },  // Заказчик
@@ -778,8 +757,9 @@ module.exports = (io) => {
             const orders = await Order.findAll({
                 where: {
                     creatorId: userId,
-                    status: 'pending',
+                    status: ["pending", "pending_payment"],
                 },  // Фильтруем заказы по ID создателя
+                order: [["createdAt", "DESC"]],
                 include: [
                     { model: db.Category, as: 'category', attributes: ['id', 'name'] },
                     { model: db.Subcategory, as: 'subcategory', attributes: ['id', 'name'] },

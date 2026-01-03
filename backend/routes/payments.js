@@ -1,4 +1,4 @@
-const express = require('express');
+const { v4: uuidv4 } = require("uuid");const express = require('express');
 const router = express.Router();
 const { Order, User } = require('../models'); // sequelize models
 const authenticateToken = require('../middlewares/userAuth'); // если нужен
