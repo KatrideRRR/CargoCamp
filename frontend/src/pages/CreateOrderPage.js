@@ -1,9 +1,9 @@
+// src/pages/CreateOrderPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useNavigate } from "react-router-dom";
-import { YMaps } from "@pbe/react-yandex-maps";
 import "../styles/CreateOrderPage.css";
 import imageCompression from "browser-image-compression";
 import { FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity } from "react-icons/fa";
@@ -26,18 +26,14 @@ function looksLikeCoordsString(v) {
 // reverse geocode через Yandex Geocoder: geocode=lng,lat
 async function reverseGeocodeYandex({ lat, lng, apiKey }) {
     if (!apiKey) throw new Error("No Yandex API key");
-
     const url = `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}&geocode=${lng},${lat}&format=json&results=1&kind=house`;
     const r = await fetch(url);
     const data = await r.json();
 
     const first = data?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
-    const text =
-        first?.metaDataProperty?.GeocoderMetaData?.text ||
-        first?.name ||
-        null;
+    const text = first?.metaDataProperty?.GeocoderMetaData?.text || first?.name || null;
 
-    return text; // строка адреса или null
+    return text;
 }
 
 function roundTo15(d) {
@@ -52,7 +48,6 @@ function roundTo15(d) {
 function CreateOrderPage() {
     const navigate = useNavigate();
     const currentDate = useMemo(() => new Date(), []);
-
     const YM_KEY = process.env.REACT_APP_YANDEX_API_KEY;
 
     const [formData, setFormData] = useState({
@@ -67,7 +62,6 @@ function CreateOrderPage() {
 
     const [markerPosition, setMarkerPosition] = useState(null); // [lat, lng]
     const [addressSuggestions, setAddressSuggestions] = useState([]);
-
     const [images, setImages] = useState([]);
 
     const [category, setCategory] = useState([]);
@@ -84,27 +78,32 @@ function CreateOrderPage() {
     const [paymentType, setPaymentType] = useState("");
     const [selectedMethod, setSelectedMethod] = useState(null);
 
-    const paymentMethods = [
-        { id: "cash", label: "Наличные" },
-        { id: "guarantee", label: "Гарантия" },
-        { id: "installment", label: "Рассрочка" },
-    ];
-
-    // адрес из профиля / кастом
+    // address
     const [profile, setProfile] = useState(null);
     const [addressMode, setAddressMode] = useState("profile"); // profile | custom
     const [showMapModal, setShowMapModal] = useState(false);
     const [addrResolving, setAddrResolving] = useState(false);
     const [addrResolveError, setAddrResolveError] = useState(null);
 
-    // время
-    const [scheduleMode, setScheduleMode] = useState("asap"); // asap | scheduled
+    // ✅ тумблер: ON = срочно
+    const [isAsap, setIsAsap] = useState(true);
+
+    const paymentMethods = useMemo(
+        () => [
+            { id: "cash", label: "Наличные" },
+            { id: "guarantee", label: "Гарантия" },
+            { id: "installment", label: "Рассрочка" },
+        ],
+        []
+    );
 
     const promotionTotal = useMemo(() => {
-        return Object.entries(promotion).reduce((sum, [key, enabled]) => (enabled ? sum + PROMOTION_PRICES[key] : sum), 0);
+        return Object.entries(promotion).reduce(
+            (sum, [key, enabled]) => (enabled ? sum + PROMOTION_PRICES[key] : sum),
+            0
+        );
     }, [promotion]);
 
-    // auth guard
     useEffect(() => {
         const token = localStorage.getItem("authToken");
         if (!token) {
@@ -113,11 +112,13 @@ function CreateOrderPage() {
         }
     }, [navigate]);
 
-    // default workTime
+    // default workTime (asap)
     useEffect(() => {
         setFormData((p) => ({ ...p, workTime: roundTo15(new Date()) }));
+        setIsAsap(true);
     }, []);
 
+    // preload location
     useEffect(() => {
         const token = localStorage.getItem("authToken");
         if (!token) return;
@@ -137,32 +138,26 @@ function CreateOrderPage() {
                 const lng = Number(loc.locationLng);
                 const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
 
-                // 1) Если в профиле нормальный адрес — используем его
                 if (loc.locationAddress && !looksLikeCoordsString(loc.locationAddress)) {
                     setFormData((p) => ({ ...p, address: loc.locationAddress }));
                     if (hasCoords) setMarkerPosition([lat, lng]);
                     return;
                 }
 
-                // 2) Если адреса нет/он координатный, но координаты есть — reverse → адрес
                 if (hasCoords) {
                     setMarkerPosition([lat, lng]);
                     setAddrResolving(true);
                     setAddrResolveError(null);
 
                     const addr = await reverseGeocodeYandex({ lat, lng, apiKey: YM_KEY });
-                    if (addr) {
-                        setFormData((p) => ({ ...p, address: addr }));
-                    } else {
-                        setAddrResolveError("Не удалось распознать адрес по координатам. Введите адрес вручную или выберите на карте.");
-                    }
+                    if (addr) setFormData((p) => ({ ...p, address: addr }));
+                    else setAddrResolveError("Не удалось распознать адрес. Введите вручную или выберите на карте.");
 
                     setAddrResolving(false);
                     return;
                 }
 
-                // 3) Вообще ничего нет — оставляем пустым
-                setAddrResolveError("В профиле нет адреса. Укажите адрес вручную или выберите на карте.");
+                setAddrResolveError("В профиле нет адреса. Укажите вручную или выберите на карте.");
             } catch (e) {
                 console.error("location preload error:", e);
                 setAddrResolveError("Не удалось загрузить местоположение из профиля.");
@@ -172,7 +167,6 @@ function CreateOrderPage() {
         })();
     }, [YM_KEY]);
 
-    // load categories
     useEffect(() => {
         axios
             .get(`${apiUrl}/api/category`)
@@ -255,7 +249,7 @@ function CreateOrderPage() {
     const handleAddressChange = async (e) => {
         const address = e.target.value;
         setFormData((p) => ({ ...p, address }));
-        setAddressMode("custom"); // ✅ если правит руками — значит кастом
+        setAddressMode("custom");
 
         if (address.length > 3) {
             try {
@@ -313,13 +307,13 @@ function CreateOrderPage() {
                 try {
                     const addr = await reverseGeocodeYandex({ lat, lng, apiKey: YM_KEY });
                     if (!addr) {
-                        setAddrResolveError("Не удалось распознать ваш адрес по GPS. Введите адрес вручную или выберите на карте.");
+                        setAddrResolveError("Не удалось распознать адрес по GPS. Введите вручную или выберите на карте.");
                         return;
                     }
                     setFormData((p) => ({ ...p, address: addr }));
                 } catch (e) {
                     console.error("reverse geocode error:", e);
-                    setAddrResolveError("Не удалось распознать ваш адрес по GPS. Введите адрес вручную или выберите на карте.");
+                    setAddrResolveError("Не удалось распознать адрес по GPS. Введите вручную или выберите на карте.");
                 } finally {
                     setAddrResolving(false);
                 }
@@ -327,7 +321,7 @@ function CreateOrderPage() {
             (err) => {
                 console.error(err);
                 setAddrResolving(false);
-                setAddrResolveError("Не удалось определить координаты по GPS. Введите адрес вручную или выберите на карте.");
+                setAddrResolveError("Не удалось определить координаты по GPS. Введите вручную или выберите на карте.");
             },
             { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
         );
@@ -371,13 +365,10 @@ function CreateOrderPage() {
             setError("Адрес обязателен");
             return;
         }
-
         if (isCoordsString(formData.address)) {
             setError("Нужно указать адрес текстом (не координаты). Выберите адрес на карте или введите вручную.");
-            setIsSubmitting(false);
             return;
         }
-
         if (!selectedCategory || !selectedSubcategory) {
             setError("Выберите категорию и подкатегорию");
             return;
@@ -400,12 +391,10 @@ function CreateOrderPage() {
         if (selectedService && Number(selectedService) > 0) data.append("serviceId", Number(selectedService));
 
         data.append("promotion", JSON.stringify(promotion));
-
         images.forEach((img) => data.append("images", img));
 
-        // ✅ если есть маркер — отправляем coordinates
         if (markerPosition?.length === 2) {
-            data.append("coordinates", `${markerPosition[0]},${markerPosition[1]}`); // lat,lng
+            data.append("coordinates", `${markerPosition[0]},${markerPosition[1]}`);
         }
 
         const token = localStorage.getItem("authToken");
@@ -435,12 +424,6 @@ function CreateOrderPage() {
                     return;
                 }
 
-                if (looksLikeCoordsString(formData.address)) {
-                    setError("Укажите адрес текстом. Если адрес не определяется автоматически — введите вручную или выберите на карте.");
-                    setIsSubmitting(false);
-                    return;
-                }
-
                 window.location.href = payResp.data.confirmationUrl;
             } else {
                 alert("Заказ успешно создан");
@@ -456,46 +439,41 @@ function CreateOrderPage() {
     return (
         <div className="create-page">
             <div className="create-shell">
-                {/* Header как в профиле */}
-                <div className="create-header glass">
-                    <div className="create-header-top">
-                        <div>
-                            <h1 className="create-title">Создать заказ</h1>
-                            <p className="create-subtitle">Заполните детали — адрес и время подставятся автоматически</p>
+                {/* Header */}
+                <div className="glass header-card">
+                    <div className="header-top">
+                        <div className="header-titles">
+                            <div className="header-title">Создать заказ</div>
+                            <div className="header-sub">Адрес и время подставятся автоматически</div>
                         </div>
-                    </div>
 
-                    {/* мини-плашка состояния адреса */}
-                    <div className="create-meta">
-          <span className="identity-pill">
-            Адрес: {formData.address ? "указан" : "не указан"}
-          </span>
-                        {addrResolving && <span className="identity-pill">Определяем адрес…</span>}
+                        <div className="header-badges">
+                            <span className="pill">Адрес: {formData.address ? "указан" : "нет"}</span>
+                            {addrResolving && <span className="pill">Определяем…</span>}
+                        </div>
                     </div>
                 </div>
 
                 {error && (
-                    <div className="alert alert-danger glass">
-                        <div>
-                            <div className="alert-title">Ошибка</div>
-                            <div className="alert-text">{error}</div>
-                        </div>
+                    <div className="glass alert-card alert-danger">
+                        <div className="alert-title">Ошибка</div>
+                        <div className="alert-text">{error}</div>
                     </div>
                 )}
 
-                {/* 1) Категория */}
-                <div className="create-card glass">
-                    <div className="card-head">
+                {/* Category */}
+                <div className="glass section-card">
+                    <div className="section-head">
                         <div>
-                            <h2 className="card-title">Категория</h2>
-                            <p className="card-subtitle">Выберите категорию, подкатегорию и услугу (если есть)</p>
+                            <div className="section-title">Категория</div>
+                            <div className="section-sub">Выберите категорию, подкатегорию и услугу</div>
                         </div>
                     </div>
 
-                    <div className="create-grid-2">
-                        <div className="input-group">
-                            <label>Категория</label>
-                            <select className="input" value={selectedCategory} onChange={handleCategoryChange}>
+                    <div className="grid2">
+                        <div className="glass field">
+                            <div className="label">Категория</div>
+                            <select className="control" value={selectedCategory} onChange={handleCategoryChange}>
                                 <option value="">Выберите категорию</option>
                                 {category
                                     .filter((cat) => cat.id !== 12 && cat.id !== 13)
@@ -507,10 +485,10 @@ function CreateOrderPage() {
                             </select>
                         </div>
 
-                        <div className="input-group">
-                            <label>Подкатегория</label>
+                        <div className="glass field">
+                            <div className="label">Подкатегория</div>
                             <select
-                                className="input"
+                                className="control"
                                 value={selectedSubcategory}
                                 onChange={handleSubcategoryChange}
                                 disabled={!selectedCategory}
@@ -518,7 +496,8 @@ function CreateOrderPage() {
                                 <option value="">Выберите подкатегорию</option>
                                 {subcategory.map((sub) => (
                                     <option key={sub.id} value={sub.id}>
-                                        {sub.name}{sub.price ? ` — ${sub.price} ₽` : ""}
+                                        {sub.name}
+                                        {sub.price ? ` — ${sub.price} ₽` : ""}
                                     </option>
                                 ))}
                             </select>
@@ -526,9 +505,9 @@ function CreateOrderPage() {
                     </div>
 
                     {services.length > 0 && (
-                        <div className="input-group" style={{ marginTop: 10 }}>
-                            <label>Услуга</label>
-                            <select className="input" value={selectedService} onChange={(e) => setSelectedService(e.target.value)}>
+                        <div className="glass field" style={{ marginTop: 10 }}>
+                            <div className="label">Услуга</div>
+                            <select className="control" value={selectedService} onChange={(e) => setSelectedService(e.target.value)}>
                                 <option value="">Выберите услугу</option>
                                 {services.map((s) => (
                                     <option key={s.id} value={s.id}>
@@ -540,20 +519,20 @@ function CreateOrderPage() {
                     )}
                 </div>
 
-                {/* 2) Описание */}
-                <div className="create-card glass">
-                    <div className="card-head">
+                {/* Description */}
+                <div className="glass section-card">
+                    <div className="section-head">
                         <div>
-                            <h2 className="card-title">Описание</h2>
-                            <p className="card-subtitle">Опишите задачу — так исполнители быстрее поймут</p>
+                            <div className="section-title">Описание</div>
+                            <div className="section-sub">Коротко и понятно</div>
                         </div>
                     </div>
 
-                    <div className="input-group">
-                        <label>Описание работы</label>
+                    <div className="glass field">
+                        <div className="label">Описание работы</div>
                         <textarea
-                            className="input create-textarea"
-                            placeholder="Введите описание работы"
+                            className="control textarea"
+                            placeholder="Что нужно сделать? Нюансы, материалы, сроки"
                             value={formData.description}
                             onChange={handleDescriptionChange}
                             rows="3"
@@ -561,30 +540,29 @@ function CreateOrderPage() {
                     </div>
                 </div>
 
-                {/* 3) Адрес */}
-                <div className="create-card glass">
-                    <div className="card-head">
+                {/* Address */}
+                <div className="glass section-card">
+                    <div className="section-head">
                         <div>
-                            <h2 className="card-title">Адрес</h2>
-                            <p className="card-subtitle">Подставляем адрес из профиля, либо выберите на карте</p>
+                            <div className="section-title">Адрес</div>
+                            <div className="section-sub">Из профиля или вручную / карта / GPS</div>
                         </div>
                     </div>
 
-                    <div className="input-group">
-                        <label>Адрес</label>
+                    <div className="glass field">
+                        <div className="label">Адрес</div>
                         <input
-                            className="input"
+                            className="control"
                             type="text"
                             placeholder="Введите адрес"
                             value={formData.address}
                             onChange={handleAddressChange}
-                            required
                         />
 
-                        {addrResolveError && <div className="loc-error">{addrResolveError}</div>}
+                        {addrResolveError && <div className="inline-error">{addrResolveError}</div>}
 
                         {addressSuggestions.length > 0 && (
-                            <ul className="address-suggestions">
+                            <ul className="suggestions">
                                 {addressSuggestions.map((a, i) => (
                                     <li key={i} onClick={() => handleAddressSelect(a)}>
                                         {a}
@@ -594,13 +572,13 @@ function CreateOrderPage() {
                         )}
                     </div>
 
-                    <div className="address-confirm">
-                        <div className="address-question">Заказ будет выполняться по этому адресу?</div>
+                    <div className="address-row">
+                        <div className="muted-strong">Использовать адрес из профиля?</div>
 
-                        <div className="address-actions">
+                        <div className="chip-row">
                             <button
                                 type="button"
-                                className={`btn btn-ghost ${addressMode === "profile" ? "btn-active" : ""}`}
+                                className={`chip-btn ${addressMode === "profile" ? "active" : ""}`}
                                 onClick={async () => {
                                     setAddressMode("profile");
                                     setAddrResolveError(null);
@@ -623,33 +601,34 @@ function CreateOrderPage() {
                                         setAddrResolving(false);
 
                                         if (resolved) setFormData((p) => ({ ...p, address: resolved }));
-                                        else setAddrResolveError("В профиле нет распознанного адреса. Введите адрес вручную или выберите на карте.");
+                                        else setAddrResolveError(
+                                            "В профиле нет распознанного адреса. Введите вручную или выберите на карте."
+                                        );
                                         return;
                                     }
 
-                                    setAddrResolveError("В профиле нет адреса. Введите адрес вручную или выберите на карте.");
+                                    setAddrResolveError("В профиле нет адреса. Введите вручную или выберите на карте.");
                                 }}
                             >
-                                Да (из профиля)
+                                Да
                             </button>
 
                             <button
                                 type="button"
-                                className={`btn btn-ghost ${addressMode === "custom" ? "btn-active" : ""}`}
+                                className={`chip-btn ${addressMode === "custom" ? "active" : ""}`}
                                 onClick={() => setAddressMode("custom")}
                             >
-                                Нет, изменить
+                                Нет
                             </button>
                         </div>
 
                         {addressMode === "custom" && (
-                            <div className="create-grid-2" style={{ marginTop: 10 }}>
-                                <button type="button" className="btn btn-ghost" onClick={() => setShowMapModal(true)}>
-                                    Выбрать на карте
+                            <div className="grid2" style={{ marginTop: 10 }}>
+                                <button type="button" className="action-btn subtle" onClick={() => setShowMapModal(true)}>
+                                    На карте
                                 </button>
-
-                                <button type="button" className="btn btn-ghost" onClick={detectGps} disabled={addrResolving}>
-                                    Определить по GPS
+                                <button type="button" className="action-btn subtle" onClick={detectGps} disabled={addrResolving}>
+                                    GPS
                                 </button>
                             </div>
                         )}
@@ -669,44 +648,42 @@ function CreateOrderPage() {
                     />
                 </div>
 
-                {/* 4) Время + сумма */}
-                <div className="create-card glass">
-                    <div className="card-head">
+                {/* Time */}
+                <div className="glass section-card">
+                    <div className="section-head">
                         <div>
-                            <h2 className="card-title">Время и бюджет</h2>
-                            <p className="card-subtitle">Минималистично: тумблер “срочно / по расписанию”</p>
+                            <div className="section-title">Время</div>
+                            <div className="section-sub">Тумблер “по времени / срочно”</div>
                         </div>
                     </div>
 
-                    <div className="create-grid-2">
-                        <div className="input-group">
-                            <label>Когда нужно</label>
+                    <div className="grid2">
+                        <div className="glass field">
+                            <div className="label">Когда нужно</div>
 
-                            <div className="segmented">
+                            {/* ✅ слева "По времени" — справа "Срочно" */}
+                            <div className="toggleRow">
+                                <span className={`toggleLabel ${!isAsap ? "active" : ""}`}>По времени</span>
+
                                 <button
                                     type="button"
-                                    className={`seg-btn ${scheduleMode === "asap" ? "active" : ""}`}
+                                    className={`toggle ${isAsap ? "on" : ""}`}
                                     onClick={() => {
-                                        setScheduleMode("asap");
-                                        setFormData((p) => ({ ...p, workTime: roundTo15(new Date()) }));
+                                        const next = !isAsap;
+                                        setIsAsap(next);
+                                        if (next) setFormData((p) => ({ ...p, workTime: roundTo15(new Date()) }));
                                     }}
+                                    aria-label="По времени / Срочно"
                                 >
-                                    В ближайшее время
+                                    <span className="toggleKnob" />
                                 </button>
 
-                                <button
-                                    type="button"
-                                    className={`seg-btn ${scheduleMode === "scheduled" ? "active" : ""}`}
-                                    onClick={() => setScheduleMode("scheduled")}
-                                >
-                                    Выбрать дату и время
-                                </button>
+                                <span className={`toggleLabel ${isAsap ? "active" : ""}`}>Срочно</span>
                             </div>
 
-                            {scheduleMode === "asap" ? (
-                                <div className="asap-chip">
-                                    Ближайшее время:{" "}
-                                    <strong>{formData.workTime ? new Date(formData.workTime).toLocaleString() : "—"}</strong>
+                            {isAsap ? (
+                                <div className="glass chip">
+                                    Ближайшее: <b>{formData.workTime ? new Date(formData.workTime).toLocaleString() : "—"}</b>
                                 </div>
                             ) : (
                                 <DatePicker
@@ -720,7 +697,7 @@ function CreateOrderPage() {
                                     minDate={new Date()}
                                     minTime={getMinTime(formData.workTime)}
                                     maxTime={new Date(0, 0, 0, 23, 59, 59)}
-                                    className="input"
+                                    className="control"
                                     portalId="date-picker-portal"
                                 />
                             )}
@@ -728,119 +705,101 @@ function CreateOrderPage() {
                     </div>
                 </div>
 
-                {/* 5) Фото */}
-                <div className="create-card glass">
-                    <div className="card-head">
+                {/* Photos */}
+                <div className="glass section-card">
+                    <div className="section-head">
                         <div>
-                            <h2 className="card-title">Фото</h2>
-                            <p className="card-subtitle">До 5 изображений, чтобы было понятнее</p>
+                            <div className="section-title">Фото</div>
+                            <div className="section-sub">Чтобы исполнителю было понятнее</div>
                         </div>
                     </div>
 
-                    <label className="upload-glass">
-                        <input
-                            id="file-input"
-                            type="file"
-                            multiple
-                            accept="image/*"
-                            onChange={handleImageChange}
-                            style={{ display: "none" }}
-                        />
+                    {/* ВАЖНО: больше НЕ даём className="glass" кнопке, чтобы не “перетирались” бордеры */}
+                    <label className="upload">
+                        <input type="file" multiple accept="image/*" onChange={handleImageChange} style={{ display: "none" }} />
                         <span>Загрузить изображения</span>
                     </label>
 
                     {images.length > 0 ? (
-                        <div className="docs-grid" style={{ marginTop: 12 }}>
+                        <div className="docsGrid" style={{ marginTop: 12 }}>
                             {images.map((img, i) => (
-                                <div className="doc-tile" key={i}>
-                                    <img className="doc-img" src={URL.createObjectURL(img)} alt={`Preview ${i + 1}`} />
-                                    <div className="doc-name">Фото {i + 1}</div>
+                                <div className="glass doc" key={i}>
+                                    <img className="docImg" src={URL.createObjectURL(img)} alt={`Preview ${i + 1}`} />
+                                    <div className="docName">Фото {i + 1}</div>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <div className="docs-empty" style={{ marginTop: 10 }}>Изображения не выбраны</div>
+                        <div className="muted" style={{ marginTop: 10 }}>
+                            Изображения не выбраны
+                        </div>
                     )}
                 </div>
 
-                {/* 6) Оплата */}
-                <div className="create-card glass">
-                    <div className="card-head">
+                {/* Payment + promotion */}
+                <div className="glass section-card">
+                    <div className="section-head">
                         <div>
-                            <h2 className="card-title">Оплата</h2>
-                            <p className="card-subtitle">Выберите способ оплаты</p>
+                            <div className="section-title">Оплата и продвижение</div>
+                            <div className="section-sub">Сумма за работу + способ оплаты + опции продвижения</div>
                         </div>
                     </div>
 
-                    <div className="input-group" style={{ marginBottom: 12 }}>
-                        <label>Предложенная сумма</label>
+                    {/* сумма перенесена сюда */}
+                    <div className="glass field">
+                        <div className="label">Сумма за работу</div>
                         <input
-                            className="input"
+                            className="control"
                             type="number"
-                            placeholder="Введите сумму"
+                            placeholder="Например 1500"
                             value={formData.proposedSum}
                             onChange={(e) => setFormData((p) => ({ ...p, proposedSum: e.target.value }))}
                             required
                         />
+                        <div className="hint">Эту сумму вы оплачиваете исполнителю. Сейчас оплачивается только продвижение.</div>
                     </div>
 
-                    <div className="payment-grid">
-                        {paymentMethods.map((m) => (
-                            <button
-                                key={m.id}
-                                className={`pay-tile ${selectedMethod === m.id ? "selected" : ""}`}
-                                onClick={(event) => handleSelectPayment(event, m.id)}
-                                type="button"
-                            >
-                                <div className="pay-tile-inner">
-                                    <span className="pay-ico">{getPaymentIcon(m.id)}</span>
-                                    <span className="pay-label">{m.label}</span>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
+                    <div className="glass field" style={{ marginTop: 10 }}>
+                        <div className="label">Способ оплаты</div>
 
-                    <div className="total-row">
-                        <div className="total-left">
-                            <div className="total-title">Итог к оплате сейчас</div>
-                            <div className="total-sub">Оплачивается только продвижение (если выбрано)</div>
+                        <div className="payGrid">
+                            {paymentMethods.map((m) => (
+                                <button
+                                    key={m.id}
+                                    className={`payTile ${selectedMethod === m.id ? "selected" : ""}`}
+                                    onClick={(event) => handleSelectPayment(event, m.id)}
+                                    type="button"
+                                >
+                                    <span className="payIco">{getPaymentIcon(m.id)}</span>
+                                    <span className="payLabel">{m.label}</span>
+                                </button>
+                            ))}
                         </div>
-                        <div className="total-amount">{promotionTotal} ₽</div>
                     </div>
 
-                </div>
+                    <div className="glass promoBox">
+                        <PromotionOptions value={promotion} onChange={setPromotion} />
+                    </div>
 
-                {/* 7) Продвижение */}
-                <div className="create-card glass">
-                    <div className="card-head">
+                    <div className="glass total">
                         <div>
-                            <h2 className="card-title">Продвижение</h2>
-                            <p className="card-subtitle">Опционально: выделение, рекомендация, пуш</p>
+                            <div className="totalTitle">К оплате сейчас</div>
+                            <div className="totalSub">Оплачивается только продвижение</div>
                         </div>
+                        <div className="totalAmount">{promotionTotal} ₽</div>
                     </div>
 
-                    <PromotionOptions value={promotion} onChange={setPromotion} />
-
-                    <div className="docs-block" style={{ marginTop: 12 }}>
-                        <div className="docs-head">
-                            <div className="docs-title">Итог</div>
-                            <div className="docs-count">{promotionTotal} ₽</div>
-                        </div>
-                        <div className="card-muted">
-                            💡 Продвижение повышает шансы, но не гарантирует отклик.
-                            ⏰ Если никто не примет заказ — уйдёт в историю через 24 часа.
-                        </div>
-                    </div>
+                    <div className="muted">💡 Если продвижение не выбрано — оплата сейчас = 0 ₽.</div>
                 </div>
 
-                {/* submit */}
-                <div className="profile-actions glass">
-                    <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)}>
+                {/* actions */}
+                <div className="glass bottomActions">
+                    <button type="button" className="action-btn subtle" onClick={() => navigate(-1)}>
                         Назад
                     </button>
 
-                    <button type="submit" disabled={isSubmitting} className="btn btn-primary" onClick={handleSubmit}>
-                        {isSubmitting ? "Создание..." : "Создать заказ"}
+                    <button type="submit" disabled={isSubmitting} className="action-btn primary" onClick={handleSubmit}>
+                        {isSubmitting ? "Создание…" : "Создать заказ"}
                     </button>
                 </div>
             </div>

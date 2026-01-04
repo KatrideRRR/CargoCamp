@@ -343,15 +343,20 @@ const ActiveOrdersPage = () => {
                                             >
                                                 <div className="order-header" onClick={() => toggleExpand(order.id)}>
 
-                                                    <p className="order-title">
-                                                        <strong>Заказ номер {order.id}</strong>
-                                                        {isCreator ? '. Вы являетесь заказчиком' : `. Вы являетесь исполнителем`}.
-                                                        Создан {new Date(order.createdAt).toLocaleString()}
-                                                        <div className="payment-icon-container">
-                                                <span
-                                                    className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
+                                                    <div className="order-top">
+                                                        <div className="order-title">
+                                                            <strong>Заказ номер {order.id}</strong>
+                                                            {isCreator ? ". Вы являетесь заказчиком" : ". Вы являетесь исполнителем"}.
                                                         </div>
-                                                    </p>
+
+                                                        <div className="payment-icon-container">
+                                                            <span className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="order-subline">
+                                                        Создан {new Date(order.createdAt).toLocaleString()}
+                                                    </div>
 
                                                     {isExecutor ?
                                                         <>
