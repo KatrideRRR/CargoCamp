@@ -71,10 +71,6 @@ module.exports = (sequelize) => {
                 type: DataTypes.BOOLEAN,
                 defaultValue: false,
             },
-            taxi_courier: {
-                type: DataTypes.BOOLEAN,
-                defaultValue: false,
-            },
             serviceId: {
                 type: DataTypes.INTEGER,
                 allowNull: true,

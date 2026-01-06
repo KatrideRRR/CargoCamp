@@ -780,59 +780,5 @@ module.exports = (io) => {
         }
     });
 
-    router.post('/express', authenticateToken, async (req, res) => {
-        try {
-            const { address, to, description, proposedSum, paymentType, subcategory, type } = req.body;
-
-            if (!type || !address || !to || !paymentType) {
-                return res.status(400).json({ message: 'Не все обязательные поля заполнены' });
-            }
-
-            // Геокодируем только адрес "откуда"
-            const geoData = await geocoder.geocode(address);
-            if (!geoData.length) {
-                return res.status(404).json({ message: 'Адрес (откуда) не найден' });
-            }
-
-            const { latitude, longitude } = geoData[0];
-            const coordinates = `${latitude},${longitude}`;
-
-            const userId = req.user.id;
-            const fullAddress = `${address} → ${to}`;
-            const categoryName = type === 'taxi' ? 'Такси' : 'Курьер';
-            const category = await Category.findOne({ where: { name: categoryName } });
-
-            if (!category) {
-                return res.status(400).json({ message: 'Категория не найдена' });
-            }
-
-            let subcategoryId = null;
-            if (subcategory) {
-                const subcat = await Subcategory.findOne({ where: { name: subcategory, categoryId: category.id } });
-                if (subcat) subcategoryId = subcat.id;
-            }
-
-            const newOrder = await Order.create({
-                address: fullAddress,
-                coordinates,
-                description,
-                proposedSum,
-                paymentType,
-                type,
-                userId,
-                creatorId: userId,
-                categoryId: category.id,
-                subcategoryId,
-                taxi_courier: true,
-                createdAt: new Date(),
-            });
-
-            res.status(201).json(newOrder);
-        } catch (err) {
-            console.error('❌ Ошибка создания express-заказа:', err);
-            res.status(500).json({ message: 'Ошибка сервера' });
-        }
-    });
-
     return router;
 };

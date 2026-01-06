@@ -22,6 +22,7 @@ const messagesRoutes = require('./routes/messages');
 const categoryRouter = require('./routes/category');
 const adminRoutes = require('./routes/admin');
 const payments = require("./routes/payments");
+const expressOrdersRoutes = require("./routes/expressorders");
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.use('/api/category', categoryRouter);
 app.use('/api/admin', adminRoutes);
 app.use("/api/payments", payments);
 app.use('/contracts', express.static(path.join(__dirname, 'contracts')));
+app.use("/api/express", expressOrdersRoutes);
 
 // Database connection
 const sequelize = require('./config/database');

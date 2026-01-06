@@ -4,6 +4,14 @@ module.exports = (sequelize) => {
     class User extends Model {
         static associate(models) {
             User.hasMany(models.Order, { foreignKey: 'userId', as: 'orders' });
+            User.hasMany(models.ExpressSavedAddress, {
+                foreignKey: "userId",
+                as: "expressSavedAddresses",
+                onDelete: "CASCADE",
+            });
+            User.hasMany(models.ExpressOrder, { foreignKey: "creatorId", as: "expressCreatedOrders" });
+            User.hasMany(models.ExpressOrder, { foreignKey: "executorId", as: "expressTakenOrders" });
+
         }
     }
     User.init(
