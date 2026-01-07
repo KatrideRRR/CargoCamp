@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+// src/pages/OrdersPage.js
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import axiosInstance from "../utils/axiosInstance";
@@ -9,6 +10,7 @@ import { toast } from "react-toastify";
 import "../styles/OrdersPage.css";
 import SwipeableMap from "../components/SwipeableMap";
 import YandexMapModal from "../components/YandexMapModal";
+import ExpressRouteButtons from "../components/ExpressRouteButtons";
 
 import { FaMapMarkedAlt, FaSlidersH, FaLocationArrow } from "react-icons/fa";
 import { FiAlertTriangle } from "react-icons/fi";
@@ -35,11 +37,7 @@ async function reverseGeocodeYandex({ lat, lng, apiKey }) {
     const data = await r.json();
 
     const first = data?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
-    const text =
-        first?.metaDataProperty?.GeocoderMetaData?.text ||
-        first?.name ||
-        null;
-
+    const text = first?.metaDataProperty?.GeocoderMetaData?.text || first?.name || null;
     return text;
 }
 
@@ -63,6 +61,8 @@ const OrdersPage = () => {
 
     // server data
     const [ordersRaw, setOrdersRaw] = useState([]);
+    const [expressRaw, setExpressRaw] = useState([]);
+
     const [creatorsInfo, setCreatorsInfo] = useState({});
     const [categories, setCategories] = useState([]);
     const [subcategories, setSubcategories] = useState([]);
@@ -167,9 +167,69 @@ const OrdersPage = () => {
         return () => socket.off("orderUpdated", fetchOrders);
     }, []);
 
-    // ---------- creators info ----------
+    // EXPRESS: доступные created + executorId null
+    const fetchExpress = useCallback(async () => {
+        try {
+            const res = await axiosInstance.get("/express/express-orders/available");
+            setExpressRaw(res.data?.orders || []);
+        } catch (e) {
+            console.error("fetchExpress error:", e);
+        }
+    }, []);
+
     useEffect(() => {
-        const ids = [...new Set((ordersRaw || []).map((o) => o.creatorId).filter(Boolean))];
+        fetchExpress();
+        socket.on("orderUpdated", fetchExpress);
+        return () => socket.off("orderUpdated", fetchExpress);
+    }, [fetchExpress]);
+
+    // normalize express -> "order-like"
+    const expressAsOrders = useMemo(() => {
+        return (expressRaw || []).map((e) => ({
+            // IMPORTANT: уникальный ключ, чтобы React не путался
+            id: `e-${e.id}`,
+            express: true,
+            expressId: e.id,
+            taxi_courier: true,
+            expressType: e.type, // taxi | courier
+
+            createdAt: e.createdAt || e.created_at,
+
+            // geo: берем точку А как координаты заказа (для карты и радиуса)
+            coordinates: `${Number(e.fromLat)},${Number(e.fromLng)}`,
+
+            // UI mapping
+            address: `${e.fromAddress} → ${e.toAddress}`,
+            description: e.description || "",
+            proposedSum: Number(e.totalPrice ?? 0),
+            paymentType: e.paymentType,
+
+            images: [],
+            // чтобы блок "Категория/Подкатегория/Услуга" не был пустым
+            category: { name: e.type === "taxi" ? "Такси" : "Курьер" },
+            subcategory: e.subcategory ? { name: e.subcategory } : null,
+            service: null,
+
+            creatorId: e.creatorId,
+            executorId: e.executorId,
+            status: "pending", // чтобы кнопка "Запросить выполнение" НЕ показывалась для экспресса (см. ниже)
+
+            is_recommended: false,
+            is_highlighted: false,
+        }));
+    }, [expressRaw]);
+
+    const allRaw = useMemo(() => {
+        const a = Array.isArray(ordersRaw) ? ordersRaw : [];
+        const b = Array.isArray(expressAsOrders) ? expressAsOrders : [];
+        return [...a, ...b];
+    }, [ordersRaw, expressAsOrders]);
+
+    // ---------- creators info (ВАЖНО: с учётом express) ----------
+    useEffect(() => {
+        const ids = [
+            ...new Set((allRaw || []).map((o) => o.creatorId).filter(Boolean)),
+        ];
         if (!ids.length) return;
 
         const missing = ids.filter((id) => !creatorsCacheRef.current[id]);
@@ -190,7 +250,7 @@ const OrdersPage = () => {
                 setCreatorsInfo({ ...creatorsCacheRef.current });
             } catch {}
         })();
-    }, [ordersRaw]);
+    }, [allRaw]);
 
     // ---------- location: profile -> gps -> manual/map ----------
     useEffect(() => {
@@ -320,7 +380,6 @@ const OrdersPage = () => {
     const toggleMap = async () => {
         if (!isMapVisible) {
             setIsMapVisible(true);
-            // при открытии карты — попробуем подтянуть актуальный GPS (если доступен)
             await detectGpsNow();
         } else {
             setIsMapVisible(false);
@@ -358,9 +417,7 @@ const OrdersPage = () => {
             setLocError(null);
 
             const response = await fetch(
-                `https://geocode-maps.yandex.ru/1.x/?apikey=${YM_KEY}&geocode=${encodeURIComponent(
-                    address
-                )}&format=json&results=1`
+                `https://geocode-maps.yandex.ru/1.x/?apikey=${YM_KEY}&geocode=${encodeURIComponent(address)}&format=json&results=1`
             );
             const data = await response.json();
             const pos = data?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject?.Point?.pos;
@@ -408,9 +465,9 @@ const OrdersPage = () => {
 
     // ---------- core filtering (tabs + drawer + geo) ----------
     const visibleOrders = useMemo(() => {
-        const base = Array.isArray(ordersRaw) ? ordersRaw : [];
+        const base = Array.isArray(allRaw) ? allRaw : [];
 
-        // 0) табы
+        // 0) tabs
         const tabFiltered =
             activeTab === "recommended"
                 ? base.filter((o) => !!o.is_recommended)
@@ -418,8 +475,7 @@ const OrdersPage = () => {
                     ? base.filter((o) => !!o.taxi_courier)
                     : base;
 
-        // 1) профессии из профиля: если выбраны — фильтруем,
-        // но taxi_courier НЕ режем (чтобы в "Все" они могли быть видны и подсвечены)
+        // 1) preferred professions (НЕ режем taxi_courier)
         const professionFiltered =
             preferredCategoryIds.length > 0
                 ? tabFiltered.filter((o) => {
@@ -430,17 +486,26 @@ const OrdersPage = () => {
                 })
                 : tabFiltered;
 
-        // 2) drawer filters
+        // 2) drawer filters (для express — они не подходят, поэтому НЕ фильтруем их этими полями)
         const byCategory = selectedCategory
-            ? professionFiltered.filter((o) => Number(o.categoryId ?? o.category?.id) === Number(selectedCategory))
+            ? professionFiltered.filter((o) => {
+                if (o.express) return true;
+                return Number(o.categoryId ?? o.category?.id) === Number(selectedCategory);
+            })
             : professionFiltered;
 
         const bySubcategory = selectedSubcategory
-            ? byCategory.filter((o) => Number(o.subcategoryId ?? o.subcategory?.id) === Number(selectedSubcategory))
+            ? byCategory.filter((o) => {
+                if (o.express) return true;
+                return Number(o.subcategoryId ?? o.subcategory?.id) === Number(selectedSubcategory);
+            })
             : byCategory;
 
         const byService = selectedService
-            ? bySubcategory.filter((o) => Number(o.serviceId ?? o.service?.id) === Number(selectedService))
+            ? bySubcategory.filter((o) => {
+                if (o.express) return true;
+                return Number(o.serviceId ?? o.service?.id) === Number(selectedService);
+            })
             : bySubcategory;
 
         // 3) geo 50km always
@@ -464,21 +529,17 @@ const OrdersPage = () => {
             })
             .filter((o) => o && o._distance <= RADIUS_KM);
 
-        // 4) sorting:
-        // - "Все": расстояние ↑, затем дата ↓ (НО recommended НЕ поднимаем)
-        // - "В приоритете": расстояние ↑, затем дата ↓
-        // - "Курьер/Такси": расстояние ↑, затем дата ↓
+        // 4) sorting: distance ↑ then date ↓
         geoFiltered.sort((a, b) => {
             const ad = Number.isFinite(a._distance) ? a._distance : 1e9;
             const bd = Number.isFinite(b._distance) ? b._distance : 1e9;
             if (ad !== bd) return ad - bd;
-
             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
 
         return geoFiltered;
     }, [
-        ordersRaw,
+        allRaw,
         activeTab,
         preferredCategoryIds,
         selectedCategory,
@@ -497,13 +558,12 @@ const OrdersPage = () => {
         <div className="orders-page">
             <div className="orders-shell">
                 {/* Top bar */}
-                {/* Top bar (compact) */}
                 <div className="orders-top glass">
                     <div className="orders-top-left">
                         <div className="orders-title">Все заказы</div>
                         <div className="orders-subtitle">
-                            Радиус: <b>{RADIUS_KM} км</b> • {preferredCategoryIds.length ? "по вашим профессиям" : "все категории"} •
-                            {" "}Найдено: <b>{visibleOrders.length}</b>
+                            Радиус: <b>{RADIUS_KM} км</b> • {preferredCategoryIds.length ? "по вашим профессиям" : "все категории"} •{" "}
+                            Найдено: <b>{visibleOrders.length}</b>
                         </div>
 
                         <div className="orders-location-row">
@@ -539,11 +599,7 @@ const OrdersPage = () => {
                                     onChange={(e) => setLocationDraft(e.target.value)}
                                     placeholder="Введите адрес (например: Крым, Белогорск)"
                                 />
-                                <button
-                                    className="btn btn-primary"
-                                    disabled={locLoading || !locationDraft.trim()}
-                                    onClick={() => geocodeAddress(locationDraft)}
-                                >
+                                <button className="btn btn-primary" disabled={locLoading || !locationDraft.trim()} onClick={() => geocodeAddress(locationDraft)}>
                                     Применить
                                 </button>
                             </div>
@@ -555,7 +611,7 @@ const OrdersPage = () => {
                     <div className="orders-top-right">
                         <button className="btn btn-ghost" onClick={toggleMap}>
                             <FaMapMarkedAlt style={{ marginRight: 8 }} />
-                            {isMapVisible ? "Карта" : "Карта"}
+                            Карта
                         </button>
 
                         <button className="btn btn-primary" onClick={() => setDrawerOpen(true)}>
@@ -565,42 +621,29 @@ const OrdersPage = () => {
                     </div>
                 </div>
 
-                {/* Tabs (separate row under top) */}
+                {/* Tabs row */}
                 <div className="orders-tabs-row glass">
-                    <button
-                        className={`tab-pill ${activeTab === "all" ? "active" : ""}`}
-                        onClick={() => setActiveTab("all")}
-                    >
+                    <button className={`tab-pill ${activeTab === "all" ? "active" : ""}`} onClick={() => setActiveTab("all")}>
                         Все
                     </button>
 
-                    <button
-                        className={`tab-pill ${activeTab === "recommended" ? "active" : ""}`}
-                        onClick={() => setActiveTab("recommended")}
-                    >
+                    <button className={`tab-pill ${activeTab === "recommended" ? "active" : ""}`} onClick={() => setActiveTab("recommended")}>
                         В приоритете
                     </button>
 
-                    <button
-                        className={`tab-pill ${activeTab === "courier" ? "active" : ""}`}
-                        onClick={() => setActiveTab("courier")}
-                    >
+                    <button className={`tab-pill ${activeTab === "courier" ? "active" : ""}`} onClick={() => setActiveTab("courier")}>
                         Курьер / Такси
                     </button>
 
                     <span className="tabs-hint">
-    Во вкладке <b>Все</b> приоритетные не поднимаются, только подсвечиваются
-  </span>
+            Во вкладке <b>Все</b> приоритетные не поднимаются, только подсвечиваются
+          </span>
                 </div>
 
                 {/* Map */}
                 {isMapVisible && (
                     <div className="orders-map glass">
-                        <SwipeableMap
-                            orders={visibleOrders}
-                            userLocation={userLocation}
-                            isOpen={isMapVisible}
-                        />
+                        <SwipeableMap orders={visibleOrders} userLocation={userLocation} isOpen={isMapVisible} />
                     </div>
                 )}
 
@@ -637,6 +680,15 @@ const OrdersPage = () => {
                             {visibleOrders.map((order) => {
                                 const creator = creatorsInfo[order.creatorId] || {};
                                 const isCreator = order.creatorId === userId;
+                                const isExpress = !!order.express;
+
+                                const displayId = isExpress ? order.expressId : order.id;
+
+                                const courierBadgeText = isExpress
+                                    ? order.expressType === "taxi"
+                                        ? "Такси"
+                                        : "Курьер"
+                                    : "Курьер / Такси";
 
                                 const cardClass = [
                                     "order-card",
@@ -654,11 +706,14 @@ const OrdersPage = () => {
                                         <div className="order-head">
                                             <div className="order-head-left">
                                                 <div className="order-title-row">
-                                                    <span className="order-number">Заказ №{order.id}</span>
+                          <span className="order-number">
+                            {isExpress ? `Экспресс №${displayId}` : `Заказ №${displayId}`}
+                          </span>
 
-                                                    {/* бейджи, но НЕ сортировка */}
                                                     {order.is_recommended && <span className="badge badge-priority">В приоритете</span>}
-                                                    {order.taxi_courier && <span className="badge badge-courier">Курьер / Такси</span>}
+
+                                                    {order.taxi_courier && <span className="badge badge-courier">{courierBadgeText}</span>}
+
                                                     {Number.isFinite(order._distance) && (
                                                         <span className="badge badge-distance">{order._distance.toFixed(1)} км</span>
                                                     )}
@@ -683,10 +738,12 @@ const OrdersPage = () => {
                                                     <span className="k">Категория</span>
                                                     <span className="v">{order.category?.name || "Не указано"}</span>
                                                 </div>
+
                                                 <div className="kv">
                                                     <span className="k">Подкатегория</span>
                                                     <span className="v">{order.subcategory?.name || "Не указано"}</span>
                                                 </div>
+
                                                 <div className="kv">
                                                     <span className="k">Услуга</span>
                                                     <span className="v">{order.service?.name || "Не указано"}</span>
@@ -729,49 +786,80 @@ const OrdersPage = () => {
                                                 {creator.complaintsCount || 0}
                                             </Link>
 
-                                            {userId !== order.creatorId && !order.executorId && order.status === "pending" && (
-                                                <button
-                                                    className="btn btn-primary"
-                                                    onClick={async () => {
-                                                        const token = localStorage.getItem("authToken");
-                                                        if (!token) {
-                                                            toast.info("Войдите, чтобы запросить выполнение");
-                                                            navigate("/login");
-                                                            return;
-                                                        }
-
-                                                        try {
-                                                            const statusRes = await axiosInstance.get("/orders/me/status", {
-                                                                headers: { Authorization: `Bearer ${token}` },
-                                                            });
-
-                                                            const debt = statusRes.data?.debt || 0;
-                                                            if (debt > 0) {
-                                                                toast.error("У вас есть задолженность по комиссии. Сначала погасите её в профиле.");
-                                                                navigate("/profile");
+                                            {/* Обычные заказы: старое поведение */}
+                                            {!isExpress &&
+                                                userId !== order.creatorId &&
+                                                !order.executorId &&
+                                                order.status === "pending" && (
+                                                    <button
+                                                        className="btn btn-primary"
+                                                        onClick={async () => {
+                                                            const token = localStorage.getItem("authToken");
+                                                            if (!token) {
+                                                                toast.info("Войдите, чтобы запросить выполнение");
+                                                                navigate("/login");
                                                                 return;
                                                             }
 
-                                                            const proposedSum = prompt("Введите сумму, которую вы хотите получить за выполнение:");
-                                                            if (!proposedSum) return;
+                                                            try {
+                                                                const statusRes = await axiosInstance.get("/orders/me/status", {
+                                                                    headers: { Authorization: `Bearer ${token}` },
+                                                                });
 
-                                                            const comment = prompt("Комментарий к заказчику (необязательно):");
+                                                                const debt = statusRes.data?.debt || 0;
+                                                                if (debt > 0) {
+                                                                    toast.error("У вас есть задолженность по комиссии. Сначала погасите её в профиле.");
+                                                                    navigate("/profile");
+                                                                    return;
+                                                                }
 
-                                                            await axiosInstance.post(
-                                                                `/orders/${order.id}/request`,
-                                                                { proposedSum, comment },
-                                                                { headers: { Authorization: `Bearer ${token}` } }
-                                                            );
+                                                                const proposedSum = prompt("Введите сумму, которую вы хотите получить за выполнение:");
+                                                                if (!proposedSum) return;
 
-                                                            toast.success("Запрос отправлен заказчику!");
-                                                        } catch (e) {
-                                                            console.error(e);
-                                                            toast.error(e.response?.data?.message || "Ошибка. Попробуйте позже.");
-                                                        }
-                                                    }}
-                                                >
-                                                    Запросить выполнение
-                                                </button>
+                                                                const comment = prompt("Комментарий к заказчику (необязательно):");
+
+                                                                await axiosInstance.post(
+                                                                    `/orders/${order.id}/request`,
+                                                                    { proposedSum, comment },
+                                                                    { headers: { Authorization: `Bearer ${token}` } }
+                                                                );
+
+                                                                toast.success("Запрос отправлен заказчику!");
+                                                            } catch (e) {
+                                                                console.error(e);
+                                                                toast.error(e.response?.data?.message || "Ошибка. Попробуйте позже.");
+                                                            }
+                                                        }}
+                                                    >
+                                                        Запросить выполнение
+                                                    </button>
+                                                )}
+
+                                            {/* Express: (пока) просто открываем экран экспресс-заказа (если у тебя есть роут) */}
+                                            {isExpress && (
+                                                <>
+                                                    <ExpressRouteButtons
+                                                        orderId={order.expressId}
+                                                        canToA={true}
+                                                        canAToB={true}
+                                                    />
+
+                                                    <button
+                                                        className="btn btn-primary"
+                                                        onClick={async () => {
+                                                            try {
+                                                                await axiosInstance.post(`/express/express-orders/${order.expressId}/accept`);
+                                                                toast.success("Заказ принят!");
+                                                                await fetchExpress();
+                                                                navigate("/active-orders");
+                                                            } catch (e) {
+                                                                toast.error(e.response?.data?.message || "Ошибка");
+                                                            }
+                                                        }}
+                                                    >
+                                                        Принять
+                                                    </button>
+                                                </>
                                             )}
                                         </div>
                                     </li>
@@ -955,11 +1043,15 @@ const OrdersPage = () => {
                         },
                     }}
                 >
-                    <button className="img-close" onClick={closeModal}>×</button>
+                    <button className="img-close" onClick={closeModal}>
+                        ×
+                    </button>
 
                     <button
                         className="img-nav left"
-                        onClick={() => setCurrentImageIndex((prev) => (prev === 0 ? currentImages.length - 1 : prev - 1))}
+                        onClick={() =>
+                            setCurrentImageIndex((prev) => (prev === 0 ? currentImages.length - 1 : prev - 1))
+                        }
                     >
                         ‹
                     </button>
@@ -968,7 +1060,9 @@ const OrdersPage = () => {
 
                     <button
                         className="img-nav right"
-                        onClick={() => setCurrentImageIndex((prev) => (prev === currentImages.length - 1 ? 0 : prev + 1))}
+                        onClick={() =>
+                            setCurrentImageIndex((prev) => (prev === currentImages.length - 1 ? 0 : prev + 1))
+                        }
                     >
                         ›
                     </button>

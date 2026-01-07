@@ -19,7 +19,7 @@ import OrderPage from './pages/OrderPage';
 import UserOrdersPage from './pages/UserOrdersPage';
 import MyOrdersPage from './pages/MyOrdersPage';
 import StartPage from './pages/StartPage';
-import ExpressOrderPage from "./pages/ExpressOrderPage";
+import CreateExpressOrder from "./pages/CreateExpressOrder";
 import ServiceInfoPage from './pages/ServiceInfoPage';
 import InfoPage from "./pages/InfoPage";
 import Modal from "react-modal";
@@ -49,7 +49,7 @@ const App = () => {
                             <Route path="/order/:id" element={<OrderPage />} />
                             <Route path="/user-orders/:userId" element={<UserOrdersPage />} />
                             <Route path="/my-orders/:userId" element={<MyOrdersPage />} />
-                            <Route path="/express" element={<ExpressOrderPage />} />
+                            <Route path="/express" element={<CreateExpressOrder />} />
                             <Route path="/services" element={<ServiceInfoPage />} />
                             <Route path="/info" element={<InfoPage />} />
                         </Routes>

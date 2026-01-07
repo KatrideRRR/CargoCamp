@@ -1,0 +1,284 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap");
+
+:root {
+    --exo-bg1: #e8f0ff;
+    --exo-bg2: #ffffff;
+    --exo-text: rgba(15, 23, 42, 0.92);
+    --exo-muted: rgba(100, 116, 139, 0.95);
+
+    --exo-glass: rgba(255, 255, 255, 0.62);
+    --exo-border: rgba(255, 255, 255, 0.42);
+    --exo-shadow: 0 18px 55px rgba(15, 23, 42, 0.10);
+
+    --exo-primary: rgba(29, 78, 216, 0.95);
+
+    --exo-r-xl: 22px;
+    --exo-r-lg: 18px;
+}
+
+.exo-page {
+    min-height: 100vh;
+    padding: 16px;
+    padding-bottom: 110px;
+    background:
+            radial-gradient(1100px 520px at 10% 0%, rgba(59,130,246,0.20), transparent 60%),
+            radial-gradient(900px 520px at 90% 20%, rgba(99,102,241,0.18), transparent 58%),
+            radial-gradient(700px 420px at 55% 95%, rgba(14,165,233,0.12), transparent 55%),
+            linear-gradient(to bottom right, var(--exo-bg1), var(--exo-bg2));
+    font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    color: var(--exo-text);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    overflow-x: hidden;
+}
+
+.exo-shell {
+    width: 100%;
+    max-width: 760px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.exo-glass {
+    background: var(--exo-glass);
+    border: 1px solid var(--exo-border);
+    border-radius: var(--exo-r-xl);
+    backdrop-filter: blur(18px) saturate(190%);
+    -webkit-backdrop-filter: blur(18px) saturate(190%);
+    box-shadow: var(--exo-shadow);
+    position: relative;
+    overflow: hidden;
+}
+
+.exo-glass::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    pointer-events: none;
+    background:
+            radial-gradient(900px 260px at 12% 0%, rgba(255,255,255,0.62), transparent 52%),
+            radial-gradient(720px 220px at 85% 8%, rgba(255,255,255,0.40), transparent 54%),
+            linear-gradient(180deg, rgba(255,255,255,0.18), transparent 55%);
+    opacity: 0.78;
+}
+
+.exo-header { padding: 14px; background: rgba(255,255,255,0.66); }
+
+.exo-headerRow {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.exo-title { font-size: 16px; font-weight: 900; letter-spacing: -0.02em; }
+.exo-subtitle { margin-top: 6px; font-size: 12px; font-weight: 800; color: var(--exo-muted); }
+
+.exo-badges { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.exo-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 10px;
+    border-radius: 999px;
+    font-weight: 900;
+    font-size: 12px;
+    background: rgba(255,255,255,0.62);
+    border: 1px solid rgba(255,255,255,0.42);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.55);
+}
+
+.exo-typeGrid { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.exo-typeBtn {
+    border: 1px solid rgba(255,255,255,0.44);
+    background: rgba(255,255,255,0.60);
+    border-radius: 18px;
+    padding: 12px 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+    font-weight: 900;
+    color: rgba(15,23,42,0.90);
+    transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.2s ease, border-color 0.2s ease;
+    box-shadow: 0 18px 46px rgba(15,23,42,0.09), 0 1px 0 rgba(255,255,255,0.22) inset;
+}
+.exo-typeBtn:hover { transform: translateY(-2px); background: rgba(255,255,255,0.74); box-shadow: 0 24px 70px rgba(15,23,42,0.14); }
+.exo-typeBtn.isActive { background: rgba(29, 78, 216, 0.14); border-color: rgba(29, 78, 216, 0.22); box-shadow: 0 0 0 4px rgba(29, 78, 216, 0.10), 0 18px 46px rgba(15,23,42,0.10); }
+
+.exo-alert { padding: 12px 14px; border-radius: var(--exo-r-xl); background: rgba(220,38,38,0.10); border: 1px solid rgba(220,38,38,0.18); }
+.exo-alertTitle { font-weight: 900; }
+.exo-alertText { margin-top: 6px; font-weight: 800; color: rgba(220,38,38,0.95); }
+
+.exo-card { padding: 12px; }
+.exo-cardTop { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.exo-cardTitle { font-size: 13px; font-weight: 900; letter-spacing: -0.01em; }
+.exo-cardSub { margin-top: 6px; font-size: 12px; font-weight: 800; color: var(--exo-muted); }
+
+.exo-subcatGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.exo-subcatBtn {
+    border: 1px solid rgba(255,255,255,0.44);
+    background: rgba(255,255,255,0.58);
+    border-radius: 16px;
+    padding: 12px 12px;
+    cursor: pointer;
+    font-weight: 900;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.2s ease, border-color 0.2s ease;
+    box-shadow: 0 18px 46px rgba(15,23,42,0.08), 0 1px 0 rgba(255,255,255,0.22) inset;
+}
+.exo-subcatBtn:hover { transform: translateY(-2px); background: rgba(255,255,255,0.74); box-shadow: 0 24px 70px rgba(15,23,42,0.14); }
+.exo-subcatBtn.selected { background: rgba(29,78,216,0.14); border-color: rgba(29,78,216,0.22); box-shadow: 0 0 0 4px rgba(29,78,216,0.10), 0 18px 46px rgba(15,23,42,0.10); }
+.exo-subcatEmoji { font-size: 18px; }
+.exo-subcatLabel { font-size: 12.5px; color: rgba(15,23,42,0.88); }
+
+.exo-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.exo-field {
+    padding: 10px;
+    border-radius: var(--exo-r-lg);
+    background: rgba(255,255,255,0.46);
+    border: 1px solid rgba(255,255,255,0.34);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22);
+    position: relative;
+    z-index: 1;
+}
+
+.exo-labelRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.exo-label { font-size: 12px; font-weight: 900; color: rgba(100,116,139,0.95); }
+
+.exo-miniActions { display: flex; gap: 8px; flex-wrap: wrap; }
+.exo-miniBtn {
+    border: 1px solid rgba(255,255,255,0.44);
+    background: rgba(255,255,255,0.60);
+    border-radius: 999px;
+    padding: 7px 10px;
+    cursor: pointer;
+    font-weight: 900;
+    font-size: 11.5px;
+    color: rgba(15,23,42,0.86);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.2s ease;
+    box-shadow: 0 12px 28px rgba(15,23,42,0.08), 0 1px 0 rgba(255,255,255,0.18) inset;
+}
+.exo-miniBtn:hover { transform: translateY(-1px); background: rgba(255,255,255,0.74); box-shadow: 0 18px 40px rgba(15,23,42,0.10); }
+
+.exo-control {
+    width: 100%;
+    border-radius: 16px;
+    padding: 11px 12px;
+    border: 1px solid rgba(29,78,216,0.18);
+    background: rgba(29,78,216,0.06);
+    outline: none;
+    font-weight: 800;
+    font-size: 12.5px;
+    color: rgba(15,23,42,0.92);
+    box-shadow: 0 6px 18px rgba(15,23,42,0.04);
+}
+.exo-control:focus {
+    border-color: rgba(29,78,216,0.32);
+    box-shadow: 0 0 0 4px rgba(29,78,216,0.10);
+    background: rgba(255,255,255,0.74);
+}
+.exo-controlSmall { padding: 10px 10px; font-size: 12px; }
+
+.exo-coordsRow { margin-top: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.exo-textarea { min-height: 92px; resize: vertical; }
+
+.exo-payGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.exo-payTile {
+    border-radius: 16px;
+    padding: 12px;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.44);
+    background: rgba(255,255,255,0.58);
+    font-weight: 900;
+    text-align: center;
+    transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.2s ease;
+    box-shadow: 0 18px 46px rgba(15,23,42,0.08), 0 1px 0 rgba(255,255,255,0.20) inset;
+}
+.exo-payTile:hover { transform: translateY(-2px); background: rgba(255,255,255,0.74); box-shadow: 0 24px 70px rgba(15,23,42,0.14); }
+.exo-payTile.selected { background: rgba(29,78,216,0.14); border-color: rgba(29,78,216,0.22); box-shadow: 0 0 0 4px rgba(29,78,216,0.10), 0 18px 46px rgba(15,23,42,0.10); }
+.exo-payLabel { font-size: 12.5px; color: rgba(15,23,42,0.88); }
+
+.exo-hint { margin-top: 8px; font-size: 12px; font-weight: 800; color: rgba(100,116,139,0.95); }
+
+.exo-actionsRow { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; z-index: 1; position: relative; }
+
+.exo-btn {
+    border: 1px solid rgba(255,255,255,0.44);
+    background: rgba(255,255,255,0.60);
+    border-radius: 16px;
+    padding: 12px 12px;
+    font-weight: 900;
+    font-size: 12.5px;
+    color: rgba(15,23,42,0.92);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.2s ease, border-color 0.2s ease;
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    box-shadow: 0 18px 46px rgba(15,23,42,0.09), 0 1px 0 rgba(255,255,255,0.22) inset;
+}
+.exo-btn:hover { transform: translateY(-2px); background: rgba(255,255,255,0.76); box-shadow: 0 24px 70px rgba(15,23,42,0.14); }
+.exo-btn:active { transform: translateY(0) scale(0.99); box-shadow: none; }
+
+.exo-btnPrimary {
+    color: rgba(255,255,255,0.98);
+    border: 1px solid rgba(255,255,255,0.22);
+    background: linear-gradient(135deg, rgba(29,78,216,0.96), rgba(99,102,241,0.96));
+    box-shadow: 0 18px 40px rgba(29,78,216,0.24), 0 1px 0 rgba(255,255,255,0.16) inset;
+}
+.exo-btnPrimary:hover { box-shadow: 0 22px 56px rgba(29,78,216,0.28), 0 1px 0 rgba(255,255,255,0.18) inset; }
+
+.exo-btnGhost { background: rgba(255,255,255,0.58); }
+
+.exo-note { margin-top: 10px; font-size: 12px; font-weight: 800; color: rgba(100,116,139,0.95); z-index: 1; position: relative; }
+
+/* toast */
+.exo-toastWrap {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    padding: 18px;
+    pointer-events: none;
+}
+.exo-toast {
+    width: min(760px, 96vw);
+    padding: 12px;
+    pointer-events: auto;
+}
+.exo-toastTitle {
+    font-weight: 900;
+    font-size: 12.5px;
+    margin-bottom: 10px;
+}
+.exo-toastRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+@media (max-width: 720px) {
+    .exo-typeGrid,
+    .exo-grid2,
+    .exo-subcatGrid,
+    .exo-payGrid,
+    .exo-actionsRow,
+    .exo-toastRow {
+        grid-template-columns: 1fr;
+    }
+}

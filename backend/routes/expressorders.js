@@ -28,6 +28,16 @@ function buildYandexNaviUrl(fromLat, fromLng, toLat, toLng) {
     return `https://yandex.ru/navi/?rtext=${fLat},${fLng}~${tLat},${tLng}&rtt=auto`;
 }
 
+function canViewAvailableExpress(order, userId) {
+    // можно ограничить: запретить создателю, чтобы он не открывал маршруты к своему же заказу
+    if (order.creatorId === userId) return false;
+    return order.status === "created" && !order.executorId;
+}
+
+function canAccessExpressOrder(order, userId) {
+    return isParticipant(order, userId) || canViewAvailableExpress(order, userId);
+}
+
 async function bumpSavedAddressUsage({ userId, id, transaction }) {
     if (!id) return;
     const addr = await ExpressSavedAddress.findOne({ where: { id, userId }, transaction });
@@ -58,6 +68,33 @@ router.get("/express-orders/available", authenticateToken, async (req, res) => {
         res.json({ success: true, orders });
     } catch (e) {
         console.error("express-orders/available error:", e);
+        res.status(500).json({ success: false, message: "Ошибка сервера" });
+    }
+});
+
+router.get("/express-orders/me", authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const mode = String(req.query.mode || "active");
+
+        const whereBase = {
+            [Op.or]: [{ creatorId: userId }, { executorId: userId }],
+        };
+
+        const where =
+            mode === "history"
+                ? { ...whereBase, status: { [Op.in]: ["completed", "cancelled"] } }
+                : { ...whereBase, status: { [Op.notIn]: ["completed", "cancelled"] } };
+
+        const orders = await ExpressOrder.findAll({
+            where,
+            order: [["id", "DESC"]],
+            limit: 200,
+        });
+
+        res.json({ success: true, orders });
+    } catch (e) {
+        console.error("express-orders/me error:", e);
         res.status(500).json({ success: false, message: "Ошибка сервера" });
     }
 });
@@ -196,48 +233,28 @@ router.get("/express-orders/:id", authenticateToken, async (req, res) => {
     }
 });
 
-router.get("/express-orders/me", authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const mode = String(req.query.mode || "active");
-
-        const whereBase = {
-            [Op.or]: [{ creatorId: userId }, { executorId: userId }],
-        };
-
-        const where =
-            mode === "history"
-                ? { ...whereBase, status: { [Op.in]: ["completed", "cancelled"] } }
-                : { ...whereBase, status: { [Op.notIn]: ["completed", "cancelled"] } };
-
-        const orders = await ExpressOrder.findAll({
-            where,
-            order: [["id", "DESC"]],
-            limit: 200,
-        });
-
-        res.json({ success: true, orders });
-    } catch (e) {
-        console.error("express-orders/me error:", e);
-        res.status(500).json({ success: false, message: "Ошибка сервера" });
-    }
-});
-
 router.post("/express-orders/:id/accept", authenticateToken, async (req, res) => {
     const t = await sequelize.transaction();
     try {
         const executorId = req.user.id;
         const id = Number(req.params.id);
 
-        const order = await ExpressOrder.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
-        if (!order) {
+        if (!Number.isFinite(id) || id <= 0) {
             await t.rollback();
-            return res.status(404).json({ success: false, message: "Заказ не найден" });
+            return res.status(400).json({ success:false, message:"Некорректный id" });
+        }
+
+        const order = await ExpressOrder.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
+        if (!order) { await t.rollback(); return res.status(404).json({ success:false, message:"Заказ не найден" }); }
+
+        if (order.creatorId === executorId) {
+            await t.rollback();
+            return res.status(409).json({ success:false, message:"Нельзя принять свой заказ" });
         }
 
         if (order.status !== "created" || order.executorId) {
             await t.rollback();
-            return res.status(409).json({ success: false, message: "Заказ уже принят" });
+            return res.status(409).json({ success:false, message:"Заказ уже принят" });
         }
 
         order.executorId = executorId;
@@ -245,11 +262,11 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
         await order.save({ transaction: t });
 
         await t.commit();
-        res.json({ success: true, order });
+        return res.json({ success:true, order });
     } catch (e) {
         await t.rollback();
         console.error("express-orders accept error:", e);
-        res.status(500).json({ success: false, message: "Ошибка сервера" });
+        return res.status(500).json({ success:false, message:"Ошибка сервера" });
     }
 });
 
@@ -403,8 +420,8 @@ router.get("/express-orders/:id/points", authenticateToken, async (req, res) => 
         const order = await ExpressOrder.findByPk(id);
         if (!order) return res.status(404).json({ success: false, message: "Заказ не найден" });
 
-        if (!isParticipant(order, userId)) {
-            return res.status(403).json({ success: false, message: "Нет доступа" });
+        if (!canAccessExpressOrder(order, userId)) {
+            return res.status(403).json({ success:false, message:"Нет доступа" });
         }
 
         res.json({
@@ -427,8 +444,8 @@ router.get("/express-orders/:id/route/A-to-B", authenticateToken, async (req, re
         const order = await ExpressOrder.findByPk(id);
         if (!order) return res.status(404).json({ success: false, message: "Заказ не найден" });
 
-        if (!isParticipant(order, userId)) {
-            return res.status(403).json({ success: false, message: "Нет доступа" });
+        if (!canAccessExpressOrder(order, userId)) {
+            return res.status(403).json({ success:false, message:"Нет доступа" });
         }
 
         const url = buildYandexNaviUrl(order.fromLat, order.fromLng, order.toLat, order.toLng);
@@ -454,8 +471,8 @@ router.get("/express-orders/:id/route/to-A", authenticateToken, async (req, res)
         const order = await ExpressOrder.findByPk(id);
         if (!order) return res.status(404).json({ success: false, message: "Заказ не найден" });
 
-        if (!isParticipant(order, userId)) {
-            return res.status(403).json({ success: false, message: "Нет доступа" });
+        if (!canAccessExpressOrder(order, userId)) {
+            return res.status(403).json({ success:false, message:"Нет доступа" });
         }
 
         const url = buildYandexNaviUrl(myLat, myLng, order.fromLat, order.fromLng);
