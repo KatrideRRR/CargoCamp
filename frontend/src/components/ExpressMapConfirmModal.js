@@ -5,7 +5,7 @@ import "../styles/CreateExpressOrder.css";
 
 Modal.setAppElement("#root");
 
-const ExpressMapConfirmModal = ({ isOpen, onClose, from, to, routeUrl, onCreate }) => {
+const ExpressMapConfirmModal = ({ isOpen, onClose, from, to, routeUrl, onCreate, onEditFrom, onEditTo }) => {
     return (
         <Modal
             isOpen={isOpen}
@@ -17,24 +17,22 @@ const ExpressMapConfirmModal = ({ isOpen, onClose, from, to, routeUrl, onCreate 
             <div className="exo-modalHead">
                 <div>
                     <div className="exo-modalTitle">Проверь “Откуда → Куда”</div>
-                    <div className="exo-modalSub">Чтобы водитель/курьер не искал и приехал быстрее</div>
+                    <div className="exo-modalSub">Если адрес не тот — поправь через карту</div>
                 </div>
-                <button className="exo-x" onClick={onClose} type="button">
-                    ✖
-                </button>
+                <button className="exo-x" onClick={onClose} type="button">✖</button>
             </div>
 
             <div className="exo-modalBody">
                 <div className="exo-previewRow">
                     <div className="exo-previewLabel">Откуда</div>
                     <div className="exo-previewText">{from?.address || "—"}</div>
-                    <div className="exo-previewSmall">{from?.lat || "—"}, {from?.lng || "—"}</div>
+                    <button className="exo-miniBtn" type="button" onClick={onEditFrom}>Изменить на карте</button>
                 </div>
 
                 <div className="exo-previewRow">
                     <div className="exo-previewLabel">Куда</div>
                     <div className="exo-previewText">{to?.address || "—"}</div>
-                    <div className="exo-previewSmall">{to?.lat || "—"}, {to?.lng || "—"}</div>
+                    <button className="exo-miniBtn" type="button" onClick={onEditTo}>Изменить на карте</button>
                 </div>
 
                 <div className="exo-modalActions">
@@ -54,7 +52,7 @@ const ExpressMapConfirmModal = ({ isOpen, onClose, from, to, routeUrl, onCreate 
                 </div>
 
                 <div className="exo-note">
-                    Если видишь, что точка не там — выбери её на карте (кнопка “Карта” рядом с полем).
+                    Если точка не там — нажми “Изменить на карте”.
                 </div>
             </div>
         </Modal>

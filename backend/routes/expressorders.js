@@ -2,7 +2,9 @@ const express = require("express");
 const router = express.Router();
 const { Op } = require("sequelize");
 const authenticateToken = require("../middlewares/userAuth");
-const { sequelize, ExpressOrder, ExpressSavedAddress } = require("../models");
+const { v4: uuidv4 } = require("uuid");
+const yooKassa = require("../config/yookassaClient");
+const { sequelize, ExpressOrder, ExpressSavedAddress, User } = require("../models");
 
 /* ================= helpers ================= */
 
@@ -241,32 +243,128 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
 
         if (!Number.isFinite(id) || id <= 0) {
             await t.rollback();
-            return res.status(400).json({ success:false, message:"Некорректный id" });
+            return res.status(400).json({ success: false, message: "Некорректный id" });
+        }
+
+        // ✅ 1) блокируем, если есть долг
+        const executor = await User.findByPk(executorId, { transaction: t, lock: t.LOCK.UPDATE });
+        if (!executor) {
+            await t.rollback();
+            return res.status(404).json({ success: false, message: "Пользователь не найден" });
+        }
+
+        const debtKopecks = Number(executor.debt || 0);
+        if (debtKopecks > 0) {
+            await t.rollback();
+            return res.status(403).json({
+                success: false,
+                message: "У вас есть задолженность по комиссии. Погасите её, чтобы брать экспресс-заказы.",
+            });
         }
 
         const order = await ExpressOrder.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
-        if (!order) { await t.rollback(); return res.status(404).json({ success:false, message:"Заказ не найден" }); }
+        if (!order) {
+            await t.rollback();
+            return res.status(404).json({ success: false, message: "Заказ не найден" });
+        }
 
         if (order.creatorId === executorId) {
             await t.rollback();
-            return res.status(409).json({ success:false, message:"Нельзя принять свой заказ" });
+            return res.status(409).json({ success: false, message: "Нельзя принять свой заказ" });
         }
 
         if (order.status !== "created" || order.executorId) {
             await t.rollback();
-            return res.status(409).json({ success:false, message:"Заказ уже принят" });
+            return res.status(409).json({ success: false, message: "Заказ уже принят" });
         }
 
+        // ✅ 2) считаем комиссию (premium — 0)
+        const now = new Date();
+        const premiumActive =
+            executor.subscription_type === "premium" &&
+            (!executor.subscription_expires_at || new Date(executor.subscription_expires_at) > now);
+
+        const raw = Number(order.totalPrice || 0);
+
+        // Приводим к копейкам (умно, чтобы не словить 100%)
+        const totalKopecks = raw >= 10000 ? raw : Math.round(raw * 100);
+
+        // 10% комиссии
+        const feeKopecks = premiumActive ? 0 : Math.round(totalKopecks * 0.10);
+
+        // ✅ 3) назначаем исполнителя
         order.executorId = executorId;
         order.status = "accepted";
         await order.save({ transaction: t });
 
+        // ✅ 4) пробуем сразу списать комиссию (если есть привязанная карта), иначе — в долг
+        let paidBySavedCard = false;
+        let debtAdded = false;
+
+        if (feeKopecks > 0) {
+            if (executor.yookassa_payment_method_id) {
+                try {
+                    const amountValue = (feeKopecks / 100).toFixed(2);
+                    const idempotenceKey = uuidv4();
+
+                    const payment = await yooKassa.createPayment(
+                        {
+                            amount: { value: amountValue, currency: "RUB" },
+                            capture: true,
+                            payment_method_id: executor.yookassa_payment_method_id,
+                            description: `Комиссия за взятие экспресс-заказа #${order.id} (исполнитель #${executorId})`,
+                            metadata: {
+                                type: "debt", // ✅ используем твой вебхук debt
+                                userId: String(executorId),
+                                expectedKopecks: String(feeKopecks),
+                                expressOrderId: String(order.id),
+                                reason: "express_accept_fee",
+                            },
+                            receipt: {
+                                customer: { phone: String(executor.phone || "").replace(/[^\d+]/g, "") },
+                                items: [
+                                    {
+                                        description: `Комиссия за экспресс-заказ #${order.id}`,
+                                        quantity: 1,
+                                        amount: { value: amountValue, currency: "RUB" },
+                                        vat_code: 1,
+                                        payment_mode: "full_payment",
+                                        payment_subject: "service",
+                                    },
+                                ],
+                                tax_system_code: 2,
+                            },
+                        },
+                        idempotenceKey
+                    );
+
+                    paidBySavedCard = payment?.status === "succeeded";
+                } catch (e) {
+                    console.error("express accept fee autopay error:", e?.message || e);
+                }
+            }
+
+            // если не оплатилось (или карты нет) — в debt
+            if (!paidBySavedCard) {
+                executor.debt = Number(executor.debt || 0) + feeKopecks;
+                await executor.save({ transaction: t });
+                debtAdded = true;
+            }
+        }
+
         await t.commit();
-        return res.json({ success:true, order });
+        return res.json({
+            success: true,
+            order,
+            feeKopecks,
+            premium: premiumActive,
+            paidBySavedCard,
+            debtAdded,
+        });
     } catch (e) {
         await t.rollback();
         console.error("express-orders accept error:", e);
-        return res.status(500).json({ success:false, message:"Ошибка сервера" });
+        return res.status(500).json({ success: false, message: "Ошибка сервера" });
     }
 });
 
