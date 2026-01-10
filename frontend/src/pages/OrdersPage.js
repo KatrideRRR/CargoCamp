@@ -91,6 +91,7 @@ const OrdersPage = () => {
     const [selectedCategory, setSelectedCategory] = useState("");
     const [selectedSubcategory, setSelectedSubcategory] = useState("");
     const [selectedService, setSelectedService] = useState("");
+    const [useProfileProfessions, setUseProfileProfessions] = useState(true);
 
     // modal images
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -103,6 +104,14 @@ const OrdersPage = () => {
         const ids = profile?.preferredCategoryIds;
         return Array.isArray(ids) ? ids.map((x) => Number(x)).filter(Number.isFinite) : [];
     }, [profile]);
+
+    const preferredCategories = useMemo(() => {
+        if (!preferredCategoryIds.length) return [];
+        const map = new Map((categories || []).map((c) => [Number(c.id), c]));
+        return preferredCategoryIds
+            .map((id) => map.get(Number(id)))
+            .filter(Boolean);
+    }, [preferredCategoryIds, categories]);
 
     const openModal = (images) => {
         setCurrentImages(images || []);
@@ -477,7 +486,7 @@ const OrdersPage = () => {
 
         // 1) preferred professions (НЕ режем taxi_courier)
         const professionFiltered =
-            preferredCategoryIds.length > 0
+            useProfileProfessions && preferredCategoryIds.length > 0
                 ? tabFiltered.filter((o) => {
                     if (o.taxi_courier) return true;
                     const catId = Number(o.categoryId ?? o.category?.id);
@@ -562,7 +571,7 @@ const OrdersPage = () => {
                     <div className="orders-top-left">
                         <div className="orders-title">Все заказы</div>
                         <div className="orders-subtitle">
-                            Радиус: <b>{RADIUS_KM} км</b> • {preferredCategoryIds.length ? "по вашим профессиям" : "все категории"} •{" "}
+                            Радиус: <b>{RADIUS_KM} км</b> • {useProfileProfessions && preferredCategoryIds.length ? "по вашим профессиям" : "все категории"} •{" "}
                             Найдено: <b>{visibleOrders.length}</b>
                         </div>
 
@@ -639,6 +648,65 @@ const OrdersPage = () => {
             Во вкладке <b>Все</b> приоритетные не поднимаются, только подсвечиваются
           </span>
                 </div>
+
+                {profile && preferredCategoryIds.length > 0 && (
+                    <div className="pref-bar glass">
+                        <div className="pref-bar__top">
+                            <div>
+                                <div className="pref-bar__title">Мои профессии (фильтр из профиля)</div>
+                                <div className="pref-bar__sub">
+                                    Эти категории применяются автоматически. Такси/курьер показываем всегда.
+                                </div>
+                            </div>
+
+                            <div className="pref-bar__actions">
+                                <button className="btn btn-ghost" onClick={() => navigate("/profile")}>
+                                    Изменить в профиле
+                                </button>
+
+                                <button
+                                    className="btn btn-ghost"
+                                    onClick={() => {
+                                        setSelectedCategory("");
+                                        setSelectedSubcategory("");
+                                        setSelectedService("");
+                                        setSubcategories([]);
+                                        setServices([]);
+                                        setActiveTab("all");
+
+                                        setUseProfileProfessions(false); // ⭐ вот это делает “сброс” заметным
+
+                                        toast.info("Фильтры сброшены. Профессии из профиля временно отключены.");
+                                    }}
+                                >
+                                    Сбросить фильтры
+                                </button>
+
+                                <button
+                                    className="btn btn-ghost"
+                                    onClick={() => {
+                                        setUseProfileProfessions(true);
+                                        toast.info("Фильтр по профессиям из профиля включен.");
+                                    }}
+                                >
+                                    Применять профессии
+                                </button>
+
+                            </div>
+                        </div>
+
+                        <div className="pref-bar__chips">
+                            {preferredCategoryIds.map((id) => {
+                                const found = preferredCategories.find((c) => Number(c.id) === Number(id));
+                                return (
+                                    <span key={id} className="pref-chip" title={found?.name || ""}>
+            {found?.name || `Категория #${id}`}
+          </span>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* Map */}
                 {isMapVisible && (

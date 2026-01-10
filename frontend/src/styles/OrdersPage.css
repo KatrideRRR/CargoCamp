@@ -926,3 +926,50 @@
     border-color: rgba(248, 113, 113, 0.22);
     color: #b91c1c;
 }
+
+.pref-bar{
+    padding: 12px 14px;
+    margin-top: 10px;
+}
+
+.pref-bar__top{
+    display:flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.pref-bar__title{
+    font-weight: 900;
+    font-size: 13px;
+}
+
+.pref-bar__sub{
+    margin-top: 4px;
+    font-weight: 800;
+    font-size: 12px;
+    color: rgba(100,116,139,0.95);
+}
+
+.pref-bar__actions{
+    display:flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.pref-bar__chips{
+    margin-top: 10px;
+    display:flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.pref-chip{
+    padding: 7px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 900;
+    background: rgba(29,78,216,0.10);
+    border: 1px solid rgba(29,78,216,0.18);
+}
