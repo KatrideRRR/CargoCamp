@@ -42,6 +42,15 @@ const smsCodes = new Map();
 
 const CODE_TTL_MS = 5 * 60 * 1000; // 5 минут
 
+function normalizePhone(raw) {
+    const digits = String(raw || "").replace(/\D/g, "");
+    if (!digits) return "";
+    if (digits.length === 11 && digits.startsWith("8")) return "7" + digits.slice(1);
+    if (digits.length === 11 && digits.startsWith("7")) return digits;
+    if (digits.length === 10) return "7" + digits;
+    return digits;
+}
+
 router.post("/send-sms", async (req, res) => {
     const { phone } = req.body;
     if (!phone) return res.status(400).json({ message: "Введите номер телефона" });
@@ -106,11 +115,19 @@ router.post('/register', async (req, res) => {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 7 * 86400000); // 7 дней
 
+    const phoneKey = normalizePhone(phone);
+    const codeFromUser = String(smsCode || "").trim();
+    const codeSaved = String(smsCodes.get(phoneKey) || "").trim();
+
+    console.log("[REGISTER] phone raw:", phone, "key:", phoneKey);
+    console.log("[REGISTER] code user:", JSON.stringify(codeFromUser), "saved:", JSON.stringify(codeSaved));
+    console.log("[REGISTER] has:", smsCodes.has(phoneKey), "size:", smsCodes.size);
+
     if (!captchaToken) {
         return res.status(400).json({ error: "Капча не пройдена" });
     }
 
-    if (!smsCodes.has(phone) || smsCodes.get(phone) !== smsCode) {
+    if (!smsCodes.has(phoneKey) || codeSaved !== codeFromUser) {
         return res.status(400).json({ message: "Неверный код" });
     }
 
@@ -150,7 +167,7 @@ router.post('/register', async (req, res) => {
             subscription_expires_at: expiresAt
         });
 
-        smsCodes.delete(phone); // Удаляем код после успешной регистрации
+        smsCodes.delete(phoneKey);
 
         // Генерация токена
         const token = jwt.sign({ id: newUser.id, phone: newUser.phone }, process.env.JWT_SECRET, { expiresIn: "7d" });
