@@ -130,6 +130,9 @@ router.post('/upload-documents',authenticateToken, upload.array('documents', 5),
 router.post('/register', async (req, res) => {
     const { username, phone, password, captchaToken, smsCode } = req.body;
 
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 дней
+
     const phoneKey = normalizePhone(phone);
     const codeFromUser = String(smsCode || "").trim();
 
