@@ -55,28 +55,29 @@ router.post("/send-sms", async (req, res) => {
     const { phone } = req.body;
     if (!phone) return res.status(400).json({ message: "Введите номер телефона" });
 
+    const phoneKey = normalizePhone(phone);
+    if (!phoneKey) return res.status(400).json({ message: "Некорректный номер" });
+
     const code = generateCode();
-    smsCodes.set(phone, { code, expiresAt: Date.now() + CODE_TTL_MS });
+    smsCodes.set(phoneKey, { code, expiresAt: Date.now() + CODE_TTL_MS });
+
+    console.log("[SEND SMS] phone raw:", phone, "key:", phoneKey, "code:", code);
+    console.log("[SEND SMS] keys:", Array.from(smsCodes.keys()));
 
     try {
-        console.log("Отправка SMS на:", phone);
-
         const response = await axios.get("https://sms.ru/sms/send", {
             params: {
-                api_id: "706A8778-9606-1CA6-F061-72BA6F3A60E3",
-                to: phone,
+                api_id: process.env.SMS_RU_API_ID, // лучше в env
+                to: phoneKey,                     // ✅ отправляем нормализованный
                 msg: `Ваш код подтверждения: ${code}`,
                 json: 1,
             },
         });
 
-        console.log(response.data);
-
         if (response.data.status === "OK") {
             return res.json({ message: "Код отправлен" });
-        } else {
-            return res.status(500).json({ message: "Ошибка отправки SMS" });
         }
+        return res.status(500).json({ message: "Ошибка отправки SMS" });
     } catch (error) {
         console.error("Ошибка SMS:", error);
         return res.status(500).json({ message: "Ошибка сервера" });
@@ -112,22 +113,30 @@ router.post('/upload-documents',authenticateToken, upload.array('documents', 5),
 router.post('/register', async (req, res) => {
     const { username, phone, password, captchaToken, smsCode } = req.body;
 
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + 7 * 86400000); // 7 дней
-
     const phoneKey = normalizePhone(phone);
     const codeFromUser = String(smsCode || "").trim();
-    const codeSaved = String(smsCodes.get(phoneKey) || "").trim();
+
+    const entry = smsCodes.get(phoneKey); // {code, expiresAt} | undefined
+    const codeSaved = String(entry?.code || "").trim();
 
     console.log("[REGISTER] phone raw:", phone, "key:", phoneKey);
     console.log("[REGISTER] code user:", JSON.stringify(codeFromUser), "saved:", JSON.stringify(codeSaved));
     console.log("[REGISTER] has:", smsCodes.has(phoneKey), "size:", smsCodes.size);
+    console.log("[REGISTER] keys:", Array.from(smsCodes.keys()));
 
-    if (!captchaToken) {
-        return res.status(400).json({ error: "Капча не пройдена" });
+    if (!captchaToken) return res.status(400).json({ error: "Капча не пройдена" });
+
+    // ✅ проверка что код есть
+    if (!entry) return res.status(400).json({ message: "Неверный код" });
+
+    // ✅ TTL
+    if (Date.now() > entry.expiresAt) {
+        smsCodes.delete(phoneKey);
+        return res.status(400).json({ message: "Код истёк. Запросите новый." });
     }
 
-    if (!smsCodes.has(phoneKey) || codeSaved !== codeFromUser) {
+    // ✅ сравнение
+    if (codeSaved !== codeFromUser) {
         return res.status(400).json({ message: "Неверный код" });
     }
 
