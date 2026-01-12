@@ -58,29 +58,46 @@ router.post("/send-sms", async (req, res) => {
     const phoneKey = normalizePhone(phone);
     if (!phoneKey) return res.status(400).json({ message: "Некорректный номер" });
 
+    const apiId = process.env.SMS_RU_API_ID || "706A8778-9606-1CA6-F061-72BA6F3A60E3"; // временно
+    if (!apiId) return res.status(500).json({ message: "SMS_RU_API_ID не задан" });
+
     const code = generateCode();
     smsCodes.set(phoneKey, { code, expiresAt: Date.now() + CODE_TTL_MS });
 
     console.log("[SEND SMS] phone raw:", phone, "key:", phoneKey, "code:", code);
-    console.log("[SEND SMS] keys:", Array.from(smsCodes.keys()));
+    console.log("[SEND SMS] apiId exists:", !!apiId);
 
     try {
         const response = await axios.get("https://sms.ru/sms/send", {
             params: {
-                api_id: process.env.SMS_RU_API_ID, // лучше в env
-                to: phoneKey,                     // ✅ отправляем нормализованный
+                api_id: apiId,
+                to: phoneKey, // 7978...
                 msg: `Ваш код подтверждения: ${code}`,
                 json: 1,
             },
+            timeout: 15000,
         });
 
-        if (response.data.status === "OK") {
+        console.log("[SEND SMS] sms.ru response:", response.data);
+
+        if (response.data?.status === "OK") {
             return res.json({ message: "Код отправлен" });
         }
-        return res.status(500).json({ message: "Ошибка отправки SMS" });
+
+        return res.status(500).json({
+            message: "sms.ru отказал",
+            details: response.data,
+        });
     } catch (error) {
-        console.error("Ошибка SMS:", error);
-        return res.status(500).json({ message: "Ошибка сервера" });
+        console.error("[SEND SMS] axios error message:", error?.message);
+        console.error("[SEND SMS] status:", error?.response?.status);
+        console.error("[SEND SMS] data:", error?.response?.data);
+        console.error("[SEND SMS] config params:", error?.config?.params);
+
+        return res.status(500).json({
+            message: "Ошибка отправки SMS",
+            details: error?.response?.data || error?.message || "unknown",
+        });
     }
 });
 
