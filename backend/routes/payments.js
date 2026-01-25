@@ -6,18 +6,6 @@ const { randomUUID } = require('crypto');
 const idempotenceKey = randomUUID();
 const yooKassa = require('../config/yookassaClient');
 
-function verifyYookassaWebhook(req, res, next) {
-    const auth = req.headers['authorization'] || '';
-    if (!process.env.YOOKASSA_WEBHOOK_AUTH) {
-        console.warn('YOOKASSA_WEBHOOK_AUTH is not set');
-        return res.sendStatus(403);
-    }
-    if (auth !== process.env.YOOKASSA_WEBHOOK_AUTH) {
-        return res.sendStatus(403);
-    }
-    next();
-}
-
 router.post('/premium/create', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
@@ -256,7 +244,7 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
             capture: true,
             confirmation: {
                 type: 'redirect',
-                return_url: `${process.env.FRONTEND_URL}/orders?promoReturn=1`,
+                return_url: `${process.env.FRONTEND_URL}/orders?promoReturn=1&orderId=${orderId}`,
             },
             description: `Продвижение заказа #${orderId}`,
             metadata: {
@@ -552,6 +540,40 @@ router.post('/yookassa/webhook', async (req, res) => {
     } catch (e) {
         console.error('yookassa webhook error:', e);
         return res.sendStatus(200);
+    }
+});
+
+router.get('/promotion/status', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { orderId } = req.query;
+        if (!orderId) return res.status(400).json({ success: false, error: 'orderId required' });
+
+        const order = await Order.findByPk(orderId);
+        if (!order) return res.status(404).json({ success: false, error: 'order not found' });
+        if (order.creatorId !== userId) return res.status(403).json({ success: false, error: 'no access' });
+
+        if (!order.promotionPaymentId) {
+            return res.json({ success: true, status: 'no_payment_id' });
+        }
+
+        const payment = await yooKassa.getPayment(order.promotionPaymentId);
+
+        if (payment.status === 'succeeded' && order.status === 'pending_payment') {
+            const pr = order.promotionRequested || {};
+            await order.update({
+                status: 'pending',
+                is_highlighted: !!pr.highlight,
+                is_recommended: !!pr.recommended,
+                is_push_notified: !!pr.push,
+                promotionPaidAt: new Date(),
+            });
+        }
+
+        return res.json({ success: true, status: payment.status });
+    } catch (e) {
+        console.error('promotion/status error:', e);
+        return res.status(500).json({ success: false, error: e?.message || 'Internal error' });
     }
 });
 

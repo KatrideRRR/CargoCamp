@@ -138,6 +138,35 @@ const OrdersPage = () => {
         }
     };
 
+    useEffect(() => {
+        const p = new URLSearchParams(window.location.search);
+        const promoReturn = p.get('promoReturn') === '1';
+        const paymentId = p.get('paymentId');
+
+        if (!promoReturn || !paymentId) return;
+
+        (async () => {
+            try {
+                const res = await axiosInstance.get(`/payments/status?paymentId=${encodeURIComponent(paymentId)}`);
+                if (res.data?.status === 'succeeded') {
+                    toast.success('Продвижение оплачено ✅');
+                } else if (res.data?.status === 'pending') {
+                    toast.info('Платёж обрабатывается… обновите страницу через пару секунд');
+                } else {
+                    toast.error('Платёж не завершён');
+                }
+            } catch (e) {
+                toast.error('Не удалось проверить платёж');
+            } finally {
+                // чистим URL чтобы не повторялось
+                p.delete('promoReturn');
+                p.delete('paymentId');
+                const newUrl = `${window.location.pathname}${p.toString() ? `?${p.toString()}` : ''}`;
+                window.history.replaceState({}, '', newUrl);
+            }
+        })();
+    }, []);
+
     // ---------- API: fetch base data ----------
     useEffect(() => {
         axios
