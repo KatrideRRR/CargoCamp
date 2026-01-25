@@ -382,7 +382,12 @@ router.post('/guarantee/create', authenticateToken, async (req, res) => {
     }
 });
 
-router.post('/yookassa/webhook',verifyYookassaWebhook, async (req, res) => {
+router.post('/yookassa/webhook', async (req, res) => {
+
+    console.log("[YOOKASSA WEBHOOK] HIT", new Date().toISOString());
+    console.log("[YOOKASSA WEBHOOK] headers auth:", req.headers.authorization);
+    console.log("[YOOKASSA WEBHOOK] body:", JSON.stringify(req.body));
+
     try {
         const event = req.body;
         const allowed = ['payment.waiting_for_capture', 'payment.succeeded', 'payment.canceled'];
