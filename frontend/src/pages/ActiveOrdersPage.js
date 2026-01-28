@@ -71,6 +71,30 @@ const ActiveOrdersPage = () => {
         }
     };
 
+    const buildServiceLine = (o) => {
+        const parts = [
+            o?.category?.name,
+            o?.subcategory?.name,
+            o?.service?.name,
+        ].filter(Boolean);
+
+        return parts.length ? parts.join(" • ") : "Не указано";
+    };
+
+    const getPaymentLabel = (type) => {
+        switch (type) {
+            case "guarantee":
+                return "Гарантия";
+            case "cash":
+                return "Наличные";
+            case "installment":
+            case "installments":
+                return "Рассрочка";
+            default:
+                return "Неизвестно";
+        }
+    };
+
     const openModal = (images) => {
         setCurrentImages(Array.isArray(images) ? images : []);
         setCurrentImageIndex(0);
@@ -351,8 +375,15 @@ const ActiveOrdersPage = () => {
                                                             {isCreator ? ". Вы являетесь заказчиком" : ". Вы являетесь исполнителем"}.
                                                         </div>
 
-                                                        <div className="payment-icon-container">
-                                                            <span className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
+                                                        <div className="pay-box">
+                                                            <span className="pay-icon">{getPaymentIcon(order.paymentType)}</span>
+
+                                                            <div className="pay-right">
+                                                                <div className="pay-price">
+                                                                    {Number(order.proposedSum ?? 0).toLocaleString("ru-RU")} ₽
+                                                                </div>
+                                                                <div className="pay-type">{getPaymentLabel(order.paymentType)}</div>
+                                                            </div>
                                                         </div>
                                                     </div>
 
@@ -458,13 +489,8 @@ const ActiveOrdersPage = () => {
                                                     <div className="order-details">
                                                         <div className="order-left">
                                                             <p>
-                                                                <strong>Категория:</strong> {order.category ? order.category.name : "Не указано"}
-                                                            </p>
-                                                            <p>
-                                                                <strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : "Не указано"}
-                                                            </p>
-                                                            <p>
-                                                                <strong>Услуга:</strong> {order.service ? order.service.name : "Не указано"}
+                                                                <strong>Категория / услуга:</strong>{" "}
+                                                                <span className="v-line">{buildServiceLine(order)}</span>
                                                             </p>
                                                         </div>
 
@@ -492,9 +518,6 @@ const ActiveOrdersPage = () => {
 
                                                         <p>
                                                             <strong>Адрес:</strong> {order.address}
-                                                        </p>
-                                                        <p>
-                                                            <strong>Цена:</strong> {order.proposedSum} ₽
                                                         </p>
                                                         <p>
                                                             <strong>Описание:</strong> {order.description}

@@ -1,14 +1,17 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import axiosInstance from "../utils/axiosInstance";
-import { FaRoute, FaLocationArrow } from "react-icons/fa";
+import { FaLocationArrow } from "react-icons/fa";
 
-const ExpressRouteButtons = ({ orderId, canToA, canAToB }) => {
+const ExpressRouteButtons = ({ orderId, navMode }) => {
     const [busy, setBusy] = useState(false);
 
-    const openUrl = (url) => {
-        if (!url) return;
-        window.open(url, "_blank");
-    };
+    const title = useMemo(() => {
+        if (navMode === "toA") return "Навигация до точки A";
+        if (navMode === "AtoB") return "Навигация A→B";
+        return "Навигация недоступна";
+    }, [navMode]);
+
+    const openUrl = (url) => url && window.open(url, "_blank");
 
     const getMyGeo = () =>
         new Promise((resolve, reject) => {
@@ -20,53 +23,46 @@ const ExpressRouteButtons = ({ orderId, canToA, canAToB }) => {
             );
         });
 
-    const routeToA = async () => {
-        if (busy) return;
-        setBusy(true);
-        try {
-            const my = await getMyGeo();
-            const r = await axiosInstance.get(`/express/express-orders/${orderId}/route/to-A`, {
-                params: { myLat: my.lat, myLng: my.lng },
-            });
-            if (!r.data?.success) throw new Error(r.data?.message || "Не удалось получить маршрут");
-            openUrl(r.data.url);
-        } catch (e) {
-            console.error(e);
-            alert(e.response?.data?.message || e.message || "Ошибка маршрута до A");
-        } finally {
-            setBusy(false);
-        }
-    };
+    const go = async () => {
+        if (busy || navMode === "none") return;
 
-    const routeAToB = async () => {
-        if (busy) return;
         setBusy(true);
         try {
-            const r = await axiosInstance.get(`/express/express-orders/${orderId}/route/A-to-B`);
-            if (!r.data?.success) throw new Error(r.data?.message || "Не удалось получить маршрут");
-            openUrl(r.data.url);
+            if (navMode === "toA") {
+                const my = await getMyGeo();
+                const r = await axiosInstance.get(`/express/express-orders/${orderId}/route/to-A`, {
+                    params: { myLat: my.lat, myLng: my.lng },
+                });
+                if (!r.data?.success) throw new Error(r.data?.message || "Не удалось получить маршрут");
+                openUrl(r.data.url);
+                return;
+            }
+
+            if (navMode === "AtoB") {
+                const r = await axiosInstance.get(`/express/express-orders/${orderId}/route/A-to-B`);
+                if (!r.data?.success) throw new Error(r.data?.message || "Не удалось получить маршрут");
+                openUrl(r.data.url);
+            }
         } catch (e) {
             console.error(e);
-            alert(e.response?.data?.message || e.message || "Ошибка маршрута A→B");
+            alert(e.response?.data?.message || e.message || "Ошибка навигации");
         } finally {
             setBusy(false);
         }
     };
 
     return (
-        <div className="express-actions-row">
-            {canToA && (
-                <button className="express-btn express-btnGhost" type="button" onClick={routeToA} disabled={busy}>
-                    <FaLocationArrow /> До точки A
-                </button>
-            )}
-
-            {canAToB && (
-                <button className="express-btn express-btnGhost" type="button" onClick={routeAToB} disabled={busy}>
-                    <FaRoute /> Маршрут A→B
-                </button>
-            )}
-        </div>
+        <button
+            className="express-btn express-btnNav"
+            type="button"
+            onClick={go}
+            disabled={busy || navMode === "none"}
+            aria-label={title}
+            title={title}
+        >
+            <FaLocationArrow />
+            <span className="btn-text">Навигация</span>
+        </button>
     );
 };
 

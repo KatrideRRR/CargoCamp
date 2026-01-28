@@ -138,6 +138,16 @@ const OrdersPage = () => {
         }
     };
 
+    const buildServiceLine = (o) => {
+        const parts = [
+            o?.category?.name,
+            o?.subcategory?.name,
+            o?.service?.name,
+        ].filter(Boolean);
+
+        return parts.length ? parts.join(" • ") : "Не указано";
+    };
+
     useEffect(() => {
         const p = new URLSearchParams(window.location.search);
         const promoReturn = p.get('promoReturn') === '1';
@@ -825,36 +835,27 @@ const OrdersPage = () => {
                                             </div>
 
                                             <div className="order-head-right">
-                                                <span className="pay-icon">{getPaymentIcon(order.paymentType)}</span>
+                                                <div className="pay-box">
+                                                    <span className="pay-icon">{getPaymentIcon(order.paymentType)}</span>
+                                                    <div className="pay-price">
+                                                        {Number(order.proposedSum ?? 0).toLocaleString("ru-RU")} ₽
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
 
                                         <div className="order-grid">
                                             <div className="order-col">
                                                 <div className="kv">
-                                                    <span className="k">Категория</span>
-                                                    <span className="v">{order.category?.name || "Не указано"}</span>
-                                                </div>
-
-                                                <div className="kv">
-                                                    <span className="k">Подкатегория</span>
-                                                    <span className="v">{order.subcategory?.name || "Не указано"}</span>
-                                                </div>
-
-                                                <div className="kv">
-                                                    <span className="k">Услуга</span>
-                                                    <span className="v">{order.service?.name || "Не указано"}</span>
+                                                    <span className="k">Категория / Услуга</span>
+                                                    <span className="v v-line">{buildServiceLine(order)}</span>
                                                 </div>
                                             </div>
 
                                             <div className="order-col">
                                                 <div className="kv">
-                                                    <span className="k">Адрес</span>
-                                                    <span className="v">{order.address || "—"}</span>
-                                                </div>
-                                                <div className="kv">
-                                                    <span className="k">Цена</span>
-                                                    <span className="v price">{order.proposedSum} ₽</span>
+                                                    <span className="k">{isExpress ? "Маршрут" : "Адрес"}</span>
+                                                    <span className={`v ${isExpress ? "route-line" : ""}`}>{order.address || "—"}</span>
                                                 </div>
                                             </div>
                                         </div>
