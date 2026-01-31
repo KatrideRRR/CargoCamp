@@ -9,7 +9,6 @@
     --muted: rgba(100, 116, 139, 0.95);
 
     --glass: rgba(255, 255, 255, 0.62);
-    --glass-strong: rgba(255, 255, 255, 0.74);
     --glass-border: rgba(255, 255, 255, 0.42);
 
     --shadow: 0 18px 50px rgba(15, 23, 42, 0.10);
@@ -18,7 +17,6 @@
     --primary-soft: rgba(29, 78, 216, 0.14);
 
     --danger: rgba(220, 38, 38, 0.95);
-    --danger-soft: rgba(220, 38, 38, 0.12);
 
     --r-xl: 22px;
     --r-lg: 18px;
@@ -30,19 +28,13 @@
 * { box-sizing: border-box; }
 
 @keyframes iosIn {
-    from {
-        opacity: 0;
-        transform: translateY(12px) scale(0.988);
-        filter: blur(2px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-        filter: blur(0);
-    }
+    from { opacity: 0; transform: translateY(12px) scale(0.988); filter: blur(2px); }
+    to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
 
-/* page */
+/* =========================
+   PAGE
+   ========================= */
 .create-page {
     min-height: 100vh;
     padding: 16px;
@@ -83,7 +75,9 @@
     box-shadow: var(--shadow);
 }
 
-/* header */
+/* =========================
+   HEADER
+   ========================= */
 .create-page .header-card {
     padding: 14px;
     background: rgba(255, 255, 255, 0.66);
@@ -114,36 +108,22 @@
     color: rgba(71, 85, 105, 0.95);
 }
 
-.create-page .header-badges {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.create-page .pill {
-    display: inline-flex;
-    align-items: center;
-    padding: 7px 10px;
-    border-radius: 999px;
-    font-weight: 900;
-    font-size: 12px;
-
-    background: rgba(255, 255, 255, 0.62);
-    border: 1px solid rgba(255, 255, 255, 0.42);
-
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
-}
-
-/* alert */
+/* =========================
+   ALERT
+   ========================= */
 .create-page .alert-card { padding: 12px; }
+
 .create-page .alert-danger {
     background: rgba(220, 38, 38, 0.08);
     border: 1px solid rgba(220, 38, 38, 0.18);
 }
+
 .create-page .alert-title { font-weight: 900; font-size: 13px; }
 .create-page .alert-text { margin-top: 6px; font-weight: 800; color: rgba(220, 38, 38, 0.95); }
 
-/* sections */
+/* =========================
+   SECTIONS
+   ========================= */
 .create-page .section-card { padding: 12px; }
 
 .create-page .section-head {
@@ -167,17 +147,15 @@
     color: rgba(100, 116, 139, 0.95);
 }
 
-/* grid */
+/* =========================
+   GRID / FIELDS
+   ========================= */
 .create-page .grid2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
 }
-@media (max-width: 520px) {
-    .create-page .grid2 { grid-template-columns: 1fr; }
-}
 
-/* field */
 .create-page .field {
     padding: 10px;
     border-radius: var(--r-lg);
@@ -193,7 +171,9 @@
     margin-bottom: 8px;
 }
 
-/* inputs */
+/* =========================
+   INPUTS
+   ========================= */
 .create-page .control {
     width: 100%;
     border-radius: 16px;
@@ -233,7 +213,9 @@
     font-size: 12px;
 }
 
-/* suggestions */
+/* =========================
+   SUGGESTIONS
+   ========================= */
 .create-page .suggestions {
     margin: 8px 0 0;
     padding: 6px;
@@ -259,7 +241,9 @@
 
 .create-page .suggestions li:hover { background: rgba(29, 78, 216, 0.10); }
 
-/* address row */
+/* =========================
+   ADDRESS ROW / CHIPS
+   ========================= */
 .create-page .address-row {
     margin-top: 12px;
     padding-top: 12px;
@@ -279,7 +263,6 @@
     margin-top: 10px;
 }
 
-/* chip buttons (изолированы) */
 .create-page .chip-btn {
     appearance: none;
     border: 1px solid rgba(255, 255, 255, 0.48);
@@ -324,22 +307,9 @@
             inset 0 1px 0 rgba(255,255,255,0.62);
 }
 
-/* toggle */
-.create-page .toggleRow {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.create-page .toggleLabel {
-    font-size: 12px;
-    font-weight: 900;
-    color: rgba(15, 23, 42, 0.55);
-}
-
-.create-page .toggleLabel.active { color: rgba(15, 23, 42, 0.92); }
-
-/* ВАЖНО: toggle без glass-класса, полностью изолирован */
+/* =========================
+   TOGGLE
+   ========================= */
 .create-page .toggle {
     appearance: none;
     border: 1px solid rgba(255, 255, 255, 0.48);
@@ -400,21 +370,23 @@
 
 .create-page .toggle.on .toggleKnob { left: 25px; }
 
-/* glass chip */
-.create-page .chip {
-    margin-top: 10px;
-    padding: 10px 12px;
-    border-radius: 16px;
-
-    background: rgba(255, 255, 255, 0.52);
-    border: 1px solid rgba(255, 255, 255, 0.38);
-
-    font-size: 12.5px;
-    font-weight: 900;
-    color: rgba(15, 23, 42, 0.86);
+/* mini toggle (ЕДИНСТВЕННОЕ определение, без дублей) */
+.create-page .toggle.mini{
+    width: 44px;
+    height: 26px;
+}
+.create-page .toggle.mini .toggleKnob{
+    width: 16px;
+    height: 16px;
+    left: 5px;
+}
+.create-page .toggle.mini.on .toggleKnob{
+    left: 22px;
 }
 
-/* UPLOAD (полностью изолирован, без .glass в JSX) */
+/* =========================
+   UPLOAD
+   ========================= */
 .create-page .upload {
     display: block;
     width: 100%;
@@ -452,14 +424,20 @@
 
 .create-page .upload:active { transform: translateY(0) scale(0.988); box-shadow: none; }
 
-/* images */
+.create-page .upload.inline{
+    margin-top: 10px;
+    padding: 11px 12px;
+    border-radius: 16px;
+    font-size: 12.5px;
+}
+
+/* =========================
+   IMAGES GRID
+   ========================= */
 .create-page .docsGrid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px;
-}
-@media (max-width: 520px) {
-    .create-page .docsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .create-page .doc {
@@ -483,14 +461,13 @@
     color: rgba(15, 23, 42, 0.78);
 }
 
-/* payment tiles (изолированы, без .glass в JSX) */
+/* =========================
+   PAYMENT
+   ========================= */
 .create-page .payGrid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
-}
-@media (max-width: 520px) {
-    .create-page .payGrid { grid-template-columns: 1fr; }
 }
 
 .create-page .payTile {
@@ -545,7 +522,9 @@
     color: rgba(15, 23, 42, 0.86);
 }
 
-/* promo */
+/* =========================
+   PROMO / TOTAL
+   ========================= */
 .create-page .promoBox {
     margin-top: 10px;
     padding: 10px;
@@ -555,7 +534,6 @@
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
 
-/* total */
 .create-page .total {
     margin-top: 10px;
     padding: 12px;
@@ -605,7 +583,9 @@
     line-height: 1.35;
 }
 
-/* bottom actions */
+/* =========================
+   BOTTOM ACTIONS
+   ========================= */
 .create-page .bottomActions {
     padding: 12px;
     border-radius: var(--r-xl);
@@ -616,11 +596,6 @@
     background: rgba(255, 255, 255, 0.62);
 }
 
-@media (max-width: 520px) {
-    .create-page .bottomActions { grid-template-columns: 1fr; }
-}
-
-/* ACTION BUTTONS (изолированы, без .glass в JSX) */
 .create-page .action-btn {
     appearance: none;
     border: 1px solid rgba(255, 255, 255, 0.52);
@@ -672,14 +647,363 @@
             inset 0 1px 0 rgba(255,255,255,0.70);
 }
 
-/* subtle variant (для “На карте / GPS / Назад”) */
 .create-page .action-btn.subtle {
     background: rgba(255, 255, 255, 0.62);
     border-color: rgba(255,255,255,0.52);
     color: rgba(15,23,42,0.92);
 }
 
-/* reduced motion */
+/* =========================
+   HEADER DROPS (address/time)
+   ========================= */
+.create-page .headerRowBtn{
+    width: 100%;
+    text-align: left;
+    appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.42);
+    background: rgba(255, 255, 255, 0.62);
+    border-radius: 18px;
+    padding: 10px 12px;
+
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+
+    cursor: pointer;
+
+    backdrop-filter: blur(18px) saturate(190%);
+    -webkit-backdrop-filter: blur(18px) saturate(190%);
+
+    box-shadow:
+            0 18px 46px rgba(15,23,42,0.10),
+            inset 0 1px 0 rgba(255,255,255,0.62);
+
+    transition: transform .18s ease, box-shadow .18s ease, background .18s ease, border-color .18s ease;
+}
+
+.create-page .headerRowBtn:hover{
+    transform: translateY(-1px);
+    background: rgba(255,255,255,0.78);
+    border-color: rgba(255,255,255,0.62);
+    box-shadow:
+            0 22px 56px rgba(15,23,42,0.12),
+            inset 0 1px 0 rgba(255,255,255,0.70);
+}
+
+.create-page .headerRowBtn:active{
+    transform: translateY(0) scale(0.992);
+    box-shadow: none;
+}
+
+.create-page .headerRowLeft{ min-width: 0; }
+
+.create-page .headerRowLabel{
+    font-size: 12px;
+    font-weight: 900;
+    color: rgba(100,116,139,0.95);
+}
+
+.create-page .headerRowValue{
+    margin-top: 4px;
+    font-size: 12.5px;
+    font-weight: 900;
+    color: rgba(15,23,42,0.92);
+    line-height: 1.25;
+    word-break: break-word;
+}
+
+.create-page .headerRowValue.danger{
+    color: rgba(220,38,38,0.95);
+}
+
+.create-page .headerRowMeta{
+    margin-top: 4px;
+    font-size: 11.5px;
+    font-weight: 800;
+    color: rgba(100,116,139,0.92);
+}
+
+.create-page .headerRowRight .chev{
+    font-weight: 900;
+    font-size: 14px;
+    color: rgba(15,23,42,0.65);
+}
+
+.create-page .headerDrop{
+    margin-top: 10px;
+}
+
+/* time row: компактный, вторичный (строка без карточки) */
+.create-page .headerTimeRow{
+    margin-top: 6px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.create-page .headerTimeLeft{
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.create-page .headerTimeMeta{
+    font-size: 12px;
+    font-weight: 900;
+    color: rgba(15,23,42,0.90);
+}
+
+/* =========================
+   HEADER MINI CARDS (2 cols)
+   ========================= */
+/* по умолчанию (ПК): одна колонка => адрес во всю ширину */
+.create-page .headerMiniGrid{
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+/* если на мобиле хочешь 2 карточки рядом — включай 2 колонки */
+@media (max-width: 520px){
+    .create-page .headerMiniGrid{
+        grid-template-columns: 1fr; /* оставь 1fr если хочешь в колонку */
+        /* или 1fr 1fr если реально две карточки там будут */
+        /* grid-template-columns: 1fr 1fr; */
+    }
+}
+
+/* на совсем узких уже есть */
+@media (max-width: 420px){
+    .create-page .headerMiniGrid{
+        grid-template-columns: 1fr;
+    }
+}
+
+.create-page .miniCard{
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.42);
+    background: rgba(255,255,255,0.58);
+
+    backdrop-filter: blur(18px) saturate(190%);
+    -webkit-backdrop-filter: blur(18px) saturate(190%);
+
+    box-shadow:
+            0 18px 46px rgba(15,23,42,0.10),
+            inset 0 1px 0 rgba(255,255,255,0.62);
+}
+
+.create-page .miniCardBtn{
+    width: 100%;
+    text-align: left;
+    appearance: none;
+    border: 0;
+    background: transparent;
+
+    padding: 10px 12px;
+    border-radius: 18px;
+
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    transition: transform .18s ease, background .18s ease;
+}
+
+.create-page .miniCardBtn:hover{
+    transform: translateY(-1px);
+    background: rgba(255,255,255,0.22);
+}
+.create-page .miniCardBtn:active{
+    transform: translateY(0) scale(0.992);
+}
+
+.create-page .miniTop{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.create-page .miniLabel{
+    font-size: 12px;
+    font-weight: 900;
+    color: rgba(100,116,139,0.95);
+}
+
+.create-page .miniChevron{
+    font-weight: 900;
+    font-size: 14px;
+    color: rgba(15,23,42,0.60);
+}
+
+.create-page .miniValue{
+    font-size: 13px;
+    font-weight: 900;
+    color: rgba(15,23,42,0.92);
+}
+
+.create-page .miniValue.danger{
+    color: rgba(220,38,38,0.95);
+}
+
+.create-page .miniSub{
+    font-size: 11.5px;
+    font-weight: 800;
+    color: rgba(100,116,139,0.92);
+    line-height: 1.25;
+    word-break: break-word;
+    min-height: 14px;
+}
+
+.create-page .miniDrop{
+    padding: 10px 12px 12px;
+    border-top: 1px solid rgba(15,23,42,0.08);
+}
+
+/* =========================
+   REDUCED MOTION
+   ========================= */
 @media (prefers-reduced-motion: reduce) {
     .create-page * { animation: none !important; transition: none !important; }
 }
+
+/* =========================
+   RESPONSIVE (ТОЛЬКО В КОНЦЕ!)
+   ========================= */
+@media (max-width: 520px) {
+    .create-page .grid2 { grid-template-columns: 1fr; }
+    .create-page .bottomActions { grid-template-columns: 1fr; }
+    .create-page .docsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    /* payment: в одну строку, узкие кнопки, только иконки */
+    .create-page .payGrid{
+        grid-template-columns: repeat(3, 44px);
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .create-page .payTile{
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        border-radius: 14px;
+        gap: 0;
+        justify-content: center;
+    }
+
+    .create-page .payLabel{ display: none; }
+    .create-page .payIco{
+        font-size: 18px;
+        line-height: 1;
+    }
+
+    .create-page .payTile.selected{
+        box-shadow:
+                0 0 0 4px rgba(29, 78, 216, 0.10),
+                0 18px 46px rgba(29,78,216,0.16),
+                inset 0 1px 0 rgba(255,255,255,0.70);
+    }
+}
+
+/* на совсем узких — мини-грид в колонку */
+@media (max-width: 420px){
+    .create-page .headerMiniGrid{
+        grid-template-columns: 1fr;
+    }
+}
+
+/* header top row: title + time chip */
+.create-page .headerTopRow{
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+/* чтобы заголовок не ломался и ужимался корректно */
+.create-page .header-titles{
+    min-width: 0;
+}
+
+/* супер-компактный чип времени (не как адресный блок) */
+.create-page .timeChip{
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+
+    padding: 8px 10px;
+    border-radius: 14px;
+
+    border: 1px solid rgba(255,255,255,0.46);
+    background: rgba(255,255,255,0.48);
+
+    backdrop-filter: blur(12px) saturate(170%);
+    -webkit-backdrop-filter: blur(12px) saturate(170%);
+
+    box-shadow:
+            0 10px 28px rgba(15,23,42,0.08),
+            inset 0 1px 0 rgba(255,255,255,0.55);
+}
+
+.create-page .timeChipText{
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.1;
+}
+
+.create-page .timeChipLabel{
+    font-size: 10.5px;
+    font-weight: 900;
+    color: rgba(100,116,139,0.92);
+}
+
+.create-page .timeChipValue{
+    font-size: 12px;
+    font-weight: 900;
+    color: rgba(15,23,42,0.92);
+    white-space: nowrap;
+}
+
+/* mini toggle еще меньше именно в чипе */
+.create-page .timeChip .toggle.mini{
+    width: 40px;
+    height: 22px;
+}
+
+.create-page .timeChip .toggle.mini .toggleKnob{
+    width: 14px;
+    height: 14px;
+    left: 4px;
+}
+
+.create-page .timeChip .toggle.mini.on .toggleKnob{
+    left: 20px;
+}
+
+@media (max-width: 520px){
+    .create-page .headerTopRow{
+        align-items: flex-start;
+    }
+
+    .create-page .timeChip{
+        padding: 7px 9px;
+        gap: 8px;
+    }
+
+    .create-page .timeChipLabel{ font-size: 10px; }
+    .create-page .timeChipValue{ font-size: 11.5px; }
+}
+

@@ -36,12 +36,11 @@ async function reverseGeocodeYandex({ lat, lng, apiKey }) {
     return text;
 }
 
-function roundTo15(d) {
+function plusHour(d) {
     const x = new Date(d);
     x.setSeconds(0, 0);
-    const m = x.getMinutes();
-    const add = (15 - (m % 15)) % 15;
-    x.setMinutes(m + add);
+    x.setMinutes(x.getMinutes()); // оставляем как есть
+    x.setHours(x.getHours() + 1);
     return x;
 }
 
@@ -71,6 +70,9 @@ function CreateOrderPage() {
     const [selectedCategory, setSelectedCategory] = useState("");
     const [selectedSubcategory, setSelectedSubcategory] = useState("");
     const [selectedService, setSelectedService] = useState("");
+
+    const [addressOpen, setAddressOpen] = useState(false);
+    const [timeOpen, setTimeOpen] = useState(false);
 
     const [promotion, setPromotion] = useState({ highlight: false, recommended: false, push: false });
 
@@ -114,8 +116,9 @@ function CreateOrderPage() {
 
     // default workTime (asap)
     useEffect(() => {
-        setFormData((p) => ({ ...p, workTime: roundTo15(new Date()) }));
         setIsAsap(true);
+        setTimeOpen(false);
+        setFormData((p) => ({ ...p, workTime: plusHour(new Date()) }));
     }, []);
 
     // preload location
@@ -363,10 +366,12 @@ function CreateOrderPage() {
         }
         if (!formData.address?.trim()) {
             setError("Адрес обязателен");
+            setAddressOpen(true);
             return;
         }
         if (isCoordsString(formData.address)) {
             setError("Нужно указать адрес текстом (не координаты). Выберите адрес на карте или введите вручную.");
+            setAddressOpen(true);
             return;
         }
         if (!selectedCategory || !selectedSubcategory) {
@@ -436,20 +441,214 @@ function CreateOrderPage() {
         }
     };
 
+    const toggleAsap = () => {
+        const next = !isAsap;
+        setIsAsap(next);
+
+        if (next) {
+            // Срочно
+            setTimeOpen(false);
+            setFormData((p) => ({ ...p, workTime: plusHour(new Date()) }));
+        } else {
+            // Ко времени
+            setTimeOpen(true);
+            // если вдруг workTime пустой — зададим на ближайшее +1 час как старт
+            setFormData((p) => ({ ...p, workTime: p.workTime ? p.workTime : plusHour(new Date()) }));
+        }
+    };
+
     return (
         <div className="create-page">
             <div className="create-shell">
                 {/* Header */}
                 <div className="glass header-card">
                     <div className="header-top">
-                        <div className="header-titles">
-                            <div className="header-title">Создать заказ</div>
-                            <div className="header-sub">Адрес и время подставятся автоматически</div>
-                        </div>
+                        <div className="headerTopRow">
+                            <div className="header-titles">
+                                <div className="header-title">Создать заказ</div>
+                                <div className="header-sub">Адрес и время подставятся автоматически</div>
+                            </div>
 
-                        <div className="header-badges">
-                            <span className="pill">Адрес: {formData.address ? "указан" : "нет"}</span>
-                            {addrResolving && <span className="pill">Определяем…</span>}
+                            {/* компактный чип времени справа */}
+                            <div className="timeChip" role="group" aria-label="Время выполнения">
+                                <div className="timeChipText">
+                                    <div className="timeChipLabel">Время</div>
+                                    <div className="timeChipValue">{isAsap ? "Срочно" : "Ко времени"}</div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    className={`toggle mini ${isAsap ? "on" : ""}`}
+                                    onClick={toggleAsap}
+                                    aria-label="Срочно / ко времени"
+                                    title="Срочно / ко времени"
+                                >
+                                    <span className="toggleKnob" />
+                                </button>
+                            </div>
+                        </div>
+                        {/* ✅ 2 независимые мини-карточки в 2 колонки */}
+
+                        {/* RIGHT: Time mini card */}
+                        {!isAsap && (
+                            <div className={`miniCard ${timeOpen ? "open" : ""}`}>
+                                {timeOpen && (
+                                    <div className="miniDrop">
+                                        <div className="glass field">
+                                            <div className="label">Ко времени</div>
+                                            <DatePicker
+                                                selected={formData.workTime}
+                                                onChange={(date) => setFormData((p) => ({ ...p, workTime: date }))}
+                                                showTimeSelect
+                                                timeFormat="HH:mm"
+                                                timeIntervals={15}
+                                                dateFormat="Pp"
+                                                placeholderText="Выберите дату и время"
+                                                minDate={new Date()}
+                                                minTime={getMinTime(formData.workTime)}
+                                                maxTime={new Date(0, 0, 0, 23, 59, 59)}
+                                                className="control"
+                                                portalId="date-picker-portal"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="headerMiniGrid">
+                            {/* LEFT: Address mini card */}
+                            <div className={`miniCard ${addressOpen ? "open" : ""}`}>
+                                <button
+                                    type="button"
+                                    className="miniCardBtn"
+                                    onClick={() => {
+                                        setAddressOpen((p) => !p);
+                                        setTimeOpen(false); // чтобы не было ощущения “вложенности”
+                                    }}
+                                >
+                                    <div className="miniTop">
+                                        <span className="miniLabel">Адрес</span>
+                                        <span className="miniChevron">{addressOpen ? "⌃" : "⌄"}</span>
+                                    </div>
+
+                                    <div className={`miniValue ${formData.address ? "" : "danger"}`}>
+                                        {formData.address ? "Указан" : "Не указан"}
+                                    </div>
+
+                                    {/* мелким — реальный адрес (если есть), иначе подсказка */}
+                                    <div className="miniSub">
+                                        {addrResolving
+                                            ? "Определяем…"
+                                            : formData.address
+                                                ? formData.address
+                                                : "Нажмите, чтобы указать"}
+                                    </div>
+                                </button>
+
+                                {/* раскрытие адреса — только под address */}
+                                {addressOpen && (
+                                    <div className="miniDrop">
+                                        <div className="glass field">
+                                            <div className="label">Адрес</div>
+                                            <input
+                                                className="control"
+                                                type="text"
+                                                placeholder="Введите адрес"
+                                                value={formData.address}
+                                                onChange={handleAddressChange}
+                                            />
+
+                                            {addrResolveError && <div className="inline-error">{addrResolveError}</div>}
+
+                                            {addressSuggestions.length > 0 && (
+                                                <ul className="suggestions">
+                                                    {addressSuggestions.map((a, i) => (
+                                                        <li key={i} onClick={() => handleAddressSelect(a)}>
+                                                            {a}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
+
+                                        <div className="address-row" style={{ marginTop: 10, paddingTop: 10 }}>
+                                            <div className="muted-strong">Адрес из профиля?</div>
+
+                                            <div className="chip-row">
+                                                <button
+                                                    type="button"
+                                                    className={`chip-btn ${addressMode === "profile" ? "active" : ""}`}
+                                                    onClick={async () => {
+                                                        setAddressMode("profile");
+                                                        setAddrResolveError(null);
+
+                                                        const addr = profile?.locationAddress;
+                                                        const lat = Number(profile?.locationLat);
+                                                        const lng = Number(profile?.locationLng);
+                                                        const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+
+                                                        if (addr && !looksLikeCoordsString(addr)) {
+                                                            setFormData((p) => ({ ...p, address: addr }));
+                                                            if (hasCoords) setMarkerPosition([lat, lng]);
+                                                            return;
+                                                        }
+
+                                                        if (hasCoords) {
+                                                            setMarkerPosition([lat, lng]);
+                                                            setAddrResolving(true);
+                                                            const resolved = await reverseGeocodeYandex({ lat, lng, apiKey: YM_KEY });
+                                                            setAddrResolving(false);
+
+                                                            if (resolved) setFormData((p) => ({ ...p, address: resolved }));
+                                                            else setAddrResolveError("В профиле нет распознанного адреса. Введите вручную или выберите на карте.");
+                                                            return;
+                                                        }
+
+                                                        setAddrResolveError("В профиле нет адреса. Введите вручную или выберите на карте.");
+                                                    }}
+                                                >
+                                                    Да
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    className={`chip-btn ${addressMode === "custom" ? "active" : ""}`}
+                                                    onClick={() => setAddressMode("custom")}
+                                                >
+                                                    Нет
+                                                </button>
+                                            </div>
+
+                                            {addressMode === "custom" && (
+                                                <div className="grid2" style={{ marginTop: 10 }}>
+                                                    <button type="button" className="action-btn subtle" onClick={() => setShowMapModal(true)}>
+                                                        На карте
+                                                    </button>
+                                                    <button type="button" className="action-btn subtle" onClick={detectGps} disabled={addrResolving}>
+                                                        GPS
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <YandexMapModal
+                                            isOpen={showMapModal}
+                                            onClose={() => setShowMapModal(false)}
+                                            initialLat={markerPosition?.[0]}
+                                            initialLng={markerPosition?.[1]}
+                                            onPick={(picked) => {
+                                                setFormData((p) => ({ ...p, address: picked.address }));
+                                                setMarkerPosition([picked.lat, picked.lng]);
+                                                setAddressMode("custom");
+                                                setShowMapModal(false);
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+
                         </div>
                     </div>
                 </div>
@@ -470,28 +669,29 @@ function CreateOrderPage() {
                         </div>
                     </div>
 
-                    <div className="grid2">
-                        <div className="glass field">
-                            <div className="label">Категория</div>
-                            <select className="control" value={selectedCategory} onChange={handleCategoryChange}>
-                                <option value="">Выберите категорию</option>
-                                {category
-                                    .filter((cat) => cat.id !== 12 && cat.id !== 13)
-                                    .map((cat) => (
-                                        <option key={cat.id} value={cat.id}>
-                                            {cat.name}
-                                        </option>
-                                    ))}
-                            </select>
-                        </div>
+                    {/* Шаг 1: Категория всегда видна */}
+                    <div className="glass field">
+                        <div className="label">Категория</div>
+                        <select className="control" value={selectedCategory} onChange={handleCategoryChange}>
+                            <option value="">Выберите категорию</option>
+                            {category
+                                .filter((cat) => cat.id !== 12 && cat.id !== 13)
+                                .map((cat) => (
+                                    <option key={cat.id} value={cat.id}>
+                                        {cat.name}
+                                    </option>
+                                ))}
+                        </select>
+                    </div>
 
-                        <div className="glass field">
+                    {/* Шаг 2: Подкатегория показывается только после выбора категории */}
+                    {selectedCategory && (
+                        <div className="glass field" style={{ marginTop: 10 }}>
                             <div className="label">Подкатегория</div>
                             <select
                                 className="control"
                                 value={selectedSubcategory}
                                 onChange={handleSubcategoryChange}
-                                disabled={!selectedCategory}
                             >
                                 <option value="">Выберите подкатегорию</option>
                                 {subcategory.map((sub) => (
@@ -502,12 +702,17 @@ function CreateOrderPage() {
                                 ))}
                             </select>
                         </div>
-                    </div>
+                    )}
 
-                    {services.length > 0 && (
+                    {/* Шаг 3: Услуга — только когда выбрана подкатегория и услуги есть */}
+                    {selectedSubcategory && services.length > 0 && (
                         <div className="glass field" style={{ marginTop: 10 }}>
                             <div className="label">Услуга</div>
-                            <select className="control" value={selectedService} onChange={(e) => setSelectedService(e.target.value)}>
+                            <select
+                                className="control"
+                                value={selectedService}
+                                onChange={(e) => setSelectedService(e.target.value)}
+                            >
                                 <option value="">Выберите услугу</option>
                                 {services.map((s) => (
                                     <option key={s.id} value={s.id}>
@@ -537,203 +742,24 @@ function CreateOrderPage() {
                             onChange={handleDescriptionChange}
                             rows="3"
                         />
-                    </div>
-                </div>
 
-                {/* Address */}
-                <div className="glass section-card">
-                    <div className="section-head">
-                        <div>
-                            <div className="section-title">Адрес</div>
-                            <div className="section-sub">Из профиля или вручную / карта / GPS</div>
-                        </div>
-                    </div>
+                        <label className="upload inline">
+                            <input type="file" multiple accept="image/*" onChange={handleImageChange} style={{ display: "none" }} />
+                            <span>📎 Прикрепить фото</span>
+                        </label>
 
-                    <div className="glass field">
-                        <div className="label">Адрес</div>
-                        <input
-                            className="control"
-                            type="text"
-                            placeholder="Введите адрес"
-                            value={formData.address}
-                            onChange={handleAddressChange}
-                        />
-
-                        {addrResolveError && <div className="inline-error">{addrResolveError}</div>}
-
-                        {addressSuggestions.length > 0 && (
-                            <ul className="suggestions">
-                                {addressSuggestions.map((a, i) => (
-                                    <li key={i} onClick={() => handleAddressSelect(a)}>
-                                        {a}
-                                    </li>
+                        {images.length > 0 ? (
+                            <div className="docsGrid" style={{ marginTop: 12 }}>
+                                {images.map((img, i) => (
+                                    <div className="glass doc" key={i}>
+                                        <img className="docImg" src={URL.createObjectURL(img)} alt={`Preview ${i + 1}`} />
+                                        <div className="docName">Фото {i + 1}</div>
+                                    </div>
                                 ))}
-                            </ul>
-                        )}
-                    </div>
-
-                    <div className="address-row">
-                        <div className="muted-strong">Использовать адрес из профиля?</div>
-
-                        <div className="chip-row">
-                            <button
-                                type="button"
-                                className={`chip-btn ${addressMode === "profile" ? "active" : ""}`}
-                                onClick={async () => {
-                                    setAddressMode("profile");
-                                    setAddrResolveError(null);
-
-                                    const addr = profile?.locationAddress;
-                                    const lat = Number(profile?.locationLat);
-                                    const lng = Number(profile?.locationLng);
-                                    const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
-
-                                    if (addr && !looksLikeCoordsString(addr)) {
-                                        setFormData((p) => ({ ...p, address: addr }));
-                                        if (hasCoords) setMarkerPosition([lat, lng]);
-                                        return;
-                                    }
-
-                                    if (hasCoords) {
-                                        setMarkerPosition([lat, lng]);
-                                        setAddrResolving(true);
-                                        const resolved = await reverseGeocodeYandex({ lat, lng, apiKey: YM_KEY });
-                                        setAddrResolving(false);
-
-                                        if (resolved) setFormData((p) => ({ ...p, address: resolved }));
-                                        else setAddrResolveError(
-                                            "В профиле нет распознанного адреса. Введите вручную или выберите на карте."
-                                        );
-                                        return;
-                                    }
-
-                                    setAddrResolveError("В профиле нет адреса. Введите вручную или выберите на карте.");
-                                }}
-                            >
-                                Да
-                            </button>
-
-                            <button
-                                type="button"
-                                className={`chip-btn ${addressMode === "custom" ? "active" : ""}`}
-                                onClick={() => setAddressMode("custom")}
-                            >
-                                Нет
-                            </button>
-                        </div>
-
-                        {addressMode === "custom" && (
-                            <div className="grid2" style={{ marginTop: 10 }}>
-                                <button type="button" className="action-btn subtle" onClick={() => setShowMapModal(true)}>
-                                    На карте
-                                </button>
-                                <button type="button" className="action-btn subtle" onClick={detectGps} disabled={addrResolving}>
-                                    GPS
-                                </button>
                             </div>
-                        )}
+                        ) : null}
+
                     </div>
-
-                    <YandexMapModal
-                        isOpen={showMapModal}
-                        onClose={() => setShowMapModal(false)}
-                        initialLat={markerPosition?.[0]}
-                        initialLng={markerPosition?.[1]}
-                        onPick={(picked) => {
-                            setFormData((p) => ({ ...p, address: picked.address }));
-                            setMarkerPosition([picked.lat, picked.lng]);
-                            setAddressMode("custom");
-                            setShowMapModal(false);
-                        }}
-                    />
-                </div>
-
-                {/* Time */}
-                <div className="glass section-card">
-                    <div className="section-head">
-                        <div>
-                            <div className="section-title">Время</div>
-                            <div className="section-sub">Тумблер “по времени / срочно”</div>
-                        </div>
-                    </div>
-
-                    <div className="grid2">
-                        <div className="glass field">
-                            <div className="label">Когда нужно</div>
-
-                            {/* ✅ слева "По времени" — справа "Срочно" */}
-                            <div className="toggleRow">
-                                <span className={`toggleLabel ${!isAsap ? "active" : ""}`}>По времени</span>
-
-                                <button
-                                    type="button"
-                                    className={`toggle ${isAsap ? "on" : ""}`}
-                                    onClick={() => {
-                                        const next = !isAsap;
-                                        setIsAsap(next);
-                                        if (next) setFormData((p) => ({ ...p, workTime: roundTo15(new Date()) }));
-                                    }}
-                                    aria-label="По времени / Срочно"
-                                >
-                                    <span className="toggleKnob" />
-                                </button>
-
-                                <span className={`toggleLabel ${isAsap ? "active" : ""}`}>Срочно</span>
-                            </div>
-
-                            {isAsap ? (
-                                <div className="glass chip">
-                                    Ближайшее: <b>{formData.workTime ? new Date(formData.workTime).toLocaleString() : "—"}</b>
-                                </div>
-                            ) : (
-                                <DatePicker
-                                    selected={formData.workTime}
-                                    onChange={(date) => setFormData((p) => ({ ...p, workTime: date }))}
-                                    showTimeSelect
-                                    timeFormat="HH:mm"
-                                    timeIntervals={15}
-                                    dateFormat="Pp"
-                                    placeholderText="Выберите дату и время"
-                                    minDate={new Date()}
-                                    minTime={getMinTime(formData.workTime)}
-                                    maxTime={new Date(0, 0, 0, 23, 59, 59)}
-                                    className="control"
-                                    portalId="date-picker-portal"
-                                />
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Photos */}
-                <div className="glass section-card">
-                    <div className="section-head">
-                        <div>
-                            <div className="section-title">Фото</div>
-                            <div className="section-sub">Чтобы исполнителю было понятнее</div>
-                        </div>
-                    </div>
-
-                    {/* ВАЖНО: больше НЕ даём className="glass" кнопке, чтобы не “перетирались” бордеры */}
-                    <label className="upload">
-                        <input type="file" multiple accept="image/*" onChange={handleImageChange} style={{ display: "none" }} />
-                        <span>Загрузить изображения</span>
-                    </label>
-
-                    {images.length > 0 ? (
-                        <div className="docsGrid" style={{ marginTop: 12 }}>
-                            {images.map((img, i) => (
-                                <div className="glass doc" key={i}>
-                                    <img className="docImg" src={URL.createObjectURL(img)} alt={`Preview ${i + 1}`} />
-                                    <div className="docName">Фото {i + 1}</div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="muted" style={{ marginTop: 10 }}>
-                            Изображения не выбраны
-                        </div>
-                    )}
                 </div>
 
                 {/* Payment + promotion */}
@@ -766,6 +792,7 @@ function CreateOrderPage() {
                             {paymentMethods.map((m) => (
                                 <button
                                     key={m.id}
+                                    title={m.label}
                                     className={`payTile ${selectedMethod === m.id ? "selected" : ""}`}
                                     onClick={(event) => handleSelectPayment(event, m.id)}
                                     type="button"
@@ -775,6 +802,13 @@ function CreateOrderPage() {
                                 </button>
                             ))}
                         </div>
+
+                        {selectedMethod && (
+                            <div className="muted" style={{ marginTop: 8 }}>
+                                Выбран способ оплаты: <b>{paymentMethods.find((x) => x.id === selectedMethod)?.label}</b>
+                            </div>
+                        )}
+
                     </div>
 
                     <div className="glass promoBox">
