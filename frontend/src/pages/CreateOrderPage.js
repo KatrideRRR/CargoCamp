@@ -23,6 +23,29 @@ function looksLikeCoordsString(v) {
     return s.startsWith("Координаты:") || /^\d{1,3}\.\d+,\s*\d{1,3}\.\d+$/.test(s);
 }
 
+function parseYandexGeocoderSuggestions(data) {
+    const members = data?.response?.GeoObjectCollection?.featureMember || [];
+
+    return members
+        .map((m) => {
+            const g = m?.GeoObject;
+            const text = g?.metaDataProperty?.GeocoderMetaData?.text; // ✅ полный адрес
+            const pos = g?.Point?.pos; // "lon lat"
+            if (!text || !pos) return null;
+
+            const [lon, lat] = pos.split(" ").map(Number);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+            return {
+                label: text,
+                address: text,
+                lat,
+                lon,
+            };
+        })
+        .filter(Boolean);
+}
+
 // reverse geocode через Yandex Geocoder: geocode=lng,lat
 async function reverseGeocodeYandex({ lat, lng, apiKey }) {
     if (!apiKey) throw new Error("No Yandex API key");
@@ -58,10 +81,10 @@ function CreateOrderPage() {
 
     const [error, setError] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [images, setImages] = useState([]);
 
     const [markerPosition, setMarkerPosition] = useState(null); // [lat, lng]
-    const [addressSuggestions, setAddressSuggestions] = useState([]);
-    const [images, setImages] = useState([]);
+    const [addressSuggestions, setAddressSuggestions] = useState([]); // [{label,address,lat,lon}]    const [images, setImages] = useState([]);
 
     const [category, setCategory] = useState([]);
     const [subcategory, setSubcategory] = useState([]);
@@ -86,6 +109,8 @@ function CreateOrderPage() {
     const [showMapModal, setShowMapModal] = useState(false);
     const [addrResolving, setAddrResolving] = useState(false);
     const [addrResolveError, setAddrResolveError] = useState(null);
+    const suggestTimerRef = React.useRef(null);
+    const suggestAbortRef = React.useRef(null);
 
     // ✅ тумблер: ON = срочно
     const [isAsap, setIsAsap] = useState(true);
@@ -249,46 +274,57 @@ function CreateOrderPage() {
         return new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0);
     };
 
-    const handleAddressChange = async (e) => {
+    const handleAddressChange = (e) => {
         const address = e.target.value;
         setFormData((p) => ({ ...p, address }));
         setAddressMode("custom");
 
-        if (address.length > 3) {
+        // чистим если мало символов
+        const q = address.trim();
+        if (q.length < 3) {
+            setAddressSuggestions([]);
+            return;
+        }
+
+        // debounce
+        if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
+
+        suggestTimerRef.current = setTimeout(async () => {
             try {
-                const r = await fetch(
-                    `https://geocode-maps.yandex.ru/1.x/?apikey=${YM_KEY}&geocode=${encodeURIComponent(address)}&format=json`
-                );
+                // abort предыдущий запрос
+                if (suggestAbortRef.current) suggestAbortRef.current.abort();
+                const ctrl = new AbortController();
+                suggestAbortRef.current = ctrl;
+
+                // ⚠️ results=10 + kind=house → чаще дает адреса до дома
+                const url =
+                    `https://geocode-maps.yandex.ru/1.x/?apikey=${YM_KEY}` +
+                    `&geocode=${encodeURIComponent(q)}` +
+                    `&format=json&results=10&kind=house`;
+
+                const r = await fetch(url, { signal: ctrl.signal });
                 const data = await r.json();
-                const suggestions = data.response.GeoObjectCollection.featureMember.map((item) => item.GeoObject.name);
-                setAddressSuggestions(suggestions);
+
+                const suggestions = parseYandexGeocoderSuggestions(data);
+
+                // можно чуть “умнее”: убрать дубли
+                const uniq = Array.from(new Map(suggestions.map(s => [s.label, s])).values());
+
+                setAddressSuggestions(uniq);
             } catch (err) {
+                if (err?.name === "AbortError") return;
                 console.error("Ошибка геокодирования:", err);
                 setAddressSuggestions([]);
             }
-        } else {
-            setAddressSuggestions([]);
-        }
+        }, 250);
     };
 
-    const handleAddressSelect = async (address) => {
-        setFormData((p) => ({ ...p, address }));
+    const handleAddressSelect = (s) => {
+        // s = {label,address,lat,lon}
+        setFormData((p) => ({ ...p, address: s.address }));
         setAddressSuggestions([]);
         setAddressMode("custom");
-
-        try {
-            const r = await fetch(
-                `https://geocode-maps.yandex.ru/1.x/?apikey=${YM_KEY}&geocode=${encodeURIComponent(address)}&format=json`
-            );
-            const data = await r.json();
-            const pos = data.response.GeoObjectCollection.featureMember?.[0]?.GeoObject?.Point?.pos;
-            if (!pos) return;
-
-            const [lon, lat] = pos.split(" ").map((v) => parseFloat(v));
-            if (Number.isFinite(lat) && Number.isFinite(lon)) setMarkerPosition([lat, lon]);
-        } catch (err) {
-            console.error("Ошибка получения координат:", err);
-        }
+        setMarkerPosition([s.lat, s.lon]);
     };
 
     const detectGps = () => {
@@ -355,6 +391,10 @@ function CreateOrderPage() {
         textarea.style.height = `${textarea.scrollHeight}px`;
         setFormData((p) => ({ ...p, description: textarea.value }));
     };
+
+    useEffect(() => {
+        if (!addressOpen) setAddressSuggestions([]);
+    }, [addressOpen]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -563,9 +603,9 @@ function CreateOrderPage() {
 
                                             {addressSuggestions.length > 0 && (
                                                 <ul className="suggestions">
-                                                    {addressSuggestions.map((a, i) => (
-                                                        <li key={i} onClick={() => handleAddressSelect(a)}>
-                                                            {a}
+                                                    {addressSuggestions.map((s, i) => (
+                                                        <li key={`${s.label}-${i}`} onClick={() => handleAddressSelect(s)}>
+                                                            {s.label}
                                                         </li>
                                                     ))}
                                                 </ul>

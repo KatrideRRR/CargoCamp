@@ -46,6 +46,8 @@ const ProfilePage = () => {
     const [locError, setLocError] = useState(null);
     const [gpsCandidate, setGpsCandidate] = useState(null); // {lat,lng,address}
     const [showMapModal, setShowMapModal] = useState(false);
+    const [addressSuggestions, setAddressSuggestions] = useState([]);
+    const [pickedCoords, setPickedCoords] = useState(null); // {lat, lng}
 
     const [categories, setCategories] = useState([]);
     const [categoryPick, setCategoryPick] = useState([]); // массив id
@@ -56,12 +58,74 @@ const ProfilePage = () => {
 
     const YM_KEY = process.env.REACT_APP_YANDEX_API_KEY;
 
+    const [headerCollapsed, setHeaderCollapsed] = useState(false);
+
+    useEffect(() => {
+        let ticking = false;
+
+        const onScroll = () => {
+            if (ticking) return;
+            ticking = true;
+
+            requestAnimationFrame(() => {
+                const y = window.scrollY;
+
+                // ГИСТЕРЕЗИС:
+                // - сворачиваем после 80px
+                // - разворачиваем только если вернулись ниже 40px
+                setHeaderCollapsed((prev) => {
+                    if (!prev && y > 80) return true;
+                    if (prev && y < 40) return false;
+                    return prev;
+                });
+
+                ticking = false;
+            });
+        };
+
+        onScroll();
+        window.addEventListener("scroll", onScroll, { passive: true });
+        return () => window.removeEventListener("scroll", onScroll);
+    }, []);
+
     const getRemainingDays = (expiresAt) => {
         if (!expiresAt) return 0;
         const now = new Date();
         const expiration = new Date(expiresAt);
         const diff = expiration - now;
         return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+    };
+
+    const fetchAddressSuggestions = async (query) => {
+        if (!query || query.length < 3) {
+            setAddressSuggestions([]);
+            return;
+        }
+
+        try {
+            const r = await fetch(
+                `https://geocode-maps.yandex.ru/1.x/?apikey=${YM_KEY}&geocode=${encodeURIComponent(
+                    query
+                )}&format=json&results=6`
+            );
+            const data = await r.json();
+
+            const items =
+                data?.response?.GeoObjectCollection?.featureMember?.map((f) => {
+                    const geo = f.GeoObject;
+                    const pos = geo.Point.pos.split(" ").map(Number);
+                    return {
+                        label: geo.metaDataProperty.GeocoderMetaData.text,
+                        lat: pos[1],
+                        lng: pos[0],
+                    };
+                }) || [];
+
+            setAddressSuggestions(items);
+        } catch (e) {
+            console.error("address suggest error", e);
+            setAddressSuggestions([]);
+        }
     };
 
     const subscriptionLabel = useMemo(() => {
@@ -143,6 +207,24 @@ const ProfilePage = () => {
             setCatSaving(false);
         }
     };
+
+    useEffect(() => {
+        const openAt = 80;   // свернуть после 80px
+        const closeAt = 40;  // развернуть обратно только если <40px
+
+        const onScroll = () => {
+            const y = window.scrollY;
+            setHeaderCollapsed(prev => {
+                if (!prev && y > openAt) return true;
+                if (prev && y < closeAt) return false;
+                return prev;
+            });
+        };
+
+        onScroll();
+        window.addEventListener("scroll", onScroll, { passive: true });
+        return () => window.removeEventListener("scroll", onScroll);
+    }, []);
 
     useEffect(() => {
         if (!profile) return;
@@ -441,11 +523,21 @@ const ProfilePage = () => {
     return (
         <div className="profile-page">
             <div className="profile-shell">
-                <div className="profile-header glass">
+                <div className={`profile-header glass ${headerCollapsed ? "is-collapsed" : ""}`}>
+
                     <div className="profile-header-top">
                         <div>
                             <h1 className="profile-title">Профиль</h1>
                             <p className="profile-subtitle">Управление аккаунтом и оплатой</p>
+
+                            {profile && (
+                                <div className="header-mini">
+                                    <span className="header-mini-name">{profile.username}</span>
+                                    <span className="header-mini-pill">
+          ★ {profile.rating ? Number(profile.rating).toFixed(1) : "—"}
+        </span>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -657,17 +749,48 @@ const ProfilePage = () => {
                     </div>
 
                     <div className="loc-row">
-                        <input
-                            className="loc-input"
-                            value={locationDraft}
-                            onChange={(e) => setLocationDraft(e.target.value)}
-                            placeholder="Введите район/город/адрес (например: Крым, Белогорск)"
-                        />
+                        <div className="loc-input-wrap">
+                            <input
+                                className="loc-input"
+                                value={locationDraft}
+                                onChange={(e) => {
+                                    const v = e.target.value;
+                                    setLocationDraft(v);
+                                    setPickedCoords(null);
+                                    fetchAddressSuggestions(v);
+                                }}
+                                placeholder="Введите район / улицу / адрес"
+                                autoComplete="off"
+                            />
+
+                            {addressSuggestions.length > 0 && (
+                                <ul className="loc-suggestions">
+                                    {addressSuggestions.map((s, i) => (
+                                        <li
+                                            key={i}
+                                            onClick={() => {
+                                                setLocationDraft(s.label);
+                                                setPickedCoords({ lat: s.lat, lng: s.lng });
+                                                setAddressSuggestions([]);
+                                            }}
+                                        >
+                                            {s.label}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+
                         <button
                             className="btn btn-primary"
                             disabled={locLoading}
                             onClick={() =>
-                                saveLocation({ address: locationDraft, lat: null, lng: null, source: "manual" })
+                                saveLocation({
+                                    address: locationDraft,
+                                    lat: pickedCoords?.lat || null,
+                                    lng: pickedCoords?.lng || null,
+                                    source: "manual",
+                                })
                             }
                         >
                             Сохранить
