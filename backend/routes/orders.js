@@ -156,6 +156,30 @@ module.exports = (io) => {
 
             const photoUrls = req.files ? req.files.map((f) => `/uploads/orders/${f.filename}`) : [];
 
+            // --- normalize ids (важно) ---
+            const catId = Number(categoryId);
+            if (!Number.isFinite(catId) || catId <= 0) {
+                return res.status(400).json({ message: "categoryId обязателен" });
+            }
+
+            const subId = subcategoryId ? Number(subcategoryId) : null;
+            const normalizedSubId = Number.isFinite(subId) && subId > 0 ? subId : null;
+
+            const svcId = serviceId ? Number(serviceId) : null;
+            const normalizedSvcId = Number.isFinite(svcId) && svcId > 0 ? svcId : null;
+
+            // --- paymentType default ---
+            paymentType = Array.isArray(paymentType) ? paymentType[0] : paymentType;
+            paymentType = String(paymentType || "").trim();
+
+            // Пока на фронте выбора нет — считаем по умолчанию cash
+            if (!paymentType) paymentType = "cash";
+
+            const allowedPaymentTypes = new Set(["cash", "guarantee", "installment"]);
+            if (!allowedPaymentTypes.has(paymentType)) {
+                return res.status(400).json({ message: "Некорректный paymentType" });
+            }
+
             const newOrder = await Order.create({
                 userId,
                 address,
@@ -167,9 +191,9 @@ module.exports = (io) => {
                 images: photoUrls,
                 creatorId: userId,
                 status,
-                categoryId,
-                subcategoryId,
-                serviceId: serviceId && serviceId !== "0" ? serviceId : null,
+                categoryId: catId,
+                subcategoryId: normalizedSubId,
+                serviceId: normalizedSvcId,
                 paymentType,
 
                 promotionCost: promotionTotal,

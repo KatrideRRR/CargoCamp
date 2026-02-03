@@ -1,4 +1,3 @@
-// src/pages/CreateOrderPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import DatePicker from "react-datepicker";
@@ -6,7 +5,6 @@ import "react-datepicker/dist/react-datepicker.css";
 import { useNavigate } from "react-router-dom";
 import "../styles/CreateOrderPage.css";
 import imageCompression from "browser-image-compression";
-import { FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity } from "react-icons/fa";
 import PromotionOptions, { PROMOTION_PRICES } from "../components/PromotionOptions";
 import YandexMapModal from "../components/YandexMapModal";
 
@@ -100,8 +98,7 @@ function CreateOrderPage() {
     const [promotion, setPromotion] = useState({ highlight: false, recommended: false, push: false });
 
     // ✅ один источник правды
-    const [paymentType, setPaymentType] = useState("");
-    const [selectedMethod, setSelectedMethod] = useState(null);
+    const [paymentType] = useState("cash"); // всегда наличные (пока не добавим гарантию/рассрочку)
 
     // address
     const [profile, setProfile] = useState(null);
@@ -114,15 +111,6 @@ function CreateOrderPage() {
 
     // ✅ тумблер: ON = срочно
     const [isAsap, setIsAsap] = useState(true);
-
-    const paymentMethods = useMemo(
-        () => [
-            { id: "cash", label: "Наличные" },
-            { id: "guarantee", label: "Гарантия" },
-            { id: "installment", label: "Рассрочка" },
-        ],
-        []
-    );
 
     const promotionTotal = useMemo(() => {
         return Object.entries(promotion).reduce(
@@ -366,25 +354,6 @@ function CreateOrderPage() {
         );
     };
 
-    const handleSelectPayment = (event, id) => {
-        event.preventDefault();
-        setSelectedMethod(id);
-        setPaymentType(id);
-    };
-
-    const getPaymentIcon = (type) => {
-        switch (type) {
-            case "guarantee":
-                return <FaUniversity title="Гарантия" />;
-            case "cash":
-                return <FaMoneyBillWave title="Наличные" />;
-            case "installment":
-                return <FaCreditCard title="Рассрочка" />;
-            default:
-                return <FaQuestionCircle title="Неизвестно" />;
-        }
-    };
-
     const handleDescriptionChange = (e) => {
         const textarea = e.target;
         textarea.style.height = "auto";
@@ -400,10 +369,6 @@ function CreateOrderPage() {
         e.preventDefault();
         setError("");
 
-        if (!paymentType) {
-            setError("Пожалуйста, выберите тип оплаты");
-            return;
-        }
         if (!formData.address?.trim()) {
             setError("Адрес обязателен");
             setAddressOpen(true);
@@ -414,8 +379,8 @@ function CreateOrderPage() {
             setAddressOpen(true);
             return;
         }
-        if (!selectedCategory || !selectedSubcategory) {
-            setError("Выберите категорию и подкатегорию");
+        if (!selectedCategory) {
+            setError("Выберите категорию");
             return;
         }
 
@@ -431,10 +396,14 @@ function CreateOrderPage() {
         data.append("paymentType", paymentType);
 
         data.append("categoryId", Number(selectedCategory));
-        data.append("subcategoryId", Number(selectedSubcategory));
 
-        if (selectedService && Number(selectedService) > 0) data.append("serviceId", Number(selectedService));
+        if (selectedSubcategory && Number(selectedSubcategory) > 0) {
+            data.append("subcategoryId", Number(selectedSubcategory));
+        }
 
+        if (selectedService && Number(selectedService) > 0) {
+            data.append("serviceId", Number(selectedService));
+        }
         data.append("promotion", JSON.stringify(promotion));
         images.forEach((img) => data.append("images", img));
 
@@ -823,32 +792,6 @@ function CreateOrderPage() {
                             required
                         />
                         <div className="hint">Эту сумму вы оплачиваете исполнителю. Сейчас оплачивается только продвижение.</div>
-                    </div>
-
-                    <div className="glass field" style={{ marginTop: 10 }}>
-                        <div className="label">Способ оплаты</div>
-
-                        <div className="payGrid">
-                            {paymentMethods.map((m) => (
-                                <button
-                                    key={m.id}
-                                    title={m.label}
-                                    className={`payTile ${selectedMethod === m.id ? "selected" : ""}`}
-                                    onClick={(event) => handleSelectPayment(event, m.id)}
-                                    type="button"
-                                >
-                                    <span className="payIco">{getPaymentIcon(m.id)}</span>
-                                    <span className="payLabel">{m.label}</span>
-                                </button>
-                            ))}
-                        </div>
-
-                        {selectedMethod && (
-                            <div className="muted" style={{ marginTop: 8 }}>
-                                Выбран способ оплаты: <b>{paymentMethods.find((x) => x.id === selectedMethod)?.label}</b>
-                            </div>
-                        )}
-
                     </div>
 
                     <div className="glass promoBox">
