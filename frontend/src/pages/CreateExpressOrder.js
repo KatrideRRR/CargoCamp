@@ -11,12 +11,12 @@ const subcategoryOptions = {
         { label: "Перевозка пассажиров", icon: "🚕" },
         { label: "Перевозка детей", icon: "🧒" },
         { label: "Перевозка животных", icon: "🐶" },
-        { label: "Перевозка между городами", icon: "🛣️" },
+        { label: "Между городами", icon: "🛣️" },
     ],
     courier: [
-        { label: "Доставка цветов", icon: "💐" },
-        { label: "Доставка еды/продуктов", icon: "🍔" },
-        { label: "Доставка документов", icon: "📄" },
+        { label: "Цветы", icon: "💐" },
+        { label: "Еда/продукты", icon: "🍔" },
+        { label: "Документы", icon: "📄" },
     ],
 };
 
@@ -25,17 +25,33 @@ function toNum(v) {
     return Number.isFinite(n) ? n : null;
 }
 
+function parseYandexGeocoderSuggestions(data) {
+    const members = data?.response?.GeoObjectCollection?.featureMember || [];
+
+    return members
+        .map((m) => {
+            const g = m?.GeoObject;
+            const text = g?.metaDataProperty?.GeocoderMetaData?.text;
+            const pos = g?.Point?.pos; // "lon lat"
+            if (!text || !pos) return null;
+
+            const [lon, lat] = pos.split(" ").map(Number);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+            return { label: text, address: text, lat, lon };
+        })
+        .filter(Boolean);
+}
+
 function buildYandexNaviUrl(fromLat, fromLng, toLat, toLng) {
     return `https://yandex.ru/navi/?rtext=${Number(fromLat)},${Number(fromLng)}~${Number(toLat)},${Number(toLng)}&rtt=auto`;
 }
 
-/** Загружаем Yandex Maps JS API один раз */
 function loadYMaps(apiKey) {
     if (window.ymaps) return Promise.resolve(window.ymaps);
 
     const id = "yandex-maps-script";
     const existing = document.getElementById(id);
-
     if (existing) {
         return new Promise((resolve, reject) => {
             existing.addEventListener("load", () => resolve(window.ymaps));
@@ -54,12 +70,10 @@ function loadYMaps(apiKey) {
     });
 }
 
-/** Пытаемся получить distance/time по дорогам через ymaps.route */
 async function calcRouteByYmaps({ apiKey, fromLat, fromLng, toLat, toLng }) {
     const ymaps = await loadYMaps(apiKey);
     await ymaps.ready();
 
-    // ymaps.route возвращает "маршрут" (обычно автомобильный), у него есть getLength()/getTime()
     const route = await ymaps.route(
         [
             [Number(fromLat), Number(fromLng)],
@@ -78,8 +92,8 @@ async function calcRouteByYmaps({ apiKey, fromLat, fromLng, toLat, toLng }) {
 }
 
 const PRICING = {
-    taxi: { base: 150, perKm: 20 },     // пример — легко поменяешь
-    courier: { base: 120, perKm: 15 },  // пример — легко поменяешь
+    taxi: { base: 150, perKm: 20 },
+    courier: { base: 120, perKm: 15 },
 };
 
 const CreateExpressOrder = () => {
@@ -91,9 +105,12 @@ const CreateExpressOrder = () => {
     const [saved, setSaved] = useState([]);
     const [savedLoading, setSavedLoading] = useState(false);
 
+    const [addrSug, setAddrSug] = useState({ from: [], to: [] });
+    const suggestTimerRef = React.useRef({ from: null, to: null });
+    const suggestAbortRef = React.useRef({ from: null, to: null });
+
     const [form, setForm] = useState({
-        subcategory: "",            // теперь НЕ обязательное
-        paymentType: "cash",        // cash | guarantee
+        subcategory: "",       // optional
         totalPrice: "",
         description: "",
 
@@ -107,26 +124,16 @@ const CreateExpressOrder = () => {
     });
 
     const [showMapFor, setShowMapFor] = useState(null); // "from" | "to" | null
-    const [showConfirm, setShowConfirm] = useState(false);
+    const [showRouteModal, setShowRouteModal] = useState(false);
 
     const [suggestSave, setSuggestSave] = useState(false);
     const [createdOrderId, setCreatedOrderId] = useState(null);
 
-    // Дополнительно
-    const [showExtra, setShowExtra] = useState(false);
+    // Дополнительно (свернуть)
+    const [extraOpen, setExtraOpen] = useState(false);
 
-    // Рекомендованные расчёты
+    // route calc
     const [routeCalc, setRouteCalc] = useState({ loading: false, distanceKm: null, durationMin: null, err: "" });
-
-    const [showRouteModal, setShowRouteModal] = useState(false);
-
-    const paymentMethods = useMemo(
-        () => [
-            { id: "cash", label: "Наличные" },
-            { id: "guarantee", label: "Гарантия" },
-        ],
-        []
-    );
 
     const setField = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
@@ -143,6 +150,83 @@ const CreateExpressOrder = () => {
         return buildYandexNaviUrl(form.fromLat, form.fromLng, form.toLat, form.toLng);
     }, [coordsOk, form.fromLat, form.fromLng, form.toLat, form.toLng]);
 
+    const clearSuggest = (kind) => {
+        setAddrSug((p) => ({ ...p, [kind]: [] }));
+    };
+
+    const fetchSuggest = (kind, query) => {
+        if (!apiKey) return; // REACT_APP_YANDEX_API_KEY
+        const q = String(query || "").trim();
+        if (q.length < 3) {
+            clearSuggest(kind);
+            return;
+        }
+
+        // debounce
+        const t = suggestTimerRef.current[kind];
+        if (t) clearTimeout(t);
+
+        suggestTimerRef.current[kind] = setTimeout(async () => {
+            try {
+                // abort previous request for this field
+                const prevCtrl = suggestAbortRef.current[kind];
+                if (prevCtrl) prevCtrl.abort();
+
+                const ctrl = new AbortController();
+                suggestAbortRef.current[kind] = ctrl;
+
+                const url =
+                    `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}` +
+                    `&geocode=${encodeURIComponent(q)}` +
+                    `&format=json&results=8&kind=house`;
+
+                const r = await fetch(url, { signal: ctrl.signal });
+                const data = await r.json();
+
+                const items = parseYandexGeocoderSuggestions(data);
+
+                // уберем дубли
+                const uniq = Array.from(new Map(items.map((x) => [x.label, x])).values());
+
+                setAddrSug((p) => ({ ...p, [kind]: uniq }));
+            } catch (e) {
+                if (e?.name === "AbortError") return;
+                console.error("suggest error:", e);
+                clearSuggest(kind);
+            }
+        }, 250);
+    };
+
+    const onAddressInput = (kind, value) => {
+        setField(kind === "from" ? "fromAddress" : "toAddress", value);
+
+        // если человек руками редактирует — координаты лучше сбросить,
+        // чтобы не было "старых" координат от предыдущего адреса
+        if (kind === "from") {
+            setField("fromLat", "");
+            setField("fromLng", "");
+        } else {
+            setField("toLat", "");
+            setField("toLng", "");
+        }
+
+        fetchSuggest(kind, value);
+    };
+
+    const onPickSuggest = (kind, s) => {
+        // s: {address, lat, lon}
+        if (kind === "from") {
+            setField("fromAddress", s.address);
+            setField("fromLat", String(s.lat));
+            setField("fromLng", String(s.lon));
+        } else {
+            setField("toAddress", s.address);
+            setField("toLat", String(s.lat));
+            setField("toLng", String(s.lon));
+        }
+        clearSuggest(kind);
+    };
+
     const recommended = useMemo(() => {
         const km = routeCalc.distanceKm;
         if (!Number.isFinite(km)) return null;
@@ -151,7 +235,6 @@ const CreateExpressOrder = () => {
         return { rec, km, min: routeCalc.durationMin };
     }, [routeCalc.distanceKm, routeCalc.durationMin, type]);
 
-    // load saved addresses
     useEffect(() => {
         const load = async () => {
             setSavedLoading(true);
@@ -167,7 +250,6 @@ const CreateExpressOrder = () => {
         load();
     }, []);
 
-    // GPS for "from" — только координаты, без текста "GPS"
     const detectGpsForFrom = () => {
         setError("");
         if (!navigator.geolocation) {
@@ -176,28 +258,24 @@ const CreateExpressOrder = () => {
         }
         navigator.geolocation.getCurrentPosition(
             (pos) => {
-                const lat = pos.coords.latitude;
-                const lng = pos.coords.longitude;
-                setField("fromLat", String(lat));
-                setField("fromLng", String(lng));
-                // адрес НЕ подставляем "GPS", чтобы не портить UX
+                setField("fromLat", String(pos.coords.latitude));
+                setField("fromLng", String(pos.coords.longitude));
             },
             () => setError("Не удалось получить координаты по GPS"),
             { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
         );
     };
 
-    // Пересчитываем distance/time, когда появились обе точки
     useEffect(() => {
         let alive = true;
 
         const run = async () => {
             if (!coordsOk) {
-                setRouteCalc((p) => ({ ...p, loading: false, distanceKm: null, durationMin: null, err: "" }));
+                setRouteCalc({ loading: false, distanceKm: null, durationMin: null, err: "" });
                 return;
             }
             if (!apiKey) {
-                setRouteCalc((p) => ({ ...p, loading: false, err: "Нет REACT_APP_YANDEX_API_KEY" }));
+                setRouteCalc({ loading: false, distanceKm: null, durationMin: null, err: "Нет REACT_APP_YANDEX_API_KEY" });
                 return;
             }
 
@@ -228,47 +306,32 @@ const CreateExpressOrder = () => {
         };
 
         run();
-        return () => {
-            alive = false;
-        };
+        return () => { alive = false; };
     }, [coordsOk, apiKey, form.fromLat, form.fromLng, form.toLat, form.toLng]);
 
-    const validateRouteOnly = () => {
-        if (!form.fromAddress?.trim() || !form.toAddress?.trim()) return "Заполните Откуда и Куда";
-        if (!coordsOk) return "Нужны координаты точек A и B (выберите на карте/из сохранённых/GPS)";
-        return "";
-    };
-
-    const openRoutePreview = () => {
-        const v = validateRouteOnly();
-        if (v) { setError(v); return; }
-        setError("");
-        setShowRouteModal(true);
-    };
+    const applyRecommended = useCallback(() => {
+        if (!recommended?.rec) return;
+        setField("totalPrice", String(recommended.rec));
+    }, [recommended?.rec]);
 
     const validate = () => {
-        if (!type) return "Выберите тип заказа";
-        // ✅ subcategory больше НЕ обязательна
         if (!form.fromAddress?.trim() || !form.toAddress?.trim()) return "Заполните Откуда и Куда";
-        if (!coordsOk) return "Нужны координаты точек A и B (выберите из сохранённых / карта / GPS)";
+        if (!coordsOk) return "Нужны координаты точек A и B (карта/сохранённые/GPS)";
         if (!form.totalPrice || Number(form.totalPrice) <= 0) return "Укажите цену";
-        if (!["cash", "guarantee"].includes(form.paymentType)) return "Выберите оплату";
         return "";
     };
-
 
     const createOrder = async () => {
         const v = validate();
-        if (v) {
-            setError(v);
-            return;
-        }
+        if (v) { setError(v); return; }
+
+        setError("");
 
         try {
             const payload = {
                 type,
-                subcategory: form.subcategory || null, // optional
-                paymentType: form.paymentType,
+                subcategory: form.subcategory || null,
+                paymentType: "cash", // ✅ фиксируем для скорости (пока)
                 totalPrice: Number(form.totalPrice),
                 description: form.description || null,
 
@@ -280,7 +343,6 @@ const CreateExpressOrder = () => {
                 toLat: Number(form.toLat),
                 toLng: Number(form.toLng),
 
-                // можно оставить нулями (или позже писать туда рекомендованные формулы)
                 basePrice: 0,
                 pricePerKm: 0,
             };
@@ -293,7 +355,6 @@ const CreateExpressOrder = () => {
 
             const id = r.data.order?.id || null;
             setCreatedOrderId(id);
-            setShowConfirm(false);
             setSuggestSave(true);
         } catch (e) {
             console.error(e);
@@ -319,22 +380,25 @@ const CreateExpressOrder = () => {
         }
     };
 
-    const applyRecommended = useCallback(() => {
-        if (!recommended?.rec) return;
-        setField("totalPrice", String(recommended.rec));
-    }, [recommended?.rec]);
+    const routeStatus = useMemo(() => {
+        if (!coordsOk) return "Укажи точки A и B на карте — покажем расстояние и время.";
+        if (routeCalc.loading) return "Считаем маршрут…";
+        if (routeCalc.err) return `Маршрут не рассчитан: ${routeCalc.err}`;
+        if (recommended) return `~${recommended.km} км · ${Number.isFinite(recommended.min) ? `~${recommended.min} мин` : "—"}`;
+        return "Маршрут готов.";
+    }, [coordsOk, routeCalc.loading, routeCalc.err, recommended]);
 
     return (
         <div className="exo-page">
             <div className="exo-shell">
+
                 {/* Header */}
                 <div className="exo-glass exo-header">
                     <div className="exo-headerRow">
                         <div>
                             <div className="exo-title">Экспресс-заказ</div>
-                            <div className="exo-subtitle">Такси или курьер — максимально быстро</div>
+                            <div className="exo-subtitle">Две точки + цена — и готово</div>
                         </div>
-
                         <div className="exo-badges">
                             <span className="exo-pill">{savedLoading ? "Адреса…" : `Адреса: ${saved.length}`}</span>
                             <span className="exo-pill">{type === "taxi" ? "🚕 Такси" : "📦 Курьер"}</span>
@@ -345,10 +409,7 @@ const CreateExpressOrder = () => {
                         <button
                             type="button"
                             className={`exo-typeBtn ${type === "taxi" ? "isActive" : ""}`}
-                            onClick={() => {
-                                setType("taxi");
-                                setField("subcategory", "");
-                            }}
+                            onClick={() => { setType("taxi"); setField("subcategory", ""); }}
                         >
                             <span className="exo-typeIcon"><FaTaxi /></span>
                             <span>Такси</span>
@@ -357,10 +418,7 @@ const CreateExpressOrder = () => {
                         <button
                             type="button"
                             className={`exo-typeBtn ${type === "courier" ? "isActive" : ""}`}
-                            onClick={() => {
-                                setType("courier");
-                                setField("subcategory", "");
-                            }}
+                            onClick={() => { setType("courier"); setField("subcategory", ""); }}
                         >
                             <span className="exo-typeIcon"><FaBox /></span>
                             <span>Курьер</span>
@@ -375,7 +433,7 @@ const CreateExpressOrder = () => {
                     </div>
                 )}
 
-                {/* Saved addresses bar */}
+                {/* Saved addresses */}
                 <ExpressSavedAddressesBar
                     items={saved}
                     onPickFrom={(item) => {
@@ -390,12 +448,12 @@ const CreateExpressOrder = () => {
                     }}
                 />
 
-                {/* Route */}
+                {/* Main: route + price + create */}
                 <div className="exo-glass exo-card">
                     <div className="exo-cardTop">
                         <div>
                             <div className="exo-cardTitle">Маршрут</div>
-                            <div className="exo-cardSub">Лучше выбирать на карте — меньше ошибок и ожидания</div>
+                            <div className="exo-cardSub">Минимум действий — максимум скорости</div>
                         </div>
                     </div>
 
@@ -416,11 +474,20 @@ const CreateExpressOrder = () => {
                             <input
                                 className="exo-control"
                                 value={form.fromAddress}
-                                onChange={(e) => setField("fromAddress", e.target.value)}
-                                placeholder="Город, улица, дом, подъезд…"
+                                onChange={(e) => onAddressInput("from", e.target.value)}
+                                placeholder="Адрес точки A"
                             />
 
-                            {/* ✅ Координаты скрываем, но храним */}
+                            {addrSug.from.length > 0 && (
+                                <ul className="suggestions">
+                                    {addrSug.from.map((s, i) => (
+                                        <li key={`${s.label}-${i}`} onClick={() => onPickSuggest("from", s)}>
+                                            {s.label}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+
                             <input type="hidden" value={form.fromLat} readOnly />
                             <input type="hidden" value={form.fromLng} readOnly />
                         </div>
@@ -438,75 +505,49 @@ const CreateExpressOrder = () => {
                             <input
                                 className="exo-control"
                                 value={form.toAddress}
-                                onChange={(e) => setField("toAddress", e.target.value)}
-                                placeholder="Город, улица, дом, подъезд…"
+                                onChange={(e) => onAddressInput("to", e.target.value)}
+                                placeholder="Адрес точки B"
                             />
 
-                            {/* ✅ Координаты скрываем, но храним */}
+                            {addrSug.to.length > 0 && (
+                                <ul className="suggestions">
+                                    {addrSug.to.map((s, i) => (
+                                        <li key={`${s.label}-${i}`} onClick={() => onPickSuggest("to", s)}>
+                                            {s.label}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+
                             <input type="hidden" value={form.toLat} readOnly />
                             <input type="hidden" value={form.toLng} readOnly />
                         </div>
                     </div>
 
-                    <div className="exo-actionsRow">
-                        <button type="button" className="exo-btn exo-btnGhost" onClick={openRoutePreview}>
+                    {/* Route status + open route */}
+                    <div className="exo-note" style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                        <div>🧭 {routeStatus}</div>
+                        <button
+                            type="button"
+                            className="exo-miniBtn"
+                            onClick={() => setShowRouteModal(true)}
+                            disabled={!coordsOk}
+                            title={!coordsOk ? "Сначала выберите точки на карте" : "Показать маршрут"}
+                        >
                             Показать маршрут
                         </button>
-
-                        <button type="button" className="exo-btn exo-btnPrimary" onClick={createOrder}>
-                            Создать заказ
-                        </button>
                     </div>
 
-                    <div className="exo-note">
-                        💡 “Проверить маршрут” откроет окно с адресами и кнопкой “Открыть в Яндекс.Навигаторе”.
-                    </div>
-                </div>
-
-                {/* Price + payment + description */}
-                <div className="exo-glass exo-card">
-                    <div className="exo-cardTop">
-                        <div>
-                            <div className="exo-cardTitle">Способ оплаты</div>
-                            <div className="exo-cardSub">Выберите заранее — это важно исполнителю</div>
-                        </div>
-                    </div>
-
-                    <div className="exo-payGrid">
-                        {paymentMethods.map((m) => (
-                            <button
-                                key={m.id}
-                                type="button"
-                                className={`exo-payTile ${form.paymentType === m.id ? "selected" : ""}`}
-                                onClick={() => setField("paymentType", m.id)}
-                            >
-                                <span className="exo-payLabel">{m.label}</span>
-                            </button>
-                        ))}
-                    </div>
-
-                    <div className="exo-hint">
-                        Комиссия сервиса будет считаться от суммы заказа (<b>totalPrice</b>).
-                    </div>
-                </div>
-
-                <div className="exo-glass exo-card">
-                    <div className="exo-cardTop">
-                        <div>
-                            <div className="exo-cardTitle">Цена</div>
-                            <div className="exo-cardSub">Цена — от заказчика. Рекомендация считается по маршруту.</div>
-                        </div>
-                    </div>
-
-                    <div className="exo-field">
+                    {/* Price compact */}
+                    <div className="exo-field" style={{ marginTop: 10 }}>
                         <div className="exo-labelRow">
-                            <div className="exo-label">Сумма</div>
-
-                            {/* мини-индикатор рекомендации справа */}
-                            {coordsOk && (
-                                <div className="exo-recoMini">
-                                    {routeCalc.loading ? "…" : recommended?.rec ? `${recommended.rec} ₽` : "—"}
-                                </div>
+                            <div className="exo-label">Цена</div>
+                            {recommended?.rec ? (
+                                <button type="button" className="exo-miniBtn" onClick={applyRecommended} title="Поставить рекомендуемую">
+                                    Рекомендуем {recommended.rec} ₽
+                                </button>
+                            ) : (
+                                <div className="exo-recoMini">{coordsOk ? "—" : ""}</div>
                             )}
                         </div>
 
@@ -517,110 +558,66 @@ const CreateExpressOrder = () => {
                             onChange={(e) => setField("totalPrice", e.target.value)}
                             placeholder="Например 500"
                         />
-
-                        {/* Рекомендация */}
-                        <div className="exo-recoBox">
-                            {routeCalc.loading && coordsOk ? (
-                                <div className="exo-recoLine">Считаем расстояние и время…</div>
-                            ) : recommended ? (
-                                <>
-                                    <div className="exo-recoLine">
-                                        Рекомендуем: <b>{recommended.rec} ₽</b>
-                                        <span className="exo-recoMeta">
-              {recommended.km} км{Number.isFinite(recommended.min) ? ` · ~${recommended.min} мин` : ""}
-            </span>
-                                    </div>
-
-                                    <div className="exo-recoActions">
-                                        <button type="button" className="exo-miniBtn" onClick={applyRecommended}>
-                                            Поставить рекомендуемую
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            className="exo-miniBtn"
-                                            onClick={() => setShowRouteModal(true)}
-                                            disabled={!coordsOk}
-                                        >
-                                            Показать маршрут
-                                        </button>
-                                    </div>
-                                </>
-                            ) : coordsOk ? (
-                                <div className="exo-recoLine">
-                                    Не удалось рассчитать рекомендацию{routeCalc.err ? `: ${routeCalc.err}` : ""}
-                                </div>
-                            ) : (
-                                <div className="exo-recoLine">
-                                    Укажи точки A и B на карте — покажем рекомендацию.
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="exo-glass exo-card">
-                    <div className="exo-cardTop">
-                        <div>
-                            <div className="exo-cardTitle">Комментарий</div>
-                            <div className="exo-cardSub">Необязательно — подъезд, домофон, позвонить заранее…</div>
-                        </div>
                     </div>
 
-                    {/* Дополнительно как чипсы */}
-                    <div className="exo-chipsRow">
-                        <div className="exo-chipsTitle">Дополнительно:</div>
-
-                        <div className="exo-chips">
-                            {subcategoryOptions[type].map((opt) => {
-                                const selected = form.subcategory === opt.label;
-                                return (
-                                    <button
-                                        key={opt.label}
-                                        type="button"
-                                        className={`exo-chip ${selected ? "selected" : ""}`}
-                                        onClick={() => setField("subcategory", selected ? "" : opt.label)}
-                                        title={opt.label}
-                                    >
-                                        <span className="exo-chipEmoji">{opt.icon}</span>
-                                        <span className="exo-chipText">{opt.label}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* выбранная метка отдельно (чтобы понятно было) */}
-                    {form.subcategory && (
-                        <div className="exo-pickedTag">
-                            Выбрано: <b>{form.subcategory}</b>
-                            <button type="button" className="exo-miniBtn" onClick={() => setField("subcategory", "")} style={{ marginLeft: 10 }}>
-                                Сбросить
-                            </button>
-                        </div>
-                    )}
-
-                    <div className="exo-field" style={{ marginTop: 10 }}>
-    <textarea
-        className="exo-control exo-textarea"
-        value={form.description}
-        onChange={(e) => setField("description", e.target.value)}
-        placeholder="Например: подъезд 3, код 1122, позвонить за 5 минут…"
-    />
-                    </div>
-
-                    {/* главная кнопка внизу формы */}
-                    <div className="exo-actionsRow" style={{ marginTop: 12 }}>
-                        <button type="button" className="exo-btn exo-btnGhost" onClick={openRoutePreview}>
-                            Показать маршрут
+                    {/* Extra (collapsed) */}
+                    <div style={{ marginTop: 10 }}>
+                        <button
+                            type="button"
+                            className="exo-miniBtn"
+                            onClick={() => setExtraOpen((p) => !p)}
+                            style={{ width: "100%", justifyContent: "center" }}
+                        >
+                            {extraOpen ? "Скрыть дополнительно" : "Дополнительно (необязательно)"}
                         </button>
 
+                        {extraOpen && (
+                            <div style={{ marginTop: 10 }}>
+                                {/* Subcategory chips */}
+                                <div className="exo-chipsRow">
+                                    <div className="exo-chipsTitle">Опции:</div>
+                                    <div className="exo-chips">
+                                        {subcategoryOptions[type].map((opt) => {
+                                            const selected = form.subcategory === opt.label;
+                                            return (
+                                                <button
+                                                    key={opt.label}
+                                                    type="button"
+                                                    className={`exo-chip ${selected ? "selected" : ""}`}
+                                                    onClick={() => setField("subcategory", selected ? "" : opt.label)}
+                                                    title={opt.label}
+                                                >
+                                                    <span className="exo-chipEmoji">{opt.icon}</span>
+                                                    <span className="exo-chipText">{opt.label}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="exo-field" style={{ marginTop: 10 }}>
+                  <textarea
+                      className="exo-control exo-textarea"
+                      value={form.description}
+                      onChange={(e) => setField("description", e.target.value)}
+                      placeholder="Комментарий (домофон, подъезд, позвонить заранее)…"
+                  />
+                                </div>
+
+                                <div className="exo-hint" style={{ marginTop: 8 }}>
+                                    Оплата сейчас: <b>наличными</b> (пока фиксировано для скорости).
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Single primary action */}
+                    <div className="exo-actionsRow" style={{ marginTop: 12 }}>
                         <button type="button" className="exo-btn exo-btnPrimary" onClick={createOrder}>
                             Создать заказ
                         </button>
                     </div>
                 </div>
-
             </div>
 
             {/* Map modal */}
@@ -653,7 +650,7 @@ const CreateExpressOrder = () => {
                 }}
             />
 
-            {/* Confirm modal (только адреса, без координат) */}
+            {/* Route modal */}
             <ExpressRouteMapModal
                 isOpen={showRouteModal}
                 onClose={() => setShowRouteModal(false)}
@@ -661,11 +658,8 @@ const CreateExpressOrder = () => {
                 pointA={{ address: form.fromAddress, lat: form.fromLat, lng: form.fromLng }}
                 pointB={{ address: form.toAddress, lat: form.toLat, lng: form.toLng }}
                 onCreate={createOrder}
-                onRouteCalculated={({ distanceKm, durationMin }) => {
-                    // если хочешь — можешь в локальный стейт положить и показывать рядом с ценой
-                    // сейчас это необязательно, потому что модалка сама показывает
-                }}
             />
+
             {/* Suggest save */}
             {suggestSave && (
                 <div className="exo-toastWrap">
@@ -673,41 +667,30 @@ const CreateExpressOrder = () => {
                         <div className="exo-toastTitle">
                             ✅ Заказ создан{createdOrderId ? ` (#${createdOrderId})` : ""} — сохранить адреса?
                         </div>
+
                         <div className="exo-toastRow">
                             <button
                                 className="exo-btn exo-btnGhost"
                                 type="button"
                                 onClick={async () => {
-                                    await saveAddress({
-                                        label: "home",
-                                        title: "Дом",
-                                        address: form.fromAddress,
-                                        lat: form.fromLat,
-                                        lng: form.fromLng,
-                                    });
+                                    await saveAddress({ label: "home", title: "Дом", address: form.fromAddress, lat: form.fromLat, lng: form.fromLng });
                                     setSuggestSave(false);
                                     alert("Сохранил 'Откуда' как Дом");
                                 }}
                             >
-                                Сохранить “Откуда” как Дом
+                                “Откуда” = Дом
                             </button>
 
                             <button
                                 className="exo-btn exo-btnPrimary"
                                 type="button"
                                 onClick={async () => {
-                                    await saveAddress({
-                                        label: "work",
-                                        title: "Работа",
-                                        address: form.toAddress,
-                                        lat: form.toLat,
-                                        lng: form.toLng,
-                                    });
+                                    await saveAddress({ label: "work", title: "Работа", address: form.toAddress, lat: form.toLat, lng: form.toLng });
                                     setSuggestSave(false);
                                     alert("Сохранил 'Куда' как Работа");
                                 }}
                             >
-                                Сохранить “Куда” как Работа
+                                “Куда” = Работа
                             </button>
                         </div>
 
@@ -715,6 +698,7 @@ const CreateExpressOrder = () => {
                             <button className="exo-miniBtn" type="button" onClick={() => setSuggestSave(false)}>
                                 Не сейчас
                             </button>
+
                             <a
                                 className="exo-miniBtn"
                                 href={routeUrl || "#"}
@@ -722,7 +706,7 @@ const CreateExpressOrder = () => {
                                 rel="noreferrer"
                                 onClick={(e) => !routeUrl && e.preventDefault()}
                             >
-                                Открыть маршрут в Яндекс
+                                Открыть в Яндекс
                             </a>
                         </div>
                     </div>
