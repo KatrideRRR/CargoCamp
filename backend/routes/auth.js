@@ -101,6 +101,39 @@ router.post("/send-sms", async (req, res) => {
     }
 });
 
+router.post("/password-reset/confirm", async (req, res) => {
+    const { phone, smsCode, newPassword } = req.body;
+
+    const phoneKey = normalizePhone(phone);
+    const codeFromUser = String(smsCode || "").trim();
+
+    if (!newPassword || String(newPassword).length < 6) {
+        return res.status(400).json({ message: "Пароль должен быть минимум 6 символов" });
+    }
+
+    const entry = smsCodes.get(phoneKey);
+    if (!entry) return res.status(400).json({ message: "Код не найден. Запросите новый." });
+
+    if (Date.now() > entry.expiresAt) {
+        smsCodes.delete(phoneKey);
+        return res.status(400).json({ message: "Код истёк. Запросите новый." });
+    }
+
+    if (String(entry.code).trim() !== codeFromUser) {
+        return res.status(400).json({ message: "Неверный код" });
+    }
+
+    const user = await User.findOne({ where: { phone: phoneKey } });
+    if (!user) return res.status(404).json({ message: "Пользователь не найден" });
+
+    const hashed = await bcrypt.hash(String(newPassword), 10);
+    await user.update({ password: hashed });
+
+    smsCodes.delete(phoneKey);
+
+    return res.json({ message: "Пароль успешно изменён" });
+});
+
 router.post('/upload-documents',authenticateToken, upload.array('documents', 5), async (req, res) => {
     try {
         const userId = req.user.id; // Получаем ID пользователя из токена или сессии
@@ -135,6 +168,7 @@ router.post('/register', async (req, res) => {
 
     const phoneKey = normalizePhone(phone);
     const codeFromUser = String(smsCode || "").trim();
+    const userExists = await User.findOne({ where: { phone: phoneKey } });
 
     const entry = smsCodes.get(phoneKey); // {code, expiresAt} | undefined
     const codeSaved = String(entry?.code || "").trim();
@@ -191,9 +225,13 @@ router.post('/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // Создание нового пользователя
-        const newUser = await User.create({ username, phone, password: hashedPassword,
-            verified: true,subscription_type: 'premium',
-            subscription_expires_at: expiresAt
+        const newUser = await User.create({
+            username,
+            phone: phoneKey,
+            password: hashedPassword,
+            verified: true,
+            subscription_type: "premium",
+            subscription_expires_at: expiresAt,
         });
 
         smsCodes.delete(phoneKey);
@@ -209,28 +247,25 @@ router.post('/register', async (req, res) => {
     }
 });
 
-router.post('/login', async (req, res) => {
+router.post("/login", async (req, res) => {
     const { phone, password } = req.body;
     try {
-        const user = await User.findOne({ where: { phone } });
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
+        const phoneKey = normalizePhone(phone);
+
+        const user = await User.findOne({ where: { phone: phoneKey } });
+        if (!user) return res.status(404).json({ message: "User not found" });
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
-        if (!isPasswordValid) {
-            return res.status(401).json({ message: 'Invalid password' });
-        }
-        if (user.role === 'banned') {
-            return res.status(403).json({ message: 'Ваш аккаунт заблокирован' });
-        }
+        if (!isPasswordValid) return res.status(401).json({ message: "Invalid password" });
 
+        if (user.role === "banned") return res.status(403).json({ message: "Ваш аккаунт заблокирован" });
 
-        const token = jwt.sign({ id: user.id, phone: user.phone }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ id: user.id, phone: user.phone }, process.env.JWT_SECRET, { expiresIn: "7d" });
+
         res.json({ token, user: { id: user.id, username: user.username, phone: user.phone, rating: user.rating || 5 } });
-    } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ message: 'Server error' });
+    } catch (e) {
+        console.error("Login error:", e);
+        res.status(500).json({ message: "Server error" });
     }
 });
 
@@ -241,37 +276,36 @@ router.post("/login-sms", async (req, res) => {
         if (!phone) return res.status(400).json({ message: "Введите номер телефона" });
         if (!smsCode) return res.status(400).json({ message: "Введите код из SMS" });
 
-        const entry = smsCodes.get(phone);
+        const phoneKey = normalizePhone(phone);
+        const codeFromUser = String(smsCode || "").trim();
+
+        const entry = smsCodes.get(phoneKey);
         if (!entry) return res.status(401).json({ message: "Код не найден. Запросите новый." });
 
         if (Date.now() > entry.expiresAt) {
-            smsCodes.delete(phone);
+            smsCodes.delete(phoneKey);
             return res.status(401).json({ message: "Код истёк. Запросите новый." });
         }
 
-        if (entry.code !== smsCode) {
+        if (String(entry.code).trim() !== codeFromUser) {
             return res.status(401).json({ message: "Неверный код" });
         }
 
-        // одноразовость
-        smsCodes.delete(phone);
+        smsCodes.delete(phoneKey);
 
-        const user = await User.findOne({ where: { phone } });
+        // ⚠️ ВАЖНО: искать пользователя тоже по нормализованному телефону
+        const user = await User.findOne({ where: { phone: phoneKey } });
         if (!user) return res.status(404).json({ message: "User not found" });
 
         if (user.role === "banned") {
             return res.status(403).json({ message: "Ваш аккаунт заблокирован" });
         }
 
-        const token = jwt.sign(
-            { id: user.id, phone: user.phone },
-            process.env.JWT_SECRET,
-            { expiresIn: "7d" }
-        );
+        const token = jwt.sign({ id: user.id, phone: user.phone }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
         res.json({
             token,
-            user: { id: user.id, username: user.username, phone: user.phone, rating: user.rating || 5 }
+            user: { id: user.id, username: user.username, phone: user.phone, rating: user.rating || 5 },
         });
     } catch (error) {
         console.error("Login SMS error:", error);
