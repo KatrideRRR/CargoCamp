@@ -23,6 +23,7 @@ const socket = io(process.env.REACT_APP_SOCKET_URL, {
 });
 
 const RADIUS_KM = 50;
+const HIDE_FROM_DRAWER = new Set(["Такси", "Курьер"]);
 
 function looksLikeCoordsString(v) {
     if (!v) return false;
@@ -535,12 +536,22 @@ const OrdersPage = () => {
                 : tabFiltered;
 
         // 2) drawer filters (для express — они не подходят, поэтому НЕ фильтруем их этими полями)
+        const hasDrawerFilters = !!(selectedCategory || selectedSubcategory || selectedService);
+
+        // ✅ ВАЖНО: если мы в табе "all" и включены drawer-фильтры — убираем taxi/courier из выдачи
+        const hideTaxiCourierInAllWhenFiltered =
+            activeTab === "all" && hasDrawerFilters;
+
+        const baseForDrawer = hideTaxiCourierInAllWhenFiltered
+            ? professionFiltered.filter((o) => !o.taxi_courier)  // убрали taxi/courier (включая express)
+            : professionFiltered;
+
         const byCategory = selectedCategory
-            ? professionFiltered.filter((o) => {
-                if (o.express) return true;
+            ? baseForDrawer.filter((o) => {
+                if (o.express) return true; // оставляем как у тебя (но express уже вырезан выше, если taxi_courier=true)
                 return Number(o.categoryId ?? o.category?.id) === Number(selectedCategory);
             })
-            : professionFiltered;
+            : baseForDrawer;
 
         const bySubcategory = selectedSubcategory
             ? byCategory.filter((o) => {
@@ -687,6 +698,12 @@ const OrdersPage = () => {
             Во вкладке <b>Все</b> приоритетные не поднимаются, только подсвечиваются
           </span>
                 </div>
+
+                {activeTab === "all" && (selectedCategory || selectedSubcategory || selectedService) && (
+                    <div className="hint-text">
+                        Во вкладке «Все» при включённых фильтрах заказы «Курьер/Такси» скрываются.
+                    </div>
+                )}
 
                 {profile && preferredCategoryIds.length > 0 && (
                     <div className="pref-bar glass">
@@ -940,6 +957,8 @@ const OrdersPage = () => {
                                                         orderId={order.expressId}
                                                         canToA={true}
                                                         canAToB={true}
+                                                        className="express-nav"
+                                                        buttonClassName="btn btn-ghost express-nav-btn"
                                                     />
 
                                                     <button
@@ -1012,11 +1031,13 @@ const OrdersPage = () => {
                                         }}
                                     >
                                         <option value="">Все</option>
-                                        {categories.map((c) => (
-                                            <option key={c.id} value={c.id}>
-                                                {c.name}
-                                            </option>
-                                        ))}
+                                        {categories
+                                            .filter((c) => !HIDE_FROM_DRAWER.has(String(c.name || "").trim()))
+                                            .map((c) => (
+                                                <option key={c.id} value={c.id}>
+                                                    {c.name}
+                                                </option>
+                                            ))}
                                     </select>
                                     <div className="hint-text">Фильтры применяются поверх текущей вкладки</div>
                                 </div>

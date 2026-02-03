@@ -1114,3 +1114,9 @@
     color: #64748b;
     white-space: nowrap;
 }
+
+.express-nav-btn {
+    padding: 9px 12px;
+    border-radius: 14px;
+    font-size: 13px;
+}

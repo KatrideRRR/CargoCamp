@@ -19,7 +19,7 @@ router.get('/subcategory/:categoryId', async (req, res) => {
     try {
         const subcategories = await Subcategory.findAll({
             where: { categoryId },
-            attributes: ['id', 'name', 'price'], // 👈 важно включить price
+            attributes: ['id', 'name'], // 👈 важно включить price
 
         });
         res.json(subcategories);
@@ -33,7 +33,7 @@ router.get('/services/:subcategoryId', async (req, res) => {
     try {
         const services = await Service.findAll({
             where: { subcategoryId },
-            attributes: ['id', 'name', 'price'],
+            attributes: ['id', 'name'],
             order: [['name', 'ASC']]
         });
         res.json(services);

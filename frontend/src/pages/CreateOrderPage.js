@@ -715,7 +715,7 @@ function CreateOrderPage() {
                         <select className="control" value={selectedCategory} onChange={handleCategoryChange}>
                             <option value="">Выберите категорию</option>
                             {category
-                                .filter((cat) => cat.id !== 12 && cat.id !== 13)
+                                .filter((cat) => !["Такси", "Курьер"].includes(cat.name))
                                 .map((cat) => (
                                     <option key={cat.id} value={cat.id}>
                                         {cat.name}

@@ -206,7 +206,7 @@ module.exports = (io) => {
                     'id', 'createdAt', 'address', 'description', 'workTime',
                     'images', 'proposedSum', 'creatorId', 'coordinates',
                     'executorId', 'status', 'paymentType',
-                    'is_highlighted', 'is_recommended', 'is_push_notified', 'taxi_courier', 'serviceId',
+                    'is_highlighted', 'is_recommended', 'is_push_notified', 'serviceId',
                     'categoryId',
                     'subcategoryId',
 
