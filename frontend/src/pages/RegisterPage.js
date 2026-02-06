@@ -138,11 +138,22 @@ const RegisterPage = () => {
                                 className="checkbox"
                             />
                             <span className="agreementText">
-                Я согласен с{" "}
+    Я принимаю{" "}
                                 <button type="button" className="linkButton" onClick={handleOpenModal}>
-                  пользовательским соглашением
-                </button>
-              </span>
+      пользовательское соглашение
+    </button>
+                                {" "}и даю согласие на обработку персональных данных согласно{" "}
+                                <span
+                                    className="linkButton"
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => navigate("/info")}
+                                    onKeyDown={(e) => e.key === "Enter" && navigate("/info")}
+                                >
+      Политике конфиденциальности
+    </span>
+    .
+  </span>
                         </div>
 
                         {!isSmsSent ? (
