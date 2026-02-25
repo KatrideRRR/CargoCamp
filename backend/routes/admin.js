@@ -4,6 +4,8 @@ const { User, Order, Message, Category, Subcategory } = require('../models');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const NodeGeocoder = require("node-geocoder");
+const { Op } = require("sequelize");
+const { ActionLog } = require("../models"); // добавь модель
 
 const geocoder = NodeGeocoder({
     provider: "openstreetmap",
@@ -11,7 +13,7 @@ const geocoder = NodeGeocoder({
 
 const router = express.Router();
 
-router.put('/users/:id/verify', async (req, res) => {
+router.put('/users/:id/verify',authMiddleware, adminMiddleware, async (req, res) => {
     const { id } = req.params; // Получаем id пользователя из параметров URL
     const { userStatus } = req.body; // Получаем новый статус верификации
 
@@ -292,6 +294,64 @@ router.get("/users/:userId/orders", authMiddleware, adminMiddleware, async (req,
     } catch (error) {
         console.error("Ошибка при получении заказов пользователя:", error);
         res.status(500).json({ error: "Ошибка сервера" });
+    }
+});
+
+router.get("/action-logs", authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const {
+            orderId,
+            expressOrderId,
+            actorUserId,
+            actionType,
+            severity,
+            paymentId,
+            dateFrom,
+            dateTo,
+            limit = 50,
+            offset = 0,
+        } = req.query;
+
+        const where = {};
+
+        if (orderId) where.orderId = Number(orderId);
+        if (expressOrderId) where.expressOrderId = Number(expressOrderId);
+        if (actorUserId) where.actorUserId = Number(actorUserId);
+        if (actionType) where.actionType = String(actionType);
+        if (severity) where.severity = String(severity);
+        if (paymentId) where.paymentId = String(paymentId);
+
+        if (dateFrom || dateTo) {
+            where.ts = {};
+            if (dateFrom) where.ts[Op.gte] = new Date(dateFrom);
+            if (dateTo) where.ts[Op.lte] = new Date(dateTo);
+        }
+
+        const rows = await ActionLog.findAll({
+            where,
+            order: [["ts", "DESC"]],
+            limit: Math.min(Number(limit) || 50, 200),
+            offset: Number(offset) || 0,
+        });
+
+        res.json({ success: true, rows });
+    } catch (e) {
+        console.error("admin/action-logs error:", e);
+        res.status(500).json({ success: false, message: "Ошибка сервера" });
+    }
+});
+
+router.get("/orders/:id/logs", authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const rows = await ActionLog.findAll({
+            where: { orderId: id },
+            order: [["ts", "DESC"]],
+            limit: 500,
+        });
+        res.json({ success: true, rows });
+    } catch (e) {
+        res.status(500).json({ success: false, message: "Ошибка сервера" });
     }
 });
 

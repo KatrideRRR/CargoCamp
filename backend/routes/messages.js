@@ -19,6 +19,20 @@ router.post('/', authenticateToken, async (req, res) => {
     try {
         const message = await Message.create({content, senderId: req.user.id, receiverId, orderId: orderIdInt});
 
+        await req.logAction({
+            req,
+            actorUserId: req.user.id,
+            actorRole: "user",
+            actionType: "message_sent",
+            entityType: "message",
+            entityId: message.id,
+            orderId: orderIdInt,
+            meta: {
+                receiverId,
+                contentLen: String(content).length,
+            },
+        });
+
         // Уведомляем получателя
 
         res.status(201).json(message);

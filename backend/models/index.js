@@ -32,8 +32,6 @@ db.OrderReview = require("./OrderReview")(sequelize, DataTypes);
 db.ExpressOrder = require("./ExpressOrder")(sequelize, DataTypes);
 db.ExpressSavedAddress = require("./ExpressSavedAddress")(sequelize, DataTypes);
 
-console.log("Loaded models:", Object.keys(db));
-
 // ✅ Ассоциации
 Object.values(db).forEach((model) => {
     if (model && typeof model.associate === "function") {

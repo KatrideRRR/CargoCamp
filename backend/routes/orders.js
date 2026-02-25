@@ -47,6 +47,18 @@ module.exports = (io) => {
                 { status: 'pending', createdAt: new Date(), updatedAt: new Date() },
                 { where: { id } }
             );
+
+            await logAction({
+                req,
+                actorUserId: req.user?.id || null,
+                actorRole: "user",
+                actionType: "order_restore",
+                entityType: "order",
+                entityId: Number(id),
+                orderId: Number(id),
+                meta: { newStatus: "pending" },
+            });
+
             res.json({ success: true, message: 'Заказ восстановлен' });
 
         } catch (error) {
@@ -202,6 +214,27 @@ module.exports = (io) => {
                 is_highlighted: promotionTotal > 0 ? false : !!parsedPromotion.highlight,
                 is_recommended: promotionTotal > 0 ? false : !!parsedPromotion.recommended,
                 is_push_notified: promotionTotal > 0 ? false : !!parsedPromotion.push,
+            });
+
+            await logAction({
+                req,
+                actorUserId: userId,
+                actorRole: "user",
+                actionType: "order_create",
+                entityType: "order",
+                entityId: newOrder.id,
+                orderId: newOrder.id,
+                meta: {
+                    status: newOrder.status,
+                    paymentType: newOrder.paymentType,
+                    categoryId: newOrder.categoryId,
+                    subcategoryId: newOrder.subcategoryId,
+                    serviceId: newOrder.serviceId,
+                    proposedSum: newOrder.proposedSum,
+                    promotionTotal: newOrder.promotionCost,
+                    coords: newOrder.coordinates,
+                    imagesCount: (newOrder.images || []).length,
+                },
             });
 
             io.emit("orderUpdated");
@@ -403,6 +436,17 @@ module.exports = (io) => {
 
             await order.save();
 
+            await logAction({
+                req,
+                actorUserId: executorId,
+                actorRole: "user",
+                actionType: "order_request_create",
+                entityType: "order",
+                entityId: order.id,
+                orderId: order.id,
+                meta: { proposedSum, comment: comment ? String(comment).slice(0, 300) : null },
+            });
+
             io.emit(`orderRequest:${order.userId}`, { orderId: order.id });
 
             res.json({ message: "Запрос на выполнение отправлен заказчику", order });
@@ -555,6 +599,25 @@ module.exports = (io) => {
 
             await order.save();
 
+            await logAction({
+                req,
+                actorUserId: req.user.id,
+                actorRole: "user",
+                actionType: "order_executor_approved",
+                entityType: "order",
+                entityId: order.id,
+                orderId: order.id,
+                meta: {
+                    executorId,
+                    paymentType: order.paymentType,
+                    finalPriceKopecks: order.finalPriceKopecks,
+                    status: order.status,
+                    dealStatus: order.dealStatus,
+                    debtKopecks,
+                    isPremium,
+                },
+            });
+
             // исполнитель
             const executor = await User.findByPk(executorId);
             if (!executor) return res.status(404).json({ message: 'Исполнитель не найден' });
@@ -654,6 +717,17 @@ module.exports = (io) => {
 
             order.completedBy = [...order.completedBy, userId];
 
+            await logAction({
+                req,
+                actorUserId: userId,
+                actorRole: "user",
+                actionType: "order_complete_confirm",
+                entityType: "order",
+                entityId: order.id,
+                orderId: order.id,
+                meta: { completedBy: order.completedBy },
+            });
+
             if (order.completedBy.includes(order.creatorId) && !order.completedBy.includes(order.executorId)) {
                 io.to(`user_${order.executorId}`).emit('orderCompleted', {
                     orderId: order.id,
@@ -697,6 +771,21 @@ module.exports = (io) => {
 
             await order.save();
 
+            await logAction({
+                req,
+                actorUserId: userId,
+                actorRole: "user",
+                actionType: "order_completed",
+                entityType: "order",
+                entityId: order.id,
+                orderId: order.id,
+                meta: {
+                    paymentType: order.paymentType,
+                    dealStatus: order.dealStatus,
+                    completedAt: order.completedAt,
+                },
+            });
+
             // 👉 Обновим заказ с пользователями
             const fullOrder = await Order.findByPk(orderId, {
                 include: [
@@ -732,6 +821,20 @@ module.exports = (io) => {
 
             fullOrder.contractPath = contractPath;
             await fullOrder.save();
+
+            await logAction({
+                req,
+                actorUserId: null,
+                actorRole: "system",
+                actionType: "payment_capture_failed",
+                entityType: "payment",
+                entityId: null,
+                orderId: order.id,
+                paymentId: order.yookassa_payment_id,
+                severity: "error",
+                success: false,
+                meta: { error: String(e?.message || e) },
+            });
 
             io.emit('orderUpdated');
             io.emit('activeOrdersUpdated');

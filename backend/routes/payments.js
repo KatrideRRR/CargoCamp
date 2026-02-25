@@ -53,6 +53,23 @@ router.post('/premium/create', authenticateToken, async (req, res) => {
             }
         }, idempotenceKey);
 
+        await req.logAction({
+            req,
+            actorUserId: userId,
+            actorRole: "user",
+            actionType: "payment_create",
+            entityType: "payment",
+            paymentId: payment.id,
+            severity: "info",
+            meta: {
+                provider: "yookassa",
+                type: "premium",
+                duration,
+                amount: amountValue,
+                status: payment.status,
+            },
+        });
+
         return res.json({
             success: true,
             paymentId: payment.id,
@@ -121,6 +138,23 @@ router.post('/debt/create', authenticateToken, async (req, res) => {
             },
         }, idempotenceKey);
 
+        await req.logAction({
+            req,
+            actorUserId: userId,
+            actorRole: "user",
+            actionType: "payment_create",
+            entityType: "payment",
+            paymentId: payment.id,
+            severity: "info",
+            meta: {
+                provider: "yookassa",
+                type: "premium",
+                duration,
+                amount: amountValue,
+                status: payment.status,
+            },
+        });
+
         return res.json({
             success: true,
             paidBySavedCard: false,
@@ -176,6 +210,23 @@ router.post('/card/bind/create', authenticateToken, async (req, res) => {
             },
             idempotenceKey
         );
+
+        await req.logAction({
+            req,
+            actorUserId: userId,
+            actorRole: "user",
+            actionType: "payment_create",
+            entityType: "payment",
+            paymentId: payment.id,
+            severity: "info",
+            meta: {
+                provider: "yookassa",
+                type: "premium",
+                duration,
+                amount: amountValue,
+                status: payment.status,
+            },
+        });
 
         return res.json({
             success: true,
@@ -270,6 +321,23 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
 
         await order.update({ promotionPaymentId: payment.id });
 
+        await req.logAction({
+            req,
+            actorUserId: userId,
+            actorRole: "user",
+            actionType: "payment_create",
+            entityType: "payment",
+            paymentId: payment.id,
+            orderId: Number(orderId),
+            severity: "info",
+            meta: {
+                provider: "yookassa",
+                type: "order_promotion",
+                amount: amountValue,
+                status: payment.status,
+            },
+        });
+
         return res.json({
             success: true,
             paymentId: payment.id,
@@ -357,6 +425,24 @@ router.post('/guarantee/create', authenticateToken, async (req, res) => {
             yookassa_payment_status: payment.status,
         });
 
+        await req.logAction({
+            req,
+            actorUserId: userId,
+            actorRole: "user",
+            actionType: "payment_create",
+            entityType: "payment",
+            paymentId: payment.id,
+            orderId: Number(orderId),
+            meta: {
+                provider: "yookassa",
+                type: "guarantee",
+                amount: amountValue,
+                capture: false,
+                status: payment.status,
+                executorId: order.executorId,
+            },
+        });
+
         return res.json({
             success: true,
             paymentId: payment.id,
@@ -383,6 +469,23 @@ router.post('/yookassa/webhook', async (req, res) => {
 
         const payment = event.object;
         const meta = payment?.metadata || {};
+
+        await req.logAction({
+            req,
+            actorUserId: null,
+            actorRole: "webhook",
+            actionType: `yookassa_${event.event}`, // например yookassa_payment.succeeded
+            entityType: "payment",
+            paymentId: payment.id,
+            orderId: meta.orderId ? Number(meta.orderId) : null,
+            severity: "info",
+            meta: {
+                type: meta.type,
+                status: payment.status,
+                amount: payment.amount?.value,
+                currency: payment.amount?.currency,
+            },
+        });
 
         // ====== 1) Premium ======
         if (meta.type === 'premium') {

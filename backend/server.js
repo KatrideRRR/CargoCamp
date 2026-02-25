@@ -15,6 +15,8 @@ const cors = require('cors');
 const http = require('http');
 const jwt = require('jsonwebtoken');
 
+const makeActionLogger = require("./utils/actionLogger");
+const { logAction } = makeActionLogger({ db });
 const { initializeSocket } = require('./socket'); // Импортируем инициализацию WebSocket
 const orderRoutes = require('./routes/orders');
 const authRoutes = require('./routes/auth');
@@ -26,6 +28,7 @@ const expressOrdersRoutes = require("./routes/expressorders");
 
 const app = express();
 
+app.set("logAction", logAction);
 app.use(express.json({
     verify: (req, res, buf) => {
         req.rawBody = buf;
@@ -52,6 +55,10 @@ app.use('/api/admin', adminRoutes);
 app.use("/api/payments", payments);
 app.use('/contracts', express.static(path.join(__dirname, 'contracts')));
 app.use("/api/express", expressOrdersRoutes);
+app.use((req, res, next) => {
+    req.logAction = logAction;
+    next();
+});
 
 // Database connection
 const sequelize = require('./config/database');

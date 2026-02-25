@@ -192,6 +192,25 @@ router.post("/express-orders", authenticateToken, async (req, res) => {
             { transaction: t }
         );
 
+        await req.logAction({
+            req,
+            actorUserId: creatorId,
+            actorRole: "user",
+            actionType: "express_order_create",
+            entityType: "express_order",
+            entityId: order.id,
+            expressOrderId: order.id,
+            meta: {
+                type: order.type,
+                paymentType: order.paymentType,
+                totalPrice: order.totalPrice,
+                basePrice: order.basePrice,
+                pricePerKm: order.pricePerKm,
+                from: { address: order.fromAddress, lat: order.fromLat, lng: order.fromLng },
+                to: { address: order.toAddress, lat: order.toLat, lng: order.toLng },
+            },
+        });
+
         // ✅ Авто-учёт использования сохранённых адресов
         await bumpSavedAddressUsage({ userId: creatorId, id: Number(fromSavedAddressId) || null, transaction: t });
         await bumpSavedAddressUsage({ userId: creatorId, id: Number(toSavedAddressId) || null, transaction: t });
@@ -297,6 +316,24 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
         order.status = "accepted";
         await order.save({ transaction: t });
 
+        await req.logAction({
+            req,
+            actorUserId: executorId,
+            actorRole: "user",
+            actionType: "express_order_accept",
+            entityType: "express_order",
+            entityId: order.id,
+            expressOrderId: order.id,
+            meta: {
+                status: order.status,
+                premiumActive,
+                totalKopecks,
+                feeKopecks,
+                paidBySavedCard,
+                debtAdded,
+            },
+        });
+
         // ✅ 4) пробуем сразу списать комиссию (если есть привязанная карта), иначе — в долг
         let paidBySavedCard = false;
         let debtAdded = false;
@@ -350,6 +387,18 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
                 await executor.save({ transaction: t });
                 debtAdded = true;
             }
+
+            await req.logAction({
+                req,
+                actorUserId: executorId,
+                actorRole: "user",
+                actionType: "commission_debt_added",
+                entityType: "user",
+                entityId: executorId,
+                expressOrderId: order.id,
+                severity: "warn",
+                meta: { feeKopecks, reason: "express_accept_fee" },
+            });
         }
 
         await t.commit();
@@ -386,6 +435,22 @@ router.post("/express-orders/:id/on-the-way", authenticateToken, async (req, res
 
         order.status = "on_the_way_to_A";
         await order.save();
+
+        const from = order.status;
+        order.status = "on_the_way_to_A";
+        await order.save();
+
+        await req.logAction({
+            req,
+            actorUserId: executorId,
+            actorRole: "user",
+            actionType: "express_status_change",
+            entityType: "express_order",
+            entityId: order.id,
+            expressOrderId: order.id,
+            meta: { from, to: order.status },
+        });
+
         res.json({ success: true, order });
     } catch (e) {
         console.error("express-orders on-the-way error:", e);
@@ -416,6 +481,21 @@ router.post("/express-orders/:id/arrived", authenticateToken, async (req, res) =
         order.arrivedAt = new Date();
         await order.save();
 
+        const from = order.status;
+        order.status = "on_the_way_to_A";
+        await order.save();
+
+        await req.logAction({
+            req,
+            actorUserId: executorId,
+            actorRole: "user",
+            actionType: "express_status_change",
+            entityType: "express_order",
+            entityId: order.id,
+            expressOrderId: order.id,
+            meta: { from, to: order.status },
+        });
+
         res.json({ success: true, order });
     } catch (e) {
         console.error("express-orders arrived error:", e);
@@ -443,6 +523,21 @@ router.post("/express-orders/:id/start", authenticateToken, async (req, res) => 
         order.startedAt = new Date();
         await order.save();
 
+        const from = order.status;
+        order.status = "on_the_way_to_A";
+        await order.save();
+
+        await req.logAction({
+            req,
+            actorUserId: executorId,
+            actorRole: "user",
+            actionType: "express_status_change",
+            entityType: "express_order",
+            entityId: order.id,
+            expressOrderId: order.id,
+            meta: { from, to: order.status },
+        });
+
         res.json({ success: true, order });
     } catch (e) {
         console.error("express-orders start error:", e);
@@ -469,6 +564,21 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
         order.status = "completed";
         order.completedAt = new Date();
         await order.save();
+
+        const from = order.status;
+        order.status = "on_the_way_to_A";
+        await order.save();
+
+        await req.logAction({
+            req,
+            actorUserId: executorId,
+            actorRole: "user",
+            actionType: "express_status_change",
+            entityType: "express_order",
+            entityId: order.id,
+            expressOrderId: order.id,
+            meta: { from, to: order.status },
+        });
 
         res.json({ success: true, order });
     } catch (e) {
@@ -502,6 +612,21 @@ router.post("/express-orders/:id/cancel", authenticateToken, async (req, res) =>
         order.status = "cancelled";
         order.dealStatus = "cancelled";
         await order.save();
+
+        const from = order.status;
+        order.status = "on_the_way_to_A";
+        await order.save();
+
+        await req.logAction({
+            req,
+            actorUserId: executorId,
+            actorRole: "user",
+            actionType: "express_status_change",
+            entityType: "express_order",
+            entityId: order.id,
+            expressOrderId: order.id,
+            meta: { from, to: order.status },
+        });
 
         res.json({ success: true, order });
     } catch (e) {
