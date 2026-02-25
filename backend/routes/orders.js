@@ -630,7 +630,10 @@ module.exports = (io) => {
 
             // ✅ ДОЛГ ТОЛЬКО ЗА CASH, И ТОЛЬКО ЕСЛИ НЕ PREMIUM
             const isCash = order.paymentType === 'cash';
-            const debtKopecks = (!isPremium && isCash) ? 200 * 100 : 0;
+            const isRecommended = !!order.is_recommended; // или если хочешь строже: && !!order.promotionPaidAt
+            const feeRub = isRecommended ? 100 : 200;
+
+            const debtKopecks = (!isPremium && isCash) ? feeRub * 100 : 0;
 
             // записываем debt (или обнуляем)
             if (debtKopecks > 0) {
