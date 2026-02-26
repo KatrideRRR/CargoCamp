@@ -28,6 +28,8 @@ db.Service = require("./Service")(sequelize, DataTypes);
 db.Notification = require("./Notification")(sequelize, DataTypes);
 db.OrderReview = require("./OrderReview")(sequelize, DataTypes);
 
+db.ActionLog = require("./ActionLog")(sequelize, DataTypes);
+
 // ✅ Express (такси/курьер)
 db.ExpressOrder = require("./ExpressOrder")(sequelize, DataTypes);
 db.ExpressSavedAddress = require("./ExpressSavedAddress")(sequelize, DataTypes);

@@ -16,7 +16,6 @@ const http = require('http');
 const jwt = require('jsonwebtoken');
 
 const makeActionLogger = require("./utils/actionLogger");
-const { logAction } = makeActionLogger({ db });
 const { initializeSocket } = require('./socket'); // Импортируем инициализацию WebSocket
 const orderRoutes = require('./routes/orders');
 const authRoutes = require('./routes/auth');
@@ -28,12 +27,16 @@ const expressOrdersRoutes = require("./routes/expressorders");
 
 const app = express();
 
-app.set("logAction", logAction);
 app.use(express.json({
     verify: (req, res, buf) => {
         req.rawBody = buf;
     }
 }));
+
+app.use((req, res, next) => {
+    req.logAction = logAction; // должно быть function
+    next();
+});
 
 const server = http.createServer( app);
 
@@ -84,6 +87,9 @@ app.post('/api/token', (req, res) => {
 sequelize.authenticate()
     .then(() => console.log())
     .catch((err) => console.error('Database connection error:', err));
+
+const { logAction } = makeActionLogger({ db });
+app.set("logAction", logAction);
 
 const PORT = process.env.PORT;
 

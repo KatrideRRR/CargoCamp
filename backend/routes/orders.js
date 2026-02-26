@@ -216,7 +216,7 @@ module.exports = (io) => {
                 is_push_notified: promotionTotal > 0 ? false : !!parsedPromotion.push,
             });
 
-            await logAction({
+            await req.logAction({
                 req,
                 actorUserId: userId,
                 actorRole: "user",

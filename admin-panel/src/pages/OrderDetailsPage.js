@@ -14,6 +14,9 @@ function OrderDetailsPage() {
     const [filteredOrders, setFilteredOrders] = useState([]);
     const token = localStorage.getItem("authToken");
     const navigate = useNavigate();
+    const [logs, setLogs] = useState([]);
+    const [logsLoading, setLogsLoading] = useState(false);
+    const [logsError, setLogsError] = useState(null);
 
     useEffect(() => {
         axios.get(`${apiUrl}/api/admin/orders/${id}`)
@@ -26,6 +29,23 @@ function OrderDetailsPage() {
                 setLoading(false);
             });
     }, [id]);
+
+    useEffect(() => {
+        if (!token) return;
+
+        setLogsLoading(true);
+        axios.get(`${apiUrl}/api/admin/orders/${id}/logs`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then(res => {
+                setLogs(res.data?.rows || []);
+                setLogsLoading(false);
+            })
+            .catch(err => {
+                setLogsError("Ошибка загрузки логов");
+                setLogsLoading(false);
+            });
+    }, [id, token]);
 
     const deleteOrder = async (id) => {
         try {
@@ -72,6 +92,52 @@ function OrderDetailsPage() {
                 <button className="delete-button" onClick={() => deleteOrder(order.id)}>
                     Удалить
                 </button>
+            </div>
+
+            <div className="order-logs">
+                <h3>История действий</h3>
+
+                {logsLoading && <p>Загрузка логов...</p>}
+                {logsError && <p>{logsError}</p>}
+
+                {!logsLoading && !logsError && logs.length === 0 && (
+                    <p>Логов пока нет</p>
+                )}
+
+                {!logsLoading && !logsError && logs.length > 0 && (
+                    <ul className="logs-list">
+                        {logs.map((l) => (
+                            <li key={l.id} className={`log-item ${l.severity || ""}`}>
+                                <div className="log-top">
+            <span className="log-time">
+              {l.ts ? new Date(l.ts).toLocaleString() : ""}
+            </span>
+
+                                    <span className="log-type">
+              <strong>{l.actionType}</strong>
+            </span>
+
+                                    <span className="log-actor">
+              {l.actorRole}{l.actorUserId ? ` #${l.actorUserId}` : ""}
+            </span>
+
+                                    <span className={`log-status ${l.success ? "ok" : "fail"}`}>
+              {l.success ? "OK" : "FAIL"}
+            </span>
+                                </div>
+
+                                {l.reason && <div className="log-reason">Причина: {l.reason}</div>}
+
+                                {l.meta && (
+                                    <details className="log-meta">
+                                        <summary>meta</summary>
+                                        <pre>{JSON.stringify(l.meta, null, 2)}</pre>
+                                    </details>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                )}
             </div>
         </div>
 

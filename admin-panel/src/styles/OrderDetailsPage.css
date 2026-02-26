@@ -38,3 +38,15 @@
     color: red;
     margin-top: 20px;
 }
+
+.order-logs { margin-top: 20px; padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.05); }
+.logs-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.log-item { padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); }
+.log-top { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.log-time { opacity: 0.85; }
+.log-status.ok { color: #2ecc71; }
+.log-status.fail { color: #e74c3c; }
+.log-item.warn { border-color: rgba(241, 196, 15, 0.4); }
+.log-item.error { border-color: rgba(231, 76, 60, 0.4); }
+.log-item.security { border-color: rgba(155, 89, 182, 0.5); }
+.log-meta pre { white-space: pre-wrap; word-break: break-word; margin: 8px 0 0; }
