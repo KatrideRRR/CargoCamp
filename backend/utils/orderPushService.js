@@ -61,6 +61,19 @@ async function sendOrderPush({
     const categoryId = Number(order.categoryId);
     if (!Number.isFinite(categoryId)) return { ok: false, reason: "category_missing" };
 
+    console.log("[PUSH] start orderId =", orderId);
+
+    console.log("[PUSH] order:", {
+        id: order.id,
+        categoryId: order.categoryId,
+        coords: order.coordinates,
+        is_push_notified: order.is_push_notified,
+    });
+
+    console.log("[PUSH] candidates from DB:", candidates.length);
+
+    console.log("[PUSH] top selected:", top.map(x => ({ userId: x.userId, km: x.distanceKm.toFixed(2) })));
+
     // 1) кого уже пушили по этому заказу (чтобы не дублить)
     const alreadySet = new Set();
     if (ActionLog) {

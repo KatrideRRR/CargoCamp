@@ -463,6 +463,11 @@ router.post('/yookassa/webhook', async (req, res) => {
     console.log("[YOOKASSA WEBHOOK] headers auth:", req.headers.authorization);
     console.log("[YOOKASSA WEBHOOK] body:", JSON.stringify(req.body));
 
+    const io = req.app.locals.io; // ✅ вот так
+    if (!io) {
+        console.warn("⚠️ io is not initialized yet");
+    }
+
     try {
         const event = req.body;
         const allowed = ['payment.waiting_for_capture', 'payment.succeeded', 'payment.canceled'];
@@ -572,8 +577,10 @@ router.post('/yookassa/webhook', async (req, res) => {
                 return res.sendStatus(200);
             }
 
-            const pr = order.promotionRequested || {};
-
+            let pr = order.promotionRequested || {};
+            if (typeof pr === "string") {
+                try { pr = JSON.parse(pr); } catch { pr = {}; }
+            }
             await order.update({
                 status: 'pending',
                 is_highlighted: !!pr.highlight,

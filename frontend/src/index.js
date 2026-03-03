@@ -44,6 +44,12 @@ function getUserIdFromToken() {
     }
 }
 
+useEffect(() => {
+    const h = (payload) => console.log("🔥 PUSH EVENT RECEIVED:", payload);
+    socket.on("push_notification", h);
+    return () => socket.off("push_notification", h);
+}, []);
+
 function App() {
     const navigate = useNavigate();
     const userId = getUserIdFromToken();
