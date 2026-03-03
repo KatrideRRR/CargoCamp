@@ -5,6 +5,7 @@ const authenticateToken = require('../middlewares/userAuth'); // если нуж
 const { randomUUID } = require('crypto');
 const idempotenceKey = randomUUID();
 const yooKassa = require('../config/yookassaClient');
+const { sendOrderPush } = require("../utils/orderPushService");
 
 router.post('/premium/create', authenticateToken, async (req, res) => {
     try {
@@ -582,6 +583,22 @@ router.post('/yookassa/webhook', async (req, res) => {
             });
 
             io.emit('orderUpdated');
+
+            if (pr.push) {
+                try {
+                    const logAction = req.logAction || req.app?.locals?.logAction || null;
+                    await sendOrderPush({
+                        db,   // у тебя db уже есть в этом файле (как в остальных местах)
+                        io,   // твой io из сокетов
+                        orderId: order.id,
+                        radiusKm: 50,
+                        limit: 10,
+                        logAction,
+                    });
+                } catch (e) {
+                    console.error("sendOrderPush error:", e);
+                }
+            }
 
             return res.sendStatus(200);
         }

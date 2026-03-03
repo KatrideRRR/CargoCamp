@@ -5,6 +5,10 @@ const { Message } = require('./models'); // Добавляем импорт мо
 let io;
 let users = {}; // Храним пользователей, подключившихся к WebSocket
 
+function getIo() {
+    return io;
+}
+
 function initializeSocket(server) {
     io = socketIo(server, {
         cors: {
@@ -143,4 +147,4 @@ function sendNotification(userId, event, data) {
     }
 }
 
-module.exports = { initializeSocket, sendNotification };
+module.exports = { initializeSocket, sendNotification, getIo };

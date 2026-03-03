@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { socket } from "./socketClient";
 import ReactDOM from 'react-dom/client';
+import { useNavigate } from 'react-router-dom';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 import OrdersPage from './pages/OrdersPage';
@@ -29,9 +31,57 @@ Modal.setAppElement = function (s) {
 };
 Modal.setAppElement('#root'); // Указываем корневой элемент
 
-const App = () => {
+function getUserIdFromToken() {
+    try {
+        const token = localStorage.getItem("authToken");
+        if (!token) return null;
+        const payloadBase64 = token.split(".")[1];
+        const payloadJson = atob(payloadBase64.replace(/-/g, "+").replace(/_/g, "/"));
+        const payload = JSON.parse(payloadJson);
+        return payload?.id ?? null;
+    } catch {
+        return null;
+    }
+}
+
+function App() {
+    const navigate = useNavigate();
+    const userId = getUserIdFromToken();
+
+    console.log("[APP RENDER] userId:", userId);
+
+    useEffect(() => {
+        if (!userId) return;
+
+        socket.emit("register", userId);
+        console.log("✅ WS register:", userId);
+
+    }, [userId]);
+
+    useEffect(() => {
+        const handlePush = (payload) => {
+            if (!payload) return;
+            if (payload.type !== "order_push") return;
+
+            console.log("📩 PUSH RECEIVED:", payload);
+
+            const open = window.confirm(
+                `${payload.title}\n${payload.message}\nОткрыть заказ?`
+            );
+
+            if (open) {
+                navigate(`/order/${payload.orderId}`); // <-- ВАЖНО: у тебя путь /order/:id
+            }
+        };
+
+        socket.on("push_notification", handlePush);
+
+        return () => {
+            socket.off("push_notification", handlePush);
+        };
+    }, [navigate]);
+
     return (
-        <Router>
         <ModalProvider>
         <AuthProvider>
             <UserProvider>
@@ -57,9 +107,12 @@ const App = () => {
             </UserProvider>
         </AuthProvider>
         </ModalProvider>
-        </Router>
     );
 };
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
+root.render(
+    <Router>
+        <App />
+    </Router>
+);

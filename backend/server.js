@@ -45,6 +45,8 @@ const io = initializeSocket(server);
 const db = require('./models');
 db.sequelize.sync();
 
+app.locals.io = io;
+
 app.use(cors({  origin: ['http://localhost:3000','http://localhost:3001', 'http://localhost:8080',
         'http://18.184.43.44:3001', 'https://81.163.27.147:3001', 'https://81.163.27.147:8080',
         'https://cargocamp.ru'], methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization'], credentials: true}));
