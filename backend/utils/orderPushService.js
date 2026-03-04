@@ -70,10 +70,6 @@ async function sendOrderPush({
         is_push_notified: order.is_push_notified,
     });
 
-    console.log("[PUSH] candidates from DB:", candidates.length);
-
-    console.log("[PUSH] top selected:", top.map(x => ({ userId: x.userId, km: x.distanceKm.toFixed(2) })));
-
     // 1) кого уже пушили по этому заказу (чтобы не дублить)
     const alreadySet = new Set();
     if (ActionLog) {
@@ -187,6 +183,8 @@ async function sendOrderPush({
         });
     }
 
+    console.log("[PUSH] candidates from DB:", candidates.length);
+    console.log("[PUSH] top selected:", top.map(x => ({ userId: x.userId, km: x.distanceKm.toFixed(2) })));
     console.log("[PUSH] will emit to:", userId);
     io.to(`user_${userId}`).emit("push_notification", payload);
     console.log("[PUSH] emitted");
