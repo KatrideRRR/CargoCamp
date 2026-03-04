@@ -187,6 +187,10 @@ async function sendOrderPush({
         });
     }
 
+    console.log("[PUSH] will emit to:", userId);
+    io.to(`user_${userId}`).emit("push_notification", payload);
+    console.log("[PUSH] emitted");
+
     return { ok: true, sent: top.length, userIds: top.map(x => x.userId) };
 }
 

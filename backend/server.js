@@ -24,6 +24,7 @@ const categoryRouter = require('./routes/category');
 const adminRoutes = require('./routes/admin');
 const payments = require("./routes/payments");
 const expressOrdersRoutes = require("./routes/expressorders");
+const logActionMiddleware = require("./middlewares/logActionMiddleware");
 
 const app = express();
 
@@ -32,6 +33,8 @@ app.use(express.json({
         req.rawBody = buf;
     }
 }));
+
+app.use(logActionMiddleware);
 
 app.use((req, res, next) => {
     req.logAction = logAction; // должно быть function

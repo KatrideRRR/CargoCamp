@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require("uuid");const express = require('express');
 const router = express.Router();
 const { Order, User } = require('../models'); // sequelize models
+const db = require("../models");
 const authenticateToken = require('../middlewares/userAuth'); // если нужен
 const { randomUUID } = require('crypto');
 const idempotenceKey = randomUUID();
