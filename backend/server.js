@@ -16,7 +16,7 @@ const http = require('http');
 const jwt = require('jsonwebtoken');
 
 const makeActionLogger = require("./utils/actionLogger");
-const { initializeSocket } = require('./socket'); // Импортируем инициализацию WebSocket
+const { initializeSocket } = require('./socket');
 const orderRoutes = require('./routes/orders');
 const authRoutes = require('./routes/auth');
 const messagesRoutes = require('./routes/messages');
@@ -26,6 +26,23 @@ const payments = require("./routes/payments");
 const expressOrdersRoutes = require("./routes/expressorders");
 const logActionMiddleware = require("./middlewares/logActionMiddleware");
 
+const db = require('./models');
+const sequelize = require('./config/database');
+
+
+const uploadsDir = path.join(__dirname, 'uploads');
+const ordersUploadsDir = path.join(uploadsDir, 'orders');
+
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
+if (!fs.existsSync(ordersUploadsDir)) {
+    fs.mkdirSync(ordersUploadsDir, { recursive: true });
+}
+
+db.Sequelize = sequelize.constructor;
+db.sequelize = sequelize;
+
 const app = express();
 
 app.use(express.json({
@@ -34,55 +51,61 @@ app.use(express.json({
     }
 }));
 
-app.use(logActionMiddleware);
-
-app.use((req, res, next) => {
-    req.logAction = logAction; // должно быть function
-    next();
-});
-
-const server = http.createServer( app);
-
-// Инициализация WebSocket
+const server = http.createServer(app);
 const io = initializeSocket(server);
-const db = require('./models');
-db.sequelize.sync();
 
 app.locals.io = io;
 
-app.use(cors({  origin: ['http://localhost:3000','http://localhost:3001', 'http://localhost:8080',
-        'http://18.184.43.44:3001', 'https://81.163.27.147:3001', 'https://81.163.27.147:8080',
-        'https://cargocamp.ru'], methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization'], credentials: true}));
-app.use(bodyParser.json());
-app.use('/api/orders', orderRoutes(io));
-app.use('/api/auth', authRoutes);
-app.use('/api/messages', messagesRoutes);
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/api/category', categoryRouter);
-app.use('/api/admin', adminRoutes);
-app.use("/api/payments", payments);
-app.use('/contracts', express.static(path.join(__dirname, 'contracts')));
-app.use("/api/express", expressOrdersRoutes);
+// ✅ СНАЧАЛА создаём logAction
+const { logAction } = makeActionLogger({ db });
+app.locals.logAction = logAction;
+app.set("logAction", logAction);
+
+// ✅ ПОТОМ middleware
+app.use(logActionMiddleware);
+
 app.use((req, res, next) => {
-    req.logAction = logAction;
+    req.logAction = typeof logAction === "function" ? logAction : async () => {};
     next();
 });
 
-// Database connection
-const sequelize = require('./config/database');
-db.Sequelize = sequelize.constructor;
-db.sequelize = sequelize;
+db.sequelize.sync();
+
+app.use(cors({
+    origin: [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:8080',
+        'http://18.184.43.44:3001',
+        'https://81.163.27.147:3001',
+        'https://81.163.27.147:8080',
+        'https://cargocamp.ru'
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+}));
+
+app.use(bodyParser.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/contracts', express.static(path.join(__dirname, 'contracts')));
+
+app.use('/api/orders', orderRoutes(io));
+app.use('/api/auth', authRoutes);
+app.use('/api/messages', messagesRoutes);
+app.use('/api/category', categoryRouter);
+app.use('/api/admin', adminRoutes);
+app.use("/api/payments", payments);
+app.use("/api/express", expressOrdersRoutes);
 
 app.post('/api/token', (req, res) => {
     const { token } = req.body;
 
     if (!token) return res.sendStatus(401);
 
-    // Проверяем refreshToken
     jwt.verify(token, process.env.REFRESH_SECRET, (err, user) => {
         if (err) return res.sendStatus(403);
 
-        // Создаём новый accessToken
         const accessToken = jwt.sign({ id: user.id }, process.env.ACCESS_SECRET, { expiresIn: '15m' });
 
         res.json({ accessToken });
@@ -90,12 +113,8 @@ app.post('/api/token', (req, res) => {
 });
 
 sequelize.authenticate()
-    .then(() => console.log())
+    .then(() => console.log('✅ База данных подключена!'))
     .catch((err) => console.error('Database connection error:', err));
 
-const { logAction } = makeActionLogger({ db });
-app.set("logAction", logAction);
-
 const PORT = process.env.PORT;
-
 server.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));

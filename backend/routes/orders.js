@@ -192,12 +192,21 @@ module.exports = (io) => {
                 return res.status(400).json({ message: "Некорректный paymentType" });
             }
 
+            const parsedProposedSum =
+                proposedSum === "" || proposedSum === null || proposedSum === undefined
+                    ? null
+                    : Number(proposedSum);
+
+            if (parsedProposedSum !== null && !Number.isFinite(parsedProposedSum)) {
+                return res.status(400).json({ message: "Некорректная proposedSum" });
+            }
+
             const newOrder = await Order.create({
                 userId,
                 address,
                 description,
                 workTime,
-                proposedSum,
+                proposedSum: parsedProposedSum,
                 coordinates: coordinatesStr,
                 createdAt: new Date().toISOString(),
                 images: photoUrls,
@@ -436,16 +445,21 @@ module.exports = (io) => {
 
             await order.save();
 
-            await logAction({
-                req,
-                actorUserId: executorId,
-                actorRole: "user",
-                actionType: "order_request_create",
-                entityType: "order",
-                entityId: order.id,
-                orderId: order.id,
-                meta: { proposedSum, comment: comment ? String(comment).slice(0, 300) : null },
-            });
+            if (req.logAction) {
+                await req.logAction({
+                    req,
+                    actorUserId: executorId,
+                    actorRole: "user",
+                    actionType: "order_request_create",
+                    entityType: "order",
+                    entityId: order.id,
+                    orderId: order.id,
+                    meta: {
+                        proposedSum,
+                        comment: comment ? String(comment).slice(0, 300) : null,
+                    },
+                });
+            }
 
             io.emit(`orderRequest:${order.userId}`, { orderId: order.id });
 
@@ -599,7 +613,7 @@ module.exports = (io) => {
 
             await order.save();
 
-            await logAction({
+            await req.logAction({
                 req,
                 actorUserId: req.user.id,
                 actorRole: "user",
