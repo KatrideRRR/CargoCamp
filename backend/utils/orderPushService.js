@@ -45,14 +45,13 @@ async function sendOrderPush({
                                  orderId,
                                  radiusKm = 50,
                                  limit = 10,
-                                 logAction = null, // опционально
+                                 logAction = null,
                              }) {
     const { Order, User, ActionLog } = db;
 
     const order = await Order.findByPk(orderId);
     if (!order) return { ok: false, reason: "order_not_found" };
 
-    // пуш только если реально оплачен и отмечен
     if (!order.is_push_notified) return { ok: false, reason: "push_not_enabled" };
 
     const coords = parseOrderCoords(order);
@@ -62,7 +61,6 @@ async function sendOrderPush({
     if (!Number.isFinite(categoryId)) return { ok: false, reason: "category_missing" };
 
     console.log("[PUSH] start orderId =", orderId);
-
     console.log("[PUSH] order:", {
         id: order.id,
         categoryId: order.categoryId,
@@ -70,7 +68,6 @@ async function sendOrderPush({
         is_push_notified: order.is_push_notified,
     });
 
-    // 1) кого уже пушили по этому заказу (чтобы не дублить)
     const alreadySet = new Set();
     if (ActionLog) {
         const sentRows = await ActionLog.findAll({
@@ -85,38 +82,60 @@ async function sendOrderPush({
         }
     }
 
-    // 2) bbox фильтр
     const bb = bbox(coords.lat, coords.lng, radiusKm);
 
-    // 3) кандидаты по SQL (быстро)
+    console.log("[PUSH] bbox:", bb);
+
     const candidates = await User.findAll({
         where: {
             role: { [Op.ne]: "banned" },
             debt: { [Op.lte]: 0 },
-
             location_lat: { [Op.between]: [bb.minLat, bb.maxLat] },
             location_lng: { [Op.between]: [bb.minLng, bb.maxLng] },
-
-            // preferred_category_ids содержит categoryId
             [Op.and]: Sequelize.literal(
                 `JSON_CONTAINS(preferred_category_ids, CAST(${categoryId} AS JSON))`
             ),
         },
-        attributes: ["id", "location_lat", "location_lng"],
+        attributes: ["id", "location_lat", "location_lng", "preferred_category_ids", "debt", "role"],
         limit: 300,
     });
 
-    // 4) точная дистанция + сортировка
+    console.log("[PUSH] candidates from DB:", candidates.length);
+    console.log(
+        "[PUSH] raw candidates:",
+        candidates.map((u) => ({
+            id: u.id,
+            lat: u.location_lat,
+            lng: u.location_lng,
+            preferred_category_ids: u.preferred_category_ids,
+            debt: u.debt,
+            role: u.role,
+        }))
+    );
+
     const scored = [];
+
     for (const u of candidates) {
-        if (alreadySet.has(String(u.id))) continue;
+        if (alreadySet.has(String(u.id))) {
+            console.log("[PUSH] skip already sent:", u.id);
+            continue;
+        }
 
         const lat = Number(u.location_lat);
         const lng = Number(u.location_lng);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            console.log("[PUSH] skip invalid coords:", u.id, u.location_lat, u.location_lng);
+            continue;
+        }
 
         const d = haversineKm(coords.lat, coords.lng, lat, lng);
-        if (d > radiusKm) continue;
+        console.log("[PUSH] distance:", { userId: u.id, distanceKm: d });
+
+        if (d > radiusKm) {
+            console.log("[PUSH] skip by radius:", u.id);
+            continue;
+        }
 
         scored.push({ userId: u.id, distanceKm: d });
     }
@@ -124,7 +143,11 @@ async function sendOrderPush({
     scored.sort((a, b) => a.distanceKm - b.distanceKm);
     const top = scored.slice(0, limit);
 
-    // 5) формируем payload пуша (его потом будет легко отправлять в моб пуши)
+    console.log(
+        "[PUSH] top selected:",
+        top.map((x) => ({ userId: x.userId, km: x.distanceKm.toFixed(2) }))
+    );
+
     const payloadBase = {
         type: "order_push",
         orderId: order.id,
@@ -139,14 +162,20 @@ async function sendOrderPush({
         },
     };
 
-    // 6) отправляем каждому + логируем
     for (const t of top) {
-        io.to(`user_${t.userId}`).emit("push_notification", {
+        const payload = {
             ...payloadBase,
             title: "Новый заказ рядом",
             message: `Заказ #${order.id} • ${order.proposedSum || ""} ₽ • ${t.distanceKm.toFixed(1)} км`,
-            data: { ...payloadBase.data, distanceKm: Number(t.distanceKm.toFixed(2)) },
-        });
+            data: {
+                ...payloadBase.data,
+                distanceKm: Number(t.distanceKm.toFixed(2)),
+            },
+        };
+
+        console.log("[PUSH] emit ->", `user_${t.userId}`, payload);
+
+        io.to(`user_${t.userId}`).emit("push_notification", payload);
 
         if (logAction) {
             await logAction({
@@ -183,13 +212,9 @@ async function sendOrderPush({
         });
     }
 
-    console.log("[PUSH] candidates from DB:", candidates.length);
-    console.log("[PUSH] top selected:", top.map(x => ({ userId: x.userId, km: x.distanceKm.toFixed(2) })));
-    console.log("[PUSH] will emit to:", userId);
-    io.to(`user_${userId}`).emit("push_notification", payload);
-    console.log("[PUSH] emitted");
+    console.log("[PUSH] done. sent =", top.length);
 
-    return { ok: true, sent: top.length, userIds: top.map(x => x.userId) };
+    return { ok: true, sent: top.length, userIds: top.map((x) => x.userId) };
 }
 
 module.exports = { sendOrderPush };
