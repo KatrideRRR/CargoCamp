@@ -96,8 +96,7 @@ async function sendOrderPush({
                 `JSON_CONTAINS(preferred_category_ids, CAST(${categoryId} AS JSON))`
             ),
         },
-        attributes: ["id", "location_lat", "location_lng", "preferred_category_ids", "debt", "role"],
-        limit: 300,
+        attributes: ["id", "locationLat", "locationLng", "preferredCategoryIds", "debt", "role"],        limit: 300,
     });
 
     console.log("[PUSH] candidates from DB:", candidates.length);
@@ -105,9 +104,9 @@ async function sendOrderPush({
         "[PUSH] raw candidates:",
         candidates.map((u) => ({
             id: u.id,
-            lat: u.location_lat,
-            lng: u.location_lng,
-            preferred_category_ids: u.preferred_category_ids,
+            lat: u.locationLat,
+            lng: u.locationLng,
+            preferred_category_ids: u.preferredCategoryIds,
             debt: u.debt,
             role: u.role,
         }))
@@ -121,8 +120,8 @@ async function sendOrderPush({
             continue;
         }
 
-        const lat = Number(u.location_lat);
-        const lng = Number(u.location_lng);
+        const lat = Number(u.locationLat);
+        const lng = Number(u.locationLng);
 
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
             console.log("[PUSH] skip invalid coords:", u.id, u.location_lat, u.location_lng);
