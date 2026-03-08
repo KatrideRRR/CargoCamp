@@ -3,19 +3,25 @@ const router = express.Router();
 const NodeGeocoder = require('node-geocoder');
 const db = require('../models');
 const authenticateToken = require('../middlewares/userAuth');
-const multer = require('multer');
 const { Op } = require('sequelize');
-const path = require('path');
-const { Sequelize } = require('sequelize');
-const moment = require('moment');
+const fs = require("fs");
+const path = require("path");
+const multer = require("multer");
 const { Order, User, Category, Subcategory, Service } = require('../models');
 const generateContractPDF = require('../utils/generateContractPDF');
 const yooKassa = require('../config/yookassaClient');
-const fs = require("fs");
 const uploadExecutorBefore = buildOrderPhotoUploader("executor_before");
 const uploadExecutorAfter = buildOrderPhotoUploader("executor_after");
 const uploadCustomerBefore = buildOrderPhotoUploader("customer_before");
 const uploadCustomerAfter = buildOrderPhotoUploader("customer_after");
+
+/* ===============================
+   Папки uploads
+================================ */
+
+const uploadsRoot = path.join(__dirname, "..", "uploads");
+const ordersRoot = path.join(uploadsRoot, "orders");
+const tempRoot = path.join(uploadsRoot, "temp");
 
 function ensureDir(dirPath) {
     if (!fs.existsSync(dirPath)) {
@@ -23,38 +29,90 @@ function ensureDir(dirPath) {
     }
 }
 
-function buildOrderPhotoUploader(type) {
-    const storage = multer.diskStorage({
-        destination: async (req, file, cb) => {
-            try {
-                const orderId = req.params.id;
-                const dir = path.join("uploads", "orders", `order_${orderId}`);
-                ensureDir(dir);
-                cb(null, dir);
-            } catch (e) {
-                cb(e);
-            }
-        },
-        filename: (req, file, cb) => {
-            const ext = path.extname(file.originalname) || ".jpg";
-            const idx = Date.now();
-            cb(null, `${type}_${idx}${ext}`);
-        },
-    });
+ensureDir(uploadsRoot);
+ensureDir(ordersRoot);
+ensureDir(tempRoot);
 
-    return multer({ storage });
-}
+/* ===============================
+   MULTER для создания заказа
+   (временная папка)
+================================ */
 
-const storage = multer.diskStorage({
+const tempStorage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'uploads/orders');
+        cb(null, tempRoot);
     },
+
     filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname));
+        const ext = path.extname(file.originalname) || ".jpg";
+        const random = Math.round(Math.random() * 1e9);
+        cb(null, `temp_${Date.now()}_${random}${ext}`);
     },
 });
 
-const upload = multer({ storage });
+const upload = multer({ storage: tempStorage });
+
+/* ===============================
+   MULTER для фото заказа
+================================ */
+
+function buildOrderPhotoUploader(type) {
+
+    const storage = multer.diskStorage({
+
+        destination: (req, file, cb) => {
+            try {
+
+                const orderId = req.params.id;
+
+                const dir = path.join(
+                    ordersRoot,
+                    `order_${orderId}`
+                );
+
+                ensureDir(dir);
+
+                cb(null, dir);
+
+            } catch (err) {
+                cb(err);
+            }
+        },
+
+        filename: (req, file, cb) => {
+
+            try {
+
+                const orderId = req.params.id;
+
+                const dir = path.join(
+                    ordersRoot,
+                    `order_${orderId}`
+                );
+
+                ensureDir(dir);
+
+                const ext = path.extname(file.originalname) || ".jpg";
+
+                const existing = fs
+                    .readdirSync(dir)
+                    .filter(name => name.startsWith(type));
+
+                const nextIndex = existing.length + 1;
+
+                cb(null, `${type}_${nextIndex}${ext}`);
+
+            } catch (err) {
+                cb(err);
+            }
+
+        },
+
+    });
+
+    return multer({ storage });
+
+}
 
 const geocoder = NodeGeocoder({
     provider: 'yandex',
@@ -136,7 +194,6 @@ module.exports = (io) => {
 
             const parseLatLng = (v) => {
                 if (!v) return null;
-                // иногда прилетает массив
                 const raw = Array.isArray(v) ? v[0] : v;
                 if (typeof raw !== "string" || !raw.includes(",")) return null;
                 const [latStr, lngStr] = raw.split(",").map((x) => x.trim());
@@ -150,12 +207,10 @@ module.exports = (io) => {
             let coordinatesStr = null;
             let latlng = parseLatLng(incomingCoords);
 
-            // 1а) если coords пришли — используем их
             if (latlng) {
                 coordinatesStr = `${latlng.lat},${latlng.lng}`;
             }
 
-            // 1б) если coords НЕ пришли — геокодим address (как было)
             if (!coordinatesStr) {
                 if (!address || !String(address).trim()) {
                     return res.status(400).json({ message: "Адрес обязателен" });
@@ -174,7 +229,6 @@ module.exports = (io) => {
             // 2) Reverse-geocode: если адрес пустой/“Координаты: …” — получаем нормальный адрес
             if (latlng && looksLikeCoordsAddress(address)) {
                 try {
-                    // ВНИМАНИЕ: у node-geocoder чаще всего reverse ждёт lat/lon (lon = долгота)
                     const rev = await geocoder.reverse({ lat: latlng.lat, lon: latlng.lng });
                     if (Array.isArray(rev) && rev[0]) {
                         address =
@@ -199,9 +253,7 @@ module.exports = (io) => {
 
             const status = promotionTotal > 0 ? "pending_payment" : "pending";
 
-            const photoUrls = req.files ? req.files.map((f) => `/uploads/orders/${f.filename}`) : [];
-
-            // --- normalize ids (важно) ---
+            // --- normalize ids ---
             const catId = Number(categoryId);
             if (!Number.isFinite(catId) || catId <= 0) {
                 return res.status(400).json({ message: "categoryId обязателен" });
@@ -217,7 +269,6 @@ module.exports = (io) => {
             paymentType = Array.isArray(paymentType) ? paymentType[0] : paymentType;
             paymentType = String(paymentType || "").trim();
 
-            // Пока на фронте выбора нет — считаем по умолчанию cash
             if (!paymentType) paymentType = "cash";
 
             const allowedPaymentTypes = new Set(["cash", "guarantee", "installment"]);
@@ -234,6 +285,7 @@ module.exports = (io) => {
                 return res.status(400).json({ message: "Некорректная proposedSum" });
             }
 
+            // 3) Сначала создаём заказ БЕЗ финальных путей картинок
             const newOrder = await Order.create({
                 userId,
                 address,
@@ -242,7 +294,7 @@ module.exports = (io) => {
                 proposedSum: parsedProposedSum,
                 coordinates: coordinatesStr,
                 createdAt: new Date().toISOString(),
-                images: photoUrls,
+                images: [],
                 creatorId: userId,
                 status,
                 categoryId: catId,
@@ -257,6 +309,27 @@ module.exports = (io) => {
                 is_recommended: promotionTotal > 0 ? false : !!parsedPromotion.recommended,
                 is_push_notified: promotionTotal > 0 ? false : !!parsedPromotion.push,
             });
+
+            // 4) Создаём папку заказа и переносим туда файлы из temp
+            const orderDir = path.join(__dirname, "..", "uploads", "orders", `order_${newOrder.id}`);
+            ensureDir(orderDir);
+
+            let photoUrls = [];
+
+            if (req.files && req.files.length > 0) {
+                photoUrls = req.files.map((file, index) => {
+                    const ext = path.extname(file.originalname) || path.extname(file.filename) || ".jpg";
+                    const newFileName = `customer_${index + 1}${ext}`;
+                    const newPath = path.join(orderDir, newFileName);
+
+                    fs.renameSync(file.path, newPath);
+
+                    return `/uploads/orders/order_${newOrder.id}/${newFileName}`;
+                });
+
+                newOrder.images = photoUrls;
+                await newOrder.save();
+            }
 
             await req.logAction({
                 req,
@@ -275,12 +348,14 @@ module.exports = (io) => {
                     proposedSum: newOrder.proposedSum,
                     promotionTotal: newOrder.promotionCost,
                     coords: newOrder.coordinates,
-                    imagesCount: (newOrder.images || []).length,
+                    imagesCount: photoUrls.length,
+                    imagePaths: photoUrls,
                 },
             });
 
             io.emit("orderUpdated");
             return res.status(201).json(newOrder);
+
         } catch (error) {
             console.error("Ошибка при создании заказа:", error);
             return res.status(500).json({ message: "Ошибка сервера" });
@@ -628,42 +703,10 @@ module.exports = (io) => {
                 order.dealStatus = 'none';
             }
 
-            if (order.paymentType === 'guarantee') {
-                // ждём, пока заказчик оплатит/захолдит деньги
-                order.status = 'pending';               // можно оставить pending
-                order.dealStatus = 'waiting_payment';   // вот ключевое поле
-            }
-
-            if (order.paymentType === 'installment') {
-                // пока не трогаем, позже
-                order.status = 'pending';
-                order.dealStatus = 'none';
-            }
-
             // Активируем заказ
             order.requestedExecutors = JSON.stringify([]); // чистим
-            order.status = 'active';
 
             await order.save();
-
-            await req.logAction({
-                req,
-                actorUserId: req.user.id,
-                actorRole: "user",
-                actionType: "order_executor_approved",
-                entityType: "order",
-                entityId: order.id,
-                orderId: order.id,
-                meta: {
-                    executorId,
-                    paymentType: order.paymentType,
-                    finalPriceKopecks: order.finalPriceKopecks,
-                    status: order.status,
-                    dealStatus: order.dealStatus,
-                    debtKopecks,
-                    isPremium,
-                },
-            });
 
             // исполнитель
             const executor = await User.findByPk(executorId);
@@ -692,6 +735,25 @@ module.exports = (io) => {
                     debt: 0,
                 });
             }
+
+            await req.logAction({
+                req,
+                actorUserId: req.user.id,
+                actorRole: "user",
+                actionType: "order_executor_approved",
+                entityType: "order",
+                entityId: order.id,
+                orderId: order.id,
+                meta: {
+                    executorId,
+                    paymentType: order.paymentType,
+                    finalPriceKopecks: order.finalPriceKopecks,
+                    status: order.status,
+                    dealStatus: order.dealStatus,
+                    debtKopecks,
+                    isPremium,
+                },
+            });
 
             // ===== договор как у тебя =====
             const contractData = {
@@ -742,9 +804,10 @@ module.exports = (io) => {
 
             return res.json({
                 success: true,
-                paymentType: 'guarantee',
-                confirmationUrl: payment.confirmation.confirmation_url,
                 orderId: order.id,
+                paymentType: order.paymentType,
+                status: order.status,
+                dealStatus: order.dealStatus,
             });
 
         } catch (error) {
