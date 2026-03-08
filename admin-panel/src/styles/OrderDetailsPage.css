@@ -39,6 +39,32 @@
     margin-top: 20px;
 }
 
+.order-photos-section {
+    margin-top: 24px;
+}
+
+.photo-block {
+    margin-bottom: 20px;
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.06);
+}
+
+.photo-grid {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.order-photo {
+    width: 110px;
+    height: 110px;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.15);
+}
+
 .order-logs { margin-top: 20px; padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.05); }
 .logs-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
 .log-item { padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); }

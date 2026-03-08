@@ -8,10 +8,13 @@ const apiUrl = process.env.REACT_APP_API_URL;
 function MessagesPage() {
     const { orderId } = useParams(); // Получаем ID заказа из URL
     const [messages, setMessages] = useState([]);
+    const token = localStorage.getItem("authToken");
 
     useEffect(() => {
         // Запрос на сервер для получения сообщений для конкретного заказа
-        axios.get(`${apiUrl}/api/admin/${orderId}/messages`)
+        axios.get(`${apiUrl}/api/admin/orders/${orderId}/messages`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
             .then(response => setMessages(response.data))
             .catch(error => console.error("Ошибка загрузки сообщений:", error));
     }, [orderId]); // Загрузка сообщений при изменении orderId
