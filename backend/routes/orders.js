@@ -11,6 +11,39 @@ const moment = require('moment');
 const { Order, User, Category, Subcategory, Service } = require('../models');
 const generateContractPDF = require('../utils/generateContractPDF');
 const yooKassa = require('../config/yookassaClient');
+const fs = require("fs");
+const uploadExecutorBefore = buildOrderPhotoUploader("executor_before");
+const uploadExecutorAfter = buildOrderPhotoUploader("executor_after");
+const uploadCustomerBefore = buildOrderPhotoUploader("customer_before");
+const uploadCustomerAfter = buildOrderPhotoUploader("customer_after");
+
+function ensureDir(dirPath) {
+    if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+    }
+}
+
+function buildOrderPhotoUploader(type) {
+    const storage = multer.diskStorage({
+        destination: async (req, file, cb) => {
+            try {
+                const orderId = req.params.id;
+                const dir = path.join("uploads", "orders", `order_${orderId}`);
+                ensureDir(dir);
+                cb(null, dir);
+            } catch (e) {
+                cb(e);
+            }
+        },
+        filename: (req, file, cb) => {
+            const ext = path.extname(file.originalname) || ".jpg";
+            const idx = Date.now();
+            cb(null, `${type}_${idx}${ext}`);
+        },
+    });
+
+    return multer({ storage });
+}
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -732,9 +765,28 @@ module.exports = (io) => {
                 return res.status(400).json({ message: "Вы уже подтвердили завершение" });
             }
 
+            const isExecutor = Number(order.executorId) === Number(userId);
+
+            if (isExecutor) {
+                const beforePhotos = Array.isArray(order.executorBeforePhotos) ? order.executorBeforePhotos : [];
+                const afterPhotos = Array.isArray(order.executorAfterPhotos) ? order.executorAfterPhotos : [];
+
+                if (beforePhotos.length === 0) {
+                    return res.status(400).json({
+                        message: "Сначала загрузите фото ДО начала работы",
+                    });
+                }
+
+                if (afterPhotos.length === 0) {
+                    return res.status(400).json({
+                        message: "Сначала загрузите фото ПОСЛЕ выполнения работы",
+                    });
+                }
+            }
+
             order.completedBy = [...order.completedBy, userId];
 
-            await logAction({
+            await req.logAction({
                 req,
                 actorUserId: userId,
                 actorRole: "user",
@@ -746,115 +798,118 @@ module.exports = (io) => {
             });
 
             if (order.completedBy.includes(order.creatorId) && !order.completedBy.includes(order.executorId)) {
-                io.to(`user_${order.executorId}`).emit('orderCompleted', {
+                io.to(`user_${order.executorId}`).emit("orderCompleted", {
                     orderId: order.id,
-                    message: 'Заказчик предложил завершить заказ',
+                    message: "Заказчик предложил завершить заказ",
                 });
             }
 
             if (order.completedBy.includes(order.executorId) && !order.completedBy.includes(order.creatorId)) {
-                io.to(`user_${order.creatorId}`).emit('orderCompleted', {
+                io.to(`user_${order.creatorId}`).emit("orderCompleted", {
                     orderId: order.id,
-                    message: 'Исполнитель предложил завершить заказ',
+                    message: "Исполнитель предложил завершить заказ",
                     creatorId: order.creatorId,
-                    executorId: order.executorId
+                    executorId: order.executorId,
                 });
             }
+
+            let fullyCompleted = false;
 
             if (order.completedBy.includes(order.creatorId) && order.completedBy.includes(order.executorId)) {
                 order.status = "completed";
                 order.completedAt = new Date();
+                fullyCompleted = true;
 
-                // ✅ гарантия: списываем холд
-                if (order.paymentType === 'guarantee' && order.dealStatus === 'funds_held' && order.yookassa_payment_id) {
+                if (order.paymentType === "guarantee" && order.dealStatus === "funds_held" && order.yookassa_payment_id) {
                     const amountValue = (Number(order.finalPriceKopecks || 0) / 100).toFixed(2);
 
                     try {
                         const captured = await yooKassa.capturePayment(order.yookassa_payment_id, {
-                            amount: { value: amountValue, currency: 'RUB' }
+                            amount: { value: amountValue, currency: "RUB" }
                         });
 
                         order.yookassa_payment_status = captured.status;
-                        // dealStatus обновится вебхуком payment.succeeded, но можно и сразу:
-                        // order.dealStatus = 'captured';
-                        // order.captured_at = new Date();
                     } catch (e) {
-                        console.error('capturePayment error:', e);
-                        // тут реши бизнес-логикой: заказ completed, но деньги не списались — это критично
-                        // можно поставить dealStatus=payment_failed и НЕ давать completed
+                        console.error("capturePayment error:", e);
+
+                        await req.logAction({
+                            req,
+                            actorUserId: null,
+                            actorRole: "system",
+                            actionType: "payment_capture_failed",
+                            entityType: "payment",
+                            entityId: null,
+                            orderId: order.id,
+                            paymentId: order.yookassa_payment_id,
+                            severity: "error",
+                            success: false,
+                            meta: { error: String(e?.message || e) },
+                        });
+
+                        return res.status(500).json({
+                            message: "Не удалось завершить заказ: ошибка списания оплаты по гарантии",
+                        });
                     }
                 }
             }
 
             await order.save();
 
-            await logAction({
-                req,
-                actorUserId: userId,
-                actorRole: "user",
-                actionType: "order_completed",
-                entityType: "order",
-                entityId: order.id,
-                orderId: order.id,
-                meta: {
-                    paymentType: order.paymentType,
-                    dealStatus: order.dealStatus,
-                    completedAt: order.completedAt,
-                },
-            });
+            if (fullyCompleted) {
+                await req.logAction({
+                    req,
+                    actorUserId: userId,
+                    actorRole: "user",
+                    actionType: "order_completed",
+                    entityType: "order",
+                    entityId: order.id,
+                    orderId: order.id,
+                    meta: {
+                        paymentType: order.paymentType,
+                        dealStatus: order.dealStatus,
+                        completedAt: order.completedAt,
+                    },
+                });
+            }
 
-            // 👉 Обновим заказ с пользователями
             const fullOrder = await Order.findByPk(orderId, {
                 include: [
-                    { model: User, as: 'creator' },
-                    { model: User, as: 'executor' },
-                    { model: Category, as: 'category' },
-                    { model: Subcategory, as: 'subcategory' }
+                    { model: User, as: "creator" },
+                    { model: User, as: "executor" },
+                    { model: Category, as: "category" },
+                    { model: Subcategory, as: "subcategory" }
                 ]
             });
 
-            // 👉 Генерация PDF с учетом второй страницы
-            const data = {
-                orderId: fullOrder.id,
-                approvalDate: fullOrder.createdAt.toLocaleDateString('ru-RU'),
-                city: "Москва", // или брать из данных заказа
-                customerId: fullOrder.creatorId,
-                customerName: fullOrder.creator.username,
-                performerId: fullOrder.executorId,
-                performerName: fullOrder.executor.username,
-                category: fullOrder.category.name,
-                subcategory: fullOrder.subcategory.name,
-                address: fullOrder.address,
-                description: fullOrder.description,
-                price: fullOrder.proposedSum,
-                paymentType: fullOrder.paymentType,
-                dueDate: new Date(fullOrder.createdAt.getTime() + 5 * 24 * 60 * 60 * 1000).toLocaleDateString('ru-RU'),
-                completeAt: fullOrder.completedAt,
-                completedBy: fullOrder.completedBy
-            };
+            if (fullyCompleted) {
+                const data = {
+                    orderId: fullOrder.id,
+                    approvalDate: fullOrder.createdAt.toLocaleDateString("ru-RU"),
+                    city: "Москва",
+                    customerId: fullOrder.creatorId,
+                    customerName: fullOrder.creator.username,
+                    performerId: fullOrder.executorId,
+                    performerName: fullOrder.executor.username,
+                    category: fullOrder.category?.name || "",
+                    subcategory: fullOrder.subcategory?.name || "",
+                    address: fullOrder.address,
+                    description: fullOrder.description,
+                    price: fullOrder.proposedSum,
+                    paymentType: fullOrder.paymentType,
+                    dueDate: new Date(fullOrder.createdAt.getTime() + 5 * 24 * 60 * 60 * 1000).toLocaleDateString("ru-RU"),
+                    completeAt: fullOrder.completedAt,
+                    completedBy: fullOrder.completedBy
+                };
 
-            const contractPath = path.join(__dirname, `../contracts/contract_${order.id}.pdf`);
-            await generateContractPDF(data, contractPath);
+                const contractPath = path.join(__dirname, `../contracts/contract_${order.id}.pdf`);
+                await generateContractPDF(data, contractPath);
 
-            fullOrder.contractPath = contractPath;
-            await fullOrder.save();
+                fullOrder.contractPath = contractPath;
+                await fullOrder.save();
+            }
 
-            await logAction({
-                req,
-                actorUserId: null,
-                actorRole: "system",
-                actionType: "payment_capture_failed",
-                entityType: "payment",
-                entityId: null,
-                orderId: order.id,
-                paymentId: order.yookassa_payment_id,
-                severity: "error",
-                success: false,
-                meta: { error: String(e?.message || e) },
-            });
-
-            io.emit('orderUpdated');
-            io.emit('activeOrdersUpdated');
+            io.emit("orderUpdated");
+            io.emit("activeOrdersUpdated");
 
             res.json(fullOrder);
         } catch (error) {
@@ -921,6 +976,230 @@ module.exports = (io) => {
         } catch (error) {
             console.error('Error fetching orders:', error);
             res.status(500).json({ message: 'Ошибка сервера' });
+        }
+    });
+
+    router.post("/:id/executor-before-photos", authenticateToken, uploadExecutorBefore.array("images", 5), async (req, res) => {
+            try {
+                const orderId = req.params.id;
+                const userId = req.user.id;
+
+                const order = await Order.findByPk(orderId);
+                if (!order) return res.status(404).json({ message: "Заказ не найден" });
+
+                if (Number(order.executorId) !== Number(userId)) {
+                    return res.status(403).json({ message: "Только назначенный исполнитель может загрузить эти фото" });
+                }
+
+                const existing = Array.isArray(order.executorBeforePhotos) ? order.executorBeforePhotos : [];
+                const photoUrls = (req.files || []).map((f) => `/uploads/orders/order_${orderId}/${f.filename}`);
+
+                order.executorBeforePhotos = [...existing, ...photoUrls];
+                order.executorBeforeUploadedAt = new Date();
+
+                await order.save();
+
+                await req.logAction({
+                    req,
+                    actorUserId: userId,
+                    actorRole: "user",
+                    actionType: "executor_before_photos_uploaded",
+                    entityType: "order",
+                    entityId: order.id,
+                    orderId: order.id,
+                    meta: {
+                        count: photoUrls.length,
+                        photoUrls,
+                    },
+                });
+
+                return res.json({
+                    success: true,
+                    executorBeforePhotos: order.executorBeforePhotos,
+                });
+            } catch (error) {
+                console.error("Ошибка загрузки фото исполнителя ДО:", error);
+                return res.status(500).json({ message: "Ошибка сервера" });
+            }
+        });
+
+    router.post("/:id/executor-after-photos", authenticateToken, uploadExecutorAfter.array("images", 5), async (req, res) => {
+            try {
+                const orderId = req.params.id;
+                const userId = req.user.id;
+
+                const order = await Order.findByPk(orderId);
+                if (!order) return res.status(404).json({ message: "Заказ не найден" });
+
+                if (Number(order.executorId) !== Number(userId)) {
+                    return res.status(403).json({ message: "Только назначенный исполнитель может загрузить эти фото" });
+                }
+
+                const existing = Array.isArray(order.executorAfterPhotos) ? order.executorAfterPhotos : [];
+                const photoUrls = (req.files || []).map((f) => `/uploads/orders/order_${orderId}/${f.filename}`);
+
+                order.executorAfterPhotos = [...existing, ...photoUrls];
+                order.executorAfterUploadedAt = new Date();
+
+                await order.save();
+
+                await req.logAction({
+                    req,
+                    actorUserId: userId,
+                    actorRole: "user",
+                    actionType: "executor_after_photos_uploaded",
+                    entityType: "order",
+                    entityId: order.id,
+                    orderId: order.id,
+                    meta: {
+                        count: photoUrls.length,
+                        photoUrls,
+                    },
+                });
+
+                return res.json({
+                    success: true,
+                    executorAfterPhotos: order.executorAfterPhotos,
+                });
+            } catch (error) {
+                console.error("Ошибка загрузки фото исполнителя ПОСЛЕ:", error);
+                return res.status(500).json({ message: "Ошибка сервера" });
+            }
+        });
+
+    router.post("/:id/customer-before-photos", authenticateToken, uploadCustomerBefore.array("images", 5), async (req, res) => {
+            try {
+                const orderId = req.params.id;
+                const userId = req.user.id;
+
+                const order = await Order.findByPk(orderId);
+                if (!order) return res.status(404).json({ message: "Заказ не найден" });
+
+                if (Number(order.creatorId) !== Number(userId)) {
+                    return res.status(403).json({ message: "Только заказчик может загрузить эти фото" });
+                }
+
+                const existing = Array.isArray(order.customerBeforePhotos) ? order.customerBeforePhotos : [];
+                const photoUrls = (req.files || []).map((f) => `/uploads/orders/order_${orderId}/${f.filename}`);
+
+                order.customerBeforePhotos = [...existing, ...photoUrls];
+                order.customerBeforeUploadedAt = new Date();
+
+                await order.save();
+
+                await req.logAction({
+                    req,
+                    actorUserId: userId,
+                    actorRole: "user",
+                    actionType: "customer_before_photos_uploaded",
+                    entityType: "order",
+                    entityId: order.id,
+                    orderId: order.id,
+                    meta: {
+                        count: photoUrls.length,
+                        photoUrls,
+                    },
+                });
+
+                return res.json({
+                    success: true,
+                    customerBeforePhotos: order.customerBeforePhotos,
+                });
+            } catch (error) {
+                console.error("Ошибка загрузки фото заказчика ДО:", error);
+                return res.status(500).json({ message: "Ошибка сервера" });
+            }
+        });
+
+    router.post("/:id/customer-after-photos", authenticateToken, uploadCustomerAfter.array("images", 5), async (req, res) => {
+            try {
+                const orderId = req.params.id;
+                const userId = req.user.id;
+
+                const order = await Order.findByPk(orderId);
+                if (!order) return res.status(404).json({ message: "Заказ не найден" });
+
+                if (Number(order.creatorId) !== Number(userId)) {
+                    return res.status(403).json({ message: "Только заказчик может загрузить эти фото" });
+                }
+
+                const existing = Array.isArray(order.customerAfterPhotos) ? order.customerAfterPhotos : [];
+                const photoUrls = (req.files || []).map((f) => `/uploads/orders/order_${orderId}/${f.filename}`);
+
+                order.customerAfterPhotos = [...existing, ...photoUrls];
+                order.customerAfterUploadedAt = new Date();
+
+                await order.save();
+
+                await req.logAction({
+                    req,
+                    actorUserId: userId,
+                    actorRole: "user",
+                    actionType: "customer_after_photos_uploaded",
+                    entityType: "order",
+                    entityId: order.id,
+                    orderId: order.id,
+                    meta: {
+                        count: photoUrls.length,
+                        photoUrls,
+                    },
+                });
+
+                return res.json({
+                    success: true,
+                    customerAfterPhotos: order.customerAfterPhotos,
+                });
+            } catch (error) {
+                console.error("Ошибка загрузки фото заказчика ПОСЛЕ:", error);
+                return res.status(500).json({ message: "Ошибка сервера" });
+            }
+        });
+
+    router.post("/:id/start-work", authenticateToken, async (req, res) => {
+        try {
+            const orderId = req.params.id;
+            const userId = req.user.id;
+
+            const order = await Order.findByPk(orderId);
+            if (!order) return res.status(404).json({ message: "Заказ не найден" });
+
+            if (Number(order.executorId) !== Number(userId)) {
+                return res.status(403).json({ message: "Только исполнитель может начать работу" });
+            }
+
+            const beforePhotos = Array.isArray(order.executorBeforePhotos) ? order.executorBeforePhotos : [];
+            if (beforePhotos.length === 0) {
+                return res.status(400).json({
+                    message: "Перед началом работы загрузите фото ДО",
+                });
+            }
+
+            if (!order.workStartedAt) {
+                order.workStartedAt = new Date();
+                await order.save();
+            }
+
+            await req.logAction({
+                req,
+                actorUserId: userId,
+                actorRole: "user",
+                actionType: "order_work_started",
+                entityType: "order",
+                entityId: order.id,
+                orderId: order.id,
+                meta: {
+                    workStartedAt: order.workStartedAt,
+                    executorBeforePhotosCount: beforePhotos.length,
+                },
+            });
+
+            return res.json({
+                success: true,
+                workStartedAt: order.workStartedAt,
+            });
+        } catch (error) {
+            console.error("Ошибка начала работы:", error);
+            return res.status(500).json({ message: "Ошибка сервера" });
         }
     });
 

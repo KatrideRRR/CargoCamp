@@ -130,6 +130,70 @@ module.exports = (sequelize) => {
                 allowNull: false,
                 defaultValue: 0,
             },
+            executorBeforePhotos: {
+                type: DataTypes.TEXT,
+                allowNull: true,
+                get() {
+                    const value = this.getDataValue("executorBeforePhotos");
+                    return value ? JSON.parse(value) : [];
+                },
+                set(value) {
+                    this.setDataValue("executorBeforePhotos", JSON.stringify(value || []));
+                },
+            },
+            executorAfterPhotos: {
+                type: DataTypes.TEXT,
+                allowNull: true,
+                get() {
+                    const value = this.getDataValue("executorAfterPhotos");
+                    return value ? JSON.parse(value) : [];
+                },
+                set(value) {
+                    this.setDataValue("executorAfterPhotos", JSON.stringify(value || []));
+                },
+            },
+            customerBeforePhotos: {
+                type: DataTypes.TEXT,
+                allowNull: true,
+                get() {
+                    const value = this.getDataValue("customerBeforePhotos");
+                    return value ? JSON.parse(value) : [];
+                },
+                set(value) {
+                    this.setDataValue("customerBeforePhotos", JSON.stringify(value || []));
+                },
+            },
+            customerAfterPhotos: {
+                type: DataTypes.TEXT,
+                allowNull: true,
+                get() {
+                    const value = this.getDataValue("customerAfterPhotos");
+                    return value ? JSON.parse(value) : [];
+                },
+                set(value) {
+                    this.setDataValue("customerAfterPhotos", JSON.stringify(value || []));
+                },
+            },
+            executorBeforeUploadedAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
+            executorAfterUploadedAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
+            customerBeforeUploadedAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
+            customerAfterUploadedAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
+            workStartedAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
         },
         {
             sequelize,

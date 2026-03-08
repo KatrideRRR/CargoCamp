@@ -221,7 +221,7 @@ router.post('/login', async (req, res) => {
     }
 });
 
-router.get("/:orderId/messages", async (req, res) => {
+router.get("/:orderId/messages", authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { orderId } = req.params;
         // Получаем все сообщения для этого заказа
@@ -244,7 +244,7 @@ router.get("/:orderId/messages", async (req, res) => {
     }
 });
 
-router.get('/orders/:id', async (req, res) => {
+router.get('/orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
     const { id } = req.params;
     try {
         const order = await Order.findOne({
