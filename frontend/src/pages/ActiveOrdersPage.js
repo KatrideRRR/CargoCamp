@@ -5,7 +5,7 @@ import "../styles/ActiveOrdersPage.css";
 import { useAuth } from "../utils/authContext";
 import io from "socket.io-client";
 import { useMediaQuery } from "react-responsive";
-import { FaPhone, FaComments, FaRoute, FaCheck, FaTrash } from "react-icons/fa";
+import { FaPhone, FaComments, FaRoute, FaCheck, FaTrash, FaExclamationTriangle } from "react-icons/fa";
 import Modal from "react-modal";
 import axiosInstance from "../utils/axiosInstance";
 import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
@@ -37,6 +37,15 @@ const ActiveOrdersPage = () => {
     // инфо о пользователях (для обычных заказов)
     const [creatorsInfo, setCreatorsInfo] = useState({});
     const [executorsInfo, setExecutorsInfo] = useState({});
+
+    //споры
+    const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
+    const [selectedOrderForDispute, setSelectedOrderForDispute] = useState(null);
+    const [disputeReasonCode, setDisputeReasonCode] = useState("poor_quality");
+    const [disputeReason, setDisputeReason] = useState("");
+    const [disputeDescription, setDisputeDescription] = useState("");
+    const [disputeLoading, setDisputeLoading] = useState(false);
+    const [orderDisputes, setOrderDisputes] = useState({});
 
     // “удаленные” обычные заказы
     const [removedOrders, setRemovedOrders] = useState(() => {
@@ -71,6 +80,109 @@ const ActiveOrdersPage = () => {
                 return <FaCreditCard title="Карта" />;
             default:
                 return <FaQuestionCircle title="Неизвестно" />;
+        }
+    };
+
+    const disputeReasonOptions = [
+        { value: "work_not_done", label: "Работа не выполнена" },
+        { value: "poor_quality", label: "Низкое качество работы" },
+        { value: "missed_deadline", label: "Нарушены сроки" },
+        { value: "wrong_price", label: "Спор по стоимости" },
+        { value: "rude_behavior", label: "Некорректное поведение" },
+        { value: "other", label: "Другое" },
+    ];
+
+    const openDisputeModal = (order) => {
+        setSelectedOrderForDispute(order);
+        setDisputeReasonCode("poor_quality");
+        setDisputeReason("");
+        setDisputeDescription("");
+        setIsDisputeModalOpen(true);
+    };
+
+    const closeDisputeModal = () => {
+        setIsDisputeModalOpen(false);
+        setSelectedOrderForDispute(null);
+        setDisputeReasonCode("poor_quality");
+        setDisputeReason("");
+        setDisputeDescription("");
+        setDisputeLoading(false);
+    };
+
+    const fetchOrderDispute = async (orderId) => {
+        try {
+            const t = localStorage.getItem("authToken");
+            if (!t) return null;
+
+            const res = await axios.get(`${apiUrl}/disputes/order/${orderId}`, {
+                headers: { Authorization: `Bearer ${t}` },
+            });
+
+            if (res.data) {
+                setOrderDisputes((prev) => ({
+                    ...prev,
+                    [orderId]: res.data,
+                }));
+                return res.data;
+            }
+
+            return null;
+        } catch (e) {
+            if (e?.response?.status !== 404) {
+                console.error(`Ошибка получения спора по заказу ${orderId}:`, e);
+            }
+            return null;
+        }
+    };
+
+    const submitDispute = async () => {
+        try {
+            const t = localStorage.getItem("authToken");
+            if (!t) {
+                alert("Вы не авторизованы");
+                navigate("/login");
+                return;
+            }
+
+            if (!selectedOrderForDispute?.id) {
+                alert("Заказ не выбран");
+                return;
+            }
+
+            if (!disputeReason.trim()) {
+                alert("Укажите краткую причину спора");
+                return;
+            }
+
+            setDisputeLoading(true);
+
+            const res = await axios.post(
+                `${apiUrl}/disputes/open`,
+                {
+                    orderId: selectedOrderForDispute.id,
+                    reasonCode: disputeReasonCode,
+                    reason: disputeReason.trim(),
+                    description: disputeDescription.trim(),
+                },
+                {
+                    headers: { Authorization: `Bearer ${t}` },
+                }
+            );
+
+            if (res.data?.dispute) {
+                setOrderDisputes((prev) => ({
+                    ...prev,
+                    [selectedOrderForDispute.id]: res.data.dispute,
+                }));
+            }
+
+            alert("Спор успешно открыт");
+            closeDisputeModal();
+        } catch (e) {
+            console.error("Ошибка открытия спора:", e);
+            alert(e?.response?.data?.message || "Не удалось открыть спор");
+        } finally {
+            setDisputeLoading(false);
         }
     };
 
@@ -387,6 +499,32 @@ const ActiveOrdersPage = () => {
             const filteredOrders = serverOrders.filter((o) => !removedOrders.includes(o.id));
             setOrders(filteredOrders);
 
+            // подгрузим данные по спорам
+            const disputeEntries = await Promise.allSettled(
+                filteredOrders.map(async (order) => {
+                    try {
+                        const res = await axios.get(`${apiUrl}/disputes/order/${order.id}`, {
+                            headers: { Authorization: `Bearer ${t}` },
+                        });
+                        return { orderId: order.id, dispute: res.data };
+                    } catch (e) {
+                        if (e?.response?.status !== 404) {
+                            console.error(`Ошибка загрузки спора для заказа ${order.id}:`, e);
+                        }
+                        return null;
+                    }
+                })
+            );
+
+            const disputesMap = {};
+            disputeEntries.forEach((entry) => {
+                if (entry.status === "fulfilled" && entry.value?.orderId && entry.value?.dispute) {
+                    disputesMap[entry.value.orderId] = entry.value.dispute;
+                }
+            });
+
+            setOrderDisputes(disputesMap);
+
             // unread counts
             const notifs = Array.isArray(response.data?.notifications) ? response.data.notifications : [];
             const counts = {};
@@ -472,9 +610,17 @@ const ActiveOrdersPage = () => {
                                             <li key={order.id} className="order-card">
                                                 <div className="order-header" onClick={() => toggleExpand(order.id)}>
                                                     <div className="order-top">
-                                                        <div className="order-title">
-                                                            <strong>Заказ номер {order.id}</strong>
-                                                            {isCreator ? ". Вы являетесь заказчиком" : ". Вы являетесь исполнителем"}.
+                                                        <div className="order-title-wrap">
+                                                            <div className="order-title">
+                                                                <strong>Заказ номер {order.id}</strong>
+                                                                {isCreator ? ". Вы являетесь заказчиком" : ". Вы являетесь исполнителем"}.
+                                                            </div>
+
+                                                            {orderDisputes[order.id] && (
+                                                                <div className={`dispute-status-badge dispute-status-${orderDisputes[order.id].status}`}>
+                                                                    Спор: {orderDisputes[order.id].status}
+                                                                </div>
+                                                            )}
                                                         </div>
 
                                                         <div className="pay-box">
@@ -559,6 +705,37 @@ const ActiveOrdersPage = () => {
                                                         >
                                                             {isMobile ? <FaRoute /> : "Маршрут"}
                                                         </button>
+
+                                                        {orderDisputes[order.id] ? (
+                                                            <button
+                                                                className="dispute-opened-button"
+                                                                onClick={async (e) => {
+                                                                    e.stopPropagation();
+                                                                    const dispute = orderDisputes[order.id] || (await fetchOrderDispute(order.id));
+                                                                    if (!dispute) {
+                                                                        return alert("Спор не найден");
+                                                                    }
+
+                                                                    alert(
+                                                                        `Спор уже открыт.\n\nСтатус: ${dispute.status}\nПричина: ${dispute.reason}${
+                                                                            dispute.description ? `\nОписание: ${dispute.description}` : ""
+                                                                        }`
+                                                                    );
+                                                                }}
+                                                            >
+                                                                {isMobile ? <FaExclamationTriangle /> : "Спор открыт"}
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                className="dispute-button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    openDisputeModal(order);
+                                                                }}
+                                                            >
+                                                                {isMobile ? <FaExclamationTriangle /> : "Открыть спор"}
+                                                            </button>
+                                                        )}
 
                                                         {isCompletedByUser ? (
                                                             isWaitingForOther ? (
@@ -785,6 +962,85 @@ const ActiveOrdersPage = () => {
                             )}
                         </div>
                     </div>
+
+                    <Modal
+                        appElement={document.getElementById("root")}
+                        isOpen={isDisputeModalOpen}
+                        onRequestClose={closeDisputeModal}
+                        contentLabel="Открытие спора"
+                        className="custom-modal dispute-modal"
+                        overlayClassName="custom-modal-overlay"
+                    >
+                        <div className="custom-modal-content dispute-modal-content">
+                            <button onClick={closeDisputeModal} className="custom-close-button">
+                                ✖
+                            </button>
+
+                            <h2 className="dispute-modal-title">Открыть спор</h2>
+
+                            {selectedOrderForDispute && (
+                                <p className="dispute-order-info">
+                                    Заказ №{selectedOrderForDispute.id}
+                                </p>
+                            )}
+
+                            <div className="dispute-form-group">
+                                <label>Категория причины</label>
+                                <select
+                                    value={disputeReasonCode}
+                                    onChange={(e) => setDisputeReasonCode(e.target.value)}
+                                    className="dispute-input"
+                                >
+                                    {disputeReasonOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="dispute-form-group">
+                                <label>Краткая причина</label>
+                                <input
+                                    type="text"
+                                    value={disputeReason}
+                                    onChange={(e) => setDisputeReason(e.target.value)}
+                                    className="dispute-input"
+                                    placeholder="Например: работа выполнена не полностью"
+                                    maxLength={255}
+                                />
+                            </div>
+
+                            <div className="dispute-form-group">
+                                <label>Подробное описание</label>
+                                <textarea
+                                    value={disputeDescription}
+                                    onChange={(e) => setDisputeDescription(e.target.value)}
+                                    className="dispute-textarea"
+                                    placeholder="Опишите подробно, в чём проблема, что произошло, что именно не устраивает"
+                                    rows={6}
+                                />
+                            </div>
+
+                            <div className="dispute-modal-actions">
+                                <button
+                                    className="dispute-cancel-button"
+                                    onClick={closeDisputeModal}
+                                    disabled={disputeLoading}
+                                >
+                                    Отмена
+                                </button>
+
+                                <button
+                                    className="dispute-submit-button"
+                                    onClick={submitDispute}
+                                    disabled={disputeLoading}
+                                >
+                                    {disputeLoading ? "Открываем..." : "Открыть спор"}
+                                </button>
+                            </div>
+                        </div>
+                    </Modal>
 
                     {/* Images Modal */}
                     <Modal

@@ -23,6 +23,7 @@ const messagesRoutes = require('./routes/messages');
 const categoryRouter = require('./routes/category');
 const adminRoutes = require('./routes/admin');
 const payments = require("./routes/payments");
+const disputeRoutes = require('./routes/disputes');
 const expressOrdersRoutes = require("./routes/expressorders");
 const logActionMiddleware = require("./middlewares/logActionMiddleware");
 
@@ -91,6 +92,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/contracts', express.static(path.join(__dirname, 'contracts')));
 
 app.use('/api/orders', orderRoutes(io));
+app.use('/api/disputes', disputeRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/category', categoryRouter);

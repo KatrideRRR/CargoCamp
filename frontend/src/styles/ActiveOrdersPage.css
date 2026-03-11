@@ -1152,3 +1152,139 @@ body {
         max-width: 160px;
     }
 }
+
+.order-title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dispute-status-badge {
+    display: inline-block;
+    width: fit-content;
+    padding: 6px 10px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    background: #fff3cd;
+    color: #856404;
+}
+
+.dispute-status-open,
+.dispute-status-in_review,
+.dispute-status-waiting_creator,
+.dispute-status-waiting_executor {
+    background: #ffe8cc;
+    color: #8a4b08;
+}
+
+.dispute-status-resolved,
+.dispute-status-closed {
+    background: #d4edda;
+    color: #155724;
+}
+
+.dispute-button,
+.dispute-opened-button {
+    border: none;
+    border-radius: 10px;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: 0.2s ease;
+}
+
+.dispute-button {
+    background: #ffe5e5;
+    color: #b42318;
+}
+
+.dispute-button:hover {
+    background: #ffd1d1;
+}
+
+.dispute-opened-button {
+    background: #fff4cc;
+    color: #8a6500;
+}
+
+.dispute-opened-button:hover {
+    background: #ffe9a8;
+}
+
+.dispute-modal-content {
+    max-width: 560px;
+    width: 100%;
+    padding: 24px;
+}
+
+.dispute-modal-title {
+    margin-bottom: 10px;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.dispute-order-info {
+    margin-bottom: 18px;
+    color: #666;
+}
+
+.dispute-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.dispute-input,
+.dispute-textarea {
+    width: 100%;
+    border: 1px solid #d0d5dd;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 15px;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.dispute-input:focus,
+.dispute-textarea:focus {
+    border-color: #2f6fed;
+}
+
+.dispute-textarea {
+    resize: vertical;
+    min-height: 120px;
+}
+
+.dispute-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.dispute-cancel-button,
+.dispute-submit-button {
+    border: none;
+    border-radius: 10px;
+    padding: 12px 18px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.dispute-cancel-button {
+    background: #f2f4f7;
+    color: #344054;
+}
+
+.dispute-submit-button {
+    background: #b42318;
+    color: #fff;
+}
+
+.dispute-submit-button:disabled,
+.dispute-cancel-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}

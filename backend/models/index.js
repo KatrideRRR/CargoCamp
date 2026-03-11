@@ -27,8 +27,8 @@ db.Subcategory = require("./Subcategory")(sequelize, DataTypes);
 db.Service = require("./Service")(sequelize, DataTypes);
 db.Notification = require("./Notification")(sequelize, DataTypes);
 db.OrderReview = require("./OrderReview")(sequelize, DataTypes);
-
 db.ActionLog = require("./ActionLog")(sequelize, DataTypes);
+db.Dispute = require("./Dispute")(sequelize, DataTypes);
 
 // ✅ Express (такси/курьер)
 db.ExpressOrder = require("./ExpressOrder")(sequelize, DataTypes);
@@ -38,6 +38,11 @@ db.ExpressSavedAddress = require("./ExpressSavedAddress")(sequelize, DataTypes);
 Object.values(db).forEach((model) => {
     if (model && typeof model.associate === "function") {
         model.associate(db);
+    }
+});
+Object.keys(db).forEach(modelName => {
+    if (db[modelName].associate) {
+        db[modelName].associate(db);
     }
 });
 
