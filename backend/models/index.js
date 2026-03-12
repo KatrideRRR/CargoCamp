@@ -40,11 +40,6 @@ Object.values(db).forEach((model) => {
         model.associate(db);
     }
 });
-Object.keys(db).forEach(modelName => {
-    if (db[modelName].associate) {
-        db[modelName].associate(db);
-    }
-});
 
 // Проверяем подключение к БД
 sequelize

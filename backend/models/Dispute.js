@@ -29,6 +29,10 @@ module.exports = (sequelize) => {
                 as: 'resolvedBy'
             });
 
+            Dispute.belongsTo(models.Order, {
+                foreignKey: 'orderId',
+                as: 'relatedOrder'
+            });
         }
     }
 

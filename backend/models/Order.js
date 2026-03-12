@@ -10,6 +10,10 @@ module.exports = (sequelize) => {
             Order.belongsTo(models.User, { as: 'creator', foreignKey: 'creatorId' });
             Order.belongsTo(models.User, { as: 'executor', foreignKey: 'executorId' });
             Order.belongsTo(models.Service, { foreignKey: 'serviceId', as: 'service' });
+            Order.hasMany(models.Dispute, {
+                foreignKey: "orderId",
+                as: "disputes"
+            });
         }
     }
 

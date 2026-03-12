@@ -157,7 +157,7 @@ const ActiveOrdersPage = () => {
             setDisputeLoading(true);
 
             const res = await axios.post(
-                `${apiUrl}/disputes/open`,
+                `${apiUrl}/api/disputes/open`,
                 {
                     orderId: selectedOrderForDispute.id,
                     reasonCode: disputeReasonCode,
@@ -503,7 +503,7 @@ const ActiveOrdersPage = () => {
             const disputeEntries = await Promise.allSettled(
                 filteredOrders.map(async (order) => {
                     try {
-                        const res = await axios.get(`${apiUrl}/disputes/order/${order.id}`, {
+                        const res = await axios.get(`${apiUrl}/api/disputes/order/${order.id}`, {
                             headers: { Authorization: `Bearer ${t}` },
                         });
                         return { orderId: order.id, dispute: res.data };

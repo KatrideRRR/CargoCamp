@@ -115,7 +115,6 @@ app.post('/api/token', (req, res) => {
 });
 
 sequelize.authenticate()
-    .then(() => console.log('✅ База данных подключена!'))
     .catch((err) => console.error('Database connection error:', err));
 
 const PORT = process.env.PORT;

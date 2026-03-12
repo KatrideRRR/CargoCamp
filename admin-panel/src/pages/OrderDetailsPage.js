@@ -24,14 +24,15 @@ function OrderDetailsPage() {
             return;
         }
 
-        axios.get(`${apiUrl}/api/admin/orders/${id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-            .then(response => {
+        axios
+            .get(`${apiUrl}/api/admin/orders/${id}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+            .then((response) => {
                 setOrder(response.data);
                 setLoading(false);
             })
-            .catch(err => {
+            .catch((err) => {
                 console.error("Ошибка загрузки заказа:", err);
                 setError(err.response?.data?.message || "Ошибка загрузки заказа");
                 setLoading(false);
@@ -42,14 +43,15 @@ function OrderDetailsPage() {
         if (!token) return;
 
         setLogsLoading(true);
-        axios.get(`${apiUrl}/api/admin/orders/${id}/logs`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-            .then(res => {
+        axios
+            .get(`${apiUrl}/api/admin/orders/${id}/logs`, {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+            .then((res) => {
                 setLogs(res.data?.rows || []);
                 setLogsLoading(false);
             })
-            .catch(err => {
+            .catch((err) => {
                 console.error("Ошибка загрузки логов:", err);
                 setLogsError(err.response?.data?.message || "Ошибка загрузки логов");
                 setLogsLoading(false);
@@ -105,9 +107,49 @@ function OrderDetailsPage() {
         );
     };
 
+    const getDisputeStatusLabel = (status) => {
+        switch (status) {
+            case "open":
+                return "Открыт";
+            case "in_review":
+                return "На рассмотрении";
+            case "waiting_creator":
+                return "Ожидает заказчика";
+            case "waiting_executor":
+                return "Ожидает исполнителя";
+            case "resolved":
+                return "Решён";
+            case "closed":
+                return "Закрыт";
+            default:
+                return status || "—";
+        }
+    };
+
+    const getReasonCodeLabel = (reasonCode) => {
+        switch (reasonCode) {
+            case "work_not_done":
+                return "Работа не выполнена";
+            case "poor_quality":
+                return "Низкое качество работы";
+            case "missed_deadline":
+                return "Нарушены сроки";
+            case "wrong_price":
+                return "Спор по стоимости";
+            case "rude_behavior":
+                return "Некорректное поведение";
+            case "other":
+                return "Другое";
+            default:
+                return reasonCode || "—";
+        }
+    };
+
     if (loading) return <p>Загрузка...</p>;
     if (error) return <p>{error}</p>;
     if (!order) return <p>Заказ не найден</p>;
+
+    const disputes = Array.isArray(order.disputes) ? order.disputes : [];
 
     return (
         <div className="order-details-container">
@@ -132,6 +174,64 @@ function OrderDetailsPage() {
                 <button className="delete-button" onClick={() => deleteOrder(order.id)}>
                     Удалить
                 </button>
+            </div>
+
+            <div className="order-disputes-section">
+                <h3>Споры по заказу</h3>
+
+                {disputes.length === 0 ? (
+                    <p>По этому заказу споров нет</p>
+                ) : (
+                    <div className="disputes-list">
+                        {disputes.map((dispute) => (
+                            <div key={dispute.id} className="dispute-card">
+                                <div className="dispute-card-top">
+                                    <div>
+                                        <strong>Спор #{dispute.id}</strong>
+                                    </div>
+                                    <div className={`dispute-admin-badge ${dispute.status}`}>
+                                        {getDisputeStatusLabel(dispute.status)}
+                                    </div>
+                                </div>
+
+                                <p>
+                                    <strong>Дата открытия:</strong>{" "}
+                                    {dispute.createdAt ? new Date(dispute.createdAt).toLocaleString() : "—"}
+                                </p>
+
+                                <p>
+                                    <strong>Открыл:</strong>{" "}
+                                    {dispute.openedByRole === "creator" ? "Заказчик" : "Исполнитель"} #{dispute.openedById}
+                                </p>
+
+                                <p>
+                                    <strong>Категория причины:</strong> {getReasonCodeLabel(dispute.reasonCode)}
+                                </p>
+
+                                <p>
+                                    <strong>Краткая причина:</strong> {dispute.reason || "—"}
+                                </p>
+
+                                <p>
+                                    <strong>Описание:</strong> {dispute.description || "—"}
+                                </p>
+
+                                <p>
+                                    <strong>Решение:</strong> {dispute.resolution || "—"}
+                                </p>
+
+                                <p>
+                                    <strong>Кем решён:</strong> {dispute.resolvedById || "—"}
+                                </p>
+
+                                <p>
+                                    <strong>Дата решения:</strong>{" "}
+                                    {dispute.resolvedAt ? new Date(dispute.resolvedAt).toLocaleString() : "—"}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             <div className="order-photos-section">

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
 
-const authMiddleware = require('../middleware/authMiddleware');
+const authMiddleware = require('../middlewares/userAuth');
 const { Dispute, Order } = require('../models');
 
 // Открыть спор
@@ -65,6 +65,23 @@ router.post('/open', authMiddleware, async (req, res) => {
             reason,
             description: description || null,
             status: 'open'
+        });
+
+        await ActionLog.create({
+            orderId: order.id,
+            actorUserId: userId,
+            actorRole: isCreator ? 'creator' : 'executor',
+            actionType: 'dispute_opened',
+            severity: 'warning',
+            success: true,
+            reason,
+            ts: new Date(),
+            meta: {
+                disputeId: dispute.id,
+                reasonCode,
+                description: description || null,
+                openedByRole: isCreator ? 'creator' : 'executor',
+            }
         });
 
         return res.status(201).json({

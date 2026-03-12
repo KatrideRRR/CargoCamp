@@ -1,11 +1,9 @@
 const express = require('express');
 const { authMiddleware, adminMiddleware } = require('../middlewares/adminAuth');
-const { User, Order, Message, Category, Subcategory } = require('../models');
-const bcrypt = require('bcrypt');
+const { User, Order, Message, Category, Subcategory, Dispute, ActionLog } = require('../models');const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const NodeGeocoder = require("node-geocoder");
 const { Op } = require("sequelize");
-const { ActionLog } = require("../models"); // добавь модель
 
 const geocoder = NodeGeocoder({
     provider: "openstreetmap",
@@ -168,9 +166,35 @@ router.put('/users/:id/unblock', authMiddleware, adminMiddleware, async (req, re
 
 router.get('/orders', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const orders = await Order.findAll();
-        res.json(orders);
+        const orders = await Order.findAll({
+            include: [
+                {
+                    model: Dispute,
+                    as: 'disputes',
+                    required: false,
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+
+        const result = orders.map((order) => {
+            const plain = order.toJSON();
+            const disputes = Array.isArray(plain.disputes) ? plain.disputes : [];
+
+            const activeDispute =
+                disputes.find((d) =>
+                    ['open', 'in_review', 'waiting_creator', 'waiting_executor'].includes(d.status)
+                ) || null;
+
+            return {
+                ...plain,
+                activeDispute,
+            };
+        });
+
+        res.json(result);
     } catch (error) {
+        console.error('Ошибка загрузки заказов:', error);
         res.status(500).json({ message: 'Ошибка сервера' });
     }
 });
@@ -246,17 +270,26 @@ router.get("/orders/:orderId/messages", authMiddleware, adminMiddleware, async (
 
 router.get('/orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
     const { id } = req.params;
+
     try {
         const order = await Order.findOne({
             where: { id },
             include: [
                 { model: Category, as: 'category' },
-                { model: Subcategory, as: 'subcategory' }
-            ]
-        } );
+                { model: Subcategory, as: 'subcategory' },
+                {
+                    model: Dispute,
+                    as: 'disputes',
+                    required: false,
+                }
+            ],
+            order: [[{ model: Dispute, as: 'disputes' }, 'createdAt', 'DESC']]
+        });
+
         if (!order) {
             return res.status(404).json({ message: 'Order not found' });
         }
+
         res.json(order);
     } catch (error) {
         console.error('Error fetching order:', error);

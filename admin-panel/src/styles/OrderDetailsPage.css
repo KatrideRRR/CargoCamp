@@ -65,6 +65,84 @@
     border: 1px solid rgba(255,255,255,0.15);
 }
 
+.admin-dispute-badge {
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.admin-dispute-badge.none {
+    background: #edf2f7;
+    color: #4a5568;
+}
+
+.admin-dispute-badge.open,
+.admin-dispute-badge.in_review,
+.admin-dispute-badge.waiting_creator,
+.admin-dispute-badge.waiting_executor {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.admin-dispute-badge.resolved,
+.admin-dispute-badge.closed {
+    background: #d4edda;
+    color: #155724;
+}
+
+.order-disputes-section {
+    margin-top: 24px;
+    padding: 20px;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.disputes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.dispute-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 16px;
+    background: #fafafa;
+}
+
+.dispute-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    gap: 12px;
+}
+
+.dispute-admin-badge {
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.dispute-admin-badge.open,
+.dispute-admin-badge.in_review,
+.dispute-admin-badge.waiting_creator,
+.dispute-admin-badge.waiting_executor {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.dispute-admin-badge.resolved,
+.dispute-admin-badge.closed {
+    background: #d4edda;
+    color: #155724;
+}
+
 .order-logs { margin-top: 20px; padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.05); }
 .logs-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
 .log-item { padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); }
