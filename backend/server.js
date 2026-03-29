@@ -80,7 +80,10 @@ app.use(cors({
         'http://18.184.43.44:3001',
         'https://81.163.27.147:3001',
         'https://81.163.27.147:8080',
-        'https://cargocamp.ru'
+        'https://cargocamp.ru',
+        'https://admin.cargocamp.ru',
+        'https://www.cargocamp.ru',
+        'http://81.163.27.147:8080'
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],

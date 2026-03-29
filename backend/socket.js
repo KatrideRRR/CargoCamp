@@ -12,9 +12,18 @@ function getIo() {
 function initializeSocket(server) {
     io = socketIo(server, {
         cors: {
-            origin: ['http://localhost:3000','http://localhost:3001', 'http://localhost:8080', 'http://18.184.43.44:3001',
-                'https://81.163.27.147:3001', 'https://81.163.27.147:8080',
-                'https://cargocamp.ru'],
+            origin: [
+                'http://localhost:3000',
+                'http://localhost:3001', 
+                'http://localhost:8080',
+                'http://18.184.43.44:3001',
+                'https://81.163.27.147:3001', 
+                'https://81.163.27.147:8080',
+                'https://cargocamp.ru',
+                'https://www.cargocamp.ru',
+                'http://81.163.27.147:8080',
+                'https://admin.cargocamp.ru',
+            ],
             methods: ["GET", "POST"],
             credentials: true,
         }
