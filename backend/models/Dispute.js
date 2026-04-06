@@ -4,11 +4,6 @@ module.exports = (sequelize) => {
     class Dispute extends Model {
         static associate(models) {
 
-            Dispute.belongsTo(models.Order, {
-                foreignKey: 'orderId',
-                as: 'order'
-            });
-
             Dispute.belongsTo(models.User, {
                 foreignKey: 'openedById',
                 as: 'openedBy'

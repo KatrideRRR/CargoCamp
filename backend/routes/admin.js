@@ -388,4 +388,123 @@ router.get("/orders/:id/logs", authMiddleware, adminMiddleware, async (req, res)
     }
 });
 
+router.patch('/disputes/:id/status', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const disputeId = Number(req.params.id);
+        const { status } = req.body;
+
+        const allowedStatuses = ['open', 'in_review', 'waiting_creator', 'waiting_executor', 'resolved', 'closed'];
+
+        if (!allowedStatuses.includes(status)) {
+            return res.status(400).json({ message: 'Недопустимый статус спора' });
+        }
+
+        const dispute = await Dispute.findByPk(disputeId);
+
+        if (dispute.status === status) {
+            return res.status(400).json({
+                message: 'У спора уже такой статус'
+            });
+        }
+
+        if (!dispute) {
+            return res.status(404).json({ message: 'Спор не найден' });
+        }
+
+        const oldStatus = dispute.status;
+        dispute.status = status;
+        await dispute.save();
+
+        await ActionLog.create({
+            entityType: 'dispute',
+            entityId: dispute.id,
+            orderId: dispute.orderId,
+            actorUserId: req.user.id,
+            actorRole: 'admin',
+            actionType: 'dispute_status_changed',
+            severity: 'info',
+            success: true,
+            reason: `Статус спора изменён: ${oldStatus} -> ${status}`,
+            ts: new Date(),
+            meta: {
+                disputeId: dispute.id,
+                oldStatus,
+                newStatus: status,
+            }
+        });
+
+        res.json({
+            success: true,
+            message: 'Статус спора обновлён',
+            dispute
+        });
+    } catch (e) {
+        console.error('Ошибка изменения статуса спора:', e);
+        res.status(500).json({ success: false, message: 'Ошибка сервера' });
+    }
+});
+
+router.patch('/disputes/:id/resolve', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const disputeId = Number(req.params.id);
+        const { resolution } = req.body;
+
+        if (!resolution || !String(resolution).trim()) {
+            return res.status(400).json({ message: 'Нужно указать решение по спору' });
+        }
+
+        const dispute = await Dispute.findByPk(disputeId);
+
+        if (!dispute) {
+            return res.status(404).json({ message: 'Спор не найден' });
+        }
+
+        dispute.resolution = String(resolution).trim();
+        dispute.status = 'resolved';
+        dispute.resolvedById = req.user.id;
+        dispute.resolvedAt = new Date();
+
+        await dispute.save();
+
+        await ActionLog.create({
+            entityType: 'dispute',
+            entityId: dispute.id,
+            orderId: dispute.orderId,
+            actorUserId: req.user.id,
+            actorRole: 'admin',
+            actionType: 'dispute_resolved',
+            severity: 'info',
+            success: true,
+            reason: dispute.resolution,
+            ts: new Date(),
+            meta: {
+                disputeId: dispute.id,
+                resolution: dispute.resolution,
+            }
+        });
+
+        res.json({
+            success: true,
+            message: 'Спор решён',
+            dispute
+        });
+    } catch (e) {
+        console.error('Ошибка решения спора:', e);
+        res.status(500).json({ success: false, message: 'Ошибка сервера' });
+    }
+});
+
+router.get('/disputes', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const disputes = await Dispute.findAll({
+            order: [['createdAt', 'DESC']]
+        });
+
+        res.json({ success: true, disputes });
+    } catch (e) {
+        console.error('Ошибка получения споров:', e);
+        res.status(500).json({ success: false, message: 'Ошибка сервера' });
+    }
+});
+
 module.exports = router;

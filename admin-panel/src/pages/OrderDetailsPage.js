@@ -13,6 +13,8 @@ function OrderDetailsPage() {
     const [logs, setLogs] = useState([]);
     const [logsLoading, setLogsLoading] = useState(false);
     const [logsError, setLogsError] = useState(null);
+    const [disputeActionLoading, setDisputeActionLoading] = useState({});
+    const [resolutionInputs, setResolutionInputs] = useState({});
 
     const token = localStorage.getItem("authToken");
     const navigate = useNavigate();
@@ -145,6 +147,96 @@ function OrderDetailsPage() {
         }
     };
 
+    const updateDisputeInOrder = (updatedDispute) => {
+        setOrder((prev) => {
+            if (!prev) return prev;
+
+            const prevDisputes = Array.isArray(prev.disputes) ? prev.disputes : [];
+
+            return {
+                ...prev,
+                disputes: prevDisputes.map((d) =>
+                    d.id === updatedDispute.id ? updatedDispute : d
+                ),
+            };
+        });
+    };
+
+    const reloadLogs = async () => {
+        try {
+            setLogsLoading(true);
+            const res = await axios.get(`${apiUrl}/api/admin/orders/${id}/logs`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setLogs(res.data?.rows || []);
+            setLogsError(null);
+        } catch (err) {
+            console.error("Ошибка загрузки логов:", err);
+            setLogsError(err.response?.data?.message || "Ошибка загрузки логов");
+        } finally {
+            setLogsLoading(false);
+        }
+    };
+
+    const changeDisputeStatus = async (disputeId, newStatus) => {
+        try {
+            setDisputeActionLoading((prev) => ({ ...prev, [`status_${disputeId}`]: true }));
+
+            const res = await axios.patch(
+                `${apiUrl}/api/admin/disputes/${disputeId}/status`,
+                { status: newStatus },
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+
+            if (res.data?.dispute) {
+                updateDisputeInOrder(res.data.dispute);
+            }
+
+            await reloadLogs();
+            alert("Статус спора обновлён");
+        } catch (err) {
+            console.error("Ошибка изменения статуса спора:", err);
+            alert(err.response?.data?.message || "Не удалось изменить статус спора");
+        } finally {
+            setDisputeActionLoading((prev) => ({ ...prev, [`status_${disputeId}`]: false }));
+        }
+    };
+
+    const resolveDispute = async (disputeId) => {
+        try {
+            const resolution = (resolutionInputs[disputeId] || "").trim();
+
+            if (!resolution) {
+                alert("Введите решение по спору");
+                return;
+            }
+
+            setDisputeActionLoading((prev) => ({ ...prev, [`resolve_${disputeId}`]: true }));
+
+            const res = await axios.patch(
+                `${apiUrl}/api/admin/disputes/${disputeId}/resolve`,
+                { resolution },
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+
+            if (res.data?.dispute) {
+                updateDisputeInOrder(res.data.dispute);
+            }
+
+            await reloadLogs();
+            alert("Спор решён");
+        } catch (err) {
+            console.error("Ошибка решения спора:", err);
+            alert(err.response?.data?.message || "Не удалось решить спор");
+        } finally {
+            setDisputeActionLoading((prev) => ({ ...prev, [`resolve_${disputeId}`]: false }));
+        }
+    };
+
     if (loading) return <p>Загрузка...</p>;
     if (error) return <p>{error}</p>;
     if (!order) return <p>Заказ не найден</p>;
@@ -187,12 +279,22 @@ function OrderDetailsPage() {
                             <div key={dispute.id} className="dispute-card">
                                 <div className="dispute-card-top">
                                     <div>
-                                        <strong>Спор #{dispute.id}</strong>
-                                    </div>
+                                        <div>
+                                            <strong>Спор по заказу #{order.id}</strong>
+                                            <span className="dispute-inner-id"> · ID спора: {dispute.id}</span>
+
+                                        </div>                                    </div>
                                     <div className={`dispute-admin-badge ${dispute.status}`}>
                                         {getDisputeStatusLabel(dispute.status)}
                                     </div>
                                 </div>
+
+                                <p>
+                                    <strong>Инициатор:</strong>{" "}
+                                    <span className={dispute.openedByRole === "creator" ? "initiator-creator" : "initiator-executor"}>
+        {dispute.openedByRole === "creator" ? "Заказчик" : "Исполнитель"}
+    </span>
+                                </p>
 
                                 <p>
                                     <strong>Дата открытия:</strong>{" "}
@@ -228,6 +330,62 @@ function OrderDetailsPage() {
                                     <strong>Дата решения:</strong>{" "}
                                     {dispute.resolvedAt ? new Date(dispute.resolvedAt).toLocaleString() : "—"}
                                 </p>
+
+                                <div className="dispute-admin-actions">
+                                    <h4>Управление спором</h4>
+
+                                    <div className="dispute-status-actions">
+                                        <button
+                                            className="dispute-action-button"
+                                            onClick={() => changeDisputeStatus(dispute.id, "in_review")}
+                                            disabled={disputeActionLoading[`status_${dispute.id}`] || dispute.status === "resolved" || dispute.status === "closed"}
+                                        >
+                                            Взять в работу
+                                        </button>
+
+                                        <button
+                                            className="dispute-action-button"
+                                            onClick={() => changeDisputeStatus(dispute.id, "waiting_creator")}
+                                            disabled={disputeActionLoading[`status_${dispute.id}`] || dispute.status === "resolved" || dispute.status === "closed"}
+                                        >
+                                            Ожидать заказчика
+                                        </button>
+
+                                        <button
+                                            className="dispute-action-button"
+                                            onClick={() => changeDisputeStatus(dispute.id, "waiting_executor")}
+                                            disabled={disputeActionLoading[`status_${dispute.id}`] || dispute.status === "resolved" || dispute.status === "closed"}
+                                        >
+                                            Ожидать исполнителя
+                                        </button>
+                                    </div>
+
+                                    <div className="dispute-resolution-box">
+                                        <label className="dispute-resolution-label">Решение администратора</label>
+                                        <textarea
+                                            className="dispute-resolution-textarea"
+                                            rows={4}
+                                            placeholder="Напишите итоговое решение по спору"
+                                            value={resolutionInputs[dispute.id] ?? dispute.resolution ?? ""}
+                                            onChange={(e) =>
+                                                setResolutionInputs((prev) => ({
+                                                    ...prev,
+                                                    [dispute.id]: e.target.value,
+                                                }))
+                                            }
+                                            disabled={dispute.status === "resolved" || dispute.status === "closed"}
+                                        />
+
+                                        <button
+                                            className="dispute-resolve-button"
+                                            onClick={() => resolveDispute(dispute.id)}
+                                            disabled={disputeActionLoading[`resolve_${dispute.id}`] || dispute.status === "resolved" || dispute.status === "closed"}
+                                        >
+                                            {disputeActionLoading[`resolve_${dispute.id}`] ? "Сохраняем..." : "Решить спор"}
+                                        </button>
+                                    </div>
+                                </div>
+
                             </div>
                         ))}
                     </div>

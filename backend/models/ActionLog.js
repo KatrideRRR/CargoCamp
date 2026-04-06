@@ -18,7 +18,7 @@ module.exports = (sequelize) => {
             actionType: { type: DataTypes.STRING(80), allowNull: false },
 
             entityType: {
-                type: DataTypes.ENUM("order", "express_order", "payment", "message", "user", "admin"),
+                type: DataTypes.ENUM("order", "express_order", "payment", "message", "user", "admin", "dispute"),
                 allowNull: false,
             },
             entityId: { type: DataTypes.BIGINT, allowNull: true },

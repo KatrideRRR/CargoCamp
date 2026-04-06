@@ -3,7 +3,7 @@ const router = express.Router();
 const { Op } = require('sequelize');
 
 const authMiddleware = require('../middlewares/userAuth');
-const { Dispute, Order } = require('../models');
+const { Dispute, Order, ActionLog } = require('../models');
 
 // Открыть спор
 router.post('/open', authMiddleware, async (req, res) => {
@@ -68,6 +68,8 @@ router.post('/open', authMiddleware, async (req, res) => {
         });
 
         await ActionLog.create({
+            entityType: 'dispute',
+            entityId: dispute.id,
             orderId: order.id,
             actorUserId: userId,
             actorRole: isCreator ? 'creator' : 'executor',
