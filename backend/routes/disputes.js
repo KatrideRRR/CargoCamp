@@ -67,22 +67,22 @@ router.post('/open', authMiddleware, async (req, res) => {
             status: 'open'
         });
 
-        await ActionLog.create({
-            entityType: 'dispute',
+        await req.logAction({
+            req,
+            actorUserId: userId,
+            actorRole: "user",
+            actionType: "dispute_opened",
+            entityType: "dispute",
             entityId: dispute.id,
             orderId: order.id,
-            actorUserId: userId,
-            actorRole: isCreator ? 'creator' : 'executor',
-            actionType: 'dispute_opened',
-            severity: 'warning',
+            severity: "warn",
             success: true,
             reason,
-            ts: new Date(),
             meta: {
                 disputeId: dispute.id,
                 reasonCode,
                 description: description || null,
-                openedByRole: isCreator ? 'creator' : 'executor',
+                openedByRole: isCreator ? "creator" : "executor",
             }
         });
 

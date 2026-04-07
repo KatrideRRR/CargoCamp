@@ -114,7 +114,7 @@ const ActiveOrdersPage = () => {
             const t = localStorage.getItem("authToken");
             if (!t) return null;
 
-            const res = await axios.get(`${apiUrl}/disputes/order/${orderId}`, {
+            const res = await axios.get(`${apiUrl}/api/disputes/order/${orderId}`, {
                 headers: { Authorization: `Bearer ${t}` },
             });
 
