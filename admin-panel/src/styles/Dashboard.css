@@ -1,38 +1,96 @@
-.dashboard-container {
-    max-width: 800px;
-    margin: 50px auto;
-    padding: 20px;
-    text-align: center;
-    background-color: #f4f4f4;
-    border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+.dashboard-page {
+    min-height: 100vh;
+    padding: 40px 24px;
+    background: linear-gradient(180deg, #f7f9fb 0%, #eef2f6 100%);
+    font-family: "Inter", "Segoe UI", Arial, sans-serif;
+    color: #1f2937;
 }
 
-.dashboard-container h1 {
-    color: #333;
-    margin-bottom: 20px;
+.dashboard-page *,
+.dashboard-page *::before,
+.dashboard-page *::after {
+    box-sizing: border-box;
+}
+
+.dashboard-container {
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.dashboard-title {
+    margin: 0 0 28px;
+    font-size: 32px;
+    font-weight: 700;
+    color: #111827;
+    text-align: center;
+    line-height: 1.2;
+}
+
+.dashboard-nav {
+    width: 100%;
 }
 
 .dashboard-nav ul {
-    list-style-type: none;
+    list-style: none;
+    margin: 0;
     padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
 }
 
 .dashboard-nav li {
-    margin: 10px 0;
+    margin: 0;
+    padding: 0;
 }
 
 .dashboard-nav a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 110px;
+    padding: 20px;
     text-decoration: none;
     font-size: 18px;
-    color: white;
-    background-color: #007bff;
-    padding: 10px 20px;
-    border-radius: 5px;
-    display: inline-block;
-    transition: background 0.3s;
+    font-weight: 600;
+    color: #111827;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+    transition: all 0.2s ease;
+    text-align: center;
 }
 
 .dashboard-nav a:hover {
-    background-color: #0056b3;
+    transform: translateY(-3px);
+    border-color: #cbd5e1;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.1);
+    color: #2563eb;
+}
+
+.dashboard-nav a:active {
+    transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+    .dashboard-page {
+        padding: 28px 16px;
+    }
+
+    .dashboard-title {
+        font-size: 26px;
+        margin-bottom: 22px;
+    }
+
+    .dashboard-nav ul {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-nav a {
+        min-height: 84px;
+        font-size: 16px;
+        border-radius: 14px;
+    }
 }

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import "../styles/CreateUserPage.css";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -9,6 +10,7 @@ function CreateUserPage() {
     const [phone, setPhone] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
+
     const navigate = useNavigate();
     const token = localStorage.getItem("authToken");
 
@@ -30,8 +32,9 @@ function CreateUserPage() {
                     },
                 }
             );
+
             alert(response.data.message);
-            navigate("/admin/users");  // Перенаправление на страницу с пользователями
+            navigate("/users");
         } catch (err) {
             console.error("Ошибка при создании пользователя:", err);
             setError(err.response?.data?.message || "Ошибка при создании пользователя");
@@ -39,39 +42,54 @@ function CreateUserPage() {
     };
 
     return (
-        <div className="create-user-container">
-            <h2>Создать нового пользователя</h2>
-            {error && <p className="error-message">{error}</p>}
-            <form onSubmit={handleSubmit}>
-                <label htmlFor="username">Имя:</label>
-                <input
-                    type="text"
-                    id="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    required
-                />
+        <div className="create-user-page">
+            <div className="create-user-card">
+                <h2>Создать нового пользователя</h2>
 
-                <label htmlFor="phone">Номер телефона:</label>
-                <input
-                    type="text"
-                    id="phone"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    required
-                />
+                {error && <p className="error-message">{error}</p>}
 
-                <label htmlFor="password">Пароль:</label>
-                <input
-                    type="password"
-                    id="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                />
+                <form onSubmit={handleSubmit} className="create-user-form">
+                    <div className="form-group">
+                        <label htmlFor="username">Имя</label>
+                        <input
+                            type="text"
+                            id="username"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            placeholder="Введите имя"
+                            required
+                        />
+                    </div>
 
-                <button type="submit">Создать пользователя</button>
-            </form>
+                    <div className="form-group">
+                        <label htmlFor="phone">Номер телефона</label>
+                        <input
+                            type="text"
+                            id="phone"
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value)}
+                            placeholder="+7XXXXXXXXXX"
+                            required
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="password">Пароль</label>
+                        <input
+                            type="password"
+                            id="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Введите пароль"
+                            required
+                        />
+                    </div>
+
+                    <button type="submit" className="submit-button">
+                        Создать пользователя
+                    </button>
+                </form>
+            </div>
         </div>
     );
 }

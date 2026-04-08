@@ -1,61 +1,160 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
-import {useNavigate, useParams} from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import '../styles/AdminCreateOrderPage.css';
+import "../styles/AdminCreateOrderPage.css";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
+function parseYandexGeocoderSuggestions(data) {
+    const members = data?.response?.GeoObjectCollection?.featureMember || [];
+
+    return members
+        .map((m) => {
+            const g = m?.GeoObject;
+            const text = g?.metaDataProperty?.GeocoderMetaData?.text;
+            const pos = g?.Point?.pos;
+            if (!text || !pos) return null;
+
+            const [lon, lat] = pos.split(" ").map(Number);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+            return {
+                label: text,
+                address: text,
+                lat,
+                lon,
+            };
+        })
+        .filter(Boolean);
+}
+
+function plusHour(d) {
+    const x = new Date(d);
+    x.setSeconds(0, 0);
+    x.setHours(x.getHours() + 1);
+    return x;
+}
+
+function toNum(v) {
+    const n = typeof v === "string" ? Number(v) : v;
+    return Number.isFinite(n) ? n : null;
+}
+
 function AdminCreateOrderPage() {
-    const { userId } = useParams(); // Получаем ID пользователя из URL
-    const [formData, setFormData] = useState({
-        userId: userId,  // Инициализируем userId
+    const { userId } = useParams();
+    const navigate = useNavigate();
+    const token = localStorage.getItem("authToken");
+    const YM_KEY = process.env.REACT_APP_YANDEX_API_KEY;
+
+    const [mode, setMode] = useState("regular");
+    const [error, setError] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+
+    const [regularForm, setRegularForm] = useState({
         description: "",
         address: "",
-        workTime: null,
+        workTime: plusHour(new Date()),
         proposedSum: "",
-        type: "",
     });
 
     const [markerPosition, setMarkerPosition] = useState(null);
-    const [error, setError] = useState("");
-    const navigate = useNavigate();
-    const [category, setCategory] = useState([]);
-    const [subcategory, setSubcategory] = useState([]);
-    const [selectedCategory, setSelectedCategory] = useState('');
-    const [selectedSubcategory, setSelectedSubcategory] = useState('');
-    const [addressSuggestions, setAddressSuggestions] = useState([]); // Подсказки для адреса
+    const [categories, setCategories] = useState([]);
+    const [subcategories, setSubcategories] = useState([]);
+    const [services, setServices] = useState([]);
+    const [selectedCategory, setSelectedCategory] = useState("");
+    const [selectedSubcategory, setSelectedSubcategory] = useState("");
+    const [selectedService, setSelectedService] = useState("");
+    const [addressSuggestions, setAddressSuggestions] = useState([]);
+    const suggestTimerRef = useRef(null);
+    const suggestAbortRef = useRef(null);
+    const [isAsap, setIsAsap] = useState(true);
+
+    const [expressType, setExpressType] = useState("taxi");
+    const [expressForm, setExpressForm] = useState({
+        subcategory: "",
+        totalPrice: "",
+        description: "",
+        fromAddress: "",
+        fromLat: "",
+        fromLng: "",
+        toAddress: "",
+        toLat: "",
+        toLng: "",
+    });
+
+    const [expressSuggestions, setExpressSuggestions] = useState({ from: [], to: [] });
+    const expressSuggestTimerRef = useRef({ from: null, to: null });
+    const expressSuggestAbortRef = useRef({ from: null, to: null });
+
+    const expressSubcategoryOptions = {
+        taxi: [
+            { label: "Перевозка пассажиров", icon: "🚕" },
+            { label: "Перевозка детей", icon: "🧒" },
+            { label: "Перевозка животных", icon: "🐶" },
+            { label: "Между городами", icon: "🛣️" },
+        ],
+        courier: [
+            { label: "Цветы", icon: "💐" },
+            { label: "Еда/продукты", icon: "🍔" },
+            { label: "Документы", icon: "📄" },
+        ],
+    };
+
+    const coordsOk = useMemo(() => {
+        const fLat = toNum(expressForm.fromLat);
+        const fLng = toNum(expressForm.fromLng);
+        const tLat = toNum(expressForm.toLat);
+        const tLng = toNum(expressForm.toLng);
+        return [fLat, fLng, tLat, tLng].every(Number.isFinite);
+    }, [expressForm.fromLat, expressForm.fromLng, expressForm.toLat, expressForm.toLng]);
 
     useEffect(() => {
-        // Получение списка категорий при загрузке компонента
-        axios.get(`${apiUrl}/api/category`)
-            .then(response => {
-                setCategory(response.data);
-            })
-            .catch(error => {
-                console.error('Ошибка при загрузке категорий', error);
-            });
+        axios
+            .get(`${apiUrl}/api/category`)
+            .then((response) => setCategories(response.data || []))
+            .catch((e) => console.error("Ошибка при загрузке категорий", e));
     }, []);
 
-    const handleCategoryChange = (event) => {
+    const handleRegularCategoryChange = async (event) => {
         const categoryId = event.target.value;
         setSelectedCategory(categoryId);
+        setSelectedSubcategory("");
+        setSelectedService("");
+        setSubcategories([]);
+        setServices([]);
 
-        // Получение подкатегорий для выбранной категории
-        axios.get(`${apiUrl}/api/category/subcategory/${categoryId}`)
-            .then(response => {
-                setSubcategory(response.data);
-            })
-            .catch(error => {
-                console.error('Ошибка при загрузке подкатегорий', error);
-            });
+        if (!categoryId) return;
+
+        try {
+            const res = await axios.get(`${apiUrl}/api/category/subcategory/${categoryId}`);
+            setSubcategories(res.data || []);
+        } catch (e) {
+            console.error("Ошибка при загрузке подкатегорий", e);
+        }
+    };
+
+    const handleRegularSubcategoryChange = async (e) => {
+        const subId = e.target.value;
+        setSelectedSubcategory(subId);
+        setSelectedService("");
+        setServices([]);
+
+        if (!subId) return;
+
+        try {
+            const res = await axios.get(`${apiUrl}/api/category/services/${subId}`);
+            setServices(res.data || []);
+        } catch (e) {
+            console.error("Ошибка при загрузке услуг:", e);
+        }
     };
 
     const getMinTime = (selectedDate) => {
-        const currentDate = new Date(); // Текущая дата
+        const currentDate = new Date();
+
         if (!selectedDate || selectedDate.toDateString() === currentDate.toDateString()) {
-            // Если дата совпадает с сегодняшней или не выбрана, минимальное время — текущее время
             return new Date(
                 currentDate.getFullYear(),
                 currentDate.getMonth(),
@@ -63,237 +162,698 @@ function AdminCreateOrderPage() {
                 currentDate.getHours(),
                 currentDate.getMinutes()
             );
-        } else {
-            // Для других дат минимальное время — начало суток
-            return new Date(0, 0, 0, 0, 0, 0);
-        }
-    };
-
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
-
-        const orderData = {
-            userId: userId, // Передаем userId для создания заказа
-            categoryId: selectedCategory,
-            subcategoryId: selectedSubcategory,
-            description: formData.description,
-            address: formData.address,
-            workTime: formData.workTime ? formData.workTime.toISOString() : null, // Преобразуем в ISO-строку, если нужно
-            proposedSum: formData.proposedSum,
-            type: formData.type,
-            coordinates: markerPosition ? markerPosition.join(",") : null, // Если есть координаты
-        };
-
-// Отправка запроса с данными в формате JSON
-        try {
-            const token = localStorage.getItem("authToken");
-
-            await axios.post(`${apiUrl}/api/admin/create-order`, orderData, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json', // Указываем тип контента как JSON
-                },
-            });
-            alert("Заказ успешно создан");
-            navigate("/orders");
-        } catch (err) {
-            console.error("Ошибка при создании заказа:", err);
-            setError("Не удалось создать заказ. Попробуйте снова.");
         }
 
+        return new Date(
+            selectedDate.getFullYear(),
+            selectedDate.getMonth(),
+            selectedDate.getDate(),
+            0,
+            0,
+            0
+        );
     };
 
-    const handleTypeInputChange = (value) => {
-        setFormData({ ...formData, type: value });
+    const handleRegularDescriptionChange = (e) => {
+        const textarea = e.target;
+        textarea.style.height = "auto";
+        textarea.style.height = `${textarea.scrollHeight}px`;
+
+        setRegularForm((p) => ({ ...p, description: textarea.value }));
     };
 
-    const handleAddressChange = async (e) => {
+    const handleRegularAddressChange = (e) => {
         const address = e.target.value;
-        setFormData({ ...formData, address });
+        setRegularForm((p) => ({ ...p, address }));
+        setMarkerPosition(null);
 
-        // Если вводим хотя бы 3 символа, начинаем запрашивать подсказки
-        if (address.length > 3) {
+        const q = address.trim();
+        if (q.length < 3) {
+            setAddressSuggestions([]);
+            return;
+        }
+
+        if (!YM_KEY) {
+            setError("Не задан REACT_APP_YANDEX_API_KEY. Подсказки адреса не работают.");
+            return;
+        }
+
+        if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
+
+        suggestTimerRef.current = setTimeout(async () => {
             try {
-                const response = await fetch(
-                    `https://geocode-maps.yandex.ru/1.x/?apikey=bf97867b-5ffb-4fc4-9fd5-8997874b300e&geocode=${encodeURIComponent(
-                        address
-                    )}&format=json`
-                );
-                const data = await response.json();
-                const suggestions = data.response.GeoObjectCollection.featureMember.map(item => item.GeoObject.name);
-                setAddressSuggestions(suggestions);
+                if (suggestAbortRef.current) suggestAbortRef.current.abort();
+                const ctrl = new AbortController();
+                suggestAbortRef.current = ctrl;
+
+                const url =
+                    `https://geocode-maps.yandex.ru/1.x/?apikey=${YM_KEY}` +
+                    `&geocode=${encodeURIComponent(q)}` +
+                    `&format=json&results=10&kind=house`;
+
+                const r = await fetch(url, { signal: ctrl.signal });
+                const data = await r.json();
+
+                const suggestions = parseYandexGeocoderSuggestions(data);
+                const uniq = Array.from(new Map(suggestions.map((s) => [s.label, s])).values());
+                setAddressSuggestions(uniq);
             } catch (err) {
+                if (err?.name === "AbortError") return;
                 console.error("Ошибка геокодирования:", err);
                 setAddressSuggestions([]);
             }
+        }, 250);
+    };
+
+    const handleRegularAddressSelect = (s) => {
+        setRegularForm((p) => ({ ...p, address: s.address }));
+        setAddressSuggestions([]);
+        setMarkerPosition([s.lat, s.lon]);
+        setError("");
+    };
+
+    const onExpressAddressInput = (kind, value) => {
+        if (kind === "from") {
+            setExpressForm((p) => ({
+                ...p,
+                fromAddress: value,
+                fromLat: "",
+                fromLng: "",
+            }));
         } else {
-            setAddressSuggestions([]);
+            setExpressForm((p) => ({
+                ...p,
+                toAddress: value,
+                toLat: "",
+                toLng: "",
+            }));
         }
+
+        const q = String(value || "").trim();
+        if (q.length < 3) {
+            setExpressSuggestions((p) => ({ ...p, [kind]: [] }));
+            return;
+        }
+
+        if (!YM_KEY) {
+            setError("Не задан REACT_APP_YANDEX_API_KEY. Подсказки адреса не работают.");
+            return;
+        }
+
+        const t = expressSuggestTimerRef.current[kind];
+        if (t) clearTimeout(t);
+
+        expressSuggestTimerRef.current[kind] = setTimeout(async () => {
+            try {
+                const prevCtrl = expressSuggestAbortRef.current[kind];
+                if (prevCtrl) prevCtrl.abort();
+
+                const ctrl = new AbortController();
+                expressSuggestAbortRef.current[kind] = ctrl;
+
+                const url =
+                    `https://geocode-maps.yandex.ru/1.x/?apikey=${YM_KEY}` +
+                    `&geocode=${encodeURIComponent(q)}` +
+                    `&format=json&results=8&kind=house`;
+
+                const r = await fetch(url, { signal: ctrl.signal });
+                const data = await r.json();
+
+                const items = parseYandexGeocoderSuggestions(data);
+                const uniq = Array.from(new Map(items.map((x) => [x.label, x])).values());
+
+                setExpressSuggestions((p) => ({ ...p, [kind]: uniq }));
+            } catch (e) {
+                if (e?.name === "AbortError") return;
+                console.error("suggest error:", e);
+                setExpressSuggestions((p) => ({ ...p, [kind]: [] }));
+            }
+        }, 250);
     };
 
-    const handleAddressSelect = async (address) => {
-        setFormData({ ...formData, address });
-        setAddressSuggestions([]); // Закрываем список подсказок
+    const onPickExpressSuggest = (kind, s) => {
+        if (kind === "from") {
+            setExpressForm((p) => ({
+                ...p,
+                fromAddress: s.address,
+                fromLat: String(s.lat),
+                fromLng: String(s.lon),
+            }));
+        } else {
+            setExpressForm((p) => ({
+                ...p,
+                toAddress: s.address,
+                toLat: String(s.lat),
+                toLng: String(s.lon),
+            }));
+        }
 
-        // Запрос координат для выбранного адреса
+        setExpressSuggestions((p) => ({ ...p, [kind]: [] }));
+        setError("");
+    };
+
+    const handleSubmitRegular = async () => {
+        if (!regularForm.address?.trim()) {
+            setError("Укажите адрес");
+            return;
+        }
+
+        if (!selectedCategory) {
+            setError("Выберите категорию");
+            return;
+        }
+
+        if (!markerPosition?.length) {
+            setError("Выберите адрес именно из подсказок.");
+            return;
+        }
+
+        setError("");
+        setSubmitting(true);
+
         try {
-            const response = await fetch(
-                `https://geocode-maps.yandex.ru/1.x/?apikey=bf97867b-5ffb-4fc4-9fd5-8997874b300e&geocode=${encodeURIComponent(address)}&format=json`
-            );
-            const data = await response.json();
-            const coordinates = data.response.GeoObjectCollection.featureMember[0].GeoObject.Point.pos.split(' ');
-            const [longitude, latitude] = coordinates.map(coord => parseFloat(coord));
-            setMarkerPosition([latitude, longitude]); // Обновляем позицию маркера
+            const payload = {
+                userId,
+                description: regularForm.description || "",
+                address: regularForm.address,
+                workTime: regularForm.workTime
+                    ? new Date(regularForm.workTime).toISOString()
+                    : "",
+                proposedSum: regularForm.proposedSum || "",
+                paymentType: "cash",
+                categoryId: Number(selectedCategory),
+                subcategoryId: selectedSubcategory ? Number(selectedSubcategory) : null,
+                serviceId: selectedService ? Number(selectedService) : null,
+                coordinates: `${markerPosition[0]},${markerPosition[1]}`,
+            };
+
+            await axios.post(`${apiUrl}/api/admin/create-order`, payload, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+            });
+
+            alert("Обычный заказ успешно создан");
+            navigate("/orders");
         } catch (err) {
-            console.error("Ошибка получения координат:", err);
+            console.error("Ошибка при создании заказа:", err);
+            console.error("Ответ сервера:", err.response?.data);
+            setError(err.response?.data?.message || "Не удалось создать заказ");
+        } finally {
+            setSubmitting(false);
         }
     };
-    const handleDescriptionChange = (e) => {
-        const textarea = e.target;
-        textarea.style.height = "auto"; // Сброс высоты
-        textarea.style.height = `${textarea.scrollHeight}px`; // Установка высоты на основе контента
-        setFormData({ ...formData, description: textarea.value });
+
+    const handleSubmitExpress = async () => {
+        if (!expressForm.fromAddress?.trim() || !expressForm.toAddress?.trim()) {
+            setError("Заполните адреса Откуда и Куда");
+            return;
+        }
+
+        if (!coordsOk) {
+            setError("Выберите оба адреса именно из подсказок.");
+            return;
+        }
+
+        if (!expressForm.totalPrice || Number(expressForm.totalPrice) <= 0) {
+            setError("Укажите цену");
+            return;
+        }
+
+        setError("");
+        setSubmitting(true);
+
+        try {
+            const payload = {
+                userId: Number(userId),
+                type: expressType,
+                subcategory: expressForm.subcategory || null,
+                paymentType: "cash",
+                totalPrice: Number(expressForm.totalPrice),
+                description: expressForm.description || null,
+
+                fromAddress: expressForm.fromAddress,
+                fromLat: Number(expressForm.fromLat),
+                fromLng: Number(expressForm.fromLng),
+
+                toAddress: expressForm.toAddress,
+                toLat: Number(expressForm.toLat),
+                toLng: Number(expressForm.toLng),
+            };
+
+            await axios.post(`${apiUrl}/api/admin/create-express-order`, payload, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+            });
+
+            alert("Экспресс-заказ успешно создан");
+            navigate("/orders");
+        } catch (err) {
+            console.error("Ошибка при создании экспресс-заказа:", err);
+            setError(err.response?.data?.message || "Не удалось создать экспресс-заказ");
+        } finally {
+            setSubmitting(false);
+        }
     };
 
+    const handleMainSubmit = (e) => {
+        e.preventDefault();
+        if (submitting) return;
 
+        if (mode === "regular") {
+            handleSubmitRegular();
+        } else {
+            handleSubmitExpress();
+        }
+    };
 
     return (
-            <div className="create-order-page">
-                <div className="form-container">
-                    {error && <p className="error-text">{error}</p>}
-                    <form onSubmit={handleSubmit} className="form">
-                        <div className="input-group">
-                            <div>
-                                <label>Выберите категорию:</label>
-                                <select value={selectedCategory} onChange={handleCategoryChange}>
-                                    <option value="">Выберите категорию</option>
-                                    {category.map(category => (
-                                        <option key={category.id} value={category.id}>
-                                            {category.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label>Выберите подкатегорию:</label>
-                                <select
-                                    value={selectedSubcategory}
-                                    onChange={e => setSelectedSubcategory(e.target.value)}
-                                    disabled={!selectedCategory}
-                                >
-                                    <option value="">Выберите подкатегорию</option>
-                                    {subcategory.map(subcategory => (
-                                        <option key={subcategory.id} value={subcategory.id}>
-                                            {subcategory.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <label className="label">Ключевое слово</label>
-                            <input
-                                className="input"
-                                type="text"
-                                value={formData.type}
-                                onChange={(e) => handleTypeInputChange(e.target.value)}
-                                placeholder="Введите ключевое слово..."
-                                required
-                            />
-
-                        </div>
-
-                        <div className="input-group">
-                            <label className="label">Описание работы</label>
-                            <textarea
-                                className="textarea"
-                                placeholder="Введите описание работы"
-                                value={formData.description}
-                                onChange={handleDescriptionChange}
-                                rows="3" // Начальная высота
-                            />
-                        </div>
-
-                        <div className="input-group">
-                            <label className="label">Адрес</label>
-                            <input
-                                className="input"
-                                type="text"
-                                placeholder="Введите адрес"
-                                value={formData.address}
-                                onChange={handleAddressChange}
-                                required
-                            />
-                            {addressSuggestions.length > 0 && (
-                                <ul className="address-suggestions">
-                                    {addressSuggestions.map((address, index) => (
-                                        <li key={index} onClick={() => handleAddressSelect(address)}>
-                                            {address}
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-
-                        </div>
-
-                        <div className="input-row">
-                            <div className="input-group date-picker">
-                                <label className="label">Дата и время</label>
-                                <DatePicker
-                                    selected={formData.workTime}
-                                    onChange={(date) => setFormData({...formData, workTime: date})}
-                                    showTimeSelect
-                                    timeFormat="HH:mm"
-                                    timeIntervals={15}
-                                    dateFormat="Pp"
-                                    placeholderText="Выберите дату и время"
-                                    minDate={new Date()}
-                                    minTime={getMinTime(formData.workTime)}
-                                    maxTime={new Date(0, 0, 0, 23, 59, 59)}
-                                    className="input"
-                                    portalId="date-picker-portal"
-                                    popperProps={{
-                                        modifiers: [
-                                            {
-                                                name: "preventOverflow",
-                                                options: {
-                                                    boundary: "viewport",
-                                                },
-                                            },
-                                            {
-                                                name: "offset",
-                                                options: {
-                                                    offset: [0, 8],
-                                                },
-                                            },
-                                        ],
-                                    }}
-                                />
-
-
-                            </div>
-                            <div className="input-group">
-                                <label className="label">Предложенная сумма</label>
-                                <input
-                                    className="input"
-                                    type="number"
-                                    placeholder="Введите сумму"
-                                    value={formData.proposedSum}
-                                    onChange={(e) =>
-                                        setFormData({...formData, proposedSum: e.target.value})
-                                    }
-                                    required
-                                />
+        <div className="admin-create-page">
+            <div className="admin-create-shell">
+                <div className="admin-glass admin-header-card">
+                    <div className="admin-header-row">
+                        <div>
+                            <div className="admin-page-title">Создать заказ</div>
+                            <div className="admin-page-subtitle">
+                                Для пользователя #{userId}
                             </div>
                         </div>
 
-                        <button type="submit" className="submit-button">
-                            Создать заказ
-                        </button>
-                    </form>
+                        <div className="admin-mode-switch">
+                            <button
+                                type="button"
+                                className={`admin-mode-btn ${mode === "regular" ? "active" : ""}`}
+                                onClick={() => setMode("regular")}
+                            >
+                                Обычный
+                            </button>
+
+                            <button
+                                type="button"
+                                className={`admin-mode-btn ${mode === "express" ? "active" : ""}`}
+                                onClick={() => setMode("express")}
+                            >
+                                Экспресс
+                            </button>
+                        </div>
+                    </div>
                 </div>
+
+                {error && (
+                    <div className="admin-glass admin-alert admin-alert-danger">
+                        <div className="admin-alert-title">Ошибка</div>
+                        <div className="admin-alert-text">{error}</div>
+                    </div>
+                )}
+
+                <form onSubmit={handleMainSubmit}>
+                    {mode === "regular" && (
+                        <>
+                            <div className="admin-glass admin-section-card">
+                                <div className="admin-section-head">
+                                    <div>
+                                        <div className="admin-section-title">Время и адрес</div>
+                                        <div className="admin-section-sub">
+                                            Быстрое создание обычного заказа
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="admin-grid-2">
+                                    <div className="admin-field">
+                                        <div className="admin-label-row">
+                                            <div className="admin-label">Режим времени</div>
+                                            <button
+                                                type="button"
+                                                className={`admin-toggle ${isAsap ? "on" : ""}`}
+                                                onClick={() => {
+                                                    const next = !isAsap;
+                                                    setIsAsap(next);
+
+                                                    if (next) {
+                                                        setRegularForm((p) => ({
+                                                            ...p,
+                                                            workTime: plusHour(new Date()),
+                                                        }));
+                                                    }
+                                                }}
+                                            >
+                                                <span className="admin-toggle-knob" />
+                                            </button>
+                                        </div>
+
+                                        <div className="admin-hint">
+                                            {isAsap ? "Срочно" : "Ко времени"}
+                                        </div>
+                                    </div>
+
+                                    {!isAsap && (
+                                        <div className="admin-field">
+                                            <div className="admin-label">Дата и время</div>
+                                            <DatePicker
+                                                selected={regularForm.workTime}
+                                                onChange={(date) =>
+                                                    setRegularForm((p) => ({ ...p, workTime: date }))
+                                                }
+                                                showTimeSelect
+                                                timeFormat="HH:mm"
+                                                timeIntervals={15}
+                                                dateFormat="Pp"
+                                                placeholderText="Выберите дату и время"
+                                                minDate={new Date()}
+                                                minTime={getMinTime(regularForm.workTime)}
+                                                maxTime={new Date(0, 0, 0, 23, 59, 59)}
+                                                className="admin-control"
+                                                portalId="date-picker-portal"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="admin-field" style={{ marginTop: 12 }}>
+                                    <div className="admin-label">Адрес</div>
+
+                                    <input
+                                        className="admin-control"
+                                        type="text"
+                                        placeholder="Введите адрес"
+                                        value={regularForm.address}
+                                        onChange={handleRegularAddressChange}
+                                    />
+
+                                    {addressSuggestions.length > 0 && (
+                                        <ul className="admin-suggestions">
+                                            {addressSuggestions.map((s, i) => (
+                                                <li
+                                                    key={`${s.label}-${i}`}
+                                                    onClick={() => handleRegularAddressSelect(s)}
+                                                >
+                                                    {s.label}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="admin-glass admin-section-card">
+                                <div className="admin-section-head">
+                                    <div>
+                                        <div className="admin-section-title">Категория</div>
+                                        <div className="admin-section-sub">
+                                            Категория, подкатегория и услуга
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="admin-field">
+                                    <div className="admin-label">Категория</div>
+                                    <select
+                                        className="admin-control"
+                                        value={selectedCategory}
+                                        onChange={handleRegularCategoryChange}
+                                    >
+                                        <option value="">Выберите категорию</option>
+                                        {categories
+                                            .filter((cat) => !["Такси", "Курьер"].includes(cat.name))
+                                            .map((cat) => (
+                                                <option key={cat.id} value={cat.id}>
+                                                    {cat.name}
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+
+                                {selectedCategory && (
+                                    <div className="admin-field" style={{ marginTop: 12 }}>
+                                        <div className="admin-label">Подкатегория</div>
+                                        <select
+                                            className="admin-control"
+                                            value={selectedSubcategory}
+                                            onChange={handleRegularSubcategoryChange}
+                                        >
+                                            <option value="">Выберите подкатегорию</option>
+                                            {subcategories.map((sub) => (
+                                                <option key={sub.id} value={sub.id}>
+                                                    {sub.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                {selectedSubcategory && services.length > 0 && (
+                                    <div className="admin-field" style={{ marginTop: 12 }}>
+                                        <div className="admin-label">Услуга</div>
+                                        <select
+                                            className="admin-control"
+                                            value={selectedService}
+                                            onChange={(e) => setSelectedService(e.target.value)}
+                                        >
+                                            <option value="">Выберите услугу</option>
+                                            {services.map((s) => (
+                                                <option key={s.id} value={s.id}>
+                                                    {s.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="admin-glass admin-section-card">
+                                <div className="admin-section-head">
+                                    <div>
+                                        <div className="admin-section-title">Описание</div>
+                                        <div className="admin-section-sub">
+                                            Детали задачи
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="admin-field">
+                                    <div className="admin-label">Описание</div>
+                                    <textarea
+                                        className="admin-control admin-textarea"
+                                        placeholder="Что нужно сделать?"
+                                        value={regularForm.description}
+                                        onChange={handleRegularDescriptionChange}
+                                        rows={3}
+                                    />
+                                </div>
+
+                                <div className="admin-field" style={{ marginTop: 12 }}>
+                                    <div className="admin-label">Сумма за работу</div>
+                                    <input
+                                        className="admin-control"
+                                        type="number"
+                                        placeholder="Например 1500"
+                                        value={regularForm.proposedSum}
+                                        onChange={(e) =>
+                                            setRegularForm((p) => ({
+                                                ...p,
+                                                proposedSum: e.target.value,
+                                            }))
+                                        }
+                                    />
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {mode === "express" && (
+                        <>
+                            <div className="admin-glass admin-section-card">
+                                <div className="admin-section-head">
+                                    <div>
+                                        <div className="admin-section-title">Тип экспресс-заказа</div>
+                                        <div className="admin-section-sub">
+                                            Такси или курьер
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="admin-type-grid">
+                                    <button
+                                        type="button"
+                                        className={`admin-type-btn ${expressType === "taxi" ? "active" : ""}`}
+                                        onClick={() => {
+                                            setExpressType("taxi");
+                                            setExpressForm((p) => ({ ...p, subcategory: "" }));
+                                        }}
+                                    >
+                                        🚕 Такси
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        className={`admin-type-btn ${expressType === "courier" ? "active" : ""}`}
+                                        onClick={() => {
+                                            setExpressType("courier");
+                                            setExpressForm((p) => ({ ...p, subcategory: "" }));
+                                        }}
+                                    >
+                                        📦 Курьер
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="admin-glass admin-section-card">
+                                <div className="admin-section-head">
+                                    <div>
+                                        <div className="admin-section-title">Маршрут</div>
+                                        <div className="admin-section-sub">
+                                            Укажите точки A и B
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="admin-grid-2">
+                                    <div className="admin-field">
+                                        <div className="admin-label">Откуда (A)</div>
+
+                                        <input
+                                            className="admin-control"
+                                            value={expressForm.fromAddress}
+                                            onChange={(e) =>
+                                                onExpressAddressInput("from", e.target.value)
+                                            }
+                                            placeholder="Адрес точки A"
+                                        />
+
+                                        {expressSuggestions.from.length > 0 && (
+                                            <ul className="admin-suggestions">
+                                                {expressSuggestions.from.map((s, i) => (
+                                                    <li
+                                                        key={`${s.label}-${i}`}
+                                                        onClick={() => onPickExpressSuggest("from", s)}
+                                                    >
+                                                        {s.label}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
+
+                                    <div className="admin-field">
+                                        <div className="admin-label">Куда (B)</div>
+
+                                        <input
+                                            className="admin-control"
+                                            value={expressForm.toAddress}
+                                            onChange={(e) =>
+                                                onExpressAddressInput("to", e.target.value)
+                                            }
+                                            placeholder="Адрес точки B"
+                                        />
+
+                                        {expressSuggestions.to.length > 0 && (
+                                            <ul className="admin-suggestions">
+                                                {expressSuggestions.to.map((s, i) => (
+                                                    <li
+                                                        key={`${s.label}-${i}`}
+                                                        onClick={() => onPickExpressSuggest("to", s)}
+                                                    >
+                                                        {s.label}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="admin-glass admin-section-card">
+                                <div className="admin-section-head">
+                                    <div>
+                                        <div className="admin-section-title">Параметры заказа</div>
+                                        <div className="admin-section-sub">
+                                            Цена, опция и комментарий
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="admin-chips-wrap">
+                                    {expressSubcategoryOptions[expressType].map((opt) => {
+                                        const selected = expressForm.subcategory === opt.label;
+
+                                        return (
+                                            <button
+                                                key={opt.label}
+                                                type="button"
+                                                className={`admin-chip ${selected ? "selected" : ""}`}
+                                                onClick={() =>
+                                                    setExpressForm((p) => ({
+                                                        ...p,
+                                                        subcategory: selected ? "" : opt.label,
+                                                    }))
+                                                }
+                                            >
+                                                <span>{opt.icon}</span>
+                                                <span>{opt.label}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="admin-field" style={{ marginTop: 14 }}>
+                                    <div className="admin-label">Цена</div>
+                                    <input
+                                        className="admin-control"
+                                        type="number"
+                                        value={expressForm.totalPrice}
+                                        onChange={(e) =>
+                                            setExpressForm((p) => ({
+                                                ...p,
+                                                totalPrice: e.target.value,
+                                            }))
+                                        }
+                                        placeholder="Например 500"
+                                    />
+                                </div>
+
+                                <div className="admin-field" style={{ marginTop: 14 }}>
+                                    <div className="admin-label">Комментарий</div>
+                                    <textarea
+                                        className="admin-control admin-textarea"
+                                        value={expressForm.description}
+                                        onChange={(e) =>
+                                            setExpressForm((p) => ({
+                                                ...p,
+                                                description: e.target.value,
+                                            }))
+                                        }
+                                        placeholder="Комментарий к экспресс-заказу"
+                                        rows={3}
+                                    />
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    <div className="admin-glass admin-bottom-actions">
+                        <button
+                            type="button"
+                            className="admin-action-btn subtle"
+                            onClick={() => navigate(-1)}
+                        >
+                            Назад
+                        </button>
+
+                        <button
+                            type="submit"
+                            disabled={submitting}
+                            className="admin-action-btn primary"
+                        >
+                            {submitting ? "Создание…" : "Создать заказ"}
+                        </button>
+                    </div>
+                </form>
             </div>
+        </div>
     );
 }
 

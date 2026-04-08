@@ -11,6 +11,7 @@ function OrdersPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
     const token = localStorage.getItem("authToken");
     const navigate = useNavigate();
 
@@ -38,11 +39,12 @@ function OrdersPage() {
 
         if (query.trim() === "") {
             setFilteredOrders(orders);
-        } else {
-            setFilteredOrders(
-                orders.filter((order) => order.id.toString().includes(query))
-            );
+            return;
         }
+
+        setFilteredOrders(
+            orders.filter((order) => order.id.toString().includes(query))
+        );
     };
 
     const handleOrderDetails = (orderId) => {
@@ -53,7 +55,7 @@ function OrdersPage() {
         const dispute = order.activeDispute;
 
         if (!dispute) {
-            return <span className="admin-dispute-badge none">Нет</span>;
+            return <span className="admin-dispute-badge none">Нет спора</span>;
         }
 
         return (
@@ -63,51 +65,98 @@ function OrdersPage() {
         );
     };
 
-    if (loading) return <p>Загрузка...</p>;
-    if (error) return <p style={{ color: "red" }}>{error}</p>;
+    const getStatusClass = (status) => {
+        switch (status) {
+            case "pending":
+                return "status-badge pending";
+            case "active":
+                return "status-badge active";
+            case "completed":
+                return "status-badge completed";
+            case "cancelled":
+                return "status-badge cancelled";
+            case "expired":
+                return "status-badge expired";
+            case "pending_payment":
+                return "status-badge pending-payment";
+            default:
+                return "status-badge";
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="orders-container">
+                <h1>Все заказы</h1>
+                <p className="orders-message">Загрузка...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="orders-container">
+                <h1>Все заказы</h1>
+                <p className="orders-message error">{error}</p>
+            </div>
+        );
+    }
 
     return (
         <div className="orders-container">
             <h1>Все заказы</h1>
 
-            <input
-                type="text"
-                className="search-input"
-                placeholder="Поиск по ID заказа"
-                value={searchQuery}
-                onChange={handleSearch}
-            />
+            <div className="orders-toolbar">
+                <input
+                    type="text"
+                    className="search-input"
+                    placeholder="Поиск по ID заказа"
+                    value={searchQuery}
+                    onChange={handleSearch}
+                />
+            </div>
 
             {filteredOrders.length === 0 ? (
-                <p>Нет заказов.</p>
+                <div className="empty-state">
+                    <p>Нет заказов.</p>
+                </div>
             ) : (
-                <table className="orders-table">
-                    <thead>
-                    <tr>
-                        <th>ID заказа</th>
-                        <th>Дата создания</th>
-                        <th>Статус заказа</th>
-                        <th>Спор</th>
-                        <th>Действия</th>
-                    </tr>
-                    </thead>
-
-                    <tbody>
-                    {filteredOrders.map((order) => (
-                        <tr key={order.id}>
-                            <td>{order.id}</td>
-                            <td>{new Date(order.createdAt).toLocaleDateString()}</td>
-                            <td>{order.status}</td>
-                            <td>{renderDisputeBadge(order)}</td>
-                            <td>
-                                <button onClick={() => handleOrderDetails(order.id)}>
-                                    Подробнее
-                                </button>
-                            </td>
+                <div className="orders-table-wrapper">
+                    <table className="orders-table">
+                        <thead>
+                        <tr>
+                            <th>ID заказа</th>
+                            <th>Дата создания</th>
+                            <th>Статус заказа</th>
+                            <th>Спор</th>
+                            <th>Действия</th>
                         </tr>
-                    ))}
-                    </tbody>
-                </table>
+                        </thead>
+
+                        <tbody>
+                        {filteredOrders.map((order) => (
+                            <tr key={order.id}>
+                                <td>{order.id}</td>
+                                <td>{new Date(order.createdAt).toLocaleDateString()}</td>
+                                <td>
+                                        <span className={getStatusClass(order.status)}>
+                                            {order.status}
+                                        </span>
+                                </td>
+                                <td>{renderDisputeBadge(order)}</td>
+                                <td>
+                                    <button
+                                        className="details-button"
+                                        onClick={() => handleOrderDetails(order.id)}
+                                    >
+                                        Подробнее
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                        </tbody>
+                    </table>
+                </div>
             )}
         </div>
     );

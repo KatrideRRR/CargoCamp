@@ -4,14 +4,17 @@ import "../styles/Dashboard.css";
 
 function Dashboard() {
     return (
-        <div className="dashboard-container">
-            <h1>Панель администратора</h1>
-            <nav className="dashboard-nav">
-                <ul>
-                    <li><Link to="/users">Пользователи</Link></li>
-                    <li><Link to="/orders">Заказы</Link></li>
-                </ul>
-            </nav>
+        <div className="dashboard-page">
+            <div className="dashboard-container">
+                <h1 className="dashboard-title">Панель администратора</h1>
+
+                <nav className="dashboard-nav">
+                    <ul>
+                        <li><Link to="/users">Пользователи</Link></li>
+                        <li><Link to="/orders">Заказы</Link></li>
+                    </ul>
+                </nav>
+            </div>
         </div>
     );
 }

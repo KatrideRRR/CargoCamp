@@ -13,7 +13,9 @@
   "private": true,
   "dependencies": {
     "@playwright/test": "^1.56.1",
+    "browser-image-compression": "^2.0.2",
     "jsonwebtoken": "^9.0.2",
+    "react-datepicker": "^9.1.0",
     "react-router-dom": "^7.9.6",
     "supertest": "^7.1.4"
   }

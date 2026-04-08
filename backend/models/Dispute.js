@@ -138,7 +138,17 @@ module.exports = (sequelize) => {
                 type: DataTypes.DATE,
                 allowNull: false,
                 defaultValue: DataTypes.NOW
-            }
+            },
+
+            takenByAdminId: {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+            },
+
+            takenAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
 
         },
         {

@@ -73,7 +73,7 @@ function OrderDetailsPage() {
     };
 
     const showMessage = (orderId) => {
-        navigate(`/orders/${orderId}/messages`);
+        navigate(`/${orderId}/messages`);
     };
 
     const renderPhotos = (photos, title) => {
@@ -81,7 +81,7 @@ function OrderDetailsPage() {
             return (
                 <div className="photo-block">
                     <h4>{title}</h4>
-                    <p>Фото нет</p>
+                    <p className="empty-text">Фото нет</p>
                 </div>
             );
         }
@@ -96,6 +96,7 @@ function OrderDetailsPage() {
                             href={`${apiUrl}${photo}`}
                             target="_blank"
                             rel="noopener noreferrer"
+                            className="photo-link"
                         >
                             <img
                                 src={`${apiUrl}${photo}`}
@@ -237,9 +238,51 @@ function OrderDetailsPage() {
         }
     };
 
-    if (loading) return <p>Загрузка...</p>;
-    if (error) return <p>{error}</p>;
-    if (!order) return <p>Заказ не найден</p>;
+    const getOrderStatusClass = (status) => {
+        switch (status) {
+            case "pending":
+                return "status-badge pending";
+            case "active":
+                return "status-badge active";
+            case "completed":
+                return "status-badge completed";
+            case "cancelled":
+                return "status-badge cancelled";
+            case "expired":
+                return "status-badge expired";
+            case "pending_payment":
+                return "status-badge pending-payment";
+            default:
+                return "status-badge";
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="order-details-container">
+                <h2>Детали заказа</h2>
+                <p className="page-message">Загрузка...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="order-details-container">
+                <h2>Детали заказа</h2>
+                <p className="page-message error">{error}</p>
+            </div>
+        );
+    }
+
+    if (!order) {
+        return (
+            <div className="order-details-container">
+                <h2>Детали заказа</h2>
+                <p className="page-message">Заказ не найден</p>
+            </div>
+        );
+    }
 
     const disputes = Array.isArray(order.disputes) ? order.disputes : [];
 
@@ -247,169 +290,253 @@ function OrderDetailsPage() {
         <div className="order-details-container">
             <h2>Детали заказа #{order.id}</h2>
 
-            <div className="order-info">
-                <p><strong>Адрес:</strong> {order.address}</p>
-                <p><strong>Статус:</strong> {order.status}</p>
-                <p><strong>Дата создания:</strong> {order.createdAt ? new Date(order.createdAt).toLocaleString() : "—"}</p>
-                <p><strong>ID создателя:</strong> {order.creatorId}</p>
-                <p><strong>ID исполнителя:</strong> {order.executorId || "—"}</p>
-                <p><strong>Категория:</strong> {order.category ? order.category.name : "Не указано"}</p>
-                <p><strong>Подкатегория:</strong> {order.subcategory ? order.subcategory.name : "Не указано"}</p>
-                <p><strong>Описание:</strong> {order.description || "—"}</p>
-                <p><strong>Цена:</strong> {order.proposedSum ?? "—"}</p>
-                <p><strong>Тип оплаты:</strong> {order.paymentType || "—"}</p>
-                <p><strong>Статус сделки:</strong> {order.dealStatus || "—"}</p>
+            <div className="order-card">
+                <div className="order-card-header">
+                    <h3>Основная информация</h3>
 
-                <button className="message-button" onClick={() => showMessage(order.id)}>
-                    Открыть чат
-                </button>
-                <button className="delete-button" onClick={() => deleteOrder(order.id)}>
-                    Удалить
-                </button>
+                    <div className="order-card-actions">
+                        <button className="message-button" onClick={() => showMessage(order.id)}>
+                            Открыть чат
+                        </button>
+                        <button className="delete-button" onClick={() => deleteOrder(order.id)}>
+                            Удалить
+                        </button>
+                    </div>
+                </div>
+
+                <div className="order-info-grid">
+                    <div className="info-item">
+                        <span className="info-label">Адрес</span>
+                        <span className="info-value">{order.address || "—"}</span>
+                    </div>
+
+                    <div className="info-item">
+                        <span className="info-label">Статус</span>
+                        <span className="info-value">
+                            <span className={getOrderStatusClass(order.status)}>
+                                {order.status || "—"}
+                            </span>
+                        </span>
+                    </div>
+
+                    <div className="info-item">
+                        <span className="info-label">Дата создания</span>
+                        <span className="info-value">
+                            {order.createdAt ? new Date(order.createdAt).toLocaleString() : "—"}
+                        </span>
+                    </div>
+
+                    <div className="info-item">
+                        <span className="info-label">ID создателя</span>
+                        <span className="info-value">{order.creatorId || "—"}</span>
+                    </div>
+
+                    <div className="info-item">
+                        <span className="info-label">ID исполнителя</span>
+                        <span className="info-value">{order.executorId || "—"}</span>
+                    </div>
+
+                    <div className="info-item">
+                        <span className="info-label">Категория</span>
+                        <span className="info-value">{order.category ? order.category.name : "Не указано"}</span>
+                    </div>
+
+                    <div className="info-item">
+                        <span className="info-label">Подкатегория</span>
+                        <span className="info-value">{order.subcategory ? order.subcategory.name : "Не указано"}</span>
+                    </div>
+
+                    <div className="info-item">
+                        <span className="info-label">Цена</span>
+                        <span className="info-value">{order.proposedSum ?? "—"}</span>
+                    </div>
+
+                    <div className="info-item">
+                        <span className="info-label">Тип оплаты</span>
+                        <span className="info-value">{order.paymentType || "—"}</span>
+                    </div>
+
+                    <div className="info-item">
+                        <span className="info-label">Статус сделки</span>
+                        <span className="info-value">{order.dealStatus || "—"}</span>
+                    </div>
+
+                    <div className="info-item info-item-full">
+                        <span className="info-label">Описание</span>
+                        <span className="info-value">{order.description || "—"}</span>
+                    </div>
+                </div>
             </div>
 
-            <div className="order-disputes-section">
+            <div className="order-card">
                 <h3>Споры по заказу</h3>
 
                 {disputes.length === 0 ? (
-                    <p>По этому заказу споров нет</p>
+                    <p className="empty-text">По этому заказу споров нет</p>
                 ) : (
                     <div className="disputes-list">
                         {disputes.map((dispute) => (
                             <div key={dispute.id} className="dispute-card">
                                 <div className="dispute-card-top">
-                                    <div>
-                                        <div>
-                                            <strong>Спор по заказу #{order.id}</strong>
-                                            <span className="dispute-inner-id"> · ID спора: {dispute.id}</span>
+                                    <div className="dispute-title-wrap">
+                                        <strong>Спор по заказу #{order.id}</strong>
+                                        <span className="dispute-inner-id">ID спора: {dispute.id}</span>
+                                    </div>
 
-                                        </div>                                    </div>
                                     <div className={`dispute-admin-badge ${dispute.status}`}>
                                         {getDisputeStatusLabel(dispute.status)}
                                     </div>
                                 </div>
 
-                                <p>
-                                    <strong>Инициатор:</strong>{" "}
-                                    <span className={dispute.openedByRole === "creator" ? "initiator-creator" : "initiator-executor"}>
-        {dispute.openedByRole === "creator" ? "Заказчик" : "Исполнитель"}
-    </span>
-                                </p>
+                                <div className="dispute-info-grid">
+                                    <div className="info-item">
+                                        <span className="info-label">Инициатор</span>
+                                        <span className="info-value">
+                                            <span className={dispute.openedByRole === "creator" ? "initiator-creator" : "initiator-executor"}>
+                                                {dispute.openedByRole === "creator" ? "Заказчик" : "Исполнитель"}
+                                            </span>
+                                        </span>
+                                    </div>
 
-                                <p>
-                                    <strong>Дата открытия:</strong>{" "}
-                                    {dispute.createdAt ? new Date(dispute.createdAt).toLocaleString() : "—"}
-                                </p>
+                                    <div className="info-item">
+                                        <span className="info-label">Открыл</span>
+                                        <span className="info-value">
+                                            {dispute.openedByRole === "creator" ? "Заказчик" : "Исполнитель"} #{dispute.openedById}
+                                        </span>
+                                    </div>
 
-                                <p>
-                                    <strong>Открыл:</strong>{" "}
-                                    {dispute.openedByRole === "creator" ? "Заказчик" : "Исполнитель"} #{dispute.openedById}
-                                </p>
+                                    <div className="info-item">
+                                        <span className="info-label">Дата открытия</span>
+                                        <span className="info-value">
+                                            {dispute.createdAt ? new Date(dispute.createdAt).toLocaleString() : "—"}
+                                        </span>
+                                    </div>
 
-                                <p>
-                                    <strong>Категория причины:</strong> {getReasonCodeLabel(dispute.reasonCode)}
-                                </p>
+                                    <div className="info-item">
+                                        <span className="info-label">В работе у администратора</span>
+                                        <span className="info-value">{dispute.takenByAdminId || "—"}</span>
+                                    </div>
 
-                                <p>
-                                    <strong>Краткая причина:</strong> {dispute.reason || "—"}
-                                </p>
+                                    <div className="info-item">
+                                        <span className="info-label">Взято в работу</span>
+                                        <span className="info-value">
+                                     {dispute.takenAt ? new Date(dispute.takenAt).toLocaleString() : "—"}
+                                        </span>
+                                    </div>
 
-                                <p>
-                                    <strong>Описание:</strong> {dispute.description || "—"}
-                                </p>
+                                    <div className="info-item">
+                                        <span className="info-label">Категория причины</span>
+                                        <span className="info-value">{getReasonCodeLabel(dispute.reasonCode)}</span>
+                                    </div>
 
-                                <p>
-                                    <strong>Решение:</strong> {dispute.resolution || "—"}
-                                </p>
+                                    <div className="info-item info-item-full">
+                                        <span className="info-label">Краткая причина</span>
+                                        <span className="info-value">{dispute.reason || "—"}</span>
+                                    </div>
 
-                                <p>
-                                    <strong>Кем решён:</strong> {dispute.resolvedById || "—"}
-                                </p>
+                                    <div className="info-item info-item-full">
+                                        <span className="info-label">Описание</span>
+                                        <span className="info-value">{dispute.description || "—"}</span>
+                                    </div>
 
-                                <p>
-                                    <strong>Дата решения:</strong>{" "}
-                                    {dispute.resolvedAt ? new Date(dispute.resolvedAt).toLocaleString() : "—"}
-                                </p>
+                                    <div className="info-item info-item-full">
+                                        <span className="info-label">Решение</span>
+                                        <span className="info-value">{dispute.resolution || "—"}</span>
+                                    </div>
+
+                                    <div className="info-item">
+                                        <span className="info-label">Кем решён</span>
+                                        <span className="info-value">{dispute.resolvedById || "—"}</span>
+                                    </div>
+
+                                    <div className="info-item">
+                                        <span className="info-label">Дата решения</span>
+                                        <span className="info-value">
+                                            {dispute.resolvedAt ? new Date(dispute.resolvedAt).toLocaleString() : "—"}
+                                        </span>
+                                    </div>
+                                </div>
 
                                 <div className="dispute-admin-actions">
                                     <h4>Управление спором</h4>
 
-                                    <div className="dispute-status-actions">
-                                        <button
-                                            className="dispute-action-button"
-                                            onClick={() => changeDisputeStatus(dispute.id, "in_review")}
-                                            disabled={disputeActionLoading[`status_${dispute.id}`] || dispute.status === "resolved" || dispute.status === "closed"}
-                                        >
-                                            Взять в работу
-                                        </button>
+                                    {dispute.status !== "in_review" &&
+                                        dispute.status !== "resolved" &&
+                                        dispute.status !== "closed" && (
+                                            <div className="dispute-status-actions">
+                                                <button
+                                                    className="dispute-action-button"
+                                                    onClick={() => changeDisputeStatus(dispute.id, "in_review")}
+                                                    disabled={disputeActionLoading[`status_${dispute.id}`]}
+                                                >
+                                                    Взять в работу
+                                                </button>
 
-                                        <button
-                                            className="dispute-action-button"
-                                            onClick={() => changeDisputeStatus(dispute.id, "waiting_creator")}
-                                            disabled={disputeActionLoading[`status_${dispute.id}`] || dispute.status === "resolved" || dispute.status === "closed"}
-                                        >
-                                            Ожидать заказчика
-                                        </button>
+                                            </div>
+                                        )}
 
-                                        <button
-                                            className="dispute-action-button"
-                                            onClick={() => changeDisputeStatus(dispute.id, "waiting_executor")}
-                                            disabled={disputeActionLoading[`status_${dispute.id}`] || dispute.status === "resolved" || dispute.status === "closed"}
-                                        >
-                                            Ожидать исполнителя
-                                        </button>
-                                    </div>
+                                    {dispute.status === "in_review" && (
+                                        <div className="dispute-resolution-box">
+                                            <label className="dispute-resolution-label">
+                                                Решение администратора
+                                            </label>
 
-                                    <div className="dispute-resolution-box">
-                                        <label className="dispute-resolution-label">Решение администратора</label>
-                                        <textarea
-                                            className="dispute-resolution-textarea"
-                                            rows={4}
-                                            placeholder="Напишите итоговое решение по спору"
-                                            value={resolutionInputs[dispute.id] ?? dispute.resolution ?? ""}
-                                            onChange={(e) =>
-                                                setResolutionInputs((prev) => ({
-                                                    ...prev,
-                                                    [dispute.id]: e.target.value,
-                                                }))
-                                            }
-                                            disabled={dispute.status === "resolved" || dispute.status === "closed"}
-                                        />
+                                            <textarea
+                                                className="dispute-resolution-textarea"
+                                                rows={4}
+                                                placeholder="Напишите итоговое решение по спору"
+                                                value={resolutionInputs[dispute.id] ?? dispute.resolution ?? ""}
+                                                onChange={(e) =>
+                                                    setResolutionInputs((prev) => ({
+                                                        ...prev,
+                                                        [dispute.id]: e.target.value,
+                                                    }))
+                                                }
+                                                disabled={disputeActionLoading[`resolve_${dispute.id}`]}
+                                            />
 
-                                        <button
-                                            className="dispute-resolve-button"
-                                            onClick={() => resolveDispute(dispute.id)}
-                                            disabled={disputeActionLoading[`resolve_${dispute.id}`] || dispute.status === "resolved" || dispute.status === "closed"}
-                                        >
-                                            {disputeActionLoading[`resolve_${dispute.id}`] ? "Сохраняем..." : "Решить спор"}
-                                        </button>
-                                    </div>
+                                            <button
+                                                className="dispute-resolve-button"
+                                                onClick={() => resolveDispute(dispute.id)}
+                                                disabled={disputeActionLoading[`resolve_${dispute.id}`]}
+                                            >
+                                                {disputeActionLoading[`resolve_${dispute.id}`]
+                                                    ? "Сохраняем..."
+                                                    : "Решить спор"}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {(dispute.status === "resolved" || dispute.status === "closed") && (
+                                        <p className="empty-text">Этот спор уже завершён.</p>
+                                    )}
                                 </div>
-
                             </div>
                         ))}
                     </div>
                 )}
             </div>
 
-            <div className="order-photos-section">
+            <div className="order-card">
                 <h3>Фото и доказательства</h3>
 
-                {renderPhotos(order.images, "Фото заказчика при создании")}
-                {renderPhotos(order.customerBeforePhotos, "Фото заказчика ДО")}
-                {renderPhotos(order.customerAfterPhotos, "Фото заказчика ПОСЛЕ")}
-                {renderPhotos(order.executorBeforePhotos, "Фото исполнителя ДО")}
-                {renderPhotos(order.executorAfterPhotos, "Фото исполнителя ПОСЛЕ")}
+                <div className="photos-section-grid">
+                    {renderPhotos(order.images, "Фото заказчика при создании")}
+                    {renderPhotos(order.customerBeforePhotos, "Фото заказчика ДО")}
+                    {renderPhotos(order.customerAfterPhotos, "Фото заказчика ПОСЛЕ")}
+                    {renderPhotos(order.executorBeforePhotos, "Фото исполнителя ДО")}
+                    {renderPhotos(order.executorAfterPhotos, "Фото исполнителя ПОСЛЕ")}
+                </div>
             </div>
 
-            <div className="order-logs">
+            <div className="order-card">
                 <h3>История действий</h3>
 
-                {logsLoading && <p>Загрузка логов...</p>}
-                {logsError && <p>{logsError}</p>}
+                {logsLoading && <p className="empty-text">Загрузка логов...</p>}
+                {logsError && <p className="page-message error">{logsError}</p>}
 
                 {!logsLoading && !logsError && logs.length === 0 && (
-                    <p>Логов пока нет</p>
+                    <p className="empty-text">Логов пока нет</p>
                 )}
 
                 {!logsLoading && !logsError && logs.length > 0 && (
@@ -426,7 +553,8 @@ function OrderDetailsPage() {
                                     </span>
 
                                     <span className="log-actor">
-                                        {l.actorRole}{l.actorUserId ? ` #${l.actorUserId}` : ""}
+                                        {l.actorRole}
+                                        {l.actorUserId ? ` #${l.actorUserId}` : ""}
                                     </span>
 
                                     <span className={`log-status ${l.success ? "ok" : "fail"}`}>

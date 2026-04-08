@@ -1,13 +1,20 @@
 const express = require('express');
 const { authMiddleware, adminMiddleware } = require('../middlewares/adminAuth');
-const { User, Order, Message, Category, Subcategory, Dispute, ActionLog } = require('../models');const bcrypt = require('bcrypt');
+const { sequelize, User, Order, Message, Category, Subcategory, Dispute, ActionLog, ExpressOrder } = require('../models');const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const NodeGeocoder = require("node-geocoder");
 const { Op } = require("sequelize");
+const fs = require("fs");
+const path = require("path");
 
 const geocoder = NodeGeocoder({
     provider: "openstreetmap",
 });
+
+function toNum(v) {
+    const n = typeof v === "string" ? Number(v) : v;
+    return Number.isFinite(n) ? n : null;
+}
 
 const router = express.Router();
 
@@ -62,44 +69,344 @@ router.get('/user-documents/:userId', authMiddleware, adminMiddleware, async (re
     }
 });
 
-router.post('/create-order', authMiddleware,  async (req, res) => {
-    const { address, description, workTime, proposedSum, type, categoryId, subcategoryId, userId } = req.body;
-
+router.post("/create-order", authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        if (!address || !userId) {
-            return res.status(400).json({ message: 'Адрес и ID пользователя обязательны' });
-        }
-
-        // Получаем координаты из геокодера
-        const geoData = await geocoder.geocode(address);
-        if (!geoData.length) {
-            return res.status(404).json({ message: 'Адрес не найден' });
-        }
-
-        const { latitude, longitude } = geoData[0];
-        const coordinates = `${latitude},${longitude}`;
-
-
-        const newOrder = await Order.create({
-            userId, // Создаём заказ от указанного пользователя
+        let {
+            userId,
             address,
             description,
             workTime,
             proposedSum,
-            coordinates,
-            type,
-            createdAt: new Date().toISOString(),
-            creatorId: userId, // ID админа, создавшего заказ
-            status: 'pending',
             categoryId,
             subcategoryId,
+            serviceId,
+            coordinates: incomingCoords,
+            paymentType,
+        } = req.body;
+
+        if (!userId) {
+            return res.status(400).json({ message: "userId обязателен" });
+        }
+
+        const targetUserId = Number(userId);
+        if (!Number.isFinite(targetUserId) || targetUserId <= 0) {
+            return res.status(400).json({ message: "Некорректный userId" });
+        }
+
+        const looksLikeCoordsAddress = (v) => {
+            if (!v) return true;
+            const s = String(v).trim();
+            return s === "" || s.startsWith("Координаты:");
+        };
+
+        const parseLatLng = (v) => {
+            if (!v) return null;
+            const raw = Array.isArray(v) ? v[0] : v;
+            if (typeof raw !== "string" || !raw.includes(",")) return null;
+
+            const [latStr, lngStr] = raw.split(",").map((x) => x.trim());
+            const lat = parseFloat(latStr);
+            const lng = parseFloat(lngStr);
+
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+            return { lat, lng };
+        };
+
+        if (!address || !String(address).trim()) {
+            return res.status(400).json({ message: "Адрес обязателен" });
+        }
+
+        let coordinatesStr = null;
+        let latlng = parseLatLng(incomingCoords);
+
+        if (latlng) {
+            coordinatesStr = `${latlng.lat},${latlng.lng}`;
+        }
+
+        if (!coordinatesStr) {
+            try {
+                const geoData = await geocoder.geocode(address);
+
+                if (!geoData || !geoData.length) {
+                    return res.status(400).json({
+                        message: "Не удалось определить координаты по адресу. Выберите адрес из подсказок или на карте.",
+                    });
+                }
+
+                const { latitude, longitude } = geoData[0];
+                coordinatesStr = `${latitude},${longitude}`;
+                latlng = { lat: Number(latitude), lng: Number(longitude) };
+            } catch (geoError) {
+                console.error("Ошибка геокодирования:", geoError);
+
+                return res.status(400).json({
+                    message: "Не удалось определить координаты. Выберите адрес из подсказок, через карту или укажите полный адрес.",
+                });
+            }
+        }
+
+        if (latlng && looksLikeCoordsAddress(address)) {
+            try {
+                const rev = await geocoder.reverse({ lat: latlng.lat, lon: latlng.lng });
+
+                if (Array.isArray(rev) && rev[0]) {
+                    address =
+                        rev[0].formattedAddress ||
+                        rev[0].streetName ||
+                        rev[0].city ||
+                        `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
+                }
+            } catch (e) {
+                console.error("Ошибка reverse geocode:", e);
+            }
+        }
+
+        paymentType = Array.isArray(paymentType) ? paymentType[0] : paymentType;
+        paymentType = String(paymentType || "").trim();
+        if (!paymentType) paymentType = "cash";
+
+        const allowedPaymentTypes = new Set(["cash", "guarantee", "installment"]);
+        if (!allowedPaymentTypes.has(paymentType)) {
+            return res.status(400).json({ message: "Некорректный paymentType" });
+        }
+
+        const catId = Number(categoryId);
+        if (!Number.isFinite(catId) || catId <= 0) {
+            return res.status(400).json({ message: "categoryId обязателен" });
+        }
+
+        const subId = subcategoryId ? Number(subcategoryId) : null;
+        const normalizedSubId = Number.isFinite(subId) && subId > 0 ? subId : null;
+
+        const svcId = serviceId ? Number(serviceId) : null;
+        const normalizedSvcId = Number.isFinite(svcId) && svcId > 0 ? svcId : null;
+
+        const parsedProposedSum =
+            proposedSum === "" || proposedSum === null || proposedSum === undefined
+                ? null
+                : Number(proposedSum);
+
+        if (parsedProposedSum !== null && !Number.isFinite(parsedProposedSum)) {
+            return res.status(400).json({ message: "Некорректная proposedSum" });
+        }
+
+        const newOrder = await Order.create({
+            userId: targetUserId,
+            address,
+            description,
+            workTime,
+            proposedSum: parsedProposedSum,
+            coordinates: coordinatesStr,
+            createdAt: new Date().toISOString(),
+            images: [],
+            creatorId: targetUserId,
+            status: "pending",
+            categoryId: catId,
+            subcategoryId: normalizedSubId,
+            serviceId: normalizedSvcId,
+            paymentType,
+
+            promotionCost: 0,
+            promotionRequested: {},
+            is_highlighted: false,
+            is_recommended: false,
+            is_push_notified: false,
+        });
+
+        await req.logAction({
+            req,
+            actorUserId: req.user.id,
+            actorRole: "admin",
+            actionType: "admin_order_create",
+            entityType: "order",
+            entityId: newOrder.id,
+            orderId: newOrder.id,
+            meta: {
+                createdForUserId: targetUserId,
+                status: newOrder.status,
+                paymentType: newOrder.paymentType,
+                categoryId: newOrder.categoryId,
+                subcategoryId: newOrder.subcategoryId,
+                serviceId: newOrder.serviceId,
+                proposedSum: newOrder.proposedSum,
+                coords: newOrder.coordinates,
+                imagesCount: 0,
+            },
         });
 
 
-        res.status(201).json(newOrder);
+        return res.status(201).json({
+            success: true,
+            message: "Заказ успешно создан администратором",
+            order: newOrder,
+        });
     } catch (error) {
-        console.error('Ошибка при создании заказа админом:', error);
-        res.status(500).json({ message: 'Ошибка сервера' });
+        console.error("Ошибка при создании заказа админом:", error);
+        return res.status(500).json({ message: "Ошибка сервера" });
+    }
+});
+
+router.post("/create-express-order", authMiddleware, adminMiddleware, async (req, res) => {
+    const t = await sequelize.transaction();
+
+    try {
+        const {
+            userId,
+            type,
+            fromAddress,
+            fromLat,
+            fromLng,
+            toAddress,
+            toLat,
+            toLng,
+            paymentType,
+            subcategory = null,
+            description = null,
+            basePrice,
+            pricePerKm,
+            totalPrice,
+        } = req.body;
+
+        if (!userId) {
+            await t.rollback();
+            return res.status(400).json({
+                success: false,
+                message: "userId обязателен",
+            });
+        }
+
+        const creatorId = Number(userId);
+        if (!Number.isFinite(creatorId) || creatorId <= 0) {
+            await t.rollback();
+            return res.status(400).json({
+                success: false,
+                message: "Некорректный userId",
+            });
+        }
+
+        if (!type || !fromAddress || !toAddress) {
+            await t.rollback();
+            return res.status(400).json({
+                success: false,
+                message: "type/fromAddress/toAddress обязательны",
+            });
+        }
+
+        if (!["taxi", "courier"].includes(type)) {
+            await t.rollback();
+            return res.status(400).json({
+                success: false,
+                message: "type должен быть taxi|courier",
+            });
+        }
+
+        const normalizedPaymentType = String(paymentType || "cash").trim() || "cash";
+        if (!["cash", "guarantee"].includes(normalizedPaymentType)) {
+            await t.rollback();
+            return res.status(400).json({
+                success: false,
+                message: "paymentType должен быть cash|guarantee",
+            });
+        }
+
+        const fLat = toNum(fromLat);
+        const fLng = toNum(fromLng);
+        const tLat = toNum(toLat);
+        const tLng = toNum(toLng);
+
+        const coordsOk =
+            Number.isFinite(fLat) &&
+            Number.isFinite(fLng) &&
+            Number.isFinite(tLat) &&
+            Number.isFinite(tLng);
+
+        if (!coordsOk) {
+            await t.rollback();
+            return res.status(400).json({
+                success: false,
+                message: "Нужны корректные координаты fromLat/fromLng/toLat/toLng",
+            });
+        }
+
+        const bp = Number.isFinite(Number(basePrice)) ? Number(basePrice) : 0;
+        const ppk = Number.isFinite(Number(pricePerKm)) ? Number(pricePerKm) : 0;
+        const tp = Number.isFinite(Number(totalPrice)) ? Number(totalPrice) : 0;
+
+        if (tp <= 0) {
+            await t.rollback();
+            return res.status(400).json({
+                success: false,
+                message: "totalPrice должен быть больше 0",
+            });
+        }
+
+        const order = await ExpressOrder.create(
+            {
+                creatorId,
+                executorId: null,
+                type,
+                fromAddress,
+                fromLat: fLat,
+                fromLng: fLng,
+                toAddress,
+                toLat: tLat,
+                toLng: tLng,
+                distanceKm: null,
+                estimatedTimeMin: null,
+                basePrice: bp,
+                pricePerKm: ppk,
+                totalPrice: tp,
+                paymentType: normalizedPaymentType,
+                dealStatus: "none",
+                status: "created",
+                subcategory,
+                description,
+            },
+            { transaction: t }
+        );
+
+        await req.logAction({
+            req,
+            actorUserId: req.user.id,
+            actorRole: "admin",
+            actionType: "admin_express_order_create",
+            entityType: "express_order",
+            entityId: order.id,
+            expressOrderId: order.id,
+            meta: {
+                createdForUserId: creatorId,
+                type: order.type,
+                paymentType: order.paymentType,
+                totalPrice: order.totalPrice,
+                basePrice: order.basePrice,
+                pricePerKm: order.pricePerKm,
+                from: {
+                    address: order.fromAddress,
+                    lat: order.fromLat,
+                    lng: order.fromLng,
+                },
+                to: {
+                    address: order.toAddress,
+                    lat: order.toLat,
+                    lng: order.toLng,
+                },
+            },
+        });
+
+        await t.commit();
+
+        return res.status(201).json({
+            success: true,
+            message: "Экспресс-заказ успешно создан администратором",
+            order,
+        });
+    } catch (e) {
+        await t.rollback();
+        console.error("Ошибка при создании экспресс-заказа админом:", e);
+        return res.status(500).json({
+            success: false,
+            message: "Ошибка сервера",
+        });
     }
 });
 
@@ -401,18 +708,44 @@ router.patch('/disputes/:id/status', authMiddleware, adminMiddleware, async (req
 
         const dispute = await Dispute.findByPk(disputeId);
 
+        if (!dispute) {
+            return res.status(404).json({ message: 'Спор не найден' });
+        }
+
         if (dispute.status === status) {
             return res.status(400).json({
                 message: 'У спора уже такой статус'
             });
         }
 
-        if (!dispute) {
-            return res.status(404).json({ message: 'Спор не найден' });
+        if (dispute.status === 'resolved' || dispute.status === 'closed') {
+            return res.status(400).json({
+                message: 'Нельзя изменить уже завершённый спор'
+            });
+        }
+
+        if (
+            dispute.takenByAdminId &&
+            dispute.takenByAdminId !== req.user.id
+        ) {
+            return res.status(403).json({
+                message: `Этот спор уже взят в работу другим администратором (ID: ${dispute.takenByAdminId})`
+            });
         }
 
         const oldStatus = dispute.status;
-        dispute.status = status;
+
+        if (status === 'in_review') {
+            dispute.status = 'in_review';
+
+            if (!dispute.takenByAdminId) {
+                dispute.takenByAdminId = req.user.id;
+                dispute.takenAt = new Date();
+            }
+        } else {
+            dispute.status = status;
+        }
+
         await dispute.save();
 
         await ActionLog.create({
@@ -430,6 +763,8 @@ router.patch('/disputes/:id/status', authMiddleware, adminMiddleware, async (req
                 disputeId: dispute.id,
                 oldStatus,
                 newStatus: status,
+                takenByAdminId: dispute.takenByAdminId || null,
+                takenAt: dispute.takenAt || null,
             }
         });
 
@@ -459,6 +794,24 @@ router.patch('/disputes/:id/resolve', authMiddleware, adminMiddleware, async (re
             return res.status(404).json({ message: 'Спор не найден' });
         }
 
+        if (dispute.status !== 'in_review') {
+            return res.status(400).json({
+                message: 'Решить можно только спор, который уже взят в работу'
+            });
+        }
+
+        if (!dispute.takenByAdminId) {
+            return res.status(400).json({
+                message: 'У спора не указан администратор, который взял его в работу'
+            });
+        }
+
+        if (dispute.takenByAdminId !== req.user.id) {
+            return res.status(403).json({
+                message: `Этот спор находится в работе у другого администратора (ID: ${dispute.takenByAdminId})`
+            });
+        }
+
         dispute.resolution = String(resolution).trim();
         dispute.status = 'resolved';
         dispute.resolvedById = req.user.id;
@@ -480,6 +833,8 @@ router.patch('/disputes/:id/resolve', authMiddleware, adminMiddleware, async (re
             meta: {
                 disputeId: dispute.id,
                 resolution: dispute.resolution,
+                takenByAdminId: dispute.takenByAdminId || null,
+                resolvedById: dispute.resolvedById || null,
             }
         });
 
