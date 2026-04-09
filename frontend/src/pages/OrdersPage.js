@@ -67,7 +67,6 @@ const OrdersPage = () => {
     const [creatorsInfo, setCreatorsInfo] = useState({});
     const [categories, setCategories] = useState([]);
     const [subcategories, setSubcategories] = useState([]);
-    const [services, setServices] = useState([]);
 
     // auth/profile
     const [userId, setUserId] = useState(null);
@@ -91,7 +90,6 @@ const OrdersPage = () => {
     // drawer filters
     const [selectedCategory, setSelectedCategory] = useState("");
     const [selectedSubcategory, setSelectedSubcategory] = useState("");
-    const [selectedService, setSelectedService] = useState("");
     const [useProfileProfessions, setUseProfileProfessions] = useState(true);
 
     // modal images
@@ -499,19 +497,6 @@ const OrdersPage = () => {
         }
     };
 
-    const fetchServices = async (subcategoryId) => {
-        if (!subcategoryId) {
-            setServices([]);
-            return;
-        }
-        try {
-            const res = await axiosInstance.get(`/category/services/${subcategoryId}`);
-            setServices(res.data || []);
-        } catch {
-            setServices([]);
-        }
-    };
-
     // ---------- core filtering (tabs + drawer + geo) ----------
     const visibleOrders = useMemo(() => {
         const base = Array.isArray(allRaw) ? allRaw : [];
@@ -536,7 +521,7 @@ const OrdersPage = () => {
                 : tabFiltered;
 
         // 2) drawer filters (для express — они не подходят, поэтому НЕ фильтруем их этими полями)
-        const hasDrawerFilters = !!(selectedCategory || selectedSubcategory || selectedService);
+        const hasDrawerFilters = !!(selectedCategory || selectedSubcategory);
 
         // ✅ ВАЖНО: если мы в табе "all" и включены drawer-фильтры — убираем taxi/courier из выдачи
         const hideTaxiCourierInAllWhenFiltered =
@@ -560,17 +545,10 @@ const OrdersPage = () => {
             })
             : byCategory;
 
-        const byService = selectedService
-            ? bySubcategory.filter((o) => {
-                if (o.express) return true;
-                return Number(o.serviceId ?? o.service?.id) === Number(selectedService);
-            })
-            : bySubcategory;
-
         // 3) geo 50km always
         if (!userLocation?.latitude || !userLocation?.longitude) return [];
 
-        const geoFiltered = byService
+        const geoFiltered = bySubcategory
             .map((order) => {
                 const [lat, lon] = String(order.coordinates || "")
                     .split(",")
@@ -603,8 +581,8 @@ const OrdersPage = () => {
         preferredCategoryIds,
         selectedCategory,
         selectedSubcategory,
-        selectedService,
         userLocation,
+        useProfileProfessions
     ]);
 
     const locationStatusText = useMemo(() => {
@@ -699,7 +677,7 @@ const OrdersPage = () => {
           </span>
                 </div>
 
-                {activeTab === "all" && (selectedCategory || selectedSubcategory || selectedService) && (
+                {activeTab === "all" && (selectedCategory || selectedSubcategory) && (
                     <div className="hint-text">
                         Во вкладке «Все» при включённых фильтрах заказы «Курьер/Такси» скрываются.
                     </div>
@@ -725,9 +703,7 @@ const OrdersPage = () => {
                                     onClick={() => {
                                         setSelectedCategory("");
                                         setSelectedSubcategory("");
-                                        setSelectedService("");
                                         setSubcategories([]);
-                                        setServices([]);
                                         setActiveTab("all");
 
                                         setUseProfileProfessions(false); // ⭐ вот это делает “сброс” заметным
@@ -1025,8 +1001,7 @@ const OrdersPage = () => {
                                             const v = e.target.value;
                                             setSelectedCategory(v);
                                             setSelectedSubcategory("");
-                                            setSelectedService("");
-                                            setServices([]);
+
                                             await fetchSubcategories(v);
                                         }}
                                     >
@@ -1049,29 +1024,12 @@ const OrdersPage = () => {
                                         onChange={async (e) => {
                                             const v = e.target.value;
                                             setSelectedSubcategory(v);
-                                            setSelectedService("");
-                                            await fetchServices(v);
+
                                         }}
                                         disabled={!selectedCategory}
                                     >
                                         <option value="">Все</option>
                                         {subcategories.map((s) => (
-                                            <option key={s.id} value={s.id}>
-                                                {s.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="field">
-                                    <label>Услуга</label>
-                                    <select
-                                        value={selectedService}
-                                        onChange={(e) => setSelectedService(e.target.value)}
-                                        disabled={!selectedSubcategory || services.length === 0}
-                                    >
-                                        <option value="">Все</option>
-                                        {services.map((s) => (
                                             <option key={s.id} value={s.id}>
                                                 {s.name}
                                             </option>
@@ -1092,9 +1050,7 @@ const OrdersPage = () => {
                                     onClick={() => {
                                         setSelectedCategory("");
                                         setSelectedSubcategory("");
-                                        setSelectedService("");
                                         setSubcategories([]);
-                                        setServices([]);
                                     }}
                                 >
                                     Сбросить

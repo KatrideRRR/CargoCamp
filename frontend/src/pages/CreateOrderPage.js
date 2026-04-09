@@ -86,11 +86,9 @@ function CreateOrderPage() {
 
     const [category, setCategory] = useState([]);
     const [subcategory, setSubcategory] = useState([]);
-    const [services, setServices] = useState([]);
 
     const [selectedCategory, setSelectedCategory] = useState("");
     const [selectedSubcategory, setSelectedSubcategory] = useState("");
-    const [selectedService, setSelectedService] = useState("");
 
     const [addressOpen, setAddressOpen] = useState(false);
     const [timeOpen, setTimeOpen] = useState(false);
@@ -214,8 +212,6 @@ function CreateOrderPage() {
         const categoryId = event.target.value;
         setSelectedCategory(categoryId);
         setSelectedSubcategory("");
-        setSelectedService("");
-        setServices([]);
         setSubcategory([]);
 
         if (!categoryId) return;
@@ -228,25 +224,10 @@ function CreateOrderPage() {
         }
     };
 
-    const fetchServices = async (subcategoryId) => {
-        if (!subcategoryId) {
-            setServices([]);
-            return;
-        }
-        try {
-            const res = await axios.get(`${apiUrl}/api/category/services/${subcategoryId}`);
-            setServices(res.data);
-        } catch (e) {
-            console.error("Ошибка при загрузке услуг:", e);
-            setServices([]);
-        }
-    };
-
     const handleSubcategoryChange = async (e) => {
         const subId = e.target.value;
         setSelectedSubcategory(subId);
-        setSelectedService("");
-        await fetchServices(subId);
+
     };
 
     const getMinTime = (selectedDate) => {
@@ -401,9 +382,6 @@ function CreateOrderPage() {
             data.append("subcategoryId", Number(selectedSubcategory));
         }
 
-        if (selectedService && Number(selectedService) > 0) {
-            data.append("serviceId", Number(selectedService));
-        }
         data.append("promotion", JSON.stringify(promotion));
         images.forEach((img) => data.append("images", img));
 
@@ -707,25 +685,6 @@ function CreateOrderPage() {
                                     <option key={sub.id} value={sub.id}>
                                         {sub.name}
                                         {sub.price ? ` — ${sub.price} ₽` : ""}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-
-                    {/* Шаг 3: Услуга — только когда выбрана подкатегория и услуги есть */}
-                    {selectedSubcategory && services.length > 0 && (
-                        <div className="glass field" style={{ marginTop: 10 }}>
-                            <div className="label">Услуга</div>
-                            <select
-                                className="control"
-                                value={selectedService}
-                                onChange={(e) => setSelectedService(e.target.value)}
-                            >
-                                <option value="">Выберите услугу</option>
-                                {services.map((s) => (
-                                    <option key={s.id} value={s.id}>
-                                        {s.name} — {s.price} ₽
                                     </option>
                                 ))}
                             </select>

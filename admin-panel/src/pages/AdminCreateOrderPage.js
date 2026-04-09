@@ -62,10 +62,8 @@ function AdminCreateOrderPage() {
     const [markerPosition, setMarkerPosition] = useState(null);
     const [categories, setCategories] = useState([]);
     const [subcategories, setSubcategories] = useState([]);
-    const [services, setServices] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState("");
     const [selectedSubcategory, setSelectedSubcategory] = useState("");
-    const [selectedService, setSelectedService] = useState("");
     const [addressSuggestions, setAddressSuggestions] = useState([]);
     const suggestTimerRef = useRef(null);
     const suggestAbortRef = useRef(null);
@@ -121,9 +119,7 @@ function AdminCreateOrderPage() {
         const categoryId = event.target.value;
         setSelectedCategory(categoryId);
         setSelectedSubcategory("");
-        setSelectedService("");
         setSubcategories([]);
-        setServices([]);
 
         if (!categoryId) return;
 
@@ -138,17 +134,9 @@ function AdminCreateOrderPage() {
     const handleRegularSubcategoryChange = async (e) => {
         const subId = e.target.value;
         setSelectedSubcategory(subId);
-        setSelectedService("");
-        setServices([]);
 
         if (!subId) return;
 
-        try {
-            const res = await axios.get(`${apiUrl}/api/category/services/${subId}`);
-            setServices(res.data || []);
-        } catch (e) {
-            console.error("Ошибка при загрузке услуг:", e);
-        }
     };
 
     const getMinTime = (selectedDate) => {
@@ -343,7 +331,6 @@ function AdminCreateOrderPage() {
                 paymentType: "cash",
                 categoryId: Number(selectedCategory),
                 subcategoryId: selectedSubcategory ? Number(selectedSubcategory) : null,
-                serviceId: selectedService ? Number(selectedService) : null,
                 coordinates: `${markerPosition[0]},${markerPosition[1]}`,
             };
 
@@ -605,23 +592,6 @@ function AdminCreateOrderPage() {
                                     </div>
                                 )}
 
-                                {selectedSubcategory && services.length > 0 && (
-                                    <div className="admin-field" style={{ marginTop: 12 }}>
-                                        <div className="admin-label">Услуга</div>
-                                        <select
-                                            className="admin-control"
-                                            value={selectedService}
-                                            onChange={(e) => setSelectedService(e.target.value)}
-                                        >
-                                            <option value="">Выберите услугу</option>
-                                            {services.map((s) => (
-                                                <option key={s.id} value={s.id}>
-                                                    {s.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
                             </div>
 
                             <div className="admin-glass admin-section-card">
