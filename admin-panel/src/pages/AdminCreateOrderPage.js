@@ -42,6 +42,56 @@ function toNum(v) {
     return Number.isFinite(n) ? n : null;
 }
 
+function loadYMaps(apiKey) {
+    if (window.ymaps) return Promise.resolve(window.ymaps);
+
+    const id = "yandex-maps-script";
+    const existing = document.getElementById(id);
+
+    if (existing) {
+        return new Promise((resolve, reject) => {
+            existing.addEventListener("load", () => resolve(window.ymaps));
+            existing.addEventListener("error", reject);
+        });
+    }
+
+    return new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.id = id;
+        s.async = true;
+        s.src = `https://api-maps.yandex.ru/2.1/?apikey=${apiKey}&lang=ru_RU`;
+        s.onload = () => resolve(window.ymaps);
+        s.onerror = reject;
+        document.head.appendChild(s);
+    });
+}
+
+async function calcRouteByYmaps({ apiKey, fromLat, fromLng, toLat, toLng }) {
+    const ymaps = await loadYMaps(apiKey);
+    await ymaps.ready();
+
+    const route = await ymaps.route(
+        [
+            [Number(fromLat), Number(fromLng)],
+            [Number(toLat), Number(toLng)],
+        ],
+        { mapStateAutoApply: false }
+    );
+
+    const meters = typeof route.getLength === "function" ? route.getLength() : null;
+    const seconds = typeof route.getTime === "function" ? route.getTime() : null;
+
+    return {
+        distanceKm: Number.isFinite(meters) ? meters / 1000 : null,
+        durationMin: Number.isFinite(seconds) ? Math.round(seconds / 60) : null,
+    };
+}
+
+const PRICING = {
+    taxi: { base: 150, perKm: 20 },
+    courier: { base: 120, perKm: 15 },
+};
+
 function AdminCreateOrderPage() {
     const { userId } = useParams();
     const navigate = useNavigate();
@@ -107,6 +157,122 @@ function AdminCreateOrderPage() {
         const tLng = toNum(expressForm.toLng);
         return [fLat, fLng, tLat, tLng].every(Number.isFinite);
     }, [expressForm.fromLat, expressForm.fromLng, expressForm.toLat, expressForm.toLng]);
+
+    const [routeCalc, setRouteCalc] = useState({
+        loading: false,
+        distanceKm: null,
+        durationMin: null,
+        err: "",
+    });
+
+    const recommended = useMemo(() => {
+        const km = routeCalc.distanceKm;
+        if (!Number.isFinite(km)) return null;
+
+        const { base, perKm } = PRICING[expressType] || PRICING.taxi;
+        const rec = Math.round(base + perKm * km);
+
+        return {
+            rec,
+            km,
+            min: routeCalc.durationMin,
+        };
+    }, [routeCalc.distanceKm, routeCalc.durationMin, expressType]);
+
+    const routeStatus = useMemo(() => {
+        if (!coordsOk) return "Укажите точки A и B — покажем расстояние и время.";
+        if (routeCalc.loading) return "Считаем маршрут…";
+        if (routeCalc.err) return `Маршрут не рассчитан: ${routeCalc.err}`;
+        if (recommended) {
+            return `~${recommended.km} км · ${Number.isFinite(recommended.min) ? `~${recommended.min} мин` : "—"}`;
+        }
+        return "Маршрут готов.";
+    }, [coordsOk, routeCalc.loading, routeCalc.err, recommended]);
+
+    const applyRecommended = () => {
+        if (!recommended?.rec) return;
+
+        setExpressForm((p) => ({
+            ...p,
+            totalPrice: String(recommended.rec),
+        }));
+    };
+
+    useEffect(() => {
+        let alive = true;
+
+        const run = async () => {
+            if (!coordsOk) {
+                setRouteCalc({
+                    loading: false,
+                    distanceKm: null,
+                    durationMin: null,
+                    err: "",
+                });
+                return;
+            }
+
+            if (!YM_KEY) {
+                setRouteCalc({
+                    loading: false,
+                    distanceKm: null,
+                    durationMin: null,
+                    err: "Нет REACT_APP_YANDEX_API_KEY",
+                });
+                return;
+            }
+
+            setRouteCalc({
+                loading: true,
+                distanceKm: null,
+                durationMin: null,
+                err: "",
+            });
+
+            try {
+                const r = await calcRouteByYmaps({
+                    apiKey: YM_KEY,
+                    fromLat: expressForm.fromLat,
+                    fromLng: expressForm.fromLng,
+                    toLat: expressForm.toLat,
+                    toLng: expressForm.toLng,
+                });
+
+                if (!alive) return;
+
+                setRouteCalc({
+                    loading: false,
+                    distanceKm: Number.isFinite(r.distanceKm) ? Number(r.distanceKm.toFixed(2)) : null,
+                    durationMin: Number.isFinite(r.durationMin) ? r.durationMin : null,
+                    err: "",
+                });
+            } catch (e) {
+                console.error("route calc error:", e);
+
+                if (!alive) return;
+
+                setRouteCalc({
+                    loading: false,
+                    distanceKm: null,
+                    durationMin: null,
+                    err: "Не удалось рассчитать маршрут",
+                });
+            }
+        };
+
+        run();
+
+        return () => {
+            alive = false;
+        };
+    }, [
+        coordsOk,
+        YM_KEY,
+        expressForm.fromLat,
+        expressForm.fromLng,
+        expressForm.toLat,
+        expressForm.toLng,
+    ]);
 
     useEffect(() => {
         axios
@@ -770,7 +936,21 @@ function AdminCreateOrderPage() {
                                 </div>
 
                                 <div className="admin-field" style={{ marginTop: 14 }}>
-                                    <div className="admin-label">Цена</div>
+                                    <div className="admin-label-row">
+                                        <div className="admin-label">Цена</div>
+
+                                        {recommended?.rec ? (
+                                            <button
+                                                type="button"
+                                                className="admin-mini-btn"
+                                                onClick={applyRecommended}
+                                                title="Поставить рекомендуемую цену"
+                                            >
+                                                Рекомендуем {recommended.rec} ₽
+                                            </button>
+                                        ) : null}
+                                    </div>
+
                                     <input
                                         className="admin-control"
                                         type="number"
@@ -783,6 +963,10 @@ function AdminCreateOrderPage() {
                                         }
                                         placeholder="Например 500"
                                     />
+
+                                    <div className="admin-route-note">
+                                        🧭 {routeStatus}
+                                    </div>
                                 </div>
 
                                 <div className="admin-field" style={{ marginTop: 14 }}>
