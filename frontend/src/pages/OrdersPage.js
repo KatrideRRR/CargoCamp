@@ -937,21 +937,23 @@ const OrdersPage = () => {
                                                         buttonClassName="btn btn-ghost express-nav-btn"
                                                     />
 
-                                                    <button
-                                                        className="btn btn-primary"
-                                                        onClick={async () => {
-                                                            try {
-                                                                await axiosInstance.post(`/express/express-orders/${order.expressId}/accept`);
-                                                                toast.success("Заказ принят!");
-                                                                await fetchExpress();
-                                                                navigate("/active-orders");
-                                                            } catch (e) {
-                                                                toast.error(e.response?.data?.message || "Ошибка");
-                                                            }
-                                                        }}
-                                                    >
-                                                        Принять
-                                                    </button>
+                                                    {Number(userId) !== Number(order.creatorId) && (
+                                                        <button
+                                                            className="btn btn-primary"
+                                                            onClick={async () => {
+                                                                try {
+                                                                    await axiosInstance.post(`/express/express-orders/${order.expressId}/accept`);
+                                                                    toast.success("Заказ принят!");
+                                                                    await fetchExpress();
+                                                                    navigate("/active-orders");
+                                                                } catch (e) {
+                                                                    toast.error(e.response?.data?.message || "Ошибка");
+                                                                }
+                                                            }}
+                                                        >
+                                                            Принять
+                                                        </button>
+                                                    )}
                                                 </>
                                             )}
                                         </div>
