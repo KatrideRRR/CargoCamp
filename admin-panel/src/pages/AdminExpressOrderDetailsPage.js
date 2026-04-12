@@ -11,8 +11,11 @@ function AdminExpressOrderDetailsPage() {
     const token = localStorage.getItem("authToken");
 
     const [order, setOrder] = useState(null);
+    const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [logsLoading, setLogsLoading] = useState(false);
     const [error, setError] = useState("");
+    const [logsError, setLogsError] = useState("");
 
     useEffect(() => {
         if (!token) {
@@ -33,6 +36,27 @@ function AdminExpressOrderDetailsPage() {
                 console.error("Ошибка загрузки express-заказа:", err);
                 setError(err.response?.data?.message || "Ошибка загрузки express-заказа");
                 setLoading(false);
+            });
+    }, [id, token]);
+
+    useEffect(() => {
+        if (!token) return;
+
+        setLogsLoading(true);
+
+        axios
+            .get(`${apiUrl}/api/admin/express-orders/${id}/logs`, {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+            .then((res) => {
+                setLogs(res.data?.rows || []);
+                setLogsError("");
+                setLogsLoading(false);
+            })
+            .catch((err) => {
+                console.error("Ошибка загрузки логов express-заказа:", err);
+                setLogsError(err.response?.data?.message || "Ошибка загрузки логов");
+                setLogsLoading(false);
             });
     }, [id, token]);
 
@@ -274,6 +298,53 @@ function AdminExpressOrderDetailsPage() {
                         </span>
                     </div>
                 </div>
+            </div>
+
+            <div className="express-card">
+                <h3>История действий</h3>
+
+                {logsLoading && <p className="page-message">Загрузка логов...</p>}
+                {logsError && <p className="page-message error">{logsError}</p>}
+
+                {!logsLoading && !logsError && logs.length === 0 && (
+                    <p className="page-message">Логов пока нет</p>
+                )}
+
+                {!logsLoading && !logsError && logs.length > 0 && (
+                    <ul className="logs-list">
+                        {logs.map((l) => (
+                            <li key={l.id} className={`log-item ${l.severity || ""}`}>
+                                <div className="log-top">
+                                    <span className="log-time">
+                                        {l.ts ? new Date(l.ts).toLocaleString() : ""}
+                                    </span>
+
+                                    <span className="log-type">
+                                        <strong>{l.actionType}</strong>
+                                    </span>
+
+                                    <span className="log-actor">
+                                        {l.actorRole}
+                                        {l.actorUserId ? ` #${l.actorUserId}` : ""}
+                                    </span>
+
+                                    <span className={`log-status ${l.success ? "ok" : "fail"}`}>
+                                        {l.success ? "OK" : "FAIL"}
+                                    </span>
+                                </div>
+
+                                {l.reason && <div className="log-reason">Причина: {l.reason}</div>}
+
+                                {l.meta && (
+                                    <details className="log-meta">
+                                        <summary>meta</summary>
+                                        <pre>{JSON.stringify(l.meta, null, 2)}</pre>
+                                    </details>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                )}
             </div>
         </div>
     );

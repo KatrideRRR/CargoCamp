@@ -898,4 +898,33 @@ router.get("/express-orders/:id", authMiddleware, adminMiddleware, async (req, r
     }
 });
 
+router.get("/express-orders/:id/logs", authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const expressOrderId = Number(req.params.id);
+
+        if (!Number.isFinite(expressOrderId) || expressOrderId <= 0) {
+            return res.status(400).json({ message: "Некорректный id express-заказа" });
+        }
+
+        const rows = await ActionLog.findAll({
+            where: {
+                [Op.or]: [
+                    { expressOrderId },
+                    {
+                        entityType: "express_order",
+                        entityId: expressOrderId,
+                    },
+                ],
+            },
+            order: [["ts", "DESC"]],
+            limit: 300,
+        });
+
+        res.json({ success: true, rows });
+    } catch (error) {
+        console.error("Ошибка загрузки логов express-заказа:", error);
+        res.status(500).json({ message: "Ошибка сервера" });
+    }
+});
+
 module.exports = router;

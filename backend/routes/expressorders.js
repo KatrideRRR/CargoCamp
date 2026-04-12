@@ -316,6 +316,10 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
         order.status = "accepted";
         await order.save({ transaction: t });
 
+        // ✅ 4) пробуем сразу списать комиссию (если есть привязанная карта), иначе — в долг
+        let paidBySavedCard = false;
+        let debtAdded = false;
+
         await req.logAction({
             req,
             actorUserId: executorId,
@@ -333,10 +337,6 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
                 debtAdded,
             },
         });
-
-        // ✅ 4) пробуем сразу списать комиссию (если есть привязанная карта), иначе — в долг
-        let paidBySavedCard = false;
-        let debtAdded = false;
 
         if (feeKopecks > 0) {
             if (executor.yookassa_payment_method_id) {
@@ -433,9 +433,6 @@ router.post("/express-orders/:id/on-the-way", authenticateToken, async (req, res
             return res.status(409).json({ success: false, message: `Нельзя из статуса ${order.status}` });
         }
 
-        order.status = "on_the_way_to_A";
-        await order.save();
-
         const from = order.status;
         order.status = "on_the_way_to_A";
         await order.save();
@@ -477,12 +474,9 @@ router.post("/express-orders/:id/arrived", authenticateToken, async (req, res) =
             });
         }
 
+        const from = order.status;
         order.status = "arrived_at_A";
         order.arrivedAt = new Date();
-        await order.save();
-
-        const from = order.status;
-        order.status = "on_the_way_to_A";
         await order.save();
 
         await req.logAction({
@@ -519,12 +513,9 @@ router.post("/express-orders/:id/start", authenticateToken, async (req, res) => 
             return res.status(409).json({ success: false, message: "Сначала подтвердите прибытие" });
         }
 
+        const from = order.status;
         order.status = "in_progress";
         order.startedAt = new Date();
-        await order.save();
-
-        const from = order.status;
-        order.status = "on_the_way_to_A";
         await order.save();
 
         await req.logAction({
@@ -561,12 +552,9 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
             return res.status(409).json({ success: false, message: "Заказ ещё не в процессе" });
         }
 
+        const from = order.status;
         order.status = "completed";
         order.completedAt = new Date();
-        await order.save();
-
-        const from = order.status;
-        order.status = "on_the_way_to_A";
         await order.save();
 
         await req.logAction({
@@ -609,12 +597,9 @@ router.post("/express-orders/:id/cancel", authenticateToken, async (req, res) =>
             return res.status(409).json({ success: false, message: `Нельзя отменить из статуса ${order.status}` });
         }
 
+        const from = order.status;
         order.status = "cancelled";
         order.dealStatus = "cancelled";
-        await order.save();
-
-        const from = order.status;
-        order.status = "on_the_way_to_A";
         await order.save();
 
         await req.logAction({

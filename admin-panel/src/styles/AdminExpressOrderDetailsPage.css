@@ -229,3 +229,107 @@
         width: 100%;
     }
 }
+
+.logs-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.log-item {
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+}
+
+.log-item.warn {
+    background: #fff7ed;
+    border-color: #fdba74;
+}
+
+.log-item.error {
+    background: #fef2f2;
+    border-color: #fca5a5;
+}
+
+.log-item.info {
+    background: #eff6ff;
+    border-color: #93c5fd;
+}
+
+.log-top {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.log-time {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.log-type {
+    font-size: 14px;
+    color: #111827;
+}
+
+.log-actor {
+    font-size: 13px;
+    color: #374151;
+}
+
+.log-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.log-status.ok {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.log-status.fail {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.log-reason {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #374151;
+}
+
+.log-meta {
+    margin-top: 10px;
+}
+
+.log-meta summary {
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: #2563eb;
+}
+
+.log-meta pre {
+    margin: 10px 0 0;
+    padding: 12px;
+    border-radius: 12px;
+    background: #111827;
+    color: #f9fafb;
+    font-size: 12px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
