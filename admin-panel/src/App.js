@@ -12,10 +12,13 @@ import UserOrdersPage from "./pages/UserOrdersPage";
 import CreateUserPage from "./pages/CreateUserPage";
 import AdminCreateOrderPage from './pages/AdminCreateOrderPage';
 import AdminUserDocumentsPage from "./pages/AdminUserDocumentsPage";
+import AdminExpressOrderDetailsPage from "./pages/AdminExpressOrderDetailsPage";
+
 function App() {
   return (
       <Router>
           <Routes>
+              <Route path="/express-orders/:id" element={<AdminExpressOrderDetailsPage />} />
               <Route path="/create-user" element={<PrivateRoute><CreateUserPage /></PrivateRoute>} />
               <Route path="/" element={<LoginPage />} />
               <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />

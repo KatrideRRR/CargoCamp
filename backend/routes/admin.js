@@ -1,11 +1,12 @@
 const express = require('express');
 const { authMiddleware, adminMiddleware } = require('../middlewares/adminAuth');
-const { sequelize, User, Order, Message, Category, Subcategory, Dispute, ActionLog, ExpressOrder } = require('../models');const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const NodeGeocoder = require("node-geocoder");
 const { Op } = require("sequelize");
 const fs = require("fs");
 const path = require("path");
+const { User, Message, Order, ExpressOrder, Category, Subcategory, Dispute, ActionLog, sequelize } = require("../models");
+const bcrypt = require("bcrypt");
 
 const geocoder = NodeGeocoder({
     provider: "openstreetmap",
@@ -859,6 +860,41 @@ router.get('/disputes', authMiddleware, adminMiddleware, async (req, res) => {
     } catch (e) {
         console.error('Ошибка получения споров:', e);
         res.status(500).json({ success: false, message: 'Ошибка сервера' });
+    }
+});
+
+router.get("/express-orders", authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const orders = await ExpressOrder.findAll({
+            order: [["created_at", "DESC"]],
+            limit: 300,
+        });
+
+        res.json(orders);
+    } catch (error) {
+        console.error("Ошибка загрузки экспресс-заказов для админа:", error);
+        res.status(500).json({ message: "Ошибка сервера" });
+    }
+});
+
+router.get("/express-orders/:id", authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+
+        if (!Number.isFinite(id) || id <= 0) {
+            return res.status(400).json({ message: "Некорректный id express-заказа" });
+        }
+
+        const order = await ExpressOrder.findByPk(id);
+
+        if (!order) {
+            return res.status(404).json({ message: "Экспресс-заказ не найден" });
+        }
+
+        res.json(order);
+    } catch (error) {
+        console.error("Ошибка загрузки express-заказа для админа:", error);
+        res.status(500).json({ message: "Ошибка сервера" });
     }
 });
 
