@@ -7,7 +7,7 @@ const { Op } = require('sequelize');
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
-const { Order, User, Category, Subcategory, Service } = require('../models');
+const { Order, User, Category, Subcategory } = require('../models');
 const generateContractPDF = require('../utils/generateContractPDF');
 const yooKassa = require('../config/yookassaClient');
 const uploadExecutorBefore = buildOrderPhotoUploader("executor_before");
@@ -23,6 +23,7 @@ const uploadsRoot = path.join(__dirname, "..", "uploads");
 const ordersRoot = path.join(uploadsRoot, "orders");
 const tempRoot = path.join(uploadsRoot, "temp");
 const uploadDocumentRoot = path.join("upload-document");
+const contractsRoot = path.join(__dirname, "..", "contracts");
 
 function ensureDir(dirPath) {
     if (!fs.existsSync(dirPath)) {
@@ -34,6 +35,7 @@ ensureDir(uploadsRoot);
 ensureDir(ordersRoot);
 ensureDir(tempRoot);
 ensureDir(uploadDocumentRoot);
+ensureDir(contractsRoot);
 
 /* ===============================
    MULTER для создания заказа
@@ -777,7 +779,7 @@ module.exports = (io) => {
                 completedBy: [],
             };
 
-            const filePath = path.join(__dirname, '..', 'contracts', `contract_${order.id}.pdf`);
+            const filePath = path.join(contractsRoot, `contract_${order.id}.pdf`);
             try {
                 await generateContractPDF(contractData, filePath);
                 order.contractPath = path.relative(path.join(__dirname, '..'), filePath);
@@ -836,17 +838,21 @@ module.exports = (io) => {
                 const beforePhotos = Array.isArray(order.executorBeforePhotos) ? order.executorBeforePhotos : [];
                 const afterPhotos = Array.isArray(order.executorAfterPhotos) ? order.executorAfterPhotos : [];
 
-                if (beforePhotos.length === 0) {
-                    return res.status(400).json({
-                        message: "Сначала загрузите фото ДО начала работы",
-                    });
-                }
-
-                if (afterPhotos.length === 0) {
-                    return res.status(400).json({
-                        message: "Сначала загрузите фото ПОСЛЕ выполнения работы",
-                    });
-                }
+                await req.logAction({
+                    req,
+                    actorUserId: userId,
+                    actorRole: "user",
+                    actionType: "order_complete_without_full_photo_protocol_check",
+                    entityType: "order",
+                    entityId: order.id,
+                    orderId: order.id,
+                    meta: {
+                        executorBeforePhotosCount: beforePhotos.length,
+                        executorAfterPhotosCount: afterPhotos.length,
+                        hasBeforePhotos: beforePhotos.length > 0,
+                        hasAfterPhotos: afterPhotos.length > 0,
+                    },
+                });
             }
 
             order.completedBy = [...order.completedBy, userId];
@@ -966,10 +972,10 @@ module.exports = (io) => {
                     completedBy: fullOrder.completedBy
                 };
 
-                const contractPath = path.join(__dirname, `../contracts/contract_${order.id}.pdf`);
+                const contractPath = path.join(contractsRoot, `contract_${order.id}.pdf`);
                 await generateContractPDF(data, contractPath);
 
-                fullOrder.contractPath = contractPath;
+                fullOrder.contractPath = path.relative(path.join(__dirname, '..'), contractPath);
                 await fullOrder.save();
             }
 
@@ -1233,11 +1239,6 @@ module.exports = (io) => {
             }
 
             const beforePhotos = Array.isArray(order.executorBeforePhotos) ? order.executorBeforePhotos : [];
-            if (beforePhotos.length === 0) {
-                return res.status(400).json({
-                    message: "Перед началом работы загрузите фото ДО",
-                });
-            }
 
             if (!order.workStartedAt) {
                 order.workStartedAt = new Date();

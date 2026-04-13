@@ -805,17 +805,25 @@ const ActiveOrdersPage = () => {
                                                         <div className="photo-protocol-section">
                                                             <h4 className="photo-protocol-title">Фото-протокол заказа</h4>
 
+                                                            <div className="photo-protocol-alert">
+                                                                Фото ДО и ПОСЛЕ не являются обязательными, но настоятельно рекомендуются.
+                                                                Если фото-протокол не загружен, споры по качеству, объёму и результату работы
+                                                                могут быть рассмотрены ограниченно, так как платформе будет сложно подтвердить,
+                                                                что именно было до начала работ и что изменилось после выполнения.
+                                                            </div>
+
                                                             {isExecutor ? (
                                                                 <>
                                                                     <div className="photo-protocol-card">
                                                                         <div className="photo-protocol-head">
                                                                             <strong>Фото ДО начала работы</strong>
-                                                                            <span className="photo-protocol-required">Обязательно</span>
+                                                                            <span className="photo-protocol-warning">Рекомендуется</span>
                                                                         </div>
 
                                                                         <p className="photo-protocol-hint">
-                                                                            Загрузите фото того, в каком состоянии объект был до начала работы.
-                                                                            Без этих фото будет сложнее защитить вашу позицию в споре.
+                                                                            Рекомендуем загрузить фото того, в каком состоянии объект был до начала работы.
+                                                                            Если фото ДО и ПОСЛЕ отсутствуют, при споре по качеству, объёму или результату работы
+                                                                            платформа не сможет полноценно установить, что именно было до начала и что изменилось после выполнения.
                                                                         </p>
 
                                                                         {renderPhotoList(order.executorBeforePhotos)}
@@ -846,12 +854,13 @@ const ActiveOrdersPage = () => {
                                                                     <div className="photo-protocol-card">
                                                                         <div className="photo-protocol-head">
                                                                             <strong>Фото ПОСЛЕ выполнения работы</strong>
-                                                                            <span className="photo-protocol-required">Обязательно</span>
+                                                                            <span className="photo-protocol-warning">Рекомендуется</span>
                                                                         </div>
 
                                                                         <p className="photo-protocol-hint">
-                                                                            Перед завершением заказа загрузите фото результата работы.
-                                                                            Без этих фото завершение заказа для исполнителя недоступно.
+                                                                            Рекомендуем загрузить фото результата работы после выполнения.
+                                                                            Если фото ДО и ПОСЛЕ отсутствуют, спор по качеству или полноте выполнения будет
+                                                                            рассматриваться ограниченно, потому что не будет наглядного подтверждения результата.
                                                                         </p>
 
                                                                         {renderPhotoList(order.executorAfterPhotos)}

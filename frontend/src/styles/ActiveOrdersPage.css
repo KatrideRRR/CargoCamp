@@ -1288,3 +1288,20 @@ body {
     opacity: 0.7;
     cursor: not-allowed;
 }
+
+.photo-protocol-warning {
+    color: #b26a00;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.photo-protocol-alert {
+    margin: 10px 0 16px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #fff8e6;
+    border: 1px solid #f0d58a;
+    color: #7a5600;
+    font-size: 14px;
+    line-height: 1.45;
+}
