@@ -1,21 +1,22 @@
 import { toast } from "react-toastify";
-import React, { createContext, useState, useEffect } from 'react';
-import io from 'socket.io-client';
-import axiosInstance from '../utils/axiosInstance';
-import '../styles/modalContext.css'
+import React, { createContext, useState, useEffect } from "react";
+import io from "socket.io-client";
+import axiosInstance from "../utils/axiosInstance";
+import "../styles/modalContext.css";
 import axios from "axios";
+
 export const ModalContext = createContext(null);
 
 const socket = io(process.env.REACT_APP_SOCKET_URL, {
-    transports: ['websocket'],
-    withCredentials: true
+    transports: ["websocket"],
+    withCredentials: true,
 });
 
 export const ModalProvider = ({ children }) => {
     const [modalData, setModalData] = useState(null);
     const [userId, setUserId] = useState(null);
-    const [notificationData, setNotificationData] = useState(null); // Для уведомлений исполнителю
-    const [completionNotificationData, setCompletionNotificationData] = useState(null); // Уведомление по завершению заказа
+    const [notificationData, setNotificationData] = useState(null); // модалка одобрения заказа
+    const [completionNotificationData, setCompletionNotificationData] = useState(null); // модалка завершения заказа
     const [showRatingModal, setShowRatingModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [rating, setRating] = useState(0);
@@ -24,12 +25,12 @@ export const ModalProvider = ({ children }) => {
     useEffect(() => {
         const fetchUserData = async () => {
             try {
-                const response = await axiosInstance.get('/auth/profile');
+                const response = await axiosInstance.get("/auth/profile");
                 setCurrUser(response.data);
                 setUserId(response.data.id);
-                socket.emit('register', response.data.id);
+                socket.emit("register", response.data.id);
             } catch (error) {
-                console.log('⛔️ Ошибка поймана:', error);
+                console.log("⛔️ Ошибка поймана:", error);
 
                 if (axios.isAxiosError(error)) {
                     if (error.response?.status === 401) {
@@ -37,7 +38,11 @@ export const ModalProvider = ({ children }) => {
                         return;
                     }
 
-                    console.warn("⚠️ Ответ сервера с ошибкой:", error.response?.status, error.response?.data);
+                    console.warn(
+                        "⚠️ Ответ сервера с ошибкой:",
+                        error.response?.status,
+                        error.response?.data
+                    );
                 } else {
                     console.error("❌ Неизвестная ошибка:", error);
                 }
@@ -49,23 +54,23 @@ export const ModalProvider = ({ children }) => {
 
     const payDebtFromModal = async () => {
         try {
-            const res = await axiosInstance.post('/payments/debt/create');
+            const res = await axiosInstance.post("/payments/debt/create");
 
             if (!res.data?.success) {
-                toast.error(res.data?.error || 'Ошибка оплаты');
+                toast.error(res.data?.error || "Ошибка оплаты");
                 return;
             }
 
             if (res.data.noDebt) {
-                toast.info('Долгов нет');
+                toast.info("Долгов нет");
                 return;
             }
 
             if (res.data.paidBySavedCard) {
-                toast.info('Пробуем списать с привязанной карты...');
+                toast.info("Пробуем списать с привязанной карты...");
 
                 setTimeout(async () => {
-                    const refreshed = await axiosInstance.get('/auth/profile');
+                    const refreshed = await axiosInstance.get("/auth/profile");
                     setCurrUser(refreshed.data);
 
                     if (Number(refreshed.data.debt || 0) === 0) {
@@ -80,7 +85,7 @@ export const ModalProvider = ({ children }) => {
             window.location.href = res.data.confirmationUrl;
         } catch (e) {
             console.error(e);
-            toast.error('Ошибка оплаты комиссии');
+            toast.error("Ошибка оплаты комиссии");
         }
     };
 
@@ -88,53 +93,58 @@ export const ModalProvider = ({ children }) => {
         setNotificationData(null);
     };
 
+    const handleCompletionNotificationClose = () => {
+        setCompletionNotificationData(null);
+    };
+
     useEffect(() => {
+        if (!userId) return;
 
-        if (userId) {
-            console.log("🔄 Подключаем WebSocket для пользователя:", userId);
+        console.log("🔄 Подключаем WebSocket для пользователя:", userId);
 
-            socket.on('orderApproved', (data) => {
-                console.log("🔔 Заказ одобрен:", data);
+        const handleOrderApproved = (data) => {
+            console.log("🔔 Заказ одобрен:", data);
 
-                if (typeof data.debt === "number") {
-                    setCurrUser(prev => prev ? ({ ...prev, debt: data.debt }) : prev);
-                }
+            if (typeof data.debt === "number") {
+                setCurrUser((prev) => (prev ? { ...prev, debt: data.debt } : prev));
+            }
 
-                if (data.message?.includes("Ваш запрос")) {
-                    const isPremiumUser = !!data.isPremium;
+            if (data.message?.includes("Ваш запрос")) {
+                const isPremiumUser = !!data.isPremium;
 
-                    setNotificationData({
-                        title: "Ваш запрос одобрен!",
-                        description: `Заказ номер ${data.orderId}: ${data.message}`,
-                        isPremium: isPremiumUser,
-                        orderId: data.orderId,
-                        debt: Number(data.debt || 0),
-                        needPay: !!data.needPay,
-                        paid: !!data.paid,
-                    });
-                }
-            });
+                setNotificationData({
+                    title: "Ваш запрос одобрен!",
+                    description: `Заказ номер ${data.orderId}: ${data.message}`,
+                    isPremium: isPremiumUser,
+                    orderId: data.orderId,
+                    debt: Number(data.debt || 0),
+                    needPay: !!data.needPay,
+                    paid: !!data.paid,
+                });
+            }
+        };
 
-            socket.on('orderCompleted', (data) => {
-                console.log("🔔 Уведомление о завершении заказа:", data);
+        const handleOrderCompleted = (data) => {
+            console.log("🔔 Уведомление о завершении заказа:", data);
 
-                if (data.message) {
-                    setCompletionNotificationData({
-                        title: "Ожидание завершения заказа",
-                        description: `Заказ номер ${data.orderId}: ${data.message}`,
-                        orderId: data.orderId,
-                        creatorId: data.creatorId,  // ✅ Добавили
-                        executorId: data.executorId // ✅ Добавили
-                    });
-                }
-            });
+            if (data.message) {
+                setCompletionNotificationData({
+                    title: "Ожидание завершения заказа",
+                    description: `Заказ номер ${data.orderId}: ${data.message}`,
+                    orderId: data.orderId,
+                    creatorId: data.creatorId,
+                    executorId: data.executorId,
+                });
+            }
+        };
 
+        socket.on("orderApproved", handleOrderApproved);
+        socket.on("orderCompleted", handleOrderCompleted);
 
-            return () => {
-                socket.off('orderApproved');
-                socket.off('orderCompleted');
-            };
-        }
+        return () => {
+            socket.off("orderApproved", handleOrderApproved);
+            socket.off("orderCompleted", handleOrderCompleted);
+        };
     }, [userId]);
 
     const handleCompleteOrder = async (orderId, creatorId, executorId) => {
@@ -143,43 +153,81 @@ export const ModalProvider = ({ children }) => {
         setSelectedOrder({
             id: orderId,
             creatorId,
-            executorId
+            executorId,
         });
 
+        setCompletionNotificationData(null);
         setShowRatingModal(true);
-
     };
 
     console.log(modalData);
 
     return (
-        <ModalContext.Provider value={{ openModal: setModalData, closeModal: () => setModalData(null) }}>
+        <ModalContext.Provider
+            value={{
+                openModal: setModalData,
+                closeModal: () => setModalData(null),
+                showRatingModal,
+                setShowRatingModal,
+                selectedOrder,
+                setSelectedOrder,
+                rating,
+                setRating,
+                currUser,
+                setCurrUser,
+            }}
+        >
             {children}
 
-                    {/* Уведомление для исполнителя в виде модала */}
+            {/* Модалка одобрения заказа */}
             {notificationData && (
                 <div className="modal-overlay">
                     <div className="modal">
+                        <button
+                            className="modal-close"
+                            onClick={handleNotificationClose}
+                            aria-label="Закрыть"
+                            type="button"
+                        >
+                            ×
+                        </button>
+
                         <h2>{notificationData.title}</h2>
                         <p>{notificationData.description}</p>
 
                         {notificationData.isPremium ? (
-                            <p className="text-green-600">
-                                У вас активен Premium — комиссия не требуется 🎉
-                            </p>
+                            <>
+                                <p className="text-green-600">
+                                    У вас активен Premium — комиссия не требуется 🎉
+                                </p>
+
+                                <button onClick={handleNotificationClose}>
+                                    Ок
+                                </button>
+                            </>
                         ) : notificationData.debt > 0 ? (
                             <>
                                 <p style={{ marginTop: 8 }}>
                                     Комиссия: <b>{Math.round(notificationData.debt / 100)} ₽</b>
                                 </p>
 
-                                <button onClick={payDebtFromModal}>
-                                    Оплатить сейчас
-                                </button>
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        gap: "10px",
+                                        justifyContent: "center",
+                                        marginTop: "16px",
+                                        flexWrap: "wrap",
+                                    }}
+                                >
+                                    <button onClick={payDebtFromModal}>
+                                        Оплатить сейчас
+                                    </button>
 
-                                <button onClick={handleNotificationClose}>
-                                    Оплатить позже
-                                </button>
+                                    <button onClick={handleNotificationClose}>
+                                        Оплатить позже
+                                    </button>
+                                </div>
                             </>
                         ) : (
                             <button onClick={handleNotificationClose}>
@@ -190,20 +238,47 @@ export const ModalProvider = ({ children }) => {
                 </div>
             )}
 
-            {/* Окно завершения заказа */}
+            {/* Модалка завершения заказа */}
             {completionNotificationData && (
                 <div className="modal-overlay">
                     <div className="modal">
-                        <h2>{completionNotificationData.title}</h2>
-                        <p>{completionNotificationData.description}</p>
-                        <button onClick={() => handleCompleteOrder(
-                            completionNotificationData.orderId,
-                            completionNotificationData.creatorId,
-                            completionNotificationData.executorId
-                        )}>
-                            Завершить
+                        <button
+                            className="modal-close"
+                            onClick={handleCompletionNotificationClose}
+                            aria-label="Закрыть"
+                            type="button"
+                        >
+                            ×
                         </button>
 
+                        <h2>{completionNotificationData.title}</h2>
+                        <p>{completionNotificationData.description}</p>
+
+                        <div
+                            style={{
+                                display: "flex",
+                                gap: "10px",
+                                justifyContent: "center",
+                                marginTop: "16px",
+                                flexWrap: "wrap",
+                            }}
+                        >
+                            <button
+                                onClick={() =>
+                                    handleCompleteOrder(
+                                        completionNotificationData.orderId,
+                                        completionNotificationData.creatorId,
+                                        completionNotificationData.executorId
+                                    )
+                                }
+                            >
+                                Завершить
+                            </button>
+
+                            <button onClick={handleCompletionNotificationClose}>
+                                Ок
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
