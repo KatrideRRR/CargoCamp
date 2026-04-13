@@ -22,6 +22,7 @@ const uploadCustomerAfter = buildOrderPhotoUploader("customer_after");
 const uploadsRoot = path.join(__dirname, "..", "uploads");
 const ordersRoot = path.join(uploadsRoot, "orders");
 const tempRoot = path.join(uploadsRoot, "temp");
+const uploadDocumentRoot = path.join("upload-document");
 
 function ensureDir(dirPath) {
     if (!fs.existsSync(dirPath)) {
@@ -32,6 +33,7 @@ function ensureDir(dirPath) {
 ensureDir(uploadsRoot);
 ensureDir(ordersRoot);
 ensureDir(tempRoot);
+ensureDir(uploadDocumentRoot);
 
 /* ===============================
    MULTER для создания заказа
