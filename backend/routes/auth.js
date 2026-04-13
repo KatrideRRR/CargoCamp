@@ -10,27 +10,51 @@ const path = require('path');
 const axios = require("axios");
 const SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
 
+const uploadsRoot = path.join(__dirname, '..', 'uploads');
+const uploadDocumentsRoot = path.join(uploadsRoot, 'upload-document');
+
+function ensureDir(dirPath) {
+    if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+    }
+}
+
+ensureDir(uploadsRoot);
+ensureDir(uploadDocumentsRoot);
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'uploads/upload-document');
+        try {
+            console.log('📁 uploadDocumentsRoot:', uploadDocumentsRoot);
+            ensureDir(uploadDocumentsRoot);
+            cb(null, uploadDocumentsRoot);
+        } catch (error) {
+            cb(error);
+        }
     },
-    filename: (req, file, cb) => {
-        const userId = req.user.id;
-        const ext = path.extname(file.originalname);
 
-        User.findByPk(userId)
-            .then(user => {
-                const imageCount = user.documentPhotos ? user.documentPhotos.length : 0;
-                const newFileName = `${userId}_${imageCount + 1}${ext}`;
-                cb(null, newFileName);
-            })
-            .catch(error => {
-                cb(error);
-            });
+    filename: async (req, file, cb) => {
+        try {
+            const userId = req.user.id;
+            const ext = path.extname(file.originalname) || '.jpg';
+
+            const user = await User.findByPk(userId);
+            const imageCount = Array.isArray(user?.documentPhotos) ? user.documentPhotos.length : 0;
+            const newFileName = `${userId}_${imageCount + 1}${ext}`;
+
+            cb(null, newFileName);
+        } catch (error) {
+            cb(error);
+        }
     }
 });
 
-const upload = multer({ storage });
+const upload = multer({
+    storage,
+    limits: {
+        fileSize: 10 * 1024 * 1024,
+    }
+});
 
 const generateTemporaryPassword = () => {
     return Math.random().toString(36).slice(-8);
@@ -134,26 +158,28 @@ router.post("/password-reset/confirm", async (req, res) => {
     return res.json({ message: "Пароль успешно изменён" });
 });
 
-router.post('/upload-documents',authenticateToken, upload.array('documents', 5), async (req, res) => {
+router.post('/upload-documents', authenticateToken, upload.array('documents', 5), async (req, res) => {
     try {
-        const userId = req.user.id; // Получаем ID пользователя из токена или сессии
+        const userId = req.user.id;
 
-        const fileNames = req.files.map(file => file.filename); // Получаем имена загруженных файлов
+        const fileNames = (req.files || []).map(file => file.filename);
 
-        // Обновляем пользователя с новыми файлами
         const user = await User.findByPk(userId);
 
         if (!user) {
             return res.status(404).json({ message: 'Пользователь не найден' });
         }
 
-        // Добавляем новые изображения в массив
-        const updatedPhotos = user.documentPhotos ? [...user.documentPhotos, ...fileNames] : fileNames;
+        const existingPhotos = Array.isArray(user.documentPhotos) ? user.documentPhotos : [];
+        const updatedPhotos = [...existingPhotos, ...fileNames];
 
-        user.documentPhotos = updatedPhotos; // Обновляем поле с изображениями
-        await user.save(); // Сохраняем изменения в базе данных
+        user.documentPhotos = updatedPhotos;
+        await user.save();
 
-        res.status(200).json({ message: 'Документы загружены успешно', files: updatedPhotos });
+        res.status(200).json({
+            message: 'Документы загружены успешно',
+            files: updatedPhotos
+        });
     } catch (error) {
         console.error('Ошибка при загрузке документов:', error);
         res.status(500).json({ message: 'Ошибка сервера' });
