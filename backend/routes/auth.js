@@ -8,6 +8,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const axios = require("axios");
+const fs = require('fs');
 const SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
 
 const uploadsRoot = path.join(__dirname, '..', 'uploads');
