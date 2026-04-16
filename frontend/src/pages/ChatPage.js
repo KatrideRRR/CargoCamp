@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import "../styles/ChatPage.css";
 import { useUser } from "../utils/userContext";
 import { socket } from "../socketClient";
@@ -9,6 +9,7 @@ const apiUrl = process.env.REACT_APP_API_URL;
 
 const ChatPage = () => {
     const { orderId } = useParams();
+    const navigate = useNavigate();
     const { currentUser } = useUser();
 
     const [messages, setMessages] = useState([]);
@@ -165,6 +166,10 @@ const ChatPage = () => {
         }
     };
 
+    const handleBack = () => {
+        navigate(-1);
+    };
+
     if (loading) {
         return (
             <div className="chat-page">
@@ -182,12 +187,23 @@ const ChatPage = () => {
     }
 
     return (
-        <div className="chat-page">
+        <div className="chat-page chat-page--no-bottom-menu">
             <div className="chat-container">
                 <header className="chat-header">
-                    <div className="chat-header-title">Чат по заказу #{orderId}</div>
-                    <div className="chat-header-subtitle">
-                        Собеседник: {selectedUser?.username || "—"}
+                    <button
+                        type="button"
+                        className="chat-back-button"
+                        onClick={handleBack}
+                        aria-label="Выйти из чата"
+                    >
+                        ←
+                    </button>
+
+                    <div className="chat-header-text">
+                        <div className="chat-header-title">Чат по заказу #{orderId}</div>
+                        <div className="chat-header-subtitle">
+                            Собеседник: {selectedUser?.username || "—"}
+                        </div>
                     </div>
                 </header>
 

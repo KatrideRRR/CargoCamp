@@ -23,6 +23,10 @@ body,
     font-family: "Segoe UI", sans-serif;
 }
 
+.chat-page--no-bottom-menu {
+    padding-bottom: 0;
+}
+
 .chat-container {
     width: 100%;
     max-width: 700px;
@@ -35,9 +39,36 @@ body,
 
 .chat-header {
     flex-shrink: 0;
-    padding: 14px 16px;
+    padding: 12px 14px;
     background: #ededed;
     border-bottom: 1px solid #ddd;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.chat-back-button {
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    border: none;
+    border-radius: 12px;
+    background: #ffffff;
+    color: #111;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.chat-back-button:active {
+    transform: scale(0.98);
+}
+
+.chat-header-text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 .chat-header-title {
@@ -50,6 +81,9 @@ body,
     margin-top: 4px;
     font-size: 13px;
     color: #555;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .chat-messages {
@@ -156,7 +190,40 @@ body,
     padding: 20px;
 }
 
-@media (min-width: 768px) {
+@media (max-width: 768px) {
+    .chat-header {
+        padding: 10px 12px;
+    }
+
+    .chat-back-button {
+        width: 40px;
+        min-width: 40px;
+        height: 40px;
+        font-size: 22px;
+    }
+
+    .chat-header-title {
+        font-size: 15px;
+    }
+
+    .chat-header-subtitle {
+        font-size: 12px;
+    }
+
+    .chat-messages {
+        padding: 10px;
+    }
+
+    .chat-message {
+        max-width: 86%;
+    }
+
+    .chat-input-container {
+        padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+    }
+}
+
+@media (min-width: 769px) {
     .chat-page {
         padding: 16px;
     }

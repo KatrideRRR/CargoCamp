@@ -1,91 +1,112 @@
-import React, { useContext, useEffect, useState } from 'react';
-import '../styles/BottomMenu.css';
-import io from 'socket.io-client';
+import React, { useContext, useEffect, useState } from "react";
+import "../styles/BottomMenu.css";
 import { AuthContext } from "../utils/authContext";
-import { ListTodo, Home, ClipboardList, ArrowUpCircle, UserRound } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
-
-const socket = io(process.env.REACT_APP_SOCKET_URL, {
-    transports: ['websocket'],
-    withCredentials: true
-});
+import { ListTodo, Home, ClipboardList, ArrowUpCircle, UserRound } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { socket } from "../socketClient";
 
 const BottomMenu = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user } = useContext(AuthContext);
+
     const [requestCount, setRequestCount] = useState(0);
     const [messageCount, setMessageCount] = useState(0);
-    const location = useLocation();
+
+    const shouldHide =
+        location.pathname.startsWith("/chat") ||
+        location.pathname.startsWith("/messages");
 
     useEffect(() => {
-        if (!user?.id) return;
+        if (!user?.id || shouldHide) return;
 
-        socket.connect();
+        if (!socket.connected) {
+            socket.connect();
+        }
 
-        console.log('Подписка на уведомления, userId:', user.id);
-        socket.emit('subscribeToNotifications', user.id);
+        socket.emit("register", user.id);
+        socket.emit("subscribeToNotifications", user.id);
 
-        socket.on('new_notification', (message) => {
-            console.log("✉️ Новое сообщение:", message);
-            setMessageCount(prev => prev + 1);
-        });
+        const handleNewNotification = (notifications) => {
+            if (!Array.isArray(notifications)) {
+                return;
+            }
+
+            const unreadMessageNotifications = notifications.filter(
+                (item) => item?.type === "new_message"
+            );
+
+            setMessageCount(unreadMessageNotifications.length);
+        };
 
         const orderRequestEvent = `orderRequest:${user.id}`;
-        console.log(`🔍 Подписка на запросы: ${orderRequestEvent}`);
 
-        socket.on(orderRequestEvent, (data) => {
-            console.log("🔥 Новый запрос на заказ:", data);
-            setRequestCount(prev => prev + 1);
-        });
+        const handleOrderRequest = () => {
+            setRequestCount((prev) => prev + 1);
+        };
+
+        socket.on("new_notification", handleNewNotification);
+        socket.on(orderRequestEvent, handleOrderRequest);
 
         return () => {
-            socket.off('new_notification');
-            socket.off(orderRequestEvent);
+            socket.off("new_notification", handleNewNotification);
+            socket.off(orderRequestEvent, handleOrderRequest);
         };
-    }, [user]);
+    }, [user?.id, shouldHide]);
 
     const isActive = (path) => {
-        return location.pathname === path ||
-            location.pathname.startsWith(path + "/");
+        return location.pathname === path || location.pathname.startsWith(path + "/");
     };
 
     const handleMyOrdersClick = () => {
+        if (!user?.id) return;
         navigate(`/my-orders/${user.id}`);
-        setRequestCount(0); // Сбрасываем счетчик запросов
+        setRequestCount(0);
     };
 
     const handleOpenActive = () => {
-        navigate('/active-orders');
-        setMessageCount(0); // Сбрасываем счетчик сообщений
+        navigate("/active-orders");
+        setMessageCount(0);
     };
 
     const formatCount = (count) => {
-        if (count > 9) return '9+';
+        if (count > 9) return "9+";
         return count;
     };
+
+    if (shouldHide) {
+        return null;
+    }
 
     return (
         <div className="bottom-menu">
             <button
                 className={`navbar-item navbar-home ${isActive("/") ? "is-active" : ""}`}
-                onClick={() => navigate('/')}
-            >                <Home size={24} className="menu-icon"/>
+                onClick={() => navigate("/")}
+                type="button"
+            >
+                <Home size={24} className="menu-icon" />
                 <span className="menu-label">Старт</span>
             </button>
 
             <button
                 className={`menu-item menu-left ${isActive("/orders") ? "is-active" : ""}`}
-                onClick={() => navigate('/orders')}
+                onClick={() => navigate("/orders")}
+                type="button"
             >
-                <ListTodo size={24} className="menu-icon"/>
+                <ListTodo size={24} className="menu-icon" />
                 <span className="menu-label">Заказы</span>
             </button>
 
             <button
-                className={`menu-item menu-center ${isActive("/my-orders") ? "is-active new-request" : ""}`}
+                className={`menu-item menu-center ${
+                    isActive("/my-orders") ? "is-active" : ""
+                } ${requestCount > 0 ? "new-request" : ""}`}
                 onClick={handleMyOrdersClick}
-            >                <div className="icon-wrapper">
-                    <ArrowUpCircle size={34} className="menu-icon-center"/>
+                type="button"
+            >
+                <div className="icon-wrapper">
+                    <ArrowUpCircle size={34} className="menu-icon-center" />
                     {requestCount > 0 && (
                         <span className="notification-badge">{formatCount(requestCount)}</span>
                     )}
@@ -95,8 +116,10 @@ const BottomMenu = () => {
             <button
                 className={`menu-item menu-right ${isActive("/active-orders") ? "is-active" : ""}`}
                 onClick={handleOpenActive}
-            >                <div className="icon-wrapper">
-                    <ClipboardList size={24} className="menu-icon"/>
+                type="button"
+            >
+                <div className="icon-wrapper">
+                    <ClipboardList size={24} className="menu-icon" />
                     {messageCount > 0 && (
                         <span className="notification-badge">{formatCount(messageCount)}</span>
                     )}
@@ -106,8 +129,10 @@ const BottomMenu = () => {
 
             <button
                 className={`navbar-item navbar-profile ${isActive("/profile") ? "is-active" : ""}`}
-                onClick={() => navigate('/profile')}
-            >                <UserRound size={24} className="menu-icon"/>
+                onClick={() => navigate("/profile")}
+                type="button"
+            >
+                <UserRound size={24} className="menu-icon" />
                 <span className="menu-label">Профиль</span>
             </button>
         </div>
