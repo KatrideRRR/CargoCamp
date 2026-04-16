@@ -1,177 +1,224 @@
-import { io } from 'socket.io-client';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import axios from 'axios';
-import { useParams } from 'react-router-dom';
-import '../styles/ChatPage.css';
-import { useUser } from '../utils/userContext';
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import axios from "axios";
+import { useParams } from "react-router-dom";
+import "../styles/ChatPage.css";
+import { useUser } from "../utils/userContext";
+import { socket } from "../socket";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
 const ChatPage = () => {
     const { orderId } = useParams();
-    const [messages, setMessages] = useState([]);
-    const [newMessage, setNewMessage] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
     const { currentUser } = useUser();
+
+    const [messages, setMessages] = useState([]);
+    const [newMessage, setNewMessage] = useState("");
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
     const [selectedUser, setSelectedUser] = useState(null);
 
-    const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
     const textareaRef = useRef(null);
-    const socket = useRef(null);
 
-    useEffect(() => {
+    const authHeader = {
+        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+    };
 
-        socket.current = io(process.env.REACT_APP_SOCKET_URL, {
-            transports: ['websocket'],
-            withCredentials: true
-        });
-        if (process.env.NODE_ENV === 'development') {
-            window.socket = socket.current;
-        }
-
-
-        if (currentUser) {
-            socket.current.emit('joinChat', { userId: currentUser.id });
-
-            socket.current.on('receiveMessage', (message) => {
-                if (String(message.orderId) === String(orderId)) { // Приводим оба к строке
-                    setMessages((prev) => [...prev, message]);
-                }
-            });
-
-        }
-
-        return () => {
-            socket.current.disconnect();
-        };
-    }, [currentUser, orderId]);
-
-    const scrollToBottom = () => {
+    const scrollToBottom = useCallback((behavior = "smooth") => {
         if (messagesContainerRef.current) {
             messagesContainerRef.current.scrollTo({
                 top: messagesContainerRef.current.scrollHeight,
-                behavior: 'smooth',
+                behavior,
             });
         }
-    };
-
+    }, []);
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages]);
+    }, [messages, scrollToBottom]);
+
+    useEffect(() => {
+        if (!currentUser?.id) return;
+
+        if (!socket.connected) {
+            socket.connect();
+        }
+
+        socket.emit("register", currentUser.id);
+        socket.emit("joinChat", { userId: currentUser.id, orderId });
+
+        const handleReceiveMessage = (message) => {
+            if (String(message.orderId) !== String(orderId)) return;
+
+            setMessages((prev) => {
+                const exists = prev.some((msg) => String(msg.id) === String(message.id));
+                if (exists) return prev;
+                return [...prev, message];
+            });
+        };
+
+        socket.on("receiveMessage", handleReceiveMessage);
+
+        return () => {
+            socket.off("receiveMessage", handleReceiveMessage);
+        };
+    }, [currentUser?.id, orderId]);
 
     useEffect(() => {
         const fetchData = async () => {
             try {
                 setLoading(true);
+                setError("");
 
-                const { data: order } = await axios.get(`${apiUrl}/api/orders/${orderId}`, {
-                    headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
-                });
+                const { data: order } = await axios.get(
+                    `${apiUrl}/api/orders/${orderId}`,
+                    authHeader
+                );
 
-                const userId = order.creatorId === currentUser.id ? order.executorId : order.creatorId;
-                const { data: user } = await axios.get(`${apiUrl}/api/auth/${userId}`);
+                const otherUserId =
+                    String(order.creatorId) === String(currentUser.id)
+                        ? order.executorId
+                        : order.creatorId;
+
+                const { data: user } = await axios.get(
+                    `${apiUrl}/api/auth/${otherUserId}`,
+                    authHeader
+                );
+
                 setSelectedUser(user);
 
-                const { data: messagesData } = await axios.get(`${apiUrl}/api/messages/${orderId}`, {
-                    headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
-                });
+                const { data: messagesData } = await axios.get(
+                    `${apiUrl}/api/messages/${orderId}`,
+                    authHeader
+                );
+
                 setMessages(messagesData);
+
+                socket.emit("markAsRead", {
+                    userId: currentUser.id,
+                    orderId,
+                });
+
+                requestAnimationFrame(() => scrollToBottom("auto"));
             } catch (err) {
-                setError('Не удалось загрузить данные чата.');
+                console.error(err);
+                setError("Не удалось загрузить данные чата.");
             } finally {
                 setLoading(false);
             }
         };
 
-        if (orderId && currentUser) {
+        if (orderId && currentUser?.id) {
             fetchData();
         }
-    }, [orderId, currentUser]);
+    }, [orderId, currentUser?.id, scrollToBottom]);
 
     const handleSendMessage = useCallback(async () => {
         if (!newMessage.trim() || !currentUser || !orderId || !selectedUser) return;
 
         try {
             const messageData = {
-                content: newMessage,
-                senderId: currentUser.id,
+                content: newMessage.trim(),
                 receiverId: selectedUser.id,
                 orderId,
             };
 
-            const { data } = await axios.post(`${apiUrl}/api/messages`, messageData, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+            const { data } = await axios.post(
+                `${apiUrl}/api/messages`,
+                messageData,
+                authHeader
+            );
+
+            setMessages((prev) => {
+                const exists = prev.some((msg) => String(msg.id) === String(data.id));
+                if (exists) return prev;
+                return [...prev, data];
             });
 
-            socket.current.emit('sendMessage', data);
-            setMessages((prev) => [...prev, data]);
-            setNewMessage('');
-            textareaRef.current.style.height = '40px';
-        } catch (err) {
-            setError('Не удалось отправить сообщение.');
-        }
-    }, [newMessage, orderId, currentUser, selectedUser]);
+            setNewMessage("");
 
-    // Обработчик изменения текста с автоувеличением высоты
+            if (textareaRef.current) {
+                textareaRef.current.style.height = "44px";
+            }
+
+            requestAnimationFrame(() => scrollToBottom());
+        } catch (err) {
+            console.error(err);
+            setError("Не удалось отправить сообщение.");
+        }
+    }, [newMessage, currentUser, orderId, selectedUser, scrollToBottom]);
+
     const handleInputChange = (e) => {
-        const textarea = textareaRef.current;
-        textarea.style.height = 'auto';
-        textarea.style.height = `${textarea.scrollHeight}px`;
         setNewMessage(e.target.value);
+
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+
+        textarea.style.height = "auto";
+        textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
     };
 
     const handleKeyDown = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             handleSendMessage();
         }
     };
 
-    // Авто-прокрутка вверх при изменении высоты поля ввода
-    useEffect(() => {
-        if (messagesContainerRef.current) {
-            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-        }
-    }, [newMessage]);
-
     if (loading) {
-        return <div className="chat-page">Загрузка чата...</div>;
+        return (
+            <div className="chat-page">
+                <div className="chat-loading">Загрузка чата...</div>
+            </div>
+        );
     }
 
     if (error) {
-        return <div className="chat-page">Ошибка: {error}</div>;
+        return (
+            <div className="chat-page">
+                <div className="chat-error">Ошибка: {error}</div>
+            </div>
+        );
     }
 
     return (
         <div className="chat-page">
             <div className="chat-container">
                 <header className="chat-header">
-                    Чат для заказа #{orderId} с {selectedUser?.username}
+                    <div className="chat-header-title">Чат по заказу #{orderId}</div>
+                    <div className="chat-header-subtitle">
+                        Собеседник: {selectedUser?.username || "—"}
+                    </div>
                 </header>
 
-                {/* Контейнер с сообщениями */}
                 <div className="chat-messages" ref={messagesContainerRef}>
                     {messages.length > 0 ? (
-                        messages.map((msg) => (
-                            <div
-                                key={msg.id}
-                                className={`chat-message ${
-                                    msg.senderId === currentUser.id ? 'chat-message-sent' : 'chat-message-received'
-                                }`}
-                            >
-                                <p>{msg.content}</p>
-                            </div>
-                        ))
+                        messages.map((msg) => {
+                            const isMine =
+                                String(msg.senderId) === String(currentUser.id);
+
+                            return (
+                                <div
+                                    key={msg.id}
+                                    className={`chat-message-row ${isMine ? "mine" : "theirs"}`}
+                                >
+                                    <div
+                                        className={`chat-message ${
+                                            isMine
+                                                ? "chat-message-sent"
+                                                : "chat-message-received"
+                                        }`}
+                                    >
+                                        <p>{msg.content}</p>
+                                    </div>
+                                </div>
+                            );
+                        })
                     ) : (
                         <div className="chat-empty">Нет сообщений</div>
                     )}
-                    <div ref={messagesEndRef} />
                 </div>
 
-                {/* Поле ввода */}
                 <div className="chat-input-container">
                     <textarea
                         ref={textareaRef}
@@ -181,10 +228,14 @@ const ChatPage = () => {
                         placeholder="Введите сообщение..."
                         className="chat-input"
                         rows="1"
-                        style={{ minHeight: '40px', maxHeight: '120px', overflowY: 'hidden' }}
                     />
 
-                    <button onClick={handleSendMessage} className="chat-send-button" disabled={!newMessage.trim()}></button>
+                    <button
+                        onClick={handleSendMessage}
+                        className="chat-send-button"
+                        disabled={!newMessage.trim()}
+                        aria-label="Отправить сообщение"
+                    />
                 </div>
             </div>
         </div>

@@ -1,201 +1,145 @@
+* {
+    box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
 .chat-page {
+    width: 100%;
+    height: 100dvh;
+    min-height: 100dvh;
     display: flex;
     justify-content: center;
-    align-items: center;
-    padding: 20px;
+    align-items: stretch;
     background: #f5f5f5;
-    min-height: 100vh;
-    font-family: 'Segoe UI', sans-serif;
+    overflow: hidden;
+    font-family: "Segoe UI", sans-serif;
 }
 
 .chat-container {
     width: 100%;
-    max-width: 600px;
-    height: 80vh;
-    background: #fff;
-    border-radius: 16px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    max-width: 700px;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
+    background: #fff;
     overflow: hidden;
 }
 
 .chat-header {
-    padding: 16px;
-    font-size: 18px;
-    font-weight: 600;
+    flex-shrink: 0;
+    padding: 14px 16px;
     background: #ededed;
     border-bottom: 1px solid #ddd;
 }
 
+.chat-header-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #111;
+}
+
+.chat-header-subtitle {
+    margin-top: 4px;
+    font-size: 13px;
+    color: #555;
+}
+
 .chat-messages {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
-    padding: 16px;
+    overflow-x: hidden;
+    padding: 12px;
     background: #e5ddd5;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
 }
 
-/* Сообщение отправителя (выравнивание вправо) */
+.chat-message-row {
+    display: flex;
+    width: 100%;
+}
+
+.chat-message-row.mine {
+    justify-content: flex-end;
+}
+
+.chat-message-row.theirs {
+    justify-content: flex-start;
+}
+
+.chat-message {
+    max-width: min(82%, 420px);
+    padding: 10px 14px;
+    word-break: break-word;
+    white-space: pre-wrap;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.chat-message p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.4;
+}
+
 .chat-message-sent {
-    align-self: flex-end;
     background: #dcf8c6;
     color: #000;
-    border-radius: 18px 18px 0 18px;
-    padding: 10px 14px;
-    max-width: 80%;
-    word-wrap: break-word;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    border-radius: 18px 18px 4px 18px;
 }
 
-/* Сообщение получателя (выравнивание влево) */
 .chat-message-received {
-    align-self: flex-start;
     background: #fff;
     color: #000;
-    border-radius: 18px 18px 18px 0;
-    padding: 10px 14px;
-    max-width: 80%;
-    word-wrap: break-word;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    border-radius: 18px 18px 18px 4px;
 }
 
 .chat-input-container {
+    flex-shrink: 0;
     display: flex;
     align-items: flex-end;
-    padding: 12px 16px;
+    gap: 10px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
     background: #ededed;
     border-top: 1px solid #ddd;
-    gap: 12px;
 }
 
 .chat-input {
     flex: 1;
     resize: none;
     border: none;
-    border-radius: 18px;
-    padding: 10px 14px;
-    font-size: 15px;
-    background: #fff;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
-    transition: all 0.2s ease-in-out;
-}
-
-.chat-input:focus {
     outline: none;
-    box-shadow: inset 0 1px 5px rgba(0,0,0,0.15);
-}
-
-/* Кнопка отправки — можно заменить на иконку paper plane */
-.chat-send-button {
-    width: 40px;
-    height: 40px;
-    border: none;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-.chat-page {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 20px;
-    background: #f5f5f5;
-    min-height: 100vh;
-    font-family: 'Segoe UI', sans-serif;
-}
-
-.chat-container {
-    width: 100%;
-    max-width: 600px;
-    height: 80vh;
+    border-radius: 18px;
+    padding: 12px 14px;
+    font-size: 15px;
+    line-height: 1.35;
     background: #fff;
-    border-radius: 16px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.chat-header {
-    padding: 16px;
-    font-size: 18px;
-    font-weight: 600;
-    background: #ededed;
-    border-bottom: 1px solid #ddd;
-}
-
-.chat-messages {
-    flex: 1;
+    min-height: 44px;
+    max-height: 120px;
     overflow-y: auto;
-    padding: 16px;
-    background: #e5ddd5;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-/* Сообщение отправителя (выравнивание вправо) */
-.chat-message-sent {
-    align-self: flex-end;
-    background: #dcf8c6;
-    color: #000;
-    border-radius: 18px 18px 0 18px;
-    padding: 10px 14px;
-    max-width: 80%;
-    word-wrap: break-word;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-}
-
-/* Сообщение получателя (выравнивание влево) */
-.chat-message-received {
-    align-self: flex-start;
-    background: #fff;
-    color: #000;
-    border-radius: 18px 18px 18px 0;
-    padding: 10px 14px;
-    max-width: 80%;
-    word-wrap: break-word;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-}
-
-.chat-input-container {
-    display: flex;
-    align-items: flex-end;
-    padding: 12px 16px;
-    background: #ededed;
-    border-top: 1px solid #ddd;
-    gap: 12px;
-}
-
-.chat-input {
-    flex: 1;
-    resize: none;
-    border: none;
-    border-radius: 18px;
-    padding: 10px 14px;
-    font-size: 15px;
-    background: #fff;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
-    transition: all 0.2s ease-in-out;
-}
-
-.chat-input:focus {
-    outline: none;
-    box-shadow: inset 0 1px 5px rgba(0,0,0,0.15);
-}
-
-/* Кнопка отправки — можно заменить на иконку paper plane */
 .chat-send-button {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
     border: none;
-    background: #0088cc url('../images/send-icon.svg') center/60% no-repeat;
     border-radius: 50%;
+    background: #0088cc url("../images/send-icon.svg") center/60% no-repeat;
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: opacity 0.2s ease;
 }
 
 .chat-send-button:disabled {
@@ -203,20 +147,24 @@
     cursor: not-allowed;
 }
 
-.chat-empty {
+.chat-empty,
+.chat-loading,
+.chat-error {
+    margin: auto;
     text-align: center;
     color: #666;
     padding: 20px;
 }
 
+@media (min-width: 768px) {
+    .chat-page {
+        padding: 16px;
+    }
 
-.chat-send-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.chat-empty {
-    text-align: center;
-    color: #666;
-    padding: 20px;
+    .chat-container {
+        height: calc(100dvh - 32px);
+        max-height: 920px;
+        border-radius: 16px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    }
 }
