@@ -3,7 +3,7 @@ import axios from "axios";
 import { useParams } from "react-router-dom";
 import "../styles/ChatPage.css";
 import { useUser } from "../utils/userContext";
-import { socket } from "../socket";
+import { socket } from "../socketClient";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
