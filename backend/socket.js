@@ -38,6 +38,7 @@ function initializeSocket(server) {
                 "https://www.cargocamp.ru",
                 "https://admin.cargocamp.ru",
                 "http://81.163.27.147:8080",
+                "http://localhost",
             ],
             methods: ["GET", "POST"],
             credentials: true,

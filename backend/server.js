@@ -83,7 +83,8 @@ app.use(cors({
         'https://cargocamp.ru',
         'https://admin.cargocamp.ru',
         'https://www.cargocamp.ru',
-        'http://81.163.27.147:8080'
+        'http://81.163.27.147:8080',
+        "http://localhost",
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -123,4 +124,6 @@ sequelize.authenticate()
     .catch((err) => console.error('Database connection error:', err));
 
 const PORT = process.env.PORT;
-server.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+server.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
+});

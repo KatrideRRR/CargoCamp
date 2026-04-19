@@ -4,6 +4,9 @@
   "private": true,
   "homepage": "https://cargocamp.ru/",
   "dependencies": {
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/cli": "^8.3.1",
+    "@capacitor/core": "^8.3.1",
     "@fortawesome/free-solid-svg-icons": "^6.7.2",
     "@fortawesome/react-fontawesome": "^0.2.2",
     "@pbe/react-yandex-maps": "^1.2.5",
@@ -42,7 +45,9 @@
   "scripts": {
     "start": "react-app-rewired start",
     "build": "react-app-rewired build",
-    "test": "react-scripts test"
+    "test": "react-scripts test",
+    "build:android": "npm run build && npx cap sync android",
+    "open:android": "npx cap open android"
   },
   "eslintConfig": {
     "extends": [
