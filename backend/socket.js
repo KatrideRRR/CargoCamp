@@ -1,5 +1,6 @@
 const socketIo = require("socket.io");
 const { Notification } = require("./models");
+const allowedOrigins = require("./config/allowedOrigins");
 
 let io;
 
@@ -8,38 +9,42 @@ function getIo() {
 }
 
 async function sendNotifications(userId) {
-    if (!io) return;
+    if (!io || !userId) return;
 
-    const unreadNotifications = await Notification.findAll({
-        where: { userId, isRead: false },
-        attributes: ["id", "type", "orderId"],
-        order: [["id", "DESC"]],
-    });
+    try {
+        const unreadNotifications = await Notification.findAll({
+            where: { userId, isRead: false },
+            attributes: ["id", "type", "orderId"],
+            order: [["id", "DESC"]],
+        });
 
-    io.to(`notifications_${String(userId)}`).emit("new_notification", unreadNotifications);
+        io.to(`notifications_${String(userId)}`).emit(
+            "new_notification",
+            unreadNotifications
+        );
+    } catch (error) {
+        console.error("Ошибка при отправке уведомлений:", error);
+    }
 }
 
 function sendToUser(userId, event, data) {
-    if (!io) return;
+    if (!io || !userId) return;
     io.to(`user_${String(userId)}`).emit(event, data);
+}
+
+function sendOrderRequestToUser(userId, data = {}) {
+    if (!io || !userId) return;
+
+    io.to(`user_${String(userId)}`).emit(`orderRequest:${String(userId)}`, {
+        type: "order_request",
+        ...data,
+    });
 }
 
 function initializeSocket(server) {
     io = socketIo(server, {
         cors: {
-            origin: [
-                "http://localhost:3000",
-                "http://localhost:3001",
-                "http://localhost:8080",
-                "http://18.184.43.44:3001",
-                "https://81.163.27.147:3001",
-                "https://81.163.27.147:8080",
-                "https://cargocamp.ru",
-                "https://www.cargocamp.ru",
-                "https://admin.cargocamp.ru",
-                "http://81.163.27.147:8080",
-                "http://localhost",
-            ],
+            origin: allowedOrigins,
             methods: ["GET", "POST"],
             credentials: true,
         },
@@ -63,7 +68,11 @@ function initializeSocket(server) {
 
         socket.on("subscribeToNotifications", (userId) => {
             if (!userId) return;
-            socket.join(`notifications_${String(userId)}`);
+
+            const normalizedUserId = String(userId);
+            socket.join(`notifications_${normalizedUserId}`);
+
+            console.log(`🔔 Подписка на уведомления: ${normalizedUserId}`);
         });
 
         socket.on("joinChat", ({ userId, orderId }) => {
@@ -76,11 +85,6 @@ function initializeSocket(server) {
             }
 
             console.log(`💬 joinChat: user=${userId}, order=${orderId}`);
-        });
-
-        socket.on("sendOrderRequest", () => {
-            console.log("🔔 Получен новый запрос на заказ!");
-            io.emit("orderRequest");
         });
 
         socket.on("markAsRead", async ({ userId, orderId }) => {
@@ -116,5 +120,6 @@ module.exports = {
     initializeSocket,
     sendNotifications,
     sendToUser,
+    sendOrderRequestToUser,
     getIo,
 };

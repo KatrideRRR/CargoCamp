@@ -14,6 +14,7 @@ const uploadExecutorBefore = buildOrderPhotoUploader("executor_before");
 const uploadExecutorAfter = buildOrderPhotoUploader("executor_after");
 const uploadCustomerBefore = buildOrderPhotoUploader("customer_before");
 const uploadCustomerAfter = buildOrderPhotoUploader("customer_after");
+const { sendOrderRequestToUser } = require("../socket");
 
 /* ===============================
    Папки uploads
@@ -573,7 +574,10 @@ module.exports = (io) => {
                 });
             }
 
-            io.emit(`orderRequest:${order.userId}`, { orderId: order.id });
+            sendOrderRequestToUser(order.creatorId || order.userId, {
+                orderId: order.id,
+                requesterId: executorId,
+            });
 
             res.json({ message: "Запрос на выполнение отправлен заказчику", order });
         } catch (error) {
