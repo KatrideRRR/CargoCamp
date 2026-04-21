@@ -41,11 +41,6 @@ const ChatPage = () => {
     useEffect(() => {
         if (!currentUser?.id) return;
 
-        if (!socket.connected) {
-            socket.connect();
-        }
-
-        socket.emit("register", currentUser.id);
         socket.emit("joinChat", { userId: currentUser.id, orderId });
 
         const handleReceiveMessage = (message) => {

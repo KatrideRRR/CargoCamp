@@ -4,8 +4,8 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import axiosInstance from "../utils/axiosInstance";
 import Modal from "react-modal";
-import io from "socket.io-client";
 import { toast } from "react-toastify";
+import { socket } from "../socketClient";
 
 import "../styles/OrdersPage.css";
 import SwipeableMap from "../components/SwipeableMap";
@@ -17,10 +17,6 @@ import { FiAlertTriangle } from "react-icons/fi";
 import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
 
 const apiUrl = process.env.REACT_APP_API_URL;
-const socket = io(process.env.REACT_APP_SOCKET_URL, {
-    transports: ["websocket"],
-    withCredentials: true,
-});
 
 const RADIUS_KM = 50;
 const HIDE_FROM_DRAWER = new Set(["Такси", "Курьер"]);
@@ -190,7 +186,6 @@ const OrdersPage = () => {
                 const res = await axiosInstance.get("/auth/profile");
                 setProfile(res.data);
                 setUserId(res.data?.id || null);
-                socket.emit("register", res.data?.id);
             } catch (e) {
                 console.info("OrdersPage: profile not loaded (maybe not logged in).");
             }

@@ -9,4 +9,5 @@ export const socket = io(socketUrl, {
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
 });

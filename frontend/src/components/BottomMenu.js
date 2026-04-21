@@ -20,17 +20,10 @@ const BottomMenu = () => {
     useEffect(() => {
         if (!user?.id || shouldHide) return;
 
-        if (!socket.connected) {
-            socket.connect();
-        }
-
-        socket.emit("register", user.id);
         socket.emit("subscribeToNotifications", user.id);
 
         const handleNewNotification = (notifications) => {
-            if (!Array.isArray(notifications)) {
-                return;
-            }
+            if (!Array.isArray(notifications)) return;
 
             const unreadMessageNotifications = notifications.filter(
                 (item) => item?.type === "new_message"

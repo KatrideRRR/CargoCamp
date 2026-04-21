@@ -1,16 +1,11 @@
 import { toast } from "react-toastify";
 import React, { createContext, useState, useEffect } from "react";
-import io from "socket.io-client";
+import { socket } from "../socketClient";
 import axiosInstance from "../utils/axiosInstance";
 import "../styles/modalContext.css";
 import axios from "axios";
 
 export const ModalContext = createContext(null);
-
-const socket = io(process.env.REACT_APP_SOCKET_URL, {
-    transports: ["websocket"],
-    withCredentials: true,
-});
 
 export const ModalProvider = ({ children }) => {
     const [modalData, setModalData] = useState(null);
@@ -28,7 +23,6 @@ export const ModalProvider = ({ children }) => {
                 const response = await axiosInstance.get("/auth/profile");
                 setCurrUser(response.data);
                 setUserId(response.data.id);
-                socket.emit("register", response.data.id);
             } catch (error) {
                 console.log("⛔️ Ошибка поймана:", error);
 
@@ -99,8 +93,6 @@ export const ModalProvider = ({ children }) => {
 
     useEffect(() => {
         if (!userId) return;
-
-        console.log("🔄 Подключаем WebSocket для пользователя:", userId);
 
         const handleOrderApproved = (data) => {
             console.log("🔔 Заказ одобрен:", data);

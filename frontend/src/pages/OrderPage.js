@@ -2,16 +2,12 @@ import React, { useEffect, useState } from 'react';
 import {useParams, Link, useNavigate} from 'react-router-dom';
 import axiosInstance from '../utils/axiosInstance';
 import '../styles/OrdersPage.css';
-import io from 'socket.io-client';
+import { socket } from "../socketClient";
 import Modal from "react-modal";
 import {FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity} from "react-icons/fa";
 import {FiAlertTriangle} from "react-icons/fi";
 
 const apiUrl = process.env.REACT_APP_API_URL;
-const socket = io(process.env.REACT_APP_SOCKET_URL, {
-    transports: ['websocket'],
-    withCredentials: true
-});
 
 const OrderPage = () => {
     const navigate = useNavigate();
@@ -43,7 +39,6 @@ const OrderPage = () => {
                 const response = await axiosInstance.get('/auth/profile');
                 console.log("👤 Данные пользователя:", response.data);
                 setUserId(response.data.id);
-                socket.emit('register', response.data.id);
             } catch (err) {
                 console.error("❌ Ошибка получения профиля:", err);
             }
@@ -52,19 +47,6 @@ const OrderPage = () => {
         fetchOrder();
         fetchUserData();
 
-        if (userId) {
-            console.log("🔄 Подключаем WebSocket для пользователя:", userId);
-
-            socket.on('orderRequested', (data) => {
-                console.log("🔔 Получен запрос на заказ:", data);
-            });
-            socket.on('orderUpdated', fetchOrder);
-
-            return () => {
-                socket.off('orderRequested');
-                socket.off('orderUpdated');
-            };
-        }
     }, [userId, id]);
 
     const openModal = (images) => {

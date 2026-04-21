@@ -3,7 +3,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "../styles/ActiveOrdersPage.css";
 import { useAuth } from "../utils/authContext";
-import io from "socket.io-client";
+import { socket } from "../socketClient";
 import { useMediaQuery } from "react-responsive";
 import { FaPhone, FaComments, FaRoute, FaCheck, FaTrash, FaExclamationTriangle } from "react-icons/fa";
 import Modal from "react-modal";
@@ -12,12 +12,6 @@ import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "r
 import ExpressOrderCard from "../components/ExpressOrderCard";
 
 const apiUrl = process.env.REACT_APP_API_URL;
-
-const socket = io(process.env.REACT_APP_SOCKET_URL, {
-    transports: ["websocket"],
-    withCredentials: true,
-    autoConnect: false, // важно: сами контролируем connect/disconnect
-});
 
 const ActiveOrdersPage = () => {
     const navigate = useNavigate();
@@ -553,7 +547,6 @@ const ActiveOrdersPage = () => {
         if (!user?.id) return;
 
         // connect socket once for this page
-        socket.connect();
         socket.emit("subscribeToNotifications", user.id);
 
         // initial load
@@ -580,7 +573,7 @@ const ActiveOrdersPage = () => {
             // socket.disconnect();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [navigate, user?.id, token, removedOrders]);
+    }, [navigate, user?.id, token]);
 
     if (!user || !user.id) return <p>Загрузка...</p>;
     if (error) return <div className="error-message">{error}</div>;

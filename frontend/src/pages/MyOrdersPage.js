@@ -2,14 +2,13 @@ import CreateOrderModal from "../components/CreateOrderModal";
 import React, { useState, useEffect, useContext, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import axiosInstance from "../utils/axiosInstance";
-import io from "socket.io-client";
+import { socket } from "../socketClient";
 import styles from "../styles/MyOrdersPage.module.css";
 import { AuthContext } from "../utils/authContext";
 import Modal from "react-modal";
 import { FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity } from "react-icons/fa";
 
 const apiUrl = process.env.REACT_APP_API_URL;
-const socket = io(process.env.REACT_APP_SOCKET_URL);
 
 const MyOrdersPage = () => {
     const { userId } = useParams();
@@ -130,10 +129,6 @@ const MyOrdersPage = () => {
                     return;
                 }
 
-                socket.on(`orderRequest-${userId}`, () => {
-                    setHasNewRequests(true);
-                    fetchOrders();
-                });
             } catch (err) {
                 console.error("Ошибка проверки пользователя:", err);
                 navigate("/login");
@@ -142,15 +137,10 @@ const MyOrdersPage = () => {
 
         checkAuthUser();
 
-        const handleOrderRequest = () => fetchOrders();
-
-        socket.on("orderRequest", handleOrderRequest);
         socket.on("orderUpdated", fetchOrders);
 
         return () => {
-            socket.off("orderRequest", handleOrderRequest);
             socket.off("orderUpdated", fetchOrders);
-            socket.off(`orderRequest-${userId}`);
         };
     }, [userId, navigate, setHasNewRequests]);
 
