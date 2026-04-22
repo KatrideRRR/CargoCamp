@@ -26,7 +26,6 @@ ensureDir(uploadDocumentsRoot);
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         try {
-            console.log('📁 uploadDocumentsRoot:', uploadDocumentsRoot);
             ensureDir(uploadDocumentsRoot);
             cb(null, uploadDocumentsRoot);
         } catch (error) {
@@ -89,8 +88,6 @@ router.post("/send-sms", async (req, res) => {
     const code = generateCode();
     smsCodes.set(phoneKey, { code, expiresAt: Date.now() + CODE_TTL_MS });
 
-    console.log("[SEND SMS] phone raw:", phone, "key:", phoneKey, "code:", code);
-    console.log("[SEND SMS] apiId exists:", !!apiId);
 
     try {
         const response = await axios.get("https://sms.ru/sms/send", {
@@ -103,7 +100,6 @@ router.post("/send-sms", async (req, res) => {
             timeout: 15000,
         });
 
-        console.log("[SEND SMS] sms.ru response:", response.data);
 
         if (response.data?.status === "OK") {
             return res.json({ message: "Код отправлен" });
@@ -199,11 +195,6 @@ router.post('/register', async (req, res) => {
 
     const entry = smsCodes.get(phoneKey); // {code, expiresAt} | undefined
     const codeSaved = String(entry?.code || "").trim();
-
-    console.log("[REGISTER] phone raw:", phone, "key:", phoneKey);
-    console.log("[REGISTER] code user:", JSON.stringify(codeFromUser), "saved:", JSON.stringify(codeSaved));
-    console.log("[REGISTER] has:", smsCodes.has(phoneKey), "size:", smsCodes.size);
-    console.log("[REGISTER] keys:", Array.from(smsCodes.keys()));
 
     if (!captchaToken) return res.status(400).json({ error: "Капча не пройдена" });
 

@@ -52,51 +52,99 @@ const MyOrdersPage = () => {
         }
     };
 
+    const getExpressStatusLabel = (status) => {
+        switch (status) {
+            case "created":
+                return { text: "Ожидает исполнителя", tone: "ok" };
+            case "accepted":
+                return { text: "Исполнитель найден", tone: "ok" };
+            case "on_the_way_to_A":
+                return { text: "Исполнитель едет к точке A", tone: "ok" };
+            case "arrived_at_A":
+                return { text: "Исполнитель прибыл в точку A", tone: "ok" };
+            case "in_progress":
+                return { text: "Выполняется", tone: "ok" };
+            case "completed":
+                return { text: "Завершён", tone: "ok" };
+            case "cancelled":
+                return { text: "Отменён", tone: "warn" };
+            default:
+                return { text: status || "Неизвестно", tone: "warn" };
+        }
+    };
+
     const fetchOrders = async () => {
         try {
             setLoading(true);
             setError("");
 
             const token = localStorage.getItem("authToken");
-            const response = await axiosInstance.get(`/orders/creator/${userId}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
 
-            const ordersData = response.data || [];
+            const [regularRes, expressRes] = await Promise.allSettled([
+                axiosInstance.get(`/orders/creator/${userId}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+                axiosInstance.get(`/express/express-orders/me?mode=active`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+            ]);
 
-            const ordersWithExecutors = await Promise.all(
-                ordersData.map(async (order) => {
-                    try {
-                        const executorsResponse = await axiosInstance.get(
-                            `/orders/${order.id}/requested-executors`,
-                            { headers: { Authorization: `Bearer ${token}` } }
-                        );
-                        return {
-                            ...order,
-                            requestedExecutors: Array.isArray(executorsResponse.data)
-                                ? executorsResponse.data
-                                : [],
-                        };
-                    } catch (error) {
-                        console.error(`Ошибка загрузки исполнителей для заказа ${order.id}:`, error);
-                        return { ...order, requestedExecutors: [] };
-                    }
-                })
-            );
+            let regularOrders = [];
+            let expressOrders = [];
 
-            // ✅ только pending / pending_payment
-            setOrders(
-                ordersWithExecutors.filter(
+            if (regularRes.status === "fulfilled") {
+                const ordersData = regularRes.value.data || [];
+
+                const ordersWithExecutors = await Promise.all(
+                    ordersData.map(async (order) => {
+                        try {
+                            const executorsResponse = await axiosInstance.get(
+                                `/orders/${order.id}/requested-executors`,
+                                { headers: { Authorization: `Bearer ${token}` } }
+                            );
+                            return {
+                                ...order,
+                                requestedExecutors: Array.isArray(executorsResponse.data)
+                                    ? executorsResponse.data
+                                    : [],
+                                kind: "regular",
+                            };
+                        } catch (error) {
+                            console.error(`Ошибка загрузки исполнителей для заказа ${order.id}:`, error);
+                            return {
+                                ...order,
+                                requestedExecutors: [],
+                                kind: "regular",
+                            };
+                        }
+                    })
+                );
+
+                regularOrders = ordersWithExecutors.filter(
                     (o) => o.status === "pending" || o.status === "pending_payment"
-                )
-            );
-        } catch (err) {
-            if (err.response && err.response.status === 404) {
-                setOrders([]);
-            } else {
-                console.error("Ошибка при загрузке заказов:", err);
-                setError("Ошибка загрузки данных");
+                );
             }
+
+            if (expressRes.status === "fulfilled") {
+                const expressData = expressRes.value.data?.orders || [];
+
+                expressOrders = expressData
+                    .filter((o) => Number(o.creatorId) === Number(userId))
+                    .filter((o) => o.status !== "completed" && o.status !== "cancelled")
+                    .map((o) => ({
+                        ...o,
+                        kind: "express",
+                    }));
+            }
+
+            const merged = [...regularOrders, ...expressOrders].sort(
+                (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
+
+            setOrders(merged);
+        } catch (err) {
+            console.error("Ошибка при загрузке заказов:", err);
+            setError("Ошибка загрузки данных");
         } finally {
             setLoading(false);
         }
@@ -228,12 +276,21 @@ const MyOrdersPage = () => {
                         </div>
                     </div>
 
-                    <button
-                        onClick={() => navigate("/create-order")}
-                        className={`${styles.createButton} ${hasNewRequests ? styles.newRequest : ""}`}
-                    >
-                        Разместить
-                    </button>
+                    <div className={styles.topActions}>
+                        <button
+                            onClick={() => navigate("/create-order")}
+                            className={`${styles.createButton} ${hasNewRequests ? styles.newRequest : ""}`}
+                        >
+                            Разместить
+                        </button>
+
+                        <button
+                            onClick={() => navigate("/express")}
+                            className={styles.expressButton}
+                        >
+                            Вызвать такси / курьера
+                        </button>
+                    </div>
                 </div>
 
                 {loading ? (
@@ -243,7 +300,8 @@ const MyOrdersPage = () => {
                 ) : orders.length > 0 ? (
                     <ul className={styles.ordersList}>
                         {orders.map((order) => {
-                            const st = getStatusLabel(order.status);
+                            const isExpress = order.kind === "express";
+                            const st = isExpress ? getExpressStatusLabel(order.status) : getStatusLabel(order.status);
                             const paymentLabel =
                                 paymentMethods.find((m) => m.id === order.paymentType)?.label || "—";
 
@@ -254,52 +312,80 @@ const MyOrdersPage = () => {
                                 Array.isArray(order.requestedExecutors) && order.requestedExecutors.length > 0;
 
                             return (
-                                <li className={styles.orderCard} key={order.id}>
+                                <li
+                                    className={`${styles.orderCard} ${isExpress ? styles.orderCardExpress : ""}`}
+                                    key={order.id}
+                                >
                                     <div className={styles.orderContent}>
                                         {/* Header row */}
                                         <div className={styles.cardTop}>
                                             <div className={styles.cardTopLeft}>
                                                 <div className={styles.orderIdLine}>
-                                                    <span className={styles.orderId}>Заказ №{order.id}</span>
+<span className={styles.orderId}>
+    {isExpress ? `Экспресс №${order.id}` : `Заказ №${order.id}`}
+</span>
                                                     <span className={styles.orderDate}>
                             {new Date(order.createdAt).toLocaleString()}
                           </span>
                                                 </div>
 
                                                 <div className={styles.titleRow}>
-                                                    <span className={styles.orderType}>{order.type}</span>
-                                                </div>
+<span className={`${styles.orderType} ${isExpress ? styles.orderTypeExpress : ""}`}>
+    {isExpress
+        ? order.type === "taxi"
+            ? "Экспресс • Такси"
+            : "Экспресс • Курьер"
+        : order.type || "Обычный заказ"}
+</span>                                                </div>
 
                                                 {/* Status pill */}
                                                 {st && (
                                                     <div className={styles.subRow}>
-                            <span className={`${styles.statusPill} ${styles[`status_${st.tone}`]}`}>
-                              {st.text}
+<span
+    className={`${styles.statusPill} ${styles[`status_${st.tone}`]} ${isExpress ? styles.statusExpress : ""}`}
+>                              {st.text}
                             </span>
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* Finance pill */}
-                                            <div className={styles.financeBadge}>
+                                            <div className={`${styles.financeBadge} ${isExpress ? styles.financeBadgeExpress : ""}`}>
                                                 <span className={styles.financeIcon}>{getPaymentIcon(order.paymentType)}</span>
-                                                <span className={styles.financePrice}>{order.proposedSum} ₽</span>
-                                                <span className={styles.financeDot}>•</span>
+                                                <span className={styles.financePrice}>
+    {isExpress ? order.totalPrice : order.proposedSum} ₽
+</span>                                                <span className={styles.financeDot}>•</span>
                                                 <span className={styles.financeType}>{paymentLabel}</span>
                                             </div>
                                         </div>
 
                                         {/* Meta */}
                                         <div className={styles.metaGrid}>
-                                            <div className={styles.metaItem}>
-                                                <span className={styles.metaLabel}>Категория</span>
-                                                <span className={styles.metaValue}>{order.category?.name || "—"}</span>
-                                            </div>
+                                            {isExpress ? (
+                                                <>
+                                                    <div className={styles.metaItem}>
+                                                        <span className={styles.metaLabel}>Откуда</span>
+                                                        <span className={styles.metaValue}>{order.fromAddress || "—"}</span>
+                                                    </div>
 
-                                            <div className={styles.metaItem}>
-                                                <span className={styles.metaLabel}>Подкатегория</span>
-                                                <span className={styles.metaValue}>{order.subcategory?.name || "—"}</span>
-                                            </div>
+                                                    <div className={styles.metaItem}>
+                                                        <span className={styles.metaLabel}>Куда</span>
+                                                        <span className={styles.metaValue}>{order.toAddress || "—"}</span>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className={styles.metaItem}>
+                                                        <span className={styles.metaLabel}>Категория</span>
+                                                        <span className={styles.metaValue}>{order.category?.name || "—"}</span>
+                                                    </div>
+
+                                                    <div className={styles.metaItem}>
+                                                        <span className={styles.metaLabel}>Подкатегория</span>
+                                                        <span className={styles.metaValue}>{order.subcategory?.name || "—"}</span>
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
 
                                         {/* Images (compact) */}
@@ -346,103 +432,116 @@ const MyOrdersPage = () => {
                                         </div>
 
                                         {/* Pending payment actions */}
-                                        {order.status === "pending_payment" ? (
-                                            <div className={styles.cardActions}>
-                                                <span className={styles.pillWarn}>Продвижение не оплачено</span>
-
-                                                <button
-                                                    className={styles.primaryBtn}
-                                                    onClick={async () => {
-                                                        try {
-                                                            const res = await axiosInstance.post(
-                                                                "/payments/order/promotion/create",
-                                                                { orderId: order.id }
-                                                            );
-                                                            const url = res.data?.confirmationUrl;
-                                                            if (url) window.location.href = url;
-                                                            else alert("Не удалось получить ссылку на оплату");
-                                                        } catch (e) {
-                                                            alert(e.response?.data?.error || "Ошибка при создании оплаты");
-                                                        }
-                                                    }}
-                                                >
-                                                    Оплатить
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            /* Executors accordion (only for pending) */
-                                            <div className={styles.section}>
-                                                <div className={styles.sectionHead}>
-                                                    <span className={styles.sectionTitle}>Запросы исполнителей</span>
-
-                                                    <span className={styles.countPill}>{hasExecutors ? order.requestedExecutors.length : 0}</span>
+                                        {!isExpress ? (
+                                            order.status === "pending_payment" ? (
+                                                <div className={styles.cardActions}>
+                                                    <span className={styles.pillWarn}>Продвижение не оплачено</span>
 
                                                     <button
-                                                        type="button"
-                                                        onClick={() => toggleExec(order.id)}
-                                                        className={styles.linkButton}
+                                                        className={styles.primaryBtn}
+                                                        onClick={async () => {
+                                                            try {
+                                                                const res = await axiosInstance.post(
+                                                                    "/payments/order/promotion/create",
+                                                                    { orderId: order.id }
+                                                                );
+                                                                const url = res.data?.confirmationUrl;
+                                                                if (url) window.location.href = url;
+                                                                else alert("Не удалось получить ссылку на оплату");
+                                                            } catch (e) {
+                                                                alert(e.response?.data?.error || "Ошибка при создании оплаты");
+                                                            }
+                                                        }}
                                                     >
-                                                        {isExecExpanded ? "Скрыть" : "Показать"}
+                                                        Оплатить
                                                     </button>
                                                 </div>
+                                            ) : (
+                                                <div className={styles.section}>
+                                                    <div className={styles.sectionHead}>
+                                                        <span className={styles.sectionTitle}>Запросы исполнителей</span>
 
-                                                {isExecExpanded ? (
-                                                    hasExecutors ? (
-                                                        <div className={styles.execList}>
-                                                            {order.requestedExecutors.map((executor) => (
-                                                                <div key={executor.id} className={styles.execCard}>
-                                                                    <div className={styles.execInfo}>
-                                                                        <div className={styles.execName}>
-                                                                            {executor.username}{" "}
-                                                                            <span className={styles.execMeta}>
-                                        • {executor.rating ? executor.rating.toFixed(1) : "—"} ⭐ • {executor.ratingCount || 0}
-                                      </span>
-                                                                        </div>
+                                                        <span className={styles.countPill}>{hasExecutors ? order.requestedExecutors.length : 0}</span>
 
-                                                                        <div className={styles.execLine}>
-                                                                            <span className={styles.k}>Цена</span>
-                                                                            <span className={styles.v}>
-                                        {executor.proposedSum ? `${executor.proposedSum} ₽` : "—"}
-                                      </span>
-                                                                        </div>
-
-                                                                        {executor.comment ? (
-                                                                            <div className={styles.execLine}>
-                                                                                <span className={styles.k}>Комментарий</span>
-                                                                                <span className={styles.v}>{executor.comment}</span>
-                                                                            </div>
-                                                                        ) : null}
-
-                                                                        {executor.isVerified && <span className={styles.verifiedBadge}>✔ Верифицирован</span>}
-                                                                    </div>
-
-                                                                    <div className={styles.execActions}>
-                                                                        <button
-                                                                            onClick={() => navigate(`/complaints/${executor.id}`)}
-                                                                            className={styles.ghostBtnDanger}
-                                                                        >
-                                                                            Жалобы
-                                                                        </button>
-
-                                                                        <button
-                                                                            disabled={approving}
-                                                                            onClick={() => approveExecutor(order.id, executor.id)}
-                                                                            className={styles.ghostBtn}
-                                                                        >
-                                                                            {approving ? "..." : "Одобрить"}
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <div className={styles.mutedText}>Пока нет запросов</div>
-                                                    )
-                                                ) : (
-                                                    <div className={styles.mutedText}>
-                                                        {hasExecutors ? "Список скрыт" : "Пока нет запросов"}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleExec(order.id)}
+                                                            className={styles.linkButton}
+                                                        >
+                                                            {isExecExpanded ? "Скрыть" : "Показать"}
+                                                        </button>
                                                     </div>
-                                                )}
+
+                                                    {isExecExpanded ? (
+                                                        hasExecutors ? (
+                                                            <div className={styles.execList}>
+                                                                {order.requestedExecutors.map((executor) => (
+                                                                    <div key={executor.id} className={styles.execCard}>
+                                                                        <div className={styles.execInfo}>
+                                                                            <div className={styles.execName}>
+                                                                                {executor.username}{" "}
+                                                                                <span className={styles.execMeta}>
+                                            • {executor.rating ? executor.rating.toFixed(1) : "—"} ⭐ • {executor.ratingCount || 0}
+                                        </span>
+                                                                            </div>
+
+                                                                            <div className={styles.execLine}>
+                                                                                <span className={styles.k}>Цена</span>
+                                                                                <span className={styles.v}>
+                                            {executor.proposedSum ? `${executor.proposedSum} ₽` : "—"}
+                                        </span>
+                                                                            </div>
+
+                                                                            {executor.comment ? (
+                                                                                <div className={styles.execLine}>
+                                                                                    <span className={styles.k}>Комментарий</span>
+                                                                                    <span className={styles.v}>{executor.comment}</span>
+                                                                                </div>
+                                                                            ) : null}
+
+                                                                            {executor.isVerified && <span className={styles.verifiedBadge}>✔ Верифицирован</span>}
+                                                                        </div>
+
+                                                                        <div className={styles.execActions}>
+                                                                            <button
+                                                                                onClick={() => navigate(`/complaints/${executor.id}`)}
+                                                                                className={styles.ghostBtnDanger}
+                                                                            >
+                                                                                Жалобы
+                                                                            </button>
+
+                                                                            <button
+                                                                                disabled={approving}
+                                                                                onClick={() => approveExecutor(order.id, executor.id)}
+                                                                                className={styles.ghostBtn}
+                                                                            >
+                                                                                {approving ? "..." : "Одобрить"}
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <div className={styles.mutedText}>Пока нет запросов</div>
+                                                        )
+                                                    ) : (
+                                                        <div className={styles.mutedText}>
+                                                            {hasExecutors ? "Список скрыт" : "Пока нет запросов"}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )
+                                        ) : (
+                                            <div className={styles.section}>
+                                                <div className={styles.sectionHead}>
+                                                    <span className={styles.sectionTitle}>Экспресс-заказ</span>
+                                                </div>
+
+                                                <div className={styles.mutedText}>
+                                                    {order.executorId
+                                                        ? "Исполнитель уже назначен. Следите за статусом заказа."
+                                                        : "Ожидаем, пока заказ примет исполнитель."}
+                                                </div>
                                             </div>
                                         )}
 

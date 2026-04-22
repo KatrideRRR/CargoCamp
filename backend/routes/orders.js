@@ -7,7 +7,7 @@ const { Op } = require('sequelize');
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
-const { Order, User, Category, Subcategory } = require('../models');
+const { Order, User, Category, Subcategory, ExpressOrder } = require('../models');
 const generateContractPDF = require('../utils/generateContractPDF');
 const yooKassa = require('../config/yookassaClient');
 const uploadExecutorBefore = buildOrderPhotoUploader("executor_before");
@@ -124,6 +124,85 @@ const geocoder = NodeGeocoder({
     apiKey: process.env.YANDEX_API_KEY,
     lang: 'ru-RU'
 });
+
+function safeJsonArray(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value !== "string") return [];
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+
+async function hasBusyRegularOrder(Order, executorId, excludeOrderId = null) {
+    const where = {
+        executorId,
+        status: {
+            [Op.notIn]: ["completed", "cancelled", "expired"],
+        },
+    };
+
+    if (excludeOrderId) {
+        where.id = { [Op.ne]: excludeOrderId };
+    }
+
+    const busyOrder = await Order.findOne({ where });
+    return !!busyOrder;
+}
+
+async function hasBusyTaxiOrder(ExpressOrder, executorId) {
+    if (!ExpressOrder) return false;
+
+    const busyTaxi = await ExpressOrder.findOne({
+        where: {
+            executorId,
+            type: "taxi",
+            status: {
+                [Op.notIn]: ["completed", "cancelled"],
+            },
+        },
+    });
+
+    return !!busyTaxi;
+}
+
+async function removeExecutorFromOtherPendingOrders(Order, executorId, approvedOrderId) {
+    const orders = await Order.findAll({
+        where: {
+            id: { [Op.ne]: approvedOrderId },
+            status: "pending",
+        },
+    });
+
+    const updatedOrderIds = [];
+
+    for (const order of orders) {
+        let requestedExecutors = safeJsonArray(order.requestedExecutors);
+        let requests = safeJsonArray(order.requests);
+
+        const beforeRequestedLen = requestedExecutors.length;
+        const beforeRequestsLen = requests.length;
+
+        requestedExecutors = requestedExecutors.filter(id => Number(id) !== Number(executorId));
+        requests = requests.filter(r => Number(r.executorId) !== Number(executorId));
+
+        const changed =
+            requestedExecutors.length !== beforeRequestedLen ||
+            requests.length !== beforeRequestsLen;
+
+        if (changed) {
+            order.requestedExecutors = JSON.stringify(requestedExecutors);
+            order.requests = JSON.stringify(requests);
+            await order.save();
+            updatedOrderIds.push(order.id);
+        }
+    }
+
+    return updatedOrderIds;
+}
 
 module.exports = (io) => {
 
@@ -377,8 +456,6 @@ module.exports = (io) => {
             if (subcategoryId) whereClause.subcategoryId = subcategoryId;
             if (serviceId) whereClause.serviceId = Number(serviceId);
 
-            console.log('📌 whereClause:', whereClause);
-
             // Запрос заказов с фильтром
             const orders = await Order.findAll({
                 attributes: [
@@ -402,7 +479,6 @@ module.exports = (io) => {
 
             });
 
-            console.log("📦 Найденные заказы:", orders.length);
             res.json(orders);
         } catch (error) {
             console.error("❌ Ошибка при получении заказов:", error);
@@ -432,7 +508,6 @@ module.exports = (io) => {
             }
 
             const orderIds = activeOrders.map(order => order.id);
-            console.log("🛠️ Найденные orderIds:", orderIds); // Логируем orderIds
 
             const notifications = await db.Notification.findAll({
                 where: {
@@ -441,8 +516,6 @@ module.exports = (io) => {
                     isRead: false,  // Только непрочитанные
                 }
             });
-
-            console.log("📩 Найденные уведомления:", notifications);
 
             res.json({ orders: activeOrders, notifications });
 
@@ -511,6 +584,15 @@ module.exports = (io) => {
         if (!hasActivePremium && Number(executor.debt || 0) > 0) {
             return res.status(400).json({
                 message: "У вас есть задолженность по комиссии. Погасите её, чтобы брать новые заказы."
+            });
+        }
+
+        const busyRegular = await hasBusyRegularOrder(Order, executorId);
+        const busyTaxi = await hasBusyTaxiOrder(ExpressOrder, executorId);
+
+        if (busyRegular || busyTaxi) {
+            return res.status(400).json({
+                message: "У вас уже есть активный заказ. Завершите его, чтобы брать новый."
             });
         }
 
@@ -635,7 +717,6 @@ module.exports = (io) => {
                 where: { id: requestedExecutors },
                 attributes: ['id', 'username', 'rating', 'ratingCount', 'userStatus'] // Выбираем нужные поля
             });
-            console.log('📡 Ответ сервера:', requestedExecutors);
             const result = executors.map(exec => {
                 const reqData = requests.find(r => r.executorId === exec.id);
                 return {
@@ -657,7 +738,6 @@ module.exports = (io) => {
         const { executorId } = req.body;
 
         try {
-            console.log(`⚡ Одобрение заказа ID: ${id} для исполнителя ID: ${executorId} пользователем ID: ${req.user.id}`);
 
             const order = await Order.findByPk(id);
             if (!order) return res.status(404).json({ message: 'Заказ не найден' });
@@ -695,7 +775,15 @@ module.exports = (io) => {
             const matchedRequest = requests.find(r => String(r.executorId) === String(executorId));
             if (matchedRequest?.proposedSum) {
                 order.proposedSum = matchedRequest.proposedSum;
-                console.log(`💰 Установлена сумма заказа: ${matchedRequest.proposedSum} ₽`);
+            }
+
+            const executorBusyRegular = await hasBusyRegularOrder(Order, executorId, order.id);
+            const executorBusyTaxi = await hasBusyTaxiOrder(ExpressOrder, executorId);
+
+            if (executorBusyRegular || executorBusyTaxi) {
+                return res.status(409).json({
+                    message: "Этот исполнитель уже занят другим заказом",
+                });
             }
 
             // Назначаем исполнителя
@@ -715,6 +803,24 @@ module.exports = (io) => {
             order.requestedExecutors = JSON.stringify([]); // чистим
 
             await order.save();
+
+            const cleanedOrderIds = await removeExecutorFromOtherPendingOrders(Order, executorId, order.id);
+
+            if (req.logAction) {
+                await req.logAction({
+                    req,
+                    actorUserId: req.user.id,
+                    actorRole: "user",
+                    actionType: "order_executor_requests_cleaned",
+                    entityType: "order",
+                    entityId: order.id,
+                    orderId: order.id,
+                    meta: {
+                        executorId,
+                        removedFromOrderIds: cleanedOrderIds,
+                    },
+                });
+            }
 
             // исполнитель
             const executor = await User.findByPk(executorId);
@@ -995,8 +1101,6 @@ module.exports = (io) => {
 
     router.get('/completed/:userId', async (req, res) => {
         const { userId } = req.params;
-
-        console.log("userId из запроса:", userId); // Проверяем, приходит ли userId
 
         if (!userId) {
             return res.status(400).json({ message: 'Некорректный userId' });

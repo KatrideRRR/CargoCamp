@@ -5,6 +5,7 @@ import YandexMapModal from "../components/YandexMapModal";
 import ExpressRouteMapModal from "../components/ExpressRouteMapModal";
 import ExpressSavedAddressesBar from "../components/ExpressSavedAddressesBar";
 import { FaTaxi, FaBox, FaLocationArrow, FaMapMarkedAlt } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 
 const subcategoryOptions = {
     taxi: [
@@ -99,6 +100,8 @@ const PRICING = {
 const CreateExpressOrder = () => {
     const apiKey = process.env.REACT_APP_YANDEX_API_KEY;
 
+    const navigate = useNavigate();
+
     const [type, setType] = useState("taxi");
     const [error, setError] = useState("");
 
@@ -108,6 +111,8 @@ const CreateExpressOrder = () => {
     const [addrSug, setAddrSug] = useState({ from: [], to: [] });
     const suggestTimerRef = React.useRef({ from: null, to: null });
     const suggestAbortRef = React.useRef({ from: null, to: null });
+
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [form, setForm] = useState({
         subcategory: "",       // optional
@@ -125,9 +130,6 @@ const CreateExpressOrder = () => {
 
     const [showMapFor, setShowMapFor] = useState(null); // "from" | "to" | null
     const [showRouteModal, setShowRouteModal] = useState(false);
-
-    const [suggestSave, setSuggestSave] = useState(false);
-    const [createdOrderId, setCreatedOrderId] = useState(null);
 
     // Дополнительно (свернуть)
     const [extraOpen, setExtraOpen] = useState(false);
@@ -322,16 +324,22 @@ const CreateExpressOrder = () => {
     };
 
     const createOrder = async () => {
+        if (isSubmitting) return;
+
         const v = validate();
-        if (v) { setError(v); return; }
+        if (v) {
+            setError(v);
+            return;
+        }
 
         setError("");
+        setIsSubmitting(true);
 
         try {
             const payload = {
                 type,
                 subcategory: form.subcategory || null,
-                paymentType: "cash", // ✅ фиксируем для скорости (пока)
+                paymentType: "cash",
                 totalPrice: Number(form.totalPrice),
                 description: form.description || null,
 
@@ -348,17 +356,22 @@ const CreateExpressOrder = () => {
             };
 
             const r = await axiosInstance.post("/express/express-orders", payload);
+
             if (!r.data?.success) {
                 setError(r.data?.message || "Ошибка при создании заказа");
+                setIsSubmitting(false);
                 return;
             }
 
-            const id = r.data.order?.id || null;
-            setCreatedOrderId(id);
-            setSuggestSave(true);
+
+
+            const profileRes = await axiosInstance.get("/auth/profile");
+            alert("Заказ успешно создан");
+            navigate(`/my-orders/${profileRes.data.id}`);
         } catch (e) {
             console.error(e);
             setError(e.response?.data?.message || "Ошибка при создании заказа");
+            setIsSubmitting(false);
         }
     };
 
@@ -613,8 +626,13 @@ const CreateExpressOrder = () => {
 
                     {/* Single primary action */}
                     <div className="exo-actionsRow" style={{ marginTop: 12 }}>
-                        <button type="button" className="exo-btn exo-btnPrimary" onClick={createOrder}>
-                            Создать заказ
+                        <button
+                            type="button"
+                            className="exo-btn exo-btnPrimary"
+                            onClick={createOrder}
+                            disabled={isSubmitting}
+                        >
+                            {isSubmitting ? "Создаём..." : "Создать заказ"}
                         </button>
                     </div>
                 </div>
@@ -660,58 +678,6 @@ const CreateExpressOrder = () => {
                 onCreate={createOrder}
             />
 
-            {/* Suggest save */}
-            {suggestSave && (
-                <div className="exo-toastWrap">
-                    <div className="exo-glass exo-toast">
-                        <div className="exo-toastTitle">
-                            ✅ Заказ создан{createdOrderId ? ` (#${createdOrderId})` : ""} — сохранить адреса?
-                        </div>
-
-                        <div className="exo-toastRow">
-                            <button
-                                className="exo-btn exo-btnGhost"
-                                type="button"
-                                onClick={async () => {
-                                    await saveAddress({ label: "home", title: "Дом", address: form.fromAddress, lat: form.fromLat, lng: form.fromLng });
-                                    setSuggestSave(false);
-                                    alert("Сохранил 'Откуда' как Дом");
-                                }}
-                            >
-                                “Откуда” = Дом
-                            </button>
-
-                            <button
-                                className="exo-btn exo-btnPrimary"
-                                type="button"
-                                onClick={async () => {
-                                    await saveAddress({ label: "work", title: "Работа", address: form.toAddress, lat: form.toLat, lng: form.toLng });
-                                    setSuggestSave(false);
-                                    alert("Сохранил 'Куда' как Работа");
-                                }}
-                            >
-                                “Куда” = Работа
-                            </button>
-                        </div>
-
-                        <div className="exo-toastRow">
-                            <button className="exo-miniBtn" type="button" onClick={() => setSuggestSave(false)}>
-                                Не сейчас
-                            </button>
-
-                            <a
-                                className="exo-miniBtn"
-                                href={routeUrl || "#"}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={(e) => !routeUrl && e.preventDefault()}
-                            >
-                                Открыть в Яндекс
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

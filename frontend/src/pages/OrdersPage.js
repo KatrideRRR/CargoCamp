@@ -56,6 +56,13 @@ const OrdersPage = () => {
     const navigate = useNavigate();
     const YM_KEY = process.env.REACT_APP_YANDEX_API_KEY;
 
+    const [busyState, setBusyState] = useState({
+        loading: true,
+        hasBusyRegular: false,
+        hasBusyTaxi: false,
+        hasAnyBusy: false,
+    });
+
     // server data
     const [ordersRaw, setOrdersRaw] = useState([]);
     const [expressRaw, setExpressRaw] = useState([]);
@@ -218,6 +225,114 @@ const OrdersPage = () => {
             console.error("fetchExpress error:", e);
         }
     }, []);
+
+    const fetchBusyState = useCallback(async () => {
+        const token = localStorage.getItem("authToken");
+
+        if (!token) {
+            setBusyState({
+                loading: false,
+                hasBusyRegular: false,
+                hasBusyTaxi: false,
+                hasAnyBusy: false,
+            });
+            return;
+        }
+
+        try {
+            const [regularRes, expressRes] = await Promise.allSettled([
+                axiosInstance.get("/orders/active-orders", {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+                axiosInstance.get("/express/express-orders/me?mode=active", {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+            ]);
+
+            let hasBusyRegular = false;
+            let hasBusyTaxi = false;
+
+            if (regularRes.status === "fulfilled") {
+                const regularOrders = regularRes.value?.data?.orders || [];
+                hasBusyRegular = regularOrders.some((o) => {
+                    const isExecutor = Number(o.executorId) === Number(userId);
+                    const activeStatuses = ["active", "in_progress", "pending_payment"];
+                    return isExecutor && activeStatuses.includes(String(o.status));
+                });
+            }
+
+            if (expressRes.status === "fulfilled") {
+                const expressOrders = expressRes.value?.data?.orders || [];
+                hasBusyTaxi = expressOrders.some((o) => {
+                    const isExecutor = Number(o.executorId) === Number(userId);
+                    const isTaxi = String(o.type) === "taxi";
+                    const activeStatuses = [
+                        "accepted",
+                        "on_the_way_to_A",
+                        "arrived_at_A",
+                        "in_progress",
+                    ];
+                    return isExecutor && isTaxi && activeStatuses.includes(String(o.status));
+                });
+            }
+
+            setBusyState({
+                loading: false,
+                hasBusyRegular,
+                hasBusyTaxi,
+                hasAnyBusy: hasBusyRegular || hasBusyTaxi,
+            });
+        } catch (e) {
+            console.error("fetchBusyState error:", e);
+            setBusyState({
+                loading: false,
+                hasBusyRegular: false,
+                hasBusyTaxi: false,
+                hasAnyBusy: false,
+            });
+        }
+    }, [userId]);
+
+    useEffect(() => {
+        if (!userId) {
+            setBusyState({
+                loading: false,
+                hasBusyRegular: false,
+                hasBusyTaxi: false,
+                hasAnyBusy: false,
+            });
+            return;
+        }
+
+        fetchBusyState();
+    }, [userId, fetchBusyState]);
+
+    useEffect(() => {
+        if (!userId) return;
+
+        socket.on("orderUpdated", fetchBusyState);
+        socket.on("activeOrdersUpdated", fetchBusyState);
+
+        return () => {
+            socket.off("orderUpdated", fetchBusyState);
+            socket.off("activeOrdersUpdated", fetchBusyState);
+        };
+    }, [userId, fetchBusyState]);
+
+    const busyHintText = useMemo(() => {
+        if (busyState.loading) return "Проверяем активные заказы...";
+        if (!busyState.hasAnyBusy) return "";
+
+        if (busyState.hasBusyRegular) {
+            return "У вас уже есть активный обычный заказ. Сначала завершите его.";
+        }
+
+        if (busyState.hasBusyTaxi) {
+            return "У вас уже есть активный заказ такси. Сначала завершите его.";
+        }
+
+        return "У вас уже есть активный заказ. Сначала завершите его.";
+    }, [busyState]);
 
     useEffect(() => {
         fetchExpress();
@@ -877,48 +992,64 @@ const OrdersPage = () => {
                                                 userId !== order.creatorId &&
                                                 !order.executorId &&
                                                 order.status === "pending" && (
-                                                    <button
-                                                        className="btn btn-primary"
-                                                        onClick={async () => {
-                                                            const token = localStorage.getItem("authToken");
-                                                            if (!token) {
-                                                                toast.info("Войдите, чтобы запросить выполнение");
-                                                                navigate("/login");
-                                                                return;
-                                                            }
-
-                                                            try {
-                                                                const statusRes = await axiosInstance.get("/orders/me/status", {
-                                                                    headers: { Authorization: `Bearer ${token}` },
-                                                                });
-
-                                                                const debt = statusRes.data?.debt || 0;
-                                                                if (debt > 0) {
-                                                                    toast.error("У вас есть задолженность по комиссии. Сначала погасите её в профиле.");
-                                                                    navigate("/profile");
+                                                    <div className="request-action-wrap">
+                                                        <button
+                                                            className="btn btn-primary"
+                                                            disabled={busyState.loading || busyState.hasAnyBusy}
+                                                            title={busyState.hasAnyBusy ? busyHintText : ""}
+                                                            onClick={async () => {
+                                                                const token = localStorage.getItem("authToken");
+                                                                if (!token) {
+                                                                    toast.info("Войдите, чтобы запросить выполнение");
+                                                                    navigate("/login");
                                                                     return;
                                                                 }
 
-                                                                const proposedSum = prompt("Введите сумму, которую вы хотите получить за выполнение:");
-                                                                if (!proposedSum) return;
+                                                                if (busyState.hasAnyBusy) {
+                                                                    toast.info(busyHintText);
+                                                                    return;
+                                                                }
 
-                                                                const comment = prompt("Комментарий к заказчику (необязательно):");
+                                                                try {
+                                                                    const statusRes = await axiosInstance.get("/orders/me/status", {
+                                                                        headers: { Authorization: `Bearer ${token}` },
+                                                                    });
 
-                                                                await axiosInstance.post(
-                                                                    `/orders/${order.id}/request`,
-                                                                    { proposedSum, comment },
-                                                                    { headers: { Authorization: `Bearer ${token}` } }
-                                                                );
+                                                                    const debt = statusRes.data?.debt || 0;
+                                                                    if (debt > 0) {
+                                                                        toast.error("У вас есть задолженность по комиссии. Сначала погасите её в профиле.");
+                                                                        navigate("/profile");
+                                                                        return;
+                                                                    }
 
-                                                                toast.success("Запрос отправлен заказчику!");
-                                                            } catch (e) {
-                                                                console.error(e);
-                                                                toast.error(e.response?.data?.message || "Ошибка. Попробуйте позже.");
-                                                            }
-                                                        }}
-                                                    >
-                                                        Запросить выполнение
-                                                    </button>
+                                                                    const proposedSum = prompt("Введите сумму, которую вы хотите получить за выполнение:");
+                                                                    if (!proposedSum) return;
+
+                                                                    const comment = prompt("Комментарий к заказчику (необязательно):");
+
+                                                                    await axiosInstance.post(
+                                                                        `/orders/${order.id}/request`,
+                                                                        { proposedSum, comment },
+                                                                        { headers: { Authorization: `Bearer ${token}` } }
+                                                                    );
+
+                                                                    toast.success("Запрос отправлен заказчику!");
+                                                                    await fetchBusyState();
+                                                                } catch (e) {
+                                                                    console.error(e);
+                                                                    toast.error(e.response?.data?.message || "Ошибка. Попробуйте позже.");
+                                                                }
+                                                            }}
+                                                        >
+                                                            {busyState.loading ? "Проверка..." : "Запросить выполнение"}
+                                                        </button>
+
+                                                        {busyState.hasAnyBusy && (
+                                                            <div className="blocked-order-hint">
+                                                                {busyHintText}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 )}
 
                                             {/* Express: (пока) просто открываем экран экспресс-заказа (если у тебя есть роут) */}
@@ -933,21 +1064,37 @@ const OrdersPage = () => {
                                                     />
 
                                                     {Number(userId) !== Number(order.creatorId) && (
-                                                        <button
-                                                            className="btn btn-primary"
-                                                            onClick={async () => {
-                                                                try {
-                                                                    await axiosInstance.post(`/express/express-orders/${order.expressId}/accept`);
-                                                                    toast.success("Заказ принят!");
-                                                                    await fetchExpress();
-                                                                    navigate("/active-orders");
-                                                                } catch (e) {
-                                                                    toast.error(e.response?.data?.message || "Ошибка");
-                                                                }
-                                                            }}
-                                                        >
-                                                            Принять
-                                                        </button>
+                                                        <div className="request-action-wrap">
+                                                            <button
+                                                                className="btn btn-primary"
+                                                                disabled={busyState.loading || busyState.hasAnyBusy}
+                                                                title={busyState.hasAnyBusy ? busyHintText : ""}
+                                                                onClick={async () => {
+                                                                    if (busyState.hasAnyBusy) {
+                                                                        toast.info(busyHintText);
+                                                                        return;
+                                                                    }
+
+                                                                    try {
+                                                                        await axiosInstance.post(`/express/express-orders/${order.expressId}/accept`);
+                                                                        toast.success("Заказ принят!");
+                                                                        await fetchExpress();
+                                                                        await fetchBusyState();
+                                                                        navigate("/active-orders");
+                                                                    } catch (e) {
+                                                                        toast.error(e.response?.data?.message || "Ошибка");
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {busyState.loading ? "Проверка..." : "Принять"}
+                                                            </button>
+
+                                                            {busyState.hasAnyBusy && (
+                                                                <div className="blocked-order-hint">
+                                                                    {busyHintText}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     )}
                                                 </>
                                             )}

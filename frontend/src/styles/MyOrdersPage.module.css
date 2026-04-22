@@ -808,3 +808,91 @@
         transition: none !important;
     }
 }
+
+.topActions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.expressButton {
+    border: none;
+    cursor: pointer;
+    padding: 10px 12px;
+    border-radius: 14px;
+
+    background: rgba(22, 163, 74, 0.14);
+    border: 1px solid rgba(22, 163, 74, 0.20);
+    color: rgba(21, 128, 61, 0.98);
+
+    font-weight: 900;
+    white-space: nowrap;
+
+    backdrop-filter: blur(10px) saturate(160%);
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
+
+    transition: transform 0.08s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.expressButton:hover {
+    background: rgba(22, 163, 74, 0.18);
+    box-shadow: 0 14px 28px rgba(22, 163, 74, 0.10);
+}
+
+.expressButton:active {
+    transform: translateY(1px);
+}
+
+.orderCardExpress {
+    background:
+            linear-gradient(180deg, rgba(22, 163, 74, 0.06), rgba(255, 255, 255, 0.58)),
+            var(--glass);
+    border: 1px solid rgba(22, 163, 74, 0.18);
+    box-shadow:
+            0 16px 44px rgba(15, 23, 42, 0.10),
+            inset 0 1px 0 rgba(255, 255, 255, 0.42);
+}
+
+.orderCardExpress:hover {
+    background:
+            linear-gradient(180deg, rgba(22, 163, 74, 0.08), rgba(255, 255, 255, 0.70)),
+            var(--glass-strong);
+    box-shadow:
+            0 24px 60px rgba(15, 23, 42, 0.14),
+            0 0 0 1px rgba(22, 163, 74, 0.10);
+}
+
+.orderTypeExpress {
+    color: rgba(21, 128, 61, 0.98);
+}
+
+.statusExpress {
+    box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.55),
+            0 0 0 1px rgba(22, 163, 74, 0.06);
+}
+
+.financeBadgeExpress {
+    background: rgba(240, 253, 244, 0.78);
+    border: 1px solid rgba(22, 163, 74, 0.18);
+}
+
+.financeBadgeExpress .financePrice {
+    color: rgba(21, 128, 61, 0.98);
+}
+
+@media (max-width: 640px) {
+    .topActions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .createButton,
+    .expressButton {
+        width: 100%;
+        justify-content: center;
+    }
+}

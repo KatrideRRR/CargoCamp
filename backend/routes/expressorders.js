@@ -4,9 +4,39 @@ const { Op } = require("sequelize");
 const authenticateToken = require("../middlewares/userAuth");
 const { v4: uuidv4 } = require("uuid");
 const yooKassa = require("../config/yookassaClient");
-const { sequelize, ExpressOrder, ExpressSavedAddress, User } = require("../models");
+const { sequelize, ExpressOrder, ExpressSavedAddress, User, Order } = require("../models");
 
 /* ================= helpers ================= */
+
+async function hasBusyRegularOrder(Order, executorId) {
+    const busyOrder = await Order.findOne({
+        where: {
+            executorId,
+            status: {
+                [Op.notIn]: ["completed", "cancelled", "expired"],
+            },
+        },
+    });
+
+    return !!busyOrder;
+}
+
+async function hasBusyTaxiOrder(ExpressOrder, executorId, excludeExpressOrderId = null) {
+    const where = {
+        executorId,
+        type: "taxi",
+        status: {
+            [Op.notIn]: ["completed", "cancelled"],
+        },
+    };
+
+    if (excludeExpressOrderId) {
+        where.id = { [Op.ne]: excludeExpressOrderId };
+    }
+
+    const busyTaxi = await ExpressOrder.findOne({ where });
+    return !!busyTaxi;
+}
 
 function toNum(v) {
     const n = typeof v === "string" ? Number(v) : v;
@@ -270,6 +300,24 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
         if (!executor) {
             await t.rollback();
             return res.status(404).json({ success: false, message: "Пользователь не найден" });
+        }
+
+        const busyRegular = await hasBusyRegularOrder(Order, executorId);
+        if (busyRegular) {
+            await t.rollback();
+            return res.status(409).json({
+                success: false,
+                message: "У вас уже есть активный обычный заказ. Завершите его, чтобы взять такси.",
+            });
+        }
+
+        const busyTaxi = await hasBusyTaxiOrder(ExpressOrder, executorId);
+        if (busyTaxi) {
+            await t.rollback();
+            return res.status(409).json({
+                success: false,
+                message: "У вас уже есть активный заказ такси. Завершите его, чтобы взять новый.",
+            });
         }
 
         const debtKopecks = Number(executor.debt || 0);
@@ -604,7 +652,7 @@ router.post("/express-orders/:id/cancel", authenticateToken, async (req, res) =>
 
         await req.logAction({
             req,
-            actorUserId: executorId,
+            actorUserId: userId,
             actorRole: "user",
             actionType: "express_status_change",
             entityType: "express_order",

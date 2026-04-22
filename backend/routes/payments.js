@@ -460,10 +460,6 @@ router.post('/guarantee/create', authenticateToken, async (req, res) => {
 
 router.post('/yookassa/webhook', async (req, res) => {
 
-    console.log("[YOOKASSA WEBHOOK] HIT", new Date().toISOString());
-    console.log("[YOOKASSA WEBHOOK] headers auth:", req.headers.authorization);
-    console.log("[YOOKASSA WEBHOOK] body:", JSON.stringify(req.body));
-
     const io = req.app.locals.io; // ✅ вот так
     if (!io) {
         console.warn("⚠️ io is not initialized yet");

@@ -52,7 +52,6 @@ function initializeSocket(server) {
     });
 
     io.on("connection", (socket) => {
-        console.log(`🟢 Новое подключение: ${socket.id}`);
 
         socket.on("register", (userId) => {
             if (!userId) return;
@@ -62,8 +61,6 @@ function initializeSocket(server) {
             socket.join(`user_${normalizedUserId}`);
             socket.join(`notifications_${normalizedUserId}`);
             socket.data.userId = normalizedUserId;
-
-            console.log(`✅ Пользователь ${normalizedUserId} зарегистрирован в WebSocket`);
         });
 
         socket.on("subscribeToNotifications", (userId) => {
@@ -71,8 +68,6 @@ function initializeSocket(server) {
 
             const normalizedUserId = String(userId);
             socket.join(`notifications_${normalizedUserId}`);
-
-            console.log(`🔔 Подписка на уведомления: ${normalizedUserId}`);
         });
 
         socket.on("joinChat", ({ userId, orderId }) => {
@@ -83,12 +78,9 @@ function initializeSocket(server) {
             if (orderId) {
                 socket.join(`chat_${String(orderId)}`);
             }
-
-            console.log(`💬 joinChat: user=${userId}, order=${orderId}`);
         });
 
         socket.on("markAsRead", async ({ userId, orderId }) => {
-            console.log("✅ markAsRead:", { userId, orderId });
 
             try {
                 await Notification.update(
@@ -109,7 +101,6 @@ function initializeSocket(server) {
         });
 
         socket.on("disconnect", (reason) => {
-            console.log(`🔴 Отключение: ${socket.id}. Причина: ${reason}`);
         });
     });
 
