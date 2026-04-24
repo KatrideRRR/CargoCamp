@@ -48,6 +48,7 @@ const ProfilePage = () => {
     const [showMapModal, setShowMapModal] = useState(false);
     const [addressSuggestions, setAddressSuggestions] = useState([]);
     const [pickedCoords, setPickedCoords] = useState(null); // {lat, lng}
+    const [avatarUploading, setAvatarUploading] = useState(false);
 
     const [categories, setCategories] = useState([]);
     const [categoryPick, setCategoryPick] = useState([]); // массив id
@@ -87,6 +88,42 @@ const ProfilePage = () => {
         window.addEventListener("scroll", onScroll, { passive: true });
         return () => window.removeEventListener("scroll", onScroll);
     }, []);
+
+    const handleAvatarUpload = async (file) => {
+        if (!file) return;
+
+        const token = localStorage.getItem("authToken");
+        if (!token) {
+            toast.error("Вы не авторизованы");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("avatar", file);
+
+        try {
+            setAvatarUploading(true);
+
+            const res = await axios.post(`${apiUrl}/api/auth/upload-avatar`, formData, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "multipart/form-data",
+                },
+            });
+
+            toast.success("Фото профиля обновлено");
+
+            setProfile((prev) => ({
+                ...prev,
+                avatar: res.data.avatar,
+            }));
+        } catch (error) {
+            console.error("Ошибка загрузки аватара:", error);
+            toast.error(error.response?.data?.message || "Не удалось загрузить фото профиля");
+        } finally {
+            setAvatarUploading(false);
+        }
+    };
 
     const getRemainingDays = (expiresAt) => {
         if (!expiresAt) return 0;
@@ -544,13 +581,37 @@ const ProfilePage = () => {
                     {profile && (
                         <div className="profile-identity">
                             <div className="identity-row">
+                                <div className="avatar-block">
+                                    {profile?.avatar ? (
+                                        <img
+                                            src={`${apiUrl}${profile.avatar}`}
+                                            alt="Аватар"
+                                            className="profile-avatar"
+                                        />
+                                    ) : (
+                                        <div className="profile-avatar profile-avatar-placeholder">
+                                            {profile?.username ? profile.username.charAt(0).toUpperCase() : "U"}
+                                        </div>
+                                    )}
+
+                                    <label className="avatar-upload-btn">
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            style={{ display: "none" }}
+                                            onChange={(e) => handleAvatarUpload(e.target.files?.[0])}
+                                        />
+                                        <span>{avatarUploading ? "Загрузка..." : "Фото профиля"}</span>
+                                    </label>
+                                </div>
+
                                 <div className="identity-main">
                                     <div className="identity-name">{profile.username}</div>
                                     <div className="identity-meta">
                                         <span className="identity-pill">ID: {profile.id}</span>
                                         <span className="identity-pill">
-                      Рейтинг: {profile.rating ? renderStars(profile.rating) : "Нет"}
-                    </span>
+                Рейтинг: {profile.rating ? renderStars(profile.rating) : "Нет"}
+            </span>
                                     </div>
                                 </div>
                             </div>

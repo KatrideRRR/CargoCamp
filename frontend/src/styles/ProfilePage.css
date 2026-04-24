@@ -22,7 +22,7 @@
     --danger-soft:rgba(220,38,38,.12);
 
     /* высота sticky header (фикс) — под нее подгоняем “контент внутри” */
-    --header-h: 168px;
+    --header-collapsed: 76px;
 }
 
 /* ===== iOS-like motion ===== */
@@ -78,39 +78,35 @@
    ========================================================= */
 
 .profile-header{
-    position:sticky;
-    top:14px;
-    z-index:5;
+    position: sticky;
+    top: 14px;
+    z-index: 5;
 
-    /* фиксируем габарит — это убирает “layout thrash” */
-    height:var(--header-h);
-    padding:18px 18px 14px;
-    overflow:hidden;
+    padding: 18px 18px 14px;
+    overflow: hidden;
 
-    background:rgba(255,255,255,.62);
-    box-shadow:0 14px 40px rgba(0,0,0,.06);
+    background: rgba(255,255,255,.62);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 14px 40px rgba(0,0,0,.06);
 
-    /* анти-мигание на Safari/iOS */
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
-    backface-visibility:hidden;
-    -webkit-backface-visibility:hidden;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
     contain: paint;
+
+    transition: box-shadow .18s ease, background .18s ease, padding .18s ease;
 }
 
-.profile-header::after{
-    content:"";
-    position:absolute;
-    left:18px;
-    right:18px;
-    bottom:12px;
-    height:1px;
-    background:linear-gradient(to right,rgba(255,255,255,0),rgba(15,23,42,.08),rgba(255,255,255,0));
-    opacity:1;
-    transition:opacity .18s ease;
-    pointer-events:none;
+.profile-header.is-collapsed{
+    max-height: var(--header-collapsed);
+    background: rgba(255,255,255,.72);
+    box-shadow: 0 12px 34px rgba(0,0,0,.08);
 }
-
 /* top row */
 .profile-header-top{
     display:flex;
@@ -158,9 +154,17 @@
 
 /* identity block */
 .profile-identity{
-    margin-top:14px;
-    transition: transform .18s ease, opacity .18s ease;
+    margin-top: 14px;
+    min-width: 0;
+    transition: transform .18s ease, opacity .18s ease, margin .18s ease;
     will-change: transform, opacity;
+}
+
+.profile-header.is-collapsed .profile-identity{
+    opacity: 0;
+    transform: translateY(-12px);
+    margin-top: 0;
+    pointer-events: none;
 }
 
 .identity-name{
@@ -739,6 +743,14 @@
 }
 @media (max-width:520px){
     .gps-actions{grid-template-columns:1fr;}
+    .identity-row{
+        align-items:flex-start;
+    }
+
+    .profile-avatar{
+        width:72px;
+        height:72px;
+    }
 }
 
 /* =========================================================
@@ -904,11 +916,6 @@
    вставить в КОНЕЦ файла
    ========================= */
 
-:root{
-    --header-expanded: 172px; /* подгони под свой контент */
-    --header-collapsed: 76px; /* высота свернутого */
-}
-
 /* убираем фикс height и делаем max-height */
 .profile-header{
     height: auto !important;
@@ -1014,4 +1021,169 @@
 /* мини-строка становится главным элементом */
 .profile-header.is-collapsed .header-mini{
     margin-top: 0;
+}
+
+.identity-row{
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 14px;
+    align-items: center;
+    min-width: 0;
+}
+
+.avatar-block{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+.profile-avatar{
+    width:84px;
+    height:84px;
+    border-radius:50%;
+    object-fit:cover;
+    display:block;
+
+    border:1px solid rgba(255,255,255,.45);
+    background:rgba(255,255,255,.55);
+    box-shadow:0 12px 30px rgba(15,23,42,.10);
+}
+
+.profile-avatar-placeholder{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:1.6rem;
+    font-weight:900;
+    color:var(--primary);
+    background:rgba(29,78,216,.10);
+    border:1px solid rgba(29,78,216,.18);
+}
+
+.identity-main{
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.identity-name{
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: -.01em;
+    line-height: 1.15;
+    word-break: break-word;
+}
+
+.identity-meta{
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.avatar-upload-btn{
+    width:100%;
+    min-height:34px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding:8px 10px;
+    border-radius:12px;
+    background:rgba(255,255,255,.55);
+    border:1px solid var(--glass-border);
+    cursor:pointer;
+    font-size:.78rem;
+    font-weight:900;
+    color:var(--text);
+    line-height:1.1;
+    transition:transform .16s ease, box-shadow .16s ease, background .16s ease;
+    box-sizing:border-box;
+}
+
+.avatar-upload-btn:hover{
+    transform:translateY(-1px);
+    background:rgba(255,255,255,.72);
+    box-shadow:var(--shadow-soft);
+}
+
+@media (max-width: 520px){
+    .identity-row{
+        grid-template-columns: 1fr;
+        justify-items:center;
+        text-align:center;
+        gap:12px;
+    }
+
+    .avatar-block{
+        width:100%;
+        flex:none;
+    }
+
+    .profile-avatar{
+        width:76px;
+        height:76px;
+    }
+
+    .identity-main{
+        width:100%;
+        align-items:center;
+    }
+
+    .identity-name{
+        font-size:1.08rem;
+        text-align:center;
+    }
+
+    .identity-meta{
+        width:100%;
+        justify-content:center;
+    }
+
+    .avatar-upload-btn{
+        width:auto;
+        min-width:140px;
+    }
+}
+
+.profile-identity{
+    margin-top:14px;
+    transition: transform .18s ease, opacity .18s ease;
+    will-change: transform, opacity;
+    min-width:0;
+}
+
+@media (max-width: 520px){
+    .identity-row{
+        grid-template-columns: 1fr;
+        justify-items: center;
+        text-align: center;
+        gap: 12px;
+    }
+
+    .avatar-block{
+        width: auto;
+    }
+
+    .profile-avatar{
+        width: 76px;
+        height: 76px;
+    }
+
+    .identity-main{
+        width: 100%;
+        align-items: center;
+    }
+
+    .identity-meta{
+        justify-content: center;
+    }
+
+    .avatar-upload-btn{
+        min-width: 140px;
+        width: auto;
+    }
 }

@@ -11,6 +11,7 @@ const axios = require("axios");
 const fs = require('fs');
 const SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
 
+const avatarsDir = path.join(__dirname, "..", "uploads", "avatars");
 const uploadsRoot = path.join(__dirname, '..', 'uploads');
 const uploadDocumentsRoot = path.join(uploadsRoot, 'upload-document');
 
@@ -56,6 +57,76 @@ const upload = multer({
     }
 });
 
+if (!fs.existsSync(avatarsDir)) {
+    fs.mkdirSync(avatarsDir, { recursive: true });
+}
+
+const avatarStorage = multer.diskStorage({
+
+    destination: (req, file, cb) => {
+
+        cb(null, avatarsDir);
+
+    },
+
+    filename: async (req, file, cb) => {
+
+        try {
+
+            const userId = req.user.id;
+
+            const ext = path.extname(file.originalname || "").toLowerCase() || ".jpg";
+
+            // удалим старые варианты этого же файла, чтобы не копились .png/.jpg/.webp
+
+            const possibleExts = [".jpg", ".jpeg", ".png", ".webp"];
+
+            for (const e of possibleExts) {
+
+                const oldPath = path.join(avatarsDir, `${userId}${e}`);
+
+                if (fs.existsSync(oldPath)) {
+
+                    fs.unlinkSync(oldPath);
+
+                }
+
+            }
+
+            cb(null, `${userId}${ext}`);
+
+        } catch (err) {
+
+            cb(err);
+
+        }
+
+    },
+
+});
+
+const uploadAvatar = multer({
+
+    storage: avatarStorage,
+
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+
+    fileFilter: (req, file, cb) => {
+
+        if (file.mimetype.startsWith("image/")) {
+
+            cb(null, true);
+
+        } else {
+
+            cb(new Error("Разрешены только изображения"));
+
+        }
+
+    },
+
+});
+
 const generateTemporaryPassword = () => {
     return Math.random().toString(36).slice(-8);
 };
@@ -74,6 +145,33 @@ function normalizePhone(raw) {
     if (digits.length === 10) return "7" + digits;
     return digits;
 }
+
+router.post("/upload-avatar", authenticateToken, uploadAvatar.single("avatar"), async (req, res) => {
+        try {
+            if (!req.file) {
+                return res.status(400).json({ message: "Файл не загружен" });
+            }
+
+            const user = await User.findByPk(req.user.id);
+            if (!user) {
+                return res.status(404).json({ message: "Пользователь не найден" });
+            }
+
+            const avatarPath = `/uploads/avatars/${req.file.filename}`;
+
+            user.avatar = avatarPath;
+            await user.save();
+
+            return res.json({
+                success: true,
+                message: "Фото профиля загружено",
+                avatar: avatarPath,
+            });
+        } catch (error) {
+            console.error("Ошибка загрузки аватара:", error);
+            return res.status(500).json({ message: "Ошибка сервера" });
+        }
+    });
 
 router.post("/send-sms", async (req, res) => {
     const { phone } = req.body;
@@ -336,7 +434,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
         const user = await User.findByPk(req.user.id, {
             attributes: [
                 'id', 'username', 'phone',
-                'debt',
+                'debt', 'avatar',
                 'yookassa_payment_method_id',
                 'cardLastFour', 'cardType',
                 'rating', 'createdAt',
@@ -370,6 +468,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
             complaintsCount: user.complaintsCount,
             userStatus: user.userStatus,
 
+            avatar: user.avatar,
             debt: user.debt,
 
             subscriptionType: user.subscription_type,

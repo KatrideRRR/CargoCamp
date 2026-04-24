@@ -121,7 +121,10 @@ module.exports = (sequelize) => {
                 defaultValue: [],
                 field: "preferred_category_ids",
             },
-
+            avatar: {
+                type: DataTypes.STRING,
+                allowNull: true,
+            },
         },
         {
             sequelize,
