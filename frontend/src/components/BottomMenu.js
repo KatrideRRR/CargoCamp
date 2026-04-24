@@ -117,7 +117,7 @@ const BottomMenu = () => {
                         <span className="notification-badge">{formatCount(messageCount)}</span>
                     )}
                 </div>
-                <span className="menu-label">Активные</span>
+                <span className="menu-label">В работе</span>
             </button>
 
             <button

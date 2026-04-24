@@ -21,6 +21,8 @@ const ActiveOrdersPage = () => {
     const [orders, setOrders] = useState([]);
     const [expressOrders, setExpressOrders] = useState([]);
 
+    const [activeView, setActiveView] = useState("performing");
+
     const [error, setError] = useState(null);
 
     // модалка картинок обычных заказов
@@ -224,10 +226,6 @@ const ActiveOrdersPage = () => {
     const prevImage = () => {
         if (!currentImages.length) return;
         setCurrentImageIndex((prev) => (prev - 1 + currentImages.length) % currentImages.length);
-    };
-
-    const toggleExpand = (orderId) => {
-        setExpandedOrders((prev) => ({ ...prev, [orderId]: !prev[orderId] }));
     };
 
     const handleRemoveOrder = (orderId) => {
@@ -578,7 +576,27 @@ const ActiveOrdersPage = () => {
     if (!user || !user.id) return <p>Загрузка...</p>;
     if (error) return <div className="error-message">{error}</div>;
 
-    const hasAny = orders.length > 0 || expressOrders.length > 0;
+    const performingOrders = orders.filter((order) => Number(order.executorId) === Number(user.id));
+    const createdOrders = orders.filter((order) => Number(order.creatorId) === Number(user.id));
+
+    const performingExpressOrders = expressOrders.filter(
+        (order) => Number(order.executorId) === Number(user.id)
+    );
+
+    const createdExpressOrders = expressOrders.filter(
+        (order) => Number(order.creatorId) === Number(user.id)
+    );
+
+    const visibleRegularOrders =
+        activeView === "performing" ? performingOrders : createdOrders;
+
+    const visibleExpressOrders =
+        activeView === "performing" ? performingExpressOrders : createdExpressOrders;
+
+    const hasAnyVisible =
+        visibleRegularOrders.length > 0 || visibleExpressOrders.length > 0;
+
+    const hasAny = hasAnyVisible;
 
     return (
         <div className="active-orders">
@@ -586,11 +604,38 @@ const ActiveOrdersPage = () => {
                 <div className="active-orders-page">
                     <div className="active-orders-container">
                         <div className="contentWrapper">
+
+                            <div className="active-orders-topbar">
+                                <div className="active-orders-title-wrap">
+                                    <div className="active-orders-title">Активные заказы</div>
+                                    <div className="active-orders-subtitle">
+                                        {activeView === "performing"
+                                            ? "Заказы, которые вы сейчас выполняете"
+                                            : "Ваши заказы, которые сейчас выполняются"}
+                                    </div>
+                                </div>
+
+                                <div className="active-orders-switch">
+                                    <button
+                                        className={`active-switch-btn ${activeView === "performing" ? "active" : ""}`}
+                                        onClick={() => setActiveView("performing")}
+                                    >
+                                        Я выполняю
+                                    </button>
+
+                                    <button
+                                        className={`active-switch-btn ${activeView === "created" ? "active" : ""}`}
+                                        onClick={() => setActiveView("created")}
+                                    >
+                                        Мои заказы выполняют
+                                    </button>
+                                </div>
+                            </div>
+
                             {hasAny ? (
                                 <ul className="orders-list">
                                     {/* обычные активные заказы */}
-                                    {orders.map((order) => {
-                                        const isCompletedByUser = Array.isArray(order.completedBy) && order.completedBy.includes(user.id);
+                                    {visibleRegularOrders.map((order) => {                                        const isCompletedByUser = Array.isArray(order.completedBy) && order.completedBy.includes(user.id);
                                         const isWaitingForOther = Array.isArray(order.completedBy) && order.completedBy.length === 1;
 
                                         const isExecutor = order.executorId === user.id;
@@ -601,19 +646,25 @@ const ActiveOrdersPage = () => {
 
                                         return (
                                             <li key={order.id} className="order-card">
-                                                <div className="order-header" onClick={() => toggleExpand(order.id)}>
+                                                <div className="order-header">
                                                     <div className="order-top">
                                                         <div className="order-title-wrap">
                                                             <div className="order-title">
-                                                                <strong>Заказ номер {order.id}</strong>
-                                                                {isCreator ? ". Вы являетесь заказчиком" : ". Вы являетесь исполнителем"}.
+                                                                <strong>Заказ №{order.id}</strong>
                                                             </div>
 
-                                                            {orderDisputes[order.id] && (
-                                                                <div className={`dispute-status-badge dispute-status-${orderDisputes[order.id].status}`}>
-                                                                    Спор: {orderDisputes[order.id].status}
-                                                                </div>
-                                                            )}
+                                                            <div className="role-badge-row">
+    <span className={`role-badge ${isCreator ? "creator-role" : "executor-role"}`}>
+        {isCreator ? "Вы заказчик" : "Вы исполнитель"}
+    </span>
+
+                                                                {orderDisputes[order.id] && (
+                                                                    <div className={`dispute-status-badge dispute-status-${orderDisputes[order.id].status}`}>
+                                                                        Спор: {orderDisputes[order.id].status}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
                                                         </div>
 
                                                         <div className="pay-box">
@@ -757,7 +808,6 @@ const ActiveOrdersPage = () => {
                                                 </div>
 
                                                 {/* details */}
-                                                {expandedOrders[order.id] && (
                                                     <div className="order-details">
                                                         <div className="order-left">
                                                             <p>
@@ -939,14 +989,12 @@ const ActiveOrdersPage = () => {
                                                             </div>
                                                         )}
                                                     </div>
-                                                )}
                                             </li>
                                         );
                                     })}
 
                                     {/* express активные заказы */}
-                                    {expressOrders.map((eo) => (
-                                        <ExpressOrderCard
+                                    {visibleExpressOrders.map((eo) => (                                        <ExpressOrderCard
                                             key={`express-${eo.id}`}
                                             order={eo}
                                             userId={user.id}

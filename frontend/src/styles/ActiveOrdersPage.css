@@ -102,7 +102,6 @@ body {
 
 /* ===== Header ===== */
 .active-orders .order-header{
-    cursor: pointer;
     position: relative;
     z-index: 1;
 }
@@ -1304,4 +1303,135 @@ body {
     color: #7a5600;
     font-size: 14px;
     line-height: 1.45;
+}
+
+.active-orders .active-orders-topbar{
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    flex-wrap: wrap;
+
+    padding: 16px 18px;
+    border-radius: 22px;
+
+    background: rgba(255,255,255,0.58);
+    border: 1px solid rgba(255,255,255,0.46);
+    backdrop-filter: blur(18px) saturate(185%);
+    -webkit-backdrop-filter: blur(18px) saturate(185%);
+
+    box-shadow:
+            0 22px 60px rgba(15,23,42,0.12),
+            inset 0 1px 0 rgba(255,255,255,0.55);
+}
+
+.active-orders .active-orders-title{
+    font-size: 1.15rem;
+    font-weight: 900;
+    color: rgba(15,23,42,0.96);
+}
+
+.active-orders .active-orders-subtitle{
+    margin-top: 4px;
+    font-size: 0.92rem;
+    color: rgba(15,23,42,0.68);
+    font-weight: 700;
+}
+
+.active-orders .active-orders-switch{
+    display: inline-flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.active-orders .active-switch-btn{
+    height: 42px;
+    padding: 0 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.46);
+
+    background: rgba(255,255,255,0.60);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+
+    color: rgba(15,23,42,0.88);
+    font-weight: 900;
+    cursor: pointer;
+
+    box-shadow:
+            0 16px 40px rgba(15,23,42,0.10),
+            inset 0 1px 0 rgba(255,255,255,0.55);
+
+    transition: transform .08s ease, box-shadow .16s ease, background .16s ease, border-color .16s ease;
+}
+
+.active-orders .active-switch-btn:hover{
+    transform: translateY(-1px);
+    background: rgba(255,255,255,0.72);
+}
+
+.active-orders .active-switch-btn.active{
+    background: rgba(59,130,246,0.14);
+    border-color: rgba(59,130,246,0.22);
+    color: rgba(30,58,138,0.98);
+}
+
+.active-orders .orders-list{
+    gap: 16px;
+}
+
+.active-orders .order-card{
+    padding: 18px 18px 16px;
+}
+
+.active-orders .order-details{
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(15,23,42,0.08);
+}
+
+.active-orders .role-badge-row{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.active-orders .role-badge{
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 0.80rem;
+    font-weight: 900;
+}
+
+.active-orders .creator-role{
+    background: rgba(59,130,246,0.12);
+    color: rgba(30,58,138,0.98);
+    border: 1px solid rgba(59,130,246,0.18);
+}
+
+.active-orders .executor-role{
+    background: rgba(34,197,94,0.12);
+    color: rgba(21,128,61,0.98);
+    border: 1px solid rgba(34,197,94,0.18);
+}
+
+@media (max-width: 768px){
+    .active-orders .active-orders-topbar{
+        padding: 14px;
+    }
+
+    .active-orders .active-orders-switch{
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .active-orders .active-switch-btn{
+        width: 100%;
+        justify-content: center;
+    }
 }
