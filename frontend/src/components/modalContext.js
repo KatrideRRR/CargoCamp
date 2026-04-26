@@ -174,7 +174,7 @@ export const ModalProvider = ({ children }) => {
             {/* Модалка одобрения заказа */}
             {notificationData && (
                 <div className="modal-overlay">
-                    <div className="modal">
+                    <div className="modal modal-compact">
                         <button
                             className="modal-close"
                             onClick={handleNotificationClose}
@@ -184,47 +184,44 @@ export const ModalProvider = ({ children }) => {
                             ×
                         </button>
 
-                        <h2>{notificationData.title}</h2>
-                        <p>{notificationData.description}</p>
+                        <div className="modal-icon">✓</div>
+                        <h2 className="modal-title">{notificationData.title}</h2>
+                        <p className="modal-text">{notificationData.description}</p>
 
                         {notificationData.isPremium ? (
                             <>
-                                <p className="text-green-600">
-                                    У вас активен Premium — комиссия не требуется 🎉
-                                </p>
+                                <div className="modal-note modal-note-success">
+                                    У вас активен Premium — комиссия не требуется.
+                                </div>
 
-                                <button onClick={handleNotificationClose}>
-                                    Ок
-                                </button>
+                                <div className="modal-actions">
+                                    <button className="modal-btn modal-btn-primary" onClick={handleNotificationClose}>
+                                        Понятно
+                                    </button>
+                                </div>
                             </>
                         ) : notificationData.debt > 0 ? (
                             <>
-                                <p style={{ marginTop: 8 }}>
+                                <div className="modal-note">
                                     Комиссия: <b>{Math.round(notificationData.debt / 100)} ₽</b>
-                                </p>
+                                </div>
 
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        gap: "10px",
-                                        justifyContent: "center",
-                                        marginTop: "16px",
-                                        flexWrap: "wrap",
-                                    }}
-                                >
-                                    <button onClick={payDebtFromModal}>
+                                <div className="modal-actions">
+                                    <button className="modal-btn modal-btn-primary" onClick={payDebtFromModal}>
                                         Оплатить сейчас
                                     </button>
 
-                                    <button onClick={handleNotificationClose}>
-                                        Оплатить позже
+                                    <button className="modal-btn modal-btn-ghost" onClick={handleNotificationClose}>
+                                        Позже
                                     </button>
                                 </div>
                             </>
                         ) : (
-                            <button onClick={handleNotificationClose}>
-                                Ок
-                            </button>
+                            <div className="modal-actions">
+                                <button className="modal-btn modal-btn-primary" onClick={handleNotificationClose}>
+                                    Понятно
+                                </button>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -233,7 +230,7 @@ export const ModalProvider = ({ children }) => {
             {/* Модалка завершения заказа */}
             {completionNotificationData && (
                 <div className="modal-overlay">
-                    <div className="modal">
+                    <div className="modal modal-compact">
                         <button
                             className="modal-close"
                             onClick={handleCompletionNotificationClose}
@@ -243,19 +240,13 @@ export const ModalProvider = ({ children }) => {
                             ×
                         </button>
 
-                        <h2>{completionNotificationData.title}</h2>
-                        <p>{completionNotificationData.description}</p>
+                        <div className="modal-icon">⏳</div>
+                        <h2 className="modal-title">{completionNotificationData.title}</h2>
+                        <p className="modal-text">{completionNotificationData.description}</p>
 
-                        <div
-                            style={{
-                                display: "flex",
-                                gap: "10px",
-                                justifyContent: "center",
-                                marginTop: "16px",
-                                flexWrap: "wrap",
-                            }}
-                        >
+                        <div className="modal-actions">
                             <button
+                                className="modal-btn modal-btn-primary"
                                 onClick={() =>
                                     handleCompleteOrder(
                                         completionNotificationData.orderId,
@@ -267,8 +258,11 @@ export const ModalProvider = ({ children }) => {
                                 Завершить
                             </button>
 
-                            <button onClick={handleCompletionNotificationClose}>
-                                Ок
+                            <button
+                                className="modal-btn modal-btn-ghost"
+                                onClick={handleCompletionNotificationClose}
+                            >
+                                Позже
                             </button>
                         </div>
                     </div>

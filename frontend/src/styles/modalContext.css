@@ -1,142 +1,246 @@
-/* Фон затемнения */
+/* overlay */
 .modal-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5); /* Затемнение фона */
+    inset: 0;
+    z-index: 2000;
     display: flex;
+    align-items: center;
     justify-content: center;
-    align-items: center; /* Центрируем по вертикали и горизонтали */
-    z-index: 1000;
+    padding: 16px;
+    background: rgba(15, 23, 42, 0.42);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
-/* Модальное окно */
+/* modal */
 .modal {
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-    text-align: center;
-    width: 90%;
-    max-width: 400px;
     position: relative;
-    z-index: 1001; /* Выше затемнения */
+    width: min(92vw, 380px);
+    padding: 18px 16px 16px;
+    border-radius: 22px;
+
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.52);
+
+    backdrop-filter: blur(18px) saturate(180%);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+
+    box-shadow:
+            0 22px 60px rgba(15, 23, 42, 0.16),
+            inset 0 1px 0 rgba(255, 255, 255, 0.55);
+
+    text-align: center;
 }
 
-/* Заголовок модального окна */
-.modal h2 {
-    font-size: 1.5em;
-    margin-bottom: 15px;
-    color: #333;
+.modal-compact {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
 }
 
-/* Текст в модальном окне */
-.modal p {
-    font-size: 1em;
-    color: #555;
-    margin-bottom: 20px;
-}
+/* close */
+.modal-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
 
-/* Кнопки */
-.modal button {
-    display: block;
-    width: 100%;
-    padding: 10px;
-    margin: 5px 0;
-    font-size: 1em;
-    border: none;
-    border-radius: 5px;
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.42);
+    border-radius: 999px;
+
+    background: rgba(255, 255, 255, 0.56);
+    color: rgba(15, 23, 42, 0.74);
+
+    font-size: 20px;
+    line-height: 1;
     cursor: pointer;
-    transition: background 0.3s;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+
+    transition: transform 0.08s ease, background 0.16s ease, color 0.16s ease;
 }
 
-/* Кнопка "Одобрить" */
-.modal button:first-of-type {
-    background: #4CAF50;
-    color: white;
+.modal-close:hover {
+    background: rgba(255, 255, 255, 0.72);
+    color: rgba(15, 23, 42, 0.94);
 }
 
-.modal button:first-of-type:hover {
-    background: #45a049;
+.modal-close:active {
+    transform: translateY(1px);
 }
 
-/* Кнопка "Отклонить" */
-.modal button:nth-of-type(2) {
-    background: #f44336;
-    color: white;
+/* icon */
+.modal-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 16px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 24px;
+    font-weight: 900;
+
+    background: rgba(29, 78, 216, 0.10);
+    border: 1px solid rgba(29, 78, 216, 0.18);
+    color: rgba(29, 78, 216, 0.95);
 }
 
-.modal button:nth-of-type(2):hover {
-    background: #d32f2f;
+/* title/text */
+.modal-title,
+.modal h2 {
+    margin: 0;
+    font-size: 1.08rem;
+    line-height: 1.2;
+    font-weight: 900;
+    color: #0f172a;
+    padding: 0 14px;
 }
 
-/* Кнопка "Перейти к жалобам" */
-.modal button:last-of-type {
-    background: #2196F3;
-    color: white;
+.modal-text,
+.modal p {
+    margin: 0;
+    font-size: 0.93rem;
+    line-height: 1.45;
+    color: #475569;
+    padding: 0 8px;
 }
 
-.modal button:last-of-type:hover {
-    background: #1976D2;
+/* notes */
+.modal-note {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: rgba(15, 23, 42, 0.04);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    color: #0f172a;
+    font-size: 0.92rem;
+    font-weight: 700;
 }
+
+.modal-note-success {
+    background: rgba(34, 197, 94, 0.10);
+    border-color: rgba(34, 197, 94, 0.18);
+    color: #166534;
+}
+
+/* actions */
+.modal-actions {
+    width: 100%;
+    display: grid;
+    gap: 8px;
+    margin-top: 2px;
+}
+
+.modal-btn {
+    width: 100%;
+    min-height: 42px;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+
+    font-size: 0.93rem;
+    font-weight: 900;
+
+    transition: transform 0.08s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.modal-btn:active {
+    transform: translateY(1px);
+}
+
+.modal-btn-primary {
+    background: rgba(29, 78, 216, 0.14);
+    border: 1px solid rgba(29, 78, 216, 0.22);
+    color: rgba(29, 78, 216, 0.98);
+
+    backdrop-filter: blur(14px) saturate(180%);
+    -webkit-backdrop-filter: blur(14px) saturate(180%);
+
+    box-shadow:
+            0 14px 28px rgba(15, 23, 42, 0.10),
+            inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.modal-btn-primary:hover {
+    background: rgba(29, 78, 216, 0.18);
+}
+
+.modal-btn-ghost {
+    background: rgba(255, 255, 255, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.52);
+    color: #0f172a;
+
+    backdrop-filter: blur(14px) saturate(180%);
+    -webkit-backdrop-filter: blur(14px) saturate(180%);
+
+    box-shadow:
+            0 12px 24px rgba(15, 23, 42, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.modal-btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.76);
+}
+
+/* rating stars */
 .stars {
     display: flex;
-    gap: 5px;
+    gap: 8px;
     justify-content: center;
 }
 
 .star {
     font-size: 24px;
     cursor: pointer;
-    color: gray;
-    transition: color 0.2s ease-in-out;
+    color: #94a3b8;
+    transition: color 0.16s ease, transform 0.08s ease;
+}
+
+.star:hover {
+    transform: translateY(-1px);
 }
 
 .star.selected {
-    color: gold;
+    color: #f59e0b;
 }
 
-
-/* Адаптация для мобильных устройств */
+/* mobile */
 @media (max-width: 480px) {
     .modal {
-        width: 95%;
-        padding: 15px;
+        width: min(94vw, 360px);
+        padding: 16px 14px 14px;
+        border-radius: 20px;
     }
 
+    .modal-title,
     .modal h2 {
-        font-size: 1.3em;
+        font-size: 1rem;
+        padding: 0 18px;
     }
 
+    .modal-text,
     .modal p {
-        font-size: 0.95em;
+        font-size: 0.9rem;
     }
 
-    .modal button {
-        font-size: 0.9em;
-        padding: 8px;
+    .modal-icon {
+        width: 46px;
+        height: 46px;
+        font-size: 22px;
     }
-}
 
-.modal {
-    position: relative;
-}
-
-.modal-close {
-    position: absolute;
-    top: 10px;
-    right: 12px;
-    background: transparent;
-    border: none;
-    font-size: 22px;
-    line-height: 1;
-    cursor: pointer;
-    color: #666;
-    padding: 0;
-}
-
-.modal-close:hover {
-    color: #000;
+    .modal-btn {
+        min-height: 40px;
+        font-size: 0.9rem;
+    }
 }
