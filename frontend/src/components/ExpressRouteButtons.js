@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback } from "react";
 import axiosInstance from "../utils/axiosInstance";
 import { FaLocationArrow } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -18,10 +18,7 @@ function openExternal(url) {
 
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-    // 1) Мобилка: пытаемся открыть как "приложение/система решит"
-    // target=_blank на мобиле чаще всего открывает приложение, если ссылка поддерживается
     if (isMobile) {
-        // iOS Safari иногда игнорирует noopener/noreferrer; оставим просто _blank
         const a = document.createElement("a");
         a.href = url;
         a.target = "_blank";
@@ -32,41 +29,26 @@ function openExternal(url) {
         return;
     }
 
-    // 2) Десктоп: новая вкладка/окно
     const win = window.open(url, "_blank", "noopener,noreferrer");
     if (!win) {
-        // если блокировщик попапов
-        // НЕ делаем window.location.href (ты этого не хочешь)
-        alert("Браузер заблокировал открытие новой вкладки. Разрешите всплывающие окна для сайта.");
+        alert("Браузер заблокировал новую вкладку. Разрешите всплывающие окна.");
     }
-}
-
-function safeOpen(url) {
-    if (!url) return false;
-    // можно просто открыть, но после await иногда блокируется — используем pre-open
-    const win = window.open("about:blank", "_blank", "noopener,noreferrer");
-    if (!win) {
-        return true;
-    }
-    return true;
 }
 
 const ExpressRouteButtons = ({
                                  orderId,
-                                 canToA = false,
-                                 canAToB = true,
+                                 navMode = "none",
                                  className = "",
-                                 buttonClassName = "btn btn-ghost",
+                                 buttonClassName = "express-btn express-btnNav",
                              }) => {
-    const [busyMode, setBusyMode] = useState(null); // "toA" | "AtoB" | null
+    const [busyMode, setBusyMode] = useState(null);
 
     const go = useCallback(
         async (mode, e) => {
             e?.preventDefault?.();
             e?.stopPropagation?.();
 
-            if (!orderId) return toast.error("Нет ID экспресс-заказа");
-            if (busyMode) return;
+            if (!orderId || busyMode) return;
 
             setBusyMode(mode);
             try {
@@ -79,21 +61,13 @@ const ExpressRouteButtons = ({
                         { params: { myLat: my.lat, myLng: my.lng } }
                     );
                 } else {
-                    // A->B
                     r = await axiosInstance.get(`/express/express-orders/${orderId}/route/A-to-B`);
                 }
 
-                const ok = !!r.data?.success;
                 const url = r.data?.url;
-
                 if (!url) throw new Error("Маршрут не получен");
+
                 openExternal(url);
-
-                if (!ok || !url) {
-                    throw new Error(r.data?.message || "Маршрут не найден");
-                }
-
-                safeOpen(url);
             } catch (err) {
                 console.error(err);
                 toast.error(err.response?.data?.message || err.message || "Ошибка навигации");
@@ -104,36 +78,31 @@ const ExpressRouteButtons = ({
         [orderId, busyMode]
     );
 
-    const disabledToA = useMemo(() => !canToA || busyMode !== null, [canToA, busyMode]);
-    const disabledAtoB = useMemo(() => !canAToB || busyMode !== null, [canAToB, busyMode]);
+    if (navMode === "none") return null;
 
     return (
         <div className={className} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {canToA && (
+            {navMode === "toA" && (
                 <button
                     type="button"
                     className={buttonClassName}
                     onClick={(e) => go("toA", e)}
-                    disabled={disabledToA}
-                    title="Навигация до точки A"
-                    aria-label="Навигация до точки A"
+                    disabled={busyMode !== null}
                 >
                     <FaLocationArrow />
-                    <span>До A</span>
+                    <span className="btn-text">До точки A</span>
                 </button>
             )}
 
-            {canAToB && (
+            {navMode === "AtoB" && (
                 <button
                     type="button"
                     className={buttonClassName}
                     onClick={(e) => go("AtoB", e)}
-                    disabled={disabledAtoB}
-                    title="Навигация A→B"
-                    aria-label="Навигация A→B"
+                    disabled={busyMode !== null}
                 >
                     <FaLocationArrow />
-                    <span>A→B</span>
+                    <span className="btn-text">Маршрут A→B</span>
                 </button>
             )}
         </div>

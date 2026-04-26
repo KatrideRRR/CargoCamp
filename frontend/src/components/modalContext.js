@@ -4,6 +4,7 @@ import { socket } from "../socketClient";
 import axiosInstance from "../utils/axiosInstance";
 import "../styles/modalContext.css";
 import axios from "axios";
+import ReviewModal from "../components/ReviewModal";
 
 export const ModalContext = createContext(null);
 
@@ -16,6 +17,7 @@ export const ModalProvider = ({ children }) => {
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [rating, setRating] = useState(0);
     const [currUser, setCurrUser] = useState(null);
+    const [reviewLoading, setReviewLoading] = useState(false);
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -45,6 +47,44 @@ export const ModalProvider = ({ children }) => {
 
         fetchUserData();
     }, []);
+
+    const openReviewFromCompletion = (orderId, creatorId, executorId) => {
+        setSelectedOrder({
+            id: orderId,
+            creatorId,
+            executorId,
+        });
+
+        setCompletionNotificationData(null);
+        setShowRatingModal(true);
+    };
+
+    const handleSubmitReview = async ({ rating, text }) => {
+        if (!selectedOrder?.id) {
+            toast.error("Заказ не выбран");
+            return;
+        }
+
+        try {
+            setReviewLoading(true);
+
+            await axiosInstance.post("/auth/review", {
+                orderId: selectedOrder.id,
+                rating,
+                text,
+            });
+
+            toast.success("Отзыв отправлен");
+            setShowRatingModal(false);
+            setSelectedOrder(null);
+            setRating(0);
+        } catch (e) {
+            console.error("Ошибка отправки отзыва:", e);
+            toast.error(e.response?.data?.message || "Не удалось отправить отзыв");
+        } finally {
+            setReviewLoading(false);
+        }
+    };
 
     const payDebtFromModal = async () => {
         try {
@@ -260,6 +300,19 @@ export const ModalProvider = ({ children }) => {
 
                             <button
                                 className="modal-btn modal-btn-ghost"
+                                onClick={() =>
+                                    openReviewFromCompletion(
+                                        completionNotificationData.orderId,
+                                        completionNotificationData.creatorId,
+                                        completionNotificationData.executorId
+                                    )
+                                }
+                            >
+                                Оставить отзыв
+                            </button>
+
+                            <button
+                                className="modal-btn modal-btn-ghost"
                                 onClick={handleCompletionNotificationClose}
                             >
                                 Позже
@@ -268,6 +321,19 @@ export const ModalProvider = ({ children }) => {
                     </div>
                 </div>
             )}
+
+            <ReviewModal
+                isOpen={showRatingModal}
+                onClose={() => {
+                    if (reviewLoading) return;
+                    setShowRatingModal(false);
+                    setSelectedOrder(null);
+                }}
+                onSubmit={handleSubmitReview}
+                loading={reviewLoading}
+                title="Оставить отзыв"
+                subtitle="Оцените участника и при желании добавьте комментарий"
+            />
         </ModalContext.Provider>
     );
 };

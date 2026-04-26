@@ -21,10 +21,9 @@ async function hasBusyRegularOrder(Order, executorId) {
     return !!busyOrder;
 }
 
-async function hasBusyTaxiOrder(ExpressOrder, executorId, excludeExpressOrderId = null) {
+async function hasBusyExpressOrder(ExpressOrder, executorId, excludeExpressOrderId = null) {
     const where = {
         executorId,
-        type: "taxi",
         status: {
             [Op.notIn]: ["completed", "cancelled"],
         },
@@ -34,8 +33,8 @@ async function hasBusyTaxiOrder(ExpressOrder, executorId, excludeExpressOrderId 
         where.id = { [Op.ne]: excludeExpressOrderId };
     }
 
-    const busyTaxi = await ExpressOrder.findOne({ where });
-    return !!busyTaxi;
+    const busyOrder = await ExpressOrder.findOne({ where });
+    return !!busyOrder;
 }
 
 function toNum(v) {
@@ -311,12 +310,12 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
             });
         }
 
-        const busyTaxi = await hasBusyTaxiOrder(ExpressOrder, executorId);
+        const busyTaxi = await hasBusyExpressOrder(ExpressOrder, executorId);
         if (busyTaxi) {
             await t.rollback();
             return res.status(409).json({
                 success: false,
-                message: "У вас уже есть активный заказ такси. Завершите его, чтобы взять новый.",
+                message: "У вас уже есть активный экспресс заказ. Завершите его, чтобы взять новый.",
             });
         }
 
@@ -545,6 +544,96 @@ router.post("/express-orders/:id/arrived", authenticateToken, async (req, res) =
     }
 });
 
+router.post("/express-orders/:id/start-waiting", authenticateToken, async (req, res) => {
+    try {
+        const executorId = req.user.id;
+        const id = Number(req.params.id);
+
+        const order = await ExpressOrder.findByPk(id);
+        if (!order) {
+            return res.status(404).json({ success: false, message: "Заказ не найден" });
+        }
+
+        if (Number(order.executorId) !== Number(executorId)) {
+            return res.status(403).json({ success: false, message: "Только исполнитель" });
+        }
+
+        if (order.type !== "taxi") {
+            return res.status(409).json({ success: false, message: "Ожидание доступно только для такси" });
+        }
+
+        if (order.status !== "arrived_at_A") {
+            return res.status(409).json({ success: false, message: "Сначала подтвердите прибытие" });
+        }
+
+        const from = order.status;
+        order.status = "waiting_at_A";
+        order.waitingStartedAt = new Date();
+        await order.save();
+
+        await req.logAction({
+            req,
+            actorUserId: executorId,
+            actorRole: "user",
+            actionType: "express_status_change",
+            entityType: "express_order",
+            entityId: order.id,
+            expressOrderId: order.id,
+            meta: { from, to: order.status },
+        });
+
+        return res.json({ success: true, order });
+    } catch (e) {
+        console.error("express-orders start-waiting error:", e);
+        return res.status(500).json({ success: false, message: "Ошибка сервера" });
+    }
+});
+
+router.post("/express-orders/:id/pick-up", authenticateToken, async (req, res) => {
+    try {
+        const executorId = req.user.id;
+        const id = Number(req.params.id);
+
+        const order = await ExpressOrder.findByPk(id);
+        if (!order) {
+            return res.status(404).json({ success: false, message: "Заказ не найден" });
+        }
+
+        if (Number(order.executorId) !== Number(executorId)) {
+            return res.status(403).json({ success: false, message: "Только исполнитель" });
+        }
+
+        if (order.type !== "courier") {
+            return res.status(409).json({ success: false, message: "Этот шаг доступен только для курьера" });
+        }
+
+        if (order.status !== "arrived_at_A") {
+            return res.status(409).json({ success: false, message: "Сначала подтвердите прибытие" });
+        }
+
+        const from = order.status;
+        order.status = "picked_up";
+        order.pickedUpAt = new Date();
+        await order.save();
+
+        await req.logAction({
+            req,
+            actorUserId: executorId,
+            actorRole: "user",
+            actionType: "express_status_change",
+            entityType: "express_order",
+            entityId: order.id,
+            expressOrderId: order.id,
+            meta: { from, to: order.status },
+        });
+
+        return res.json({ success: true, order });
+    } catch (e) {
+        console.error("express-orders pick-up error:", e);
+        return res.status(500).json({ success: false, message: "Ошибка сервера" });
+    }
+});
+
 router.post("/express-orders/:id/start", authenticateToken, async (req, res) => {
     try {
         const executorId = req.user.id;
@@ -553,12 +642,20 @@ router.post("/express-orders/:id/start", authenticateToken, async (req, res) => 
         const order = await ExpressOrder.findByPk(id);
         if (!order) return res.status(404).json({ success: false, message: "Заказ не найден" });
 
-        if (order.executorId !== executorId) {
+        if (Number(order.executorId) !== Number(executorId)) {
             return res.status(403).json({ success: false, message: "Только исполнитель" });
         }
 
-        if (order.status !== "arrived_at_A") {
-            return res.status(409).json({ success: false, message: "Сначала подтвердите прибытие" });
+        const allowedStatuses =
+            order.type === "taxi"
+                ? ["waiting_at_A"]
+                : ["picked_up"];
+
+        if (!allowedStatuses.includes(order.status)) {
+            return res.status(409).json({
+                success: false,
+                message: "Нельзя начать выполнение из текущего статуса",
+            });
         }
 
         const from = order.status;
@@ -577,10 +674,10 @@ router.post("/express-orders/:id/start", authenticateToken, async (req, res) => 
             meta: { from, to: order.status },
         });
 
-        res.json({ success: true, order });
+        return res.json({ success: true, order });
     } catch (e) {
         console.error("express-orders start error:", e);
-        res.status(500).json({ success: false, message: "Ошибка сервера" });
+        return res.status(500).json({ success: false, message: "Ошибка сервера" });
     }
 });
 

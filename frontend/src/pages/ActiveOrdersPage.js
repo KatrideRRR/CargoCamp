@@ -52,9 +52,6 @@ const ActiveOrdersPage = () => {
     const [photoUploading, setPhotoUploading] = useState({});
     const [startingWork, setStartingWork] = useState({});
 
-    // раскрытие карточки обычного заказа
-    const [expandedOrders, setExpandedOrders] = useState({});
-
     // непрочитанные сообщения (обычные заказы)
     const [unreadOrders, setUnreadOrders] = useState({});
 
@@ -377,6 +374,9 @@ const ActiveOrdersPage = () => {
     };
 
     const completeOrderRequest = async (orderId) => {
+        const ok = window.confirm("Подтвердить завершение заказа?");
+        if (!ok) return;
+
         try {
             const t = localStorage.getItem("authToken");
             if (!t) {
@@ -588,10 +588,14 @@ const ActiveOrdersPage = () => {
     );
 
     const visibleRegularOrders =
-        activeView === "performing" ? performingOrders : createdOrders;
+        activeView === "performing"
+            ? performingOrders.slice(0, 1)
+            : createdOrders;
 
     const visibleExpressOrders =
-        activeView === "performing" ? performingExpressOrders : createdExpressOrders;
+        activeView === "performing"
+            ? (performingOrders.length > 0 ? [] : performingExpressOrders.slice(0, 1))
+            : createdExpressOrders;
 
     const hasAnyVisible =
         visibleRegularOrders.length > 0 || visibleExpressOrders.length > 0;
@@ -987,7 +991,8 @@ const ActiveOrdersPage = () => {
                                     })}
 
                                     {/* express активные заказы */}
-                                    {visibleExpressOrders.map((eo) => (                                        <ExpressOrderCard
+                                    {visibleExpressOrders.map((eo) => (
+                                        <ExpressOrderCard
                                             key={`express-${eo.id}`}
                                             order={eo}
                                             userId={user.id}
@@ -996,6 +1001,20 @@ const ActiveOrdersPage = () => {
                                                     params: { mode: "active" },
                                                 });
                                                 if (r.data?.success) setExpressOrders(Array.isArray(r.data.orders) ? r.data.orders : []);
+                                            }}
+                                            onOpenChat={(orderId) => handleOpenChat(orderId)}
+                                            onOpenDispute={(order) => openDisputeModal(order)}
+                                            onCallUser={async (order) => {
+                                                const phone = Number(order.creatorId) === Number(user.id)
+                                                    ? await getUserPhone(order.executorId)
+                                                    : await getUserPhone(order.creatorId);
+
+                                                if (!phone) {
+                                                    alert("Телефон не найден");
+                                                    return;
+                                                }
+
+                                                window.open(`tel:${phone}`);
                                             }}
                                         />
                                     ))}

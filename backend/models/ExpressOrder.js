@@ -113,6 +113,8 @@ module.exports = (sequelize, DataTypes) => {
                     'accepted',
                     'on_the_way_to_A',
                     'arrived_at_A',
+                    'waiting_at_A',
+                    'picked_up',
                     'in_progress',
                     'completed',
                     'cancelled'
@@ -133,6 +135,16 @@ module.exports = (sequelize, DataTypes) => {
             },
 
             /* === Тайминги === */
+            waitingStartedAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+                field: 'waiting_started_at',
+            },
+            pickedUpAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+                field: 'picked_up_at',
+            },
             arrivedAt: {
                 type: DataTypes.DATE,
                 allowNull: true,
