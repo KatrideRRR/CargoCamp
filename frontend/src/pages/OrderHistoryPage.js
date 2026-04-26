@@ -231,7 +231,7 @@ const OrderHistoryPage = () => {
                                         ) : (
                                             <span className="oh-pill oh-pill--muted">
                         <FiCheckCircle style={{ marginRight: 6 }} />
-                        Отзыв недоступен
+                        Отзыв сохранен
                       </span>
                                         )}
                                     </div>
