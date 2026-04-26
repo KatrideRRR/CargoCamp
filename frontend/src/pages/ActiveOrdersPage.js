@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "../styles/ActiveOrdersPage.css";
@@ -10,12 +10,14 @@ import Modal from "react-modal";
 import axiosInstance from "../utils/axiosInstance";
 import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
 import ExpressOrderCard from "../components/ExpressOrderCard";
+import { ModalContext } from "../components/modalContext";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
 const ActiveOrdersPage = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
+    const { openCompletionSuccessModal } = useContext(ModalContext);
     const isMobile = useMediaQuery({ maxWidth: 768 });
 
     const [orders, setOrders] = useState([]);
@@ -74,6 +76,34 @@ const ActiveOrdersPage = () => {
             default:
                 return <FaQuestionCircle title="Неизвестно" />;
         }
+    };
+
+    const buildCompletionPayload = ({ order, orderType }) => {
+        if (!order) return null;
+
+        if (orderType === "express") {
+            return {
+                orderId: order.id,
+                orderType: "express",
+                title: `Экспресс-заказ №${order.id} выполнен.`,
+                amount: Number(order.totalPrice || 0),
+                startedAt: order.startedAt || null,
+                completedAt: order.completedAt || null,
+                creatorId: order.creatorId,
+                executorId: order.executorId,
+            };
+        }
+
+        return {
+            orderId: order.id,
+            orderType: "regular",
+            title: `Заказ №${order.id} выполнен.`,
+            amount: Number(order.proposedSum || 0),
+            startedAt: order.workStartedAt || null,
+            completedAt: order.completedAt || null,
+            creatorId: order.creatorId,
+            executorId: order.executorId,
+        };
     };
 
     const disputeReasonOptions = [
@@ -385,23 +415,28 @@ const ActiveOrdersPage = () => {
                 return;
             }
 
-            await axiosInstance.post(`/orders/complete/${orderId}`, {}, { headers: { Authorization: `Bearer ${t}` } });
-
-            // локально обновим completedBy, но также сервер обычно пришлёт сокетом обновление
-            setOrders((prev) =>
-                prev.map((o) =>
-                    o.id === orderId
-                        ? {
-                            ...o,
-                            completedBy: Array.isArray(o.completedBy)
-                                ? [...new Set([...o.completedBy, user.id])]
-                                : [user.id],
-                        }
-                        : o
-                )
+            const res = await axiosInstance.post(
+                `/orders/complete/${orderId}`,
+                {},
+                { headers: { Authorization: `Bearer ${t}` } }
             );
 
-            alert("Подтверждение завершения отправлено ✅");
+            const updatedOrder = res.data;
+
+            setOrders((prev) =>
+                prev.map((o) => (o.id === orderId ? updatedOrder : o))
+            );
+
+            if (updatedOrder?.status === "completed") {
+                openCompletionSuccessModal(
+                    buildCompletionPayload({
+                        order: updatedOrder,
+                        orderType: "regular",
+                    })
+                );
+            } else {
+                alert("Подтверждение завершения отправлено ✅");
+            }
         } catch (e) {
             console.error(e);
             alert(e.response?.data?.message || "Ошибка при завершении заказа");
@@ -1000,7 +1035,17 @@ const ActiveOrdersPage = () => {
                                                 const r = await axiosInstance.get(`/express/express-orders/me`, {
                                                     params: { mode: "active" },
                                                 });
-                                                if (r.data?.success) setExpressOrders(Array.isArray(r.data.orders) ? r.data.orders : []);
+                                                if (r.data?.success) {
+                                                    setExpressOrders(Array.isArray(r.data.orders) ? r.data.orders : []);
+                                                }
+                                            }}
+                                            onCompletedSuccessfully={(completedOrder) => {
+                                                openCompletionSuccessModal(
+                                                    buildCompletionPayload({
+                                                        order: completedOrder,
+                                                        orderType: "express",
+                                                    })
+                                                );
                                             }}
                                             onOpenChat={(orderId) => handleOpenChat(orderId)}
                                             onOpenDispute={(order) => openDisputeModal(order)}

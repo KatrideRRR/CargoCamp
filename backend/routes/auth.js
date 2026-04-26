@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { User, OrderReview, Order, Category } = require('../models');
+const { User, OrderReview, Order, Category, ExpressOrder } = require('../models');
 const authenticateToken = require('../middlewares/userAuth');
 const router = express.Router();
 const multer = require('multer');
@@ -609,52 +609,86 @@ router.get("/reviews/user/:userId", async (req, res) => {
 router.post("/review", authenticateToken, async (req, res) => {
     try {
         const fromUserId = req.user.id;
-        const { orderId, rating, text } = req.body;
+        const { orderId, rating, text, isExpress } = req.body;
 
-        if (!orderId) return res.status(400).json({ message: "orderId обязателен" });
+        if (!orderId) {
+            return res.status(400).json({ message: "orderId обязателен" });
+        }
+
         const r = Number(rating);
         if (!Number.isFinite(r) || r < 1 || r > 5) {
             return res.status(400).json({ message: "rating должен быть от 1 до 5" });
         }
 
-        const order = await Order.findByPk(orderId);
-        if (!order) return res.status(404).json({ message: "Заказ не найден" });
+        let targetOrder = null;
+        let orderType = "regular";
 
-        // ✅ только после полного завершения
-        if (order.status !== "completed") {
-            return res.status(400).json({ message: "Отзыв можно оставить только после полного завершения заказа" });
+        // 1) если фронт явно передал, что заказ экспресс
+        if (isExpress === true) {
+            targetOrder = await ExpressOrder.findByPk(orderId);
+            orderType = "express";
+        } else {
+            // 2) сначала пробуем обычный заказ
+            targetOrder = await Order.findByPk(orderId);
+
+            // 3) если обычный не найден — пробуем экспресс
+            if (!targetOrder) {
+                targetOrder = await ExpressOrder.findByPk(orderId);
+                if (targetOrder) {
+                    orderType = "express";
+                }
+            }
+        }
+
+        if (!targetOrder) {
+            return res.status(404).json({ message: "Заказ не найден" });
+        }
+
+        // ✅ отзыв только после полного завершения
+        if (targetOrder.status !== "completed") {
+            return res.status(400).json({
+                message: "Отзыв можно оставить только после полного завершения заказа",
+            });
         }
 
         // ✅ только участник заказа
-        const isCreator = order.creatorId === fromUserId;
-        const isExecutor = order.executorId === fromUserId;
+        const isCreator = Number(targetOrder.creatorId) === Number(fromUserId);
+        const isExecutor = Number(targetOrder.executorId) === Number(fromUserId);
+
         if (!isCreator && !isExecutor) {
             return res.status(403).json({ message: "Вы не участник этого заказа" });
         }
 
-        const toUserId = isCreator ? order.executorId : order.creatorId;
+        const toUserId = isCreator ? targetOrder.executorId : targetOrder.creatorId;
+
         if (!toUserId) {
             return res.status(400).json({ message: "Невозможно определить второго участника" });
         }
 
-        // ✅ запрет “2 раза за один заказ” (уникальный ключ + проверка для норм сообщения)
-        const existing = await OrderReview.findOne({ where: { orderId, fromUserId } });
+        // ✅ запрет повторного отзыва за тот же заказ от того же пользователя
+        // если OrderReview у тебя пока привязан только к orderId, то этого хватит,
+        // но лучше ниже добавить поле orderType в модель OrderReview
+        const existing = await OrderReview.findOne({
+            where: { orderId, orderType, fromUserId }
+        });
+
         if (existing) {
             return res.status(400).json({ message: "Вы уже оставляли отзыв по этому заказу" });
         }
 
-        // Создаём отзыв
         await OrderReview.create({
             orderId,
             fromUserId,
             toUserId,
             rating: r,
             text: (text || "").trim() || null,
+            orderType, // если такого поля нет в модели — временно убери эту строку
         });
 
-        // Обновляем рейтинг пользователя (как у тебя сейчас)
         const user = await User.findByPk(toUserId);
-        if (!user) return res.status(404).json({ message: "Пользователь для оценки не найден" });
+        if (!user) {
+            return res.status(404).json({ message: "Пользователь для оценки не найден" });
+        }
 
         const currentRating = Number(user.rating || 0);
         const currentCount = Number(user.ratingCount || 0);
@@ -664,7 +698,13 @@ router.post("/review", authenticateToken, async (req, res) => {
         user.ratingCount = currentCount + 1;
         await user.save();
 
-        return res.json({ message: "Отзыв сохранён", toUserId, rating: user.rating, ratingCount: user.ratingCount });
+        return res.json({
+            message: "Отзыв сохранён",
+            orderType,
+            toUserId,
+            rating: user.rating,
+            ratingCount: user.ratingCount,
+        });
     } catch (e) {
         console.error("review error:", e);
         return res.status(500).json({ message: "Ошибка сервера" });

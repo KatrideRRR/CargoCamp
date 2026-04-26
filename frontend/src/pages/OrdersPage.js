@@ -1075,6 +1075,12 @@ const OrdersPage = () => {
                                                                         return;
                                                                     }
 
+                                                                    const confirmed = window.confirm(
+                                                                        `Вы уверены, что хотите взять в работу этот экспресс-заказ №${order.expressId}?`
+                                                                    );
+
+                                                                    if (!confirmed) return;
+
                                                                     try {
                                                                         await axiosInstance.post(`/express/express-orders/${order.expressId}/accept`);
                                                                         toast.success("Заказ принят!");

@@ -244,3 +244,33 @@
         font-size: 0.9rem;
     }
 }
+
+.modal-success .modal-icon-party{
+    font-size: 42px;
+    line-height: 1;
+    margin-bottom: 10px;
+}
+
+.modal-summary{
+    width: 100%;
+    margin-top: 10px;
+    padding: 12px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.62);
+    border: 1px solid rgba(255,255,255,0.45);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.55);
+}
+
+.modal-summary-row{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    color: #344054;
+    font-size: 15px;
+}
+
+.modal-summary-row + .modal-summary-row{
+    border-top: 1px solid rgba(15,23,42,0.08);
+}

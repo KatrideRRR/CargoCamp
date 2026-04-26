@@ -109,6 +109,7 @@ const ExpressOrderCard = ({
                               onOpenChat,
                               onOpenDispute,
                               onCallUser,
+                              onCompletedSuccessfully,
                           }) => {
     const [busy, setBusy] = useState(false);
 
@@ -181,7 +182,9 @@ const ExpressOrderCard = ({
     const pickUp = () =>
         doAction(
             () => axiosInstance.post(`/express/express-orders/${order.id}/pick-up`),
-            "Подтвердить, что вы забрали заказ?"
+            order.type === "taxi"
+                ? "Подтвердить, что клиент сел в машину?"
+                : "Подтвердить, что вы забрали заказ?"
         );
 
     const start = () =>
@@ -194,7 +197,13 @@ const ExpressOrderCard = ({
 
     const complete = () =>
         doAction(
-            () => axiosInstance.post(`/express/express-orders/${order.id}/complete`),
+            async () => {
+                const res = await axiosInstance.post(`/express/express-orders/${order.id}/complete`);
+                if (res.data?.success && res.data?.order) {
+                    onCompletedSuccessfully?.(res.data.order);
+                }
+                return res;
+            },
             "Подтвердить завершение заказа?"
         );
 
@@ -218,14 +227,20 @@ const ExpressOrderCard = ({
                 return { label: "Начать ожидание", icon: <FaHourglassHalf />, onClick: startWaiting };
             }
             if (order.status === "waiting_at_A") {
-                return { label: "Клиент сел", icon: <FaPlay />, onClick: start };
+                return {
+                    label: "Клиент в машине",
+                    icon: <FaPlay />,
+                    onClick: () =>
+                        doAction(
+                            () => axiosInstance.post(`/express/express-orders/${order.id}/start`),
+                            "Подтвердить, что клиент сел в машину и поездка началась?"
+                        ),
+                };
             }
             if (order.status === "in_progress") {
                 return { label: "Завершить заказ", icon: <FaFlagCheckered />, onClick: complete };
             }
-        }
-
-        if (order.type === "courier") {
+        } else {
             if (order.status === "accepted") {
                 return { label: "Еду к точке", icon: <FaCarSide />, onClick: onTheWay };
             }
@@ -236,7 +251,15 @@ const ExpressOrderCard = ({
                 return { label: "Забрал заказ", icon: <FaBoxOpen />, onClick: pickUp };
             }
             if (order.status === "picked_up") {
-                return { label: "Начать доставку", icon: <FaPlay />, onClick: start };
+                return {
+                    label: "Начать доставку",
+                    icon: <FaPlay />,
+                    onClick: () =>
+                        doAction(
+                            () => axiosInstance.post(`/express/express-orders/${order.id}/start`),
+                            "Подтвердить начало доставки?"
+                        ),
+                };
             }
             if (order.status === "in_progress") {
                 return { label: "Завершить заказ", icon: <FaFlagCheckered />, onClick: complete };

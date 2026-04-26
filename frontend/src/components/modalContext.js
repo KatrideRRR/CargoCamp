@@ -8,16 +8,44 @@ import ReviewModal from "../components/ReviewModal";
 
 export const ModalContext = createContext(null);
 
+const formatRub = (value) => {
+    const n = Number(value || 0);
+    return `${n.toLocaleString("ru-RU")} ₽`;
+};
+
+const formatDuration = (start, end) => {
+    if (!start || !end) return "—";
+
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return "—";
+
+    const diffMs = endDate - startDate;
+    if (diffMs <= 0) return "—";
+
+    const totalMin = Math.floor(diffMs / 60000);
+    const hours = Math.floor(totalMin / 60);
+    const mins = totalMin % 60;
+
+    if (hours > 0 && mins > 0) return `${hours} ч ${mins} мин`;
+    if (hours > 0) return `${hours} ч`;
+    return `${mins} мин`;
+};
+
 export const ModalProvider = ({ children }) => {
     const [modalData, setModalData] = useState(null);
     const [userId, setUserId] = useState(null);
-    const [notificationData, setNotificationData] = useState(null); // модалка одобрения заказа
-    const [completionNotificationData, setCompletionNotificationData] = useState(null); // модалка завершения заказа
+    const [notificationData, setNotificationData] = useState(null);
+    const [completionNotificationData, setCompletionNotificationData] = useState(null);
+
     const [showRatingModal, setShowRatingModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [rating, setRating] = useState(0);
     const [currUser, setCurrUser] = useState(null);
     const [reviewLoading, setReviewLoading] = useState(false);
+
+    const [completionSuccessData, setCompletionSuccessData] = useState(null);
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -48,15 +76,24 @@ export const ModalProvider = ({ children }) => {
         fetchUserData();
     }, []);
 
-    const openReviewFromCompletion = (orderId, creatorId, executorId) => {
+    const openReviewFromCompletion = (orderId, creatorId, executorId, orderType = "regular") => {
         setSelectedOrder({
             id: orderId,
             creatorId,
             executorId,
+            orderType,
         });
 
         setCompletionNotificationData(null);
         setShowRatingModal(true);
+    };
+
+    const openCompletionSuccessModal = (payload) => {
+        setCompletionSuccessData(payload);
+    };
+
+    const closeCompletionSuccessModal = () => {
+        setCompletionSuccessData(null);
     };
 
     const handleSubmitReview = async ({ rating, text }) => {
@@ -72,6 +109,7 @@ export const ModalProvider = ({ children }) => {
                 orderId: selectedOrder.id,
                 rating,
                 text,
+                isExpress: !!selectedOrder.isExpress,
             });
 
             toast.success("Отзыв отправлен");
@@ -166,6 +204,7 @@ export const ModalProvider = ({ children }) => {
                     orderId: data.orderId,
                     creatorId: data.creatorId,
                     executorId: data.executorId,
+                    orderType: "regular",
                 });
             }
         };
@@ -180,19 +219,16 @@ export const ModalProvider = ({ children }) => {
     }, [userId]);
 
     const handleCompleteOrder = async (orderId, creatorId, executorId) => {
-        console.log("▶ Начало завершения заказа", { orderId, creatorId, executorId });
-
         setSelectedOrder({
             id: orderId,
             creatorId,
             executorId,
+            orderType: "regular",
         });
 
         setCompletionNotificationData(null);
         setShowRatingModal(true);
     };
-
-    console.log(modalData);
 
     return (
         <ModalContext.Provider
@@ -207,11 +243,12 @@ export const ModalProvider = ({ children }) => {
                 setRating,
                 currUser,
                 setCurrUser,
+                openCompletionSuccessModal,
+                closeCompletionSuccessModal,
             }}
         >
             {children}
 
-            {/* Модалка одобрения заказа */}
             {notificationData && (
                 <div className="modal-overlay">
                     <div className="modal modal-compact">
@@ -267,7 +304,6 @@ export const ModalProvider = ({ children }) => {
                 </div>
             )}
 
-            {/* Модалка завершения заказа */}
             {completionNotificationData && (
                 <div className="modal-overlay">
                     <div className="modal modal-compact">
@@ -304,7 +340,8 @@ export const ModalProvider = ({ children }) => {
                                     openReviewFromCompletion(
                                         completionNotificationData.orderId,
                                         completionNotificationData.creatorId,
-                                        completionNotificationData.executorId
+                                        completionNotificationData.executorId,
+                                        "regular"
                                     )
                                 }
                             >
@@ -316,6 +353,60 @@ export const ModalProvider = ({ children }) => {
                                 onClick={handleCompletionNotificationClose}
                             >
                                 Позже
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {completionSuccessData && (
+                <div className="modal-overlay">
+                    <div className="modal modal-compact modal-success">
+                        <button
+                            className="modal-close"
+                            onClick={closeCompletionSuccessModal}
+                            aria-label="Закрыть"
+                            type="button"
+                        >
+                            ×
+                        </button>
+
+                        <div className="modal-icon modal-icon-party">🎉</div>
+                        <h2 className="modal-title">Заказ успешно завершён</h2>
+                        <p className="modal-text">{completionSuccessData.title}</p>
+
+                        <div className="modal-summary">
+                            <div className="modal-summary-row">
+                                <span>Ваш доход</span>
+                                <b>{formatRub(completionSuccessData.amount)}</b>
+                            </div>
+
+                            <div className="modal-summary-row">
+                                <span>Время выполнения</span>
+                                <b>{formatDuration(completionSuccessData.startedAt, completionSuccessData.completedAt)}</b>
+                            </div>
+                        </div>
+
+                        <div className="modal-actions">
+                            <button
+                                className="modal-btn modal-btn-primary"
+                                onClick={() =>
+                                    openReviewFromCompletion(
+                                        completionSuccessData.orderId,
+                                        completionSuccessData.creatorId,
+                                        completionSuccessData.executorId,
+                                        completionSuccessData.orderType
+                                    )
+                                }
+                            >
+                                Оставить отзыв
+                            </button>
+
+                            <button
+                                className="modal-btn modal-btn-ghost"
+                                onClick={closeCompletionSuccessModal}
+                            >
+                                Закрыть
                             </button>
                         </div>
                     </div>

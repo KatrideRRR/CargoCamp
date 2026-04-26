@@ -59,6 +59,12 @@ module.exports = (sequelize) => {
                 type: DataTypes.TEXT,
                 allowNull: true,
             },
+
+            orderType: {
+                type: DataTypes.ENUM("regular", "express"),
+                allowNull: false,
+                defaultValue: "regular",
+            }
         },
         {
             sequelize,
