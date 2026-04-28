@@ -1187,3 +1187,34 @@
         width: auto;
     }
 }
+
+.card-demo-note{
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 16px;
+    background: rgba(29,78,216,.08);
+    border: 1px solid rgba(29,78,216,.18);
+    color: rgba(29,78,216,.95);
+    font-size: .9rem;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+.modal-window-compact{
+    max-width: 520px;
+}
+
+.modal-actions-row{
+    margin-top: 16px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 520px){
+    .modal-actions-row{
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+}

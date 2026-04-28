@@ -9,13 +9,15 @@ import YandexMapModal from "../components/YandexMapModal";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
+// ✅ временно для скринов ЮKassa
+const CARD_BIND_SCREENSHOT_MODE = true;
+
 function looksLikeCoordsString(v) {
     if (!v) return false;
     const s = String(v).trim();
     return s.startsWith("Координаты:") || /^\d{1,3}\.\d+,\s*\d{1,3}\.\d+$/.test(s);
 }
 
-// reverse geocode через Yandex Geocoder: geocode=lng,lat
 async function reverseGeocodeYandex({ lat, lng, apiKey }) {
     if (!apiKey) throw new Error("No Yandex API key");
 
@@ -23,7 +25,9 @@ async function reverseGeocodeYandex({ lat, lng, apiKey }) {
     const r = await fetch(url);
     const data = await r.json();
 
-    const first = data?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
+    const first =
+        data?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
+
     const text =
         first?.metaDataProperty?.GeocoderMetaData?.text ||
         first?.name ||
@@ -44,22 +48,30 @@ const ProfilePage = () => {
     const [locationDraft, setLocationDraft] = useState("");
     const [locLoading, setLocLoading] = useState(false);
     const [locError, setLocError] = useState(null);
-    const [gpsCandidate, setGpsCandidate] = useState(null); // {lat,lng,address}
+    const [gpsCandidate, setGpsCandidate] = useState(null);
     const [showMapModal, setShowMapModal] = useState(false);
     const [addressSuggestions, setAddressSuggestions] = useState([]);
-    const [pickedCoords, setPickedCoords] = useState(null); // {lat, lng}
+    const [pickedCoords, setPickedCoords] = useState(null);
     const [avatarUploading, setAvatarUploading] = useState(false);
 
     const [categories, setCategories] = useState([]);
-    const [categoryPick, setCategoryPick] = useState([]); // массив id
+    const [categoryPick, setCategoryPick] = useState([]);
     const [catSaving, setCatSaving] = useState(false);
+
+    const [headerCollapsed, setHeaderCollapsed] = useState(false);
+
+    // ✅ demo-состояние карты для скринов
+    const [demoCardBound, setDemoCardBound] = useState(false);
+    const [demoCardData, setDemoCardData] = useState({
+        cardType: "Visa",
+        cardLastFour: "1234",
+    });
+    const [showUnbindConfirm, setShowUnbindConfirm] = useState(false);
 
     const navigate = useNavigate();
     const { logout, isAuthenticated } = useAuth();
 
     const YM_KEY = process.env.REACT_APP_YANDEX_API_KEY;
-
-    const [headerCollapsed, setHeaderCollapsed] = useState(false);
 
     useEffect(() => {
         let ticking = false;
@@ -71,9 +83,6 @@ const ProfilePage = () => {
             requestAnimationFrame(() => {
                 const y = window.scrollY;
 
-                // ГИСТЕРЕЗИС:
-                // - сворачиваем после 80px
-                // - разворачиваем только если вернулись ниже 40px
                 setHeaderCollapsed((prev) => {
                     if (!prev && y > 80) return true;
                     if (prev && y < 40) return false;
@@ -141,9 +150,7 @@ const ProfilePage = () => {
 
         try {
             const r = await fetch(
-                `https://geocode-maps.yandex.ru/1.x/?apikey=${YM_KEY}&geocode=${encodeURIComponent(
-                    query
-                )}&format=json&results=6`
+                `https://geocode-maps.yandex.ru/1.x/?apikey=${YM_KEY}&geocode=${encodeURIComponent(query)}&format=json&results=6`
             );
             const data = await r.json();
 
@@ -246,8 +253,8 @@ const ProfilePage = () => {
     };
 
     useEffect(() => {
-        const openAt = 80;   // свернуть после 80px
-        const closeAt = 40;  // развернуть обратно только если <40px
+        const openAt = 80;
+        const closeAt = 40;
 
         const onScroll = () => {
             const y = window.scrollY;
@@ -273,13 +280,11 @@ const ProfilePage = () => {
             const lng = Number(profile.locationLng);
             const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
 
-            // 1) если адрес нормальный — ставим его
             if (addr && !looksLikeCoordsString(addr)) {
                 setLocationDraft(addr);
                 return;
             }
 
-            // 2) если адреса нет/он "Координаты...", но есть координаты — reverse -> адрес
             if (hasCoords) {
                 setLocLoading(true);
                 setLocError(null);
@@ -296,7 +301,6 @@ const ProfilePage = () => {
                 return;
             }
 
-            // 3) вообще ничего нет
             setLocationDraft(addr || "");
         })();
     }, [profile, YM_KEY]);
@@ -362,10 +366,7 @@ const ProfilePage = () => {
                         return;
                     }
 
-                    // ✅ показываем пользователю сразу адрес
                     setLocationDraft(addr);
-
-                    // ✅ кандидат для подтверждения уже с адресом (без координат в тексте)
                     setGpsCandidate({ lat, lng, address: addr });
                 } catch (e) {
                     console.error("reverse geocode error:", e);
@@ -441,6 +442,16 @@ const ProfilePage = () => {
     };
 
     const handleBindCard = async () => {
+        if (CARD_BIND_SCREENSHOT_MODE) {
+            setDemoCardBound(true);
+            setDemoCardData({
+                cardType: "Visa",
+                cardLastFour: "1234",
+            });
+            toast.success("Демо-карта привязана");
+            return;
+        }
+
         try {
             const token = localStorage.getItem("authToken");
             if (!token) return toast.error("Вы не авторизованы");
@@ -461,6 +472,13 @@ const ProfilePage = () => {
     };
 
     const handleUnbindCard = async () => {
+        if (CARD_BIND_SCREENSHOT_MODE) {
+            setDemoCardBound(false);
+            setShowUnbindConfirm(false);
+            toast.success("Карта удалена");
+            return;
+        }
+
         try {
             const token = localStorage.getItem("authToken");
             if (!token) return toast.error("Вы не авторизованы");
@@ -533,8 +551,6 @@ const ProfilePage = () => {
             });
 
             toast.success("Документы успешно загружены");
-
-            // ✅ сразу подтянем изменения
             await fetchProfileData();
         } catch (error) {
             console.error("Ошибка загрузки документов:", error);
@@ -549,19 +565,31 @@ const ProfilePage = () => {
         return "Не пройдена";
     }, [profile]);
 
+    const isCardBound = CARD_BIND_SCREENSHOT_MODE
+        ? demoCardBound
+        : !!paymentMethodId;
+
+    const cardTypeView = CARD_BIND_SCREENSHOT_MODE
+        ? demoCardData.cardType
+        : profile?.cardType;
+
+    const cardLastFourView = CARD_BIND_SCREENSHOT_MODE
+        ? demoCardData.cardLastFour
+        : profile?.cardLastFour;
+
     if (loading) return <div className="profile-loading">Загрузка данных профиля...</div>;
-    if (error)
+    if (error) {
         return (
             <div className="profile-loading">
                 <p className="profile-error">{error}</p>
             </div>
         );
+    }
 
     return (
         <div className="profile-page">
             <div className="profile-shell">
                 <div className={`profile-header glass ${headerCollapsed ? "is-collapsed" : ""}`}>
-
                     <div className="profile-header-top">
                         <div>
                             <h1 className="profile-title">Профиль</h1>
@@ -571,8 +599,8 @@ const ProfilePage = () => {
                                 <div className="header-mini">
                                     <span className="header-mini-name">{profile.username}</span>
                                     <span className="header-mini-pill">
-          ★ {profile.rating ? Number(profile.rating).toFixed(1) : "—"}
-        </span>
+                                        ★ {profile.rating ? Number(profile.rating).toFixed(1) : "—"}
+                                    </span>
                                 </div>
                             )}
                         </div>
@@ -610,8 +638,8 @@ const ProfilePage = () => {
                                     <div className="identity-meta">
                                         <span className="identity-pill">ID: {profile.id}</span>
                                         <span className="identity-pill">
-                Рейтинг: {profile.rating ? renderStars(profile.rating) : "Нет"}
-            </span>
+                                            Рейтинг: {profile.rating ? renderStars(profile.rating) : "Нет"}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -619,7 +647,6 @@ const ProfilePage = () => {
                     )}
                 </div>
 
-                {/* Платежи */}
                 <div className="profile-card glass">
                     <div className="card-head">
                         <div>
@@ -628,22 +655,34 @@ const ProfilePage = () => {
                         </div>
                     </div>
 
-                    {paymentMethodId ? (
+                    {isCardBound ? (
                         <div className="card-row">
                             <div className="card-row-text">
                                 <div className="card-strong">Карта привязана</div>
                                 <div className="card-muted">
-                                    {profile?.cardType} •••• {profile?.cardLastFour}
+                                    {cardTypeView} •••• {cardLastFourView}
                                 </div>
                             </div>
-                            <button className="btn btn-ghost-danger" onClick={handleUnbindCard}>
+                            <button
+                                className="btn btn-ghost-danger"
+                                onClick={() => setShowUnbindConfirm(true)}
+                            >
                                 Удалить
                             </button>
                         </div>
                     ) : (
-                        <button className="btn btn-primary" onClick={handleBindCard}>
+                        <button
+                            className="btn btn-primary"
+                            onClick={CARD_BIND_SCREENSHOT_MODE ? handleBindCard : () => setShowAgreement(true)}
+                        >
                             Привязать карту
                         </button>
+                    )}
+
+                    {CARD_BIND_SCREENSHOT_MODE && (
+                        <div className="card-demo-note">
+                            Демо-режим для скриншотов: интерфейс привязки/отвязки показывается без реального запроса в ЮKassa.
+                        </div>
                     )}
 
                     {hasDebt && (
@@ -659,7 +698,6 @@ const ProfilePage = () => {
                     )}
                 </div>
 
-                {/* Premium */}
                 <div className="profile-card glass">
                     <div className="card-head">
                         <div>
@@ -678,7 +716,6 @@ const ProfilePage = () => {
                     </div>
                 </div>
 
-                {/* Верификация */}
                 <div className="profile-card glass">
                     <div className="card-head">
                         <div>
@@ -744,7 +781,6 @@ const ProfilePage = () => {
                     ) : (
                         <div className="docs-empty">Документы ещё не загружены</div>
                     )}
-
                 </div>
 
                 <div className="profile-card glass">
@@ -868,13 +904,10 @@ const ProfilePage = () => {
                         </button>
                     </div>
 
-                    {/* ✅ Подтверждение GPS */}
                     {gpsCandidate && (
                         <div className="gps-confirm">
                             <div className="gps-title">Мы определили координаты. Верно?</div>
-                            <div className="gps-sub">
-                                {gpsCandidate.address}
-                            </div>
+                            <div className="gps-sub">{gpsCandidate.address}</div>
                             <div className="gps-actions">
                                 <button
                                     className="btn btn-primary"
@@ -897,14 +930,12 @@ const ProfilePage = () => {
                         </div>
                     )}
 
-                    {/* ✅ Модалка карты */}
                     <YandexMapModal
                         isOpen={showMapModal}
                         onClose={() => setShowMapModal(false)}
                         initialLat={profile?.locationLat}
                         initialLng={profile?.locationLng}
                         onPick={(picked) => {
-                            // picked: {lat,lng,address}
                             setLocationDraft(picked.address);
                             saveLocation({ address: picked.address, lat: picked.lat, lng: picked.lng, source: "map" });
                             setShowMapModal(false);
@@ -920,7 +951,6 @@ const ProfilePage = () => {
                     {locError && <div className="loc-error">{locError}</div>}
                 </div>
 
-                {/* Действия */}
                 <div className="profile-actions glass">
                     <button onClick={handleMyComplaints} className="btn btn-ghost">
                         Отзывы
@@ -968,6 +998,32 @@ const ProfilePage = () => {
                             <button className="btn btn-ghost" onClick={() => setShowVerificationModal(false)}>
                                 Закрыть
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showUnbindConfirm && (
+                <div className="modal-overlay" onClick={() => setShowUnbindConfirm(false)}>
+                    <div className="modal-window modal-window-compact" onClick={(e) => e.stopPropagation()}>
+                        <h3>Удалить карту?</h3>
+                        <div className="modal-content">
+                            <p>
+                                Вы уверены, что хотите отвязать сохранённую карту{" "}
+                                <strong>{cardTypeView} •••• {cardLastFourView}</strong>?
+                            </p>
+                            <p className="warning">
+                                После удаления карта больше не будет использоваться для быстрых платежей.
+                            </p>
+
+                            <div className="modal-actions-row">
+                                <button className="btn btn-ghost" onClick={() => setShowUnbindConfirm(false)}>
+                                    Отмена
+                                </button>
+                                <button className="btn btn-danger" onClick={handleUnbindCard}>
+                                    Удалить карту
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
