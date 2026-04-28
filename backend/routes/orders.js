@@ -569,37 +569,60 @@ module.exports = (io) => {
         const { proposedSum, comment } = req.body;
         const executorId = req.user.id;
 
-        // ✅ запрет брать новые заказы, если есть долг
-        const executor = await User.findByPk(executorId, {
-            attributes: ['id', 'debt', 'subscription_type', 'subscription_expires_at']
-        });
-
-        if (!executor) return res.status(404).json({ message: "Пользователь не найден" });
-
-        const hasActivePremium =
-            executor.subscription_type === 'premium' &&
-            executor.subscription_expires_at &&
-            new Date(executor.subscription_expires_at) > new Date();
-
-        if (!hasActivePremium && Number(executor.debt || 0) > 0) {
-            return res.status(400).json({
-                message: "У вас есть задолженность по комиссии. Погасите её, чтобы брать новые заказы."
-            });
-        }
-
-        const busyRegular = await hasBusyRegularOrder(Order, executorId);
-        const busyTaxi = await hasBusyTaxiOrder(ExpressOrder, executorId);
-
-        if (busyRegular || busyTaxi) {
-            return res.status(400).json({
-                message: "У вас уже есть активный заказ. Завершите его, чтобы брать новый."
-            });
-        }
-
         try {
+            // ✅ валидируем сумму сразу
+            const normalizedProposedSum = Number(
+                String(proposedSum ?? "")
+                    .replace(",", ".")
+                    .trim()
+            );
+
+            if (!Number.isFinite(normalizedProposedSum) || normalizedProposedSum <= 0) {
+                return res.status(400).json({
+                    message: "Укажите корректную сумму больше 0",
+                });
+            }
+
+            // если хочешь только целые рубли — оставляем так
+            const proposedSumRub = Math.round(normalizedProposedSum);
+
+            // ✅ запрет брать новые заказы, если есть долг
+            const executor = await User.findByPk(executorId, {
+                attributes: ["id", "debt", "subscription_type", "subscription_expires_at"],
+            });
+
+            if (!executor) {
+                return res.status(404).json({ message: "Пользователь не найден" });
+            }
+
+            const hasActivePremium =
+                executor.subscription_type === "premium" &&
+                executor.subscription_expires_at &&
+                new Date(executor.subscription_expires_at) > new Date();
+
+            if (!hasActivePremium && Number(executor.debt || 0) > 0) {
+                return res.status(400).json({
+                    message: "У вас есть задолженность по комиссии. Погасите её, чтобы брать новые заказы.",
+                });
+            }
+
+            const busyRegular = await hasBusyRegularOrder(Order, executorId);
+            const busyTaxi = await hasBusyTaxiOrder(ExpressOrder, executorId);
+
+            if (busyRegular || busyTaxi) {
+                return res.status(400).json({
+                    message: "У вас уже есть активный заказ. Завершите его, чтобы брать новый.",
+                });
+            }
+
             const order = await Order.findByPk(id);
-            if (!order) return res.status(404).json({ message: "Заказ не найден" });
-            if (order.status !== "pending") return res.status(400).json({ message: "Заказ недоступен" });
+            if (!order) {
+                return res.status(404).json({ message: "Заказ не найден" });
+            }
+
+            if (order.status !== "pending") {
+                return res.status(400).json({ message: "Заказ недоступен" });
+            }
 
             // Парсим existing requests
             let requests = [];
@@ -608,20 +631,21 @@ module.exports = (io) => {
                     requests = Array.isArray(order.requests) ? order.requests : JSON.parse(order.requests);
                 } catch (e) {
                     console.error("Ошибка парсинга requests:", e);
+                    requests = [];
                 }
             }
 
             // Проверка на повторный запрос
-            if (requests.some(req => req.executorId === executorId)) {
+            if (requests.some((reqItem) => Number(reqItem.executorId) === Number(executorId))) {
                 return res.status(400).json({ message: "Вы уже отправили запрос на этот заказ" });
             }
 
             // Добавляем новый запрос
             requests.push({
-                executorId,
-                proposedSum,
-                comment,
-                createdAt: new Date().toISOString()
+                executorId: Number(executorId),
+                proposedSum: proposedSumRub,
+                comment: comment ? String(comment).trim() : "",
+                createdAt: new Date().toISOString(),
             });
 
             order.requests = JSON.stringify(requests);
@@ -630,11 +654,16 @@ module.exports = (io) => {
             let requestedExecutors = [];
             if (order.requestedExecutors) {
                 try {
-                    requestedExecutors = JSON.parse(order.requestedExecutors);
-                } catch (e) {}
+                    requestedExecutors = Array.isArray(order.requestedExecutors)
+                        ? order.requestedExecutors
+                        : JSON.parse(order.requestedExecutors);
+                } catch (e) {
+                    requestedExecutors = [];
+                }
             }
-            if (!requestedExecutors.includes(executorId)) {
-                requestedExecutors.push(executorId);
+
+            if (!requestedExecutors.map(Number).includes(Number(executorId))) {
+                requestedExecutors.push(Number(executorId));
                 order.requestedExecutors = JSON.stringify(requestedExecutors);
             }
 
@@ -650,7 +679,7 @@ module.exports = (io) => {
                     entityId: order.id,
                     orderId: order.id,
                     meta: {
-                        proposedSum,
+                        proposedSum: proposedSumRub,
                         comment: comment ? String(comment).slice(0, 300) : null,
                     },
                 });
@@ -661,10 +690,13 @@ module.exports = (io) => {
                 requesterId: executorId,
             });
 
-            res.json({ message: "Запрос на выполнение отправлен заказчику", order });
+            return res.json({
+                message: "Запрос на выполнение отправлен заказчику",
+                order,
+            });
         } catch (error) {
             console.error("Ошибка при запросе заказа:", error);
-            res.status(500).json({ message: "Ошибка сервера" });
+            return res.status(500).json({ message: "Ошибка сервера" });
         }
     });
 
@@ -733,52 +765,80 @@ module.exports = (io) => {
         }
     });
 
-    router.post('/:id/approve', authenticateToken, async (req, res) => {
+    router.post("/:id/approve", authenticateToken, async (req, res) => {
         const { id } = req.params;
         const { executorId } = req.body;
 
         try {
+            const normalizedExecutorId = Number(executorId);
 
-            const order = await Order.findByPk(id);
-            if (!order) return res.status(404).json({ message: 'Заказ не найден' });
-
-            if (order.creatorId !== req.user.id) {
-                return res.status(403).json({ message: 'Вы не можете одобрить этот заказ' });
+            if (!Number.isFinite(normalizedExecutorId) || normalizedExecutorId <= 0) {
+                return res.status(400).json({ message: "Некорректный executorId" });
             }
 
-            if (!order.requestedExecutors || order.requestedExecutors.length === 0) {
-                return res.status(400).json({ message: 'Нет исполнителей, ожидающих одобрения' });
+            const order = await Order.findByPk(id);
+            if (!order) {
+                return res.status(404).json({ message: "Заказ не найден" });
+            }
+
+            if (Number(order.creatorId) !== Number(req.user.id)) {
+                return res.status(403).json({ message: "Вы не можете одобрить этот заказ" });
             }
 
             // requestedExecutors -> array
             let requestedExecutors = [];
             try {
-                requestedExecutors = JSON.parse(order.requestedExecutors);
-                if (!Array.isArray(requestedExecutors)) requestedExecutors = [];
+                requestedExecutors = Array.isArray(order.requestedExecutors)
+                    ? order.requestedExecutors
+                    : JSON.parse(order.requestedExecutors || "[]");
+
+                if (!Array.isArray(requestedExecutors)) {
+                    requestedExecutors = [];
+                }
             } catch (e) {
                 requestedExecutors = [];
             }
 
-            if (!requestedExecutors.includes(executorId)) {
-                return res.status(400).json({ message: 'Исполнитель не найден среди запросивших' });
+            if (!requestedExecutors.map(Number).includes(normalizedExecutorId)) {
+                return res.status(400).json({ message: "Исполнитель не найден среди запросивших" });
             }
 
             // requests -> array
             let requests = [];
             try {
-                requests = JSON.parse(order.requests);
-                if (!Array.isArray(requests)) requests = [];
+                requests = Array.isArray(order.requests)
+                    ? order.requests
+                    : JSON.parse(order.requests || "[]");
+
+                if (!Array.isArray(requests)) {
+                    requests = [];
+                }
             } catch (e) {
                 requests = [];
             }
 
-            const matchedRequest = requests.find(r => String(r.executorId) === String(executorId));
-            if (matchedRequest?.proposedSum) {
-                order.proposedSum = matchedRequest.proposedSum;
+            const matchedRequest = requests.find(
+                (r) => Number(r.executorId) === normalizedExecutorId
+            );
+
+            if (!matchedRequest) {
+                return res.status(400).json({ message: "Запрос исполнителя не найден" });
             }
 
-            const executorBusyRegular = await hasBusyRegularOrder(Order, executorId, order.id);
-            const executorBusyTaxi = await hasBusyTaxiOrder(ExpressOrder, executorId);
+            const approvedSum = Number(
+                String(matchedRequest.proposedSum ?? "")
+                    .replace(",", ".")
+                    .trim()
+            );
+
+            if (!Number.isFinite(approvedSum) || approvedSum <= 0) {
+                return res.status(400).json({
+                    message: "У выбранного исполнителя некорректная сумма. Попросите отправить запрос заново.",
+                });
+            }
+
+            const executorBusyRegular = await hasBusyRegularOrder(Order, normalizedExecutorId, order.id);
+            const executorBusyTaxi = await hasBusyTaxiOrder(ExpressOrder, normalizedExecutorId);
 
             if (executorBusyRegular || executorBusyTaxi) {
                 return res.status(409).json({
@@ -787,24 +847,38 @@ module.exports = (io) => {
             }
 
             // Назначаем исполнителя
-            order.executorId = executorId;
+            order.executorId = normalizedExecutorId;
+            order.proposedSum = Math.round(approvedSum);
+            order.finalPriceKopecks = Math.max(0, Math.round(approvedSum * 100));
 
-            // финальная сумма в копейках (берем proposedSum)
-            const proposedRub = Number(order.proposedSum || 0);
-            order.finalPriceKopecks = Math.max(0, Math.round(proposedRub * 100));
-
-            // cash / guarantee / installment
-            if (order.paymentType === 'cash') {
-                order.status = 'active';
-                order.dealStatus = 'none';
+            // Статус / сделка
+            if (order.paymentType === "cash") {
+                order.status = "active";
+                order.dealStatus = "none";
+            } else if (order.paymentType === "guarantee") {
+                // если у тебя дальше отдельная логика холда - подстрой под неё
+                order.status = "active";
+                if (!order.dealStatus || order.dealStatus === "none") {
+                    order.dealStatus = "waiting_payment";
+                }
+            } else if (order.paymentType === "installment" || order.paymentType === "installments") {
+                order.status = "active";
+                order.dealStatus = "none";
+            } else {
+                order.status = "active";
             }
 
-            // Активируем заказ
-            order.requestedExecutors = JSON.stringify([]); // чистим
+            // чистим список запросов
+            order.requestedExecutors = JSON.stringify([]);
+            order.requests = JSON.stringify([]);
 
             await order.save();
 
-            const cleanedOrderIds = await removeExecutorFromOtherPendingOrders(Order, executorId, order.id);
+            const cleanedOrderIds = await removeExecutorFromOtherPendingOrders(
+                Order,
+                normalizedExecutorId,
+                order.id
+            );
 
             if (req.logAction) {
                 await req.logAction({
@@ -816,38 +890,31 @@ module.exports = (io) => {
                     entityId: order.id,
                     orderId: order.id,
                     meta: {
-                        executorId,
+                        executorId: normalizedExecutorId,
                         removedFromOrderIds: cleanedOrderIds,
                     },
                 });
             }
 
-            // исполнитель
-            const executor = await User.findByPk(executorId);
-            if (!executor) return res.status(404).json({ message: 'Исполнитель не найден' });
+            const executor = await User.findByPk(normalizedExecutorId);
+            if (!executor) {
+                return res.status(404).json({ message: "Исполнитель не найден" });
+            }
 
-            // premium?
             const isPremium =
-                executor.subscription_type === 'premium' &&
+                executor.subscription_type === "premium" &&
                 executor.subscription_expires_at &&
                 new Date(executor.subscription_expires_at) > new Date();
 
-            // ✅ ДОЛГ ТОЛЬКО ЗА CASH, И ТОЛЬКО ЕСЛИ НЕ PREMIUM
-            const isCash = order.paymentType === 'cash';
-            const isRecommended = !!order.is_recommended; // или если хочешь строже: && !!order.promotionPaidAt
+            const isCash = order.paymentType === "cash";
+            const isRecommended = !!order.is_recommended;
             const feeRub = isRecommended ? 100 : 200;
+            const debtKopecks = !isPremium && isCash ? feeRub * 100 : 0;
 
-            const debtKopecks = (!isPremium && isCash) ? feeRub * 100 : 0;
-
-            // записываем debt (или обнуляем)
             if (debtKopecks > 0) {
-                await executor.update({
-                    debt: debtKopecks,
-                });
+                await executor.update({ debt: debtKopecks });
             } else {
-                await executor.update({
-                    debt: 0,
-                });
+                await executor.update({ debt: 0 });
             }
 
             await req.logAction({
@@ -859,7 +926,7 @@ module.exports = (io) => {
                 entityId: order.id,
                 orderId: order.id,
                 meta: {
-                    executorId,
+                    executorId: normalizedExecutorId,
                     paymentType: order.paymentType,
                     finalPriceKopecks: order.finalPriceKopecks,
                     status: order.status,
@@ -869,64 +936,78 @@ module.exports = (io) => {
                 },
             });
 
-            // ===== договор как у тебя =====
+            // ✅ грузим полный заказ с ассоциациями для PDF
+            const fullOrder = await Order.findByPk(order.id, {
+                include: [
+                    { model: User, as: "creator" },
+                    { model: User, as: "executor" },
+                    { model: Category, as: "category" },
+                    { model: Subcategory, as: "subcategory" },
+                    { model: Service, as: "service" },
+                ],
+            });
+
+            // ===== договор =====
             const contractData = {
-                orderId: order.id,
-                approvalDate: new Date().toLocaleDateString('ru-RU'),
-                city: 'Москва',
-                customerId: order.creatorId,
-                performerId: executorId,
-                customerName: `Пользователь ${order.creatorId}`,
-                performerName: `Пользователь ${executorId}`,
-                category: order.category || 'Общая категория',
-                subcategory: order.subcategory || 'Общая подкатегория',
-                address: order.address || 'Адрес не указан',
-                description: order.description || 'Описание не указано',
-                price: order.proposedSum || 0,
-                paymentType: order.paymentType || 'не указано',
-                dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('ru-RU'),
+                orderId: fullOrder.id,
+                approvalDate: new Date().toLocaleDateString("ru-RU"),
+                city: "Москва",
+
+                customerId: fullOrder.creatorId,
+                performerId: fullOrder.executorId,
+
+                customerName: fullOrder.creator?.username || `Пользователь ${fullOrder.creatorId}`,
+                performerName: fullOrder.executor?.username || `Пользователь ${fullOrder.executorId}`,
+
+                category: fullOrder.category?.name || "Общая категория",
+                subcategory: fullOrder.subcategory?.name || "Общая подкатегория",
+
+                address: fullOrder.address || "Адрес не указан",
+                description: fullOrder.description || "Описание не указано",
+                price: fullOrder.proposedSum || 0,
+                paymentType: fullOrder.paymentType || "не указано",
+                dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString("ru-RU"),
                 completeAt: null,
                 completedBy: [],
             };
 
-            const filePath = path.join(contractsRoot, `contract_${order.id}.pdf`);
+            const filePath = path.join(contractsRoot, `contract_${fullOrder.id}.pdf`);
+
             try {
                 await generateContractPDF(contractData, filePath);
-                order.contractPath = path.relative(path.join(__dirname, '..'), filePath);
-                await order.save();
+
+                fullOrder.contractPath = path.relative(path.join(__dirname, ".."), filePath);
+                await fullOrder.save();
             } catch (err) {
-                console.error('❌ Ошибка генерации PDF договора:', err);
+                console.error("❌ Ошибка генерации PDF договора:", err);
             }
 
-            io.emit('orderUpdated');
+            io.emit("orderUpdated");
 
-            // ✅ уведомление исполнителю (только факт debt/premium)
-            io.to(`user_${order.executorId}`).emit('orderApproved', {
-                orderId: order.id,
-                message: 'Ваш запрос на выполнение заказа одобрен!',
+            io.to(`user_${fullOrder.executorId}`).emit("orderApproved", {
+                orderId: fullOrder.id,
+                message: "Ваш запрос на выполнение заказа одобрен!",
                 isPremium,
                 debt: debtKopecks,
                 needPay: debtKopecks > 0,
                 paid: debtKopecks === 0,
             });
 
-            // уведомление заказчику
-            io.to(`user_${order.creatorId}`).emit('orderApproved', {
-                orderId: order.id,
-                message: 'Вы успешно одобрили заказ!',
+            io.to(`user_${fullOrder.creatorId}`).emit("orderApproved", {
+                orderId: fullOrder.id,
+                message: "Вы успешно одобрили заказ!",
             });
 
             return res.json({
                 success: true,
-                orderId: order.id,
-                paymentType: order.paymentType,
-                status: order.status,
-                dealStatus: order.dealStatus,
+                orderId: fullOrder.id,
+                paymentType: fullOrder.paymentType,
+                status: fullOrder.status,
+                dealStatus: fullOrder.dealStatus,
             });
-
         } catch (error) {
-            console.error('❌ Ошибка при одобрении заказа:', error);
-            return res.status(500).json({ message: 'Ошибка сервера' });
+            console.error("❌ Ошибка при одобрении заказа:", error);
+            return res.status(500).json({ message: "Ошибка сервера" });
         }
     });
 
