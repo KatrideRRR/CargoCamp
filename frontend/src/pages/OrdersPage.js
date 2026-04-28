@@ -386,8 +386,14 @@ const OrdersPage = () => {
 
     useEffect(() => {
         fetchExpress();
+
         socket.on("orderUpdated", fetchExpress);
-        return () => socket.off("orderUpdated", fetchExpress);
+        socket.on("expressOrdersUpdated", fetchExpress);
+
+        return () => {
+            socket.off("orderUpdated", fetchExpress);
+            socket.off("expressOrdersUpdated", fetchExpress);
+        };
     }, [fetchExpress]);
 
     // normalize express -> "order-like"

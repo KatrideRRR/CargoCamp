@@ -233,6 +233,11 @@ router.post("/express-orders", authenticateToken, async (req, res) => {
             { transaction: t }
         );
 
+        const io = req.app.locals.io;
+        if (io) {
+            io.emit("expressOrdersUpdated");
+        }
+
         await req.logAction({
             req,
             actorUserId: creatorId,
@@ -464,6 +469,13 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
         }
 
         await t.commit();
+
+        if (io) {
+            io.emit("expressOrdersUpdated"); // убрать заказ из общего списка
+            io.to(`user_${order.creatorId}`).emit("activeOrdersUpdated");
+            io.to(`user_${order.executorId}`).emit("activeOrdersUpdated");
+        }
+
         return res.json({
             success: true,
             order,
@@ -758,6 +770,7 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
             });
 
             // по желанию можно обновить активные заказы у всех участников
+            io.emit("expressOrdersUpdated");
             io.to(`user_${order.creatorId}`).emit("activeOrdersUpdated");
             io.to(`user_${order.executorId}`).emit("activeOrdersUpdated");
         }
@@ -809,6 +822,15 @@ router.post("/express-orders/:id/cancel", authenticateToken, async (req, res) =>
             expressOrderId: order.id,
             meta: { from, to: order.status },
         });
+
+        const io = req.app.locals.io;
+        if (io) {
+            io.emit("expressOrdersUpdated");
+            io.to(`user_${order.creatorId}`).emit("activeOrdersUpdated");
+            if (order.executorId) {
+                io.to(`user_${order.executorId}`).emit("activeOrdersUpdated");
+            }
+        }
 
         res.json({ success: true, order });
     } catch (e) {
