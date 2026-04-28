@@ -570,23 +570,6 @@ module.exports = (io) => {
         const executorId = req.user.id;
 
         try {
-            // ✅ валидируем сумму сразу
-            const normalizedProposedSum = Number(
-                String(proposedSum ?? "")
-                    .replace(",", ".")
-                    .trim()
-            );
-
-            if (!Number.isFinite(normalizedProposedSum) || normalizedProposedSum <= 0) {
-                return res.status(400).json({
-                    message: "Укажите корректную сумму больше 0",
-                });
-            }
-
-            // если хочешь только целые рубли — оставляем так
-            const proposedSumRub = Math.round(normalizedProposedSum);
-
-            // ✅ запрет брать новые заказы, если есть долг
             const executor = await User.findByPk(executorId, {
                 attributes: ["id", "debt", "subscription_type", "subscription_expires_at"],
             });
@@ -624,48 +607,70 @@ module.exports = (io) => {
                 return res.status(400).json({ message: "Заказ недоступен" });
             }
 
-            // Парсим existing requests
-            let requests = [];
-            if (order.requests) {
-                try {
-                    requests = Array.isArray(order.requests) ? order.requests : JSON.parse(order.requests);
-                } catch (e) {
-                    console.error("Ошибка парсинга requests:", e);
-                    requests = [];
-                }
+            if (Number(order.creatorId) === Number(executorId)) {
+                return res.status(400).json({ message: "Нельзя откликнуться на свой заказ" });
             }
 
-            // Проверка на повторный запрос
+            const normalizedProposedSum = Number(
+                String(proposedSum ?? "")
+                    .replace(",", ".")
+                    .trim()
+            );
+
+            if (!Number.isFinite(normalizedProposedSum) || normalizedProposedSum <= 0) {
+                return res.status(400).json({
+                    message: "Введите корректную сумму больше 0",
+                });
+            }
+
+            const safeProposedSum = Math.round(normalizedProposedSum);
+            const safeComment = comment ? String(comment).trim().slice(0, 1000) : "";
+
+            let requests = [];
+            try {
+                requests = Array.isArray(order.requests)
+                    ? order.requests
+                    : JSON.parse(order.requests || "[]");
+
+                if (!Array.isArray(requests)) {
+                    requests = [];
+                }
+            } catch (e) {
+                console.error("Ошибка парсинга requests:", e);
+                requests = [];
+            }
+
             if (requests.some((reqItem) => Number(reqItem.executorId) === Number(executorId))) {
                 return res.status(400).json({ message: "Вы уже отправили запрос на этот заказ" });
             }
 
-            // Добавляем новый запрос
             requests.push({
-                executorId: Number(executorId),
-                proposedSum: proposedSumRub,
-                comment: comment ? String(comment).trim() : "",
+                executorId,
+                proposedSum: safeProposedSum,
+                comment: safeComment,
                 createdAt: new Date().toISOString(),
             });
 
             order.requests = JSON.stringify(requests);
 
-            // Обновим requestedExecutors (старый механизм)
             let requestedExecutors = [];
-            if (order.requestedExecutors) {
-                try {
-                    requestedExecutors = Array.isArray(order.requestedExecutors)
-                        ? order.requestedExecutors
-                        : JSON.parse(order.requestedExecutors);
-                } catch (e) {
+            try {
+                requestedExecutors = Array.isArray(order.requestedExecutors)
+                    ? order.requestedExecutors
+                    : JSON.parse(order.requestedExecutors || "[]");
+
+                if (!Array.isArray(requestedExecutors)) {
                     requestedExecutors = [];
                 }
+            } catch (e) {
+                requestedExecutors = [];
             }
 
             if (!requestedExecutors.map(Number).includes(Number(executorId))) {
-                requestedExecutors.push(Number(executorId));
-                order.requestedExecutors = JSON.stringify(requestedExecutors);
+                requestedExecutors.push(executorId);
             }
+
+            order.requestedExecutors = JSON.stringify(requestedExecutors);
 
             await order.save();
 
@@ -679,8 +684,8 @@ module.exports = (io) => {
                     entityId: order.id,
                     orderId: order.id,
                     meta: {
-                        proposedSum: proposedSumRub,
-                        comment: comment ? String(comment).slice(0, 300) : null,
+                        proposedSum: safeProposedSum,
+                        comment: safeComment || null,
                     },
                 });
             }
@@ -943,7 +948,6 @@ module.exports = (io) => {
                     { model: User, as: "executor" },
                     { model: Category, as: "category" },
                     { model: Subcategory, as: "subcategory" },
-                    { model: Service, as: "service" },
                 ],
             });
 
