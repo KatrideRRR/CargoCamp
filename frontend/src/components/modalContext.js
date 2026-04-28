@@ -33,6 +33,22 @@ const formatDuration = (start, end) => {
     return `${mins} мин`;
 };
 
+// ✅ кто может оставлять отзыв
+const canReviewOrder = ({ orderType, userId, creatorId, executorId }) => {
+    if (!userId) return false;
+
+    // для экспресс-заказа отзыв первым оставляет заказчик
+    if (orderType === "express") {
+        return Number(userId) === Number(creatorId);
+    }
+
+    // для обычного заказа оставляем текущую логику — участник заказа
+    return (
+        Number(userId) === Number(creatorId) ||
+        Number(userId) === Number(executorId)
+    );
+};
+
 export const ModalProvider = ({ children }) => {
     const [modalData, setModalData] = useState(null);
     const [userId, setUserId] = useState(null);
@@ -79,12 +95,18 @@ export const ModalProvider = ({ children }) => {
         fetchUserData();
     }, []);
 
-    const openReviewFromCompletion = (orderId, creatorId, executorId, orderType = "regular") => {
+    const openReviewFromCompletion = (
+        orderId,
+        creatorId,
+        executorId,
+        orderType = "regular"
+    ) => {
         setSelectedOrder({
             id: orderId,
             creatorId,
             executorId,
             orderType,
+            isExpress: orderType === "express",
         });
 
         setCompletionNotificationData(null);
@@ -113,6 +135,7 @@ export const ModalProvider = ({ children }) => {
                 rating,
                 text,
                 isExpress: !!selectedOrder.isExpress,
+                orderType: selectedOrder.orderType || (selectedOrder.isExpress ? "express" : "regular"),
             });
 
             toast.success("Отзыв отправлен");
@@ -211,6 +234,21 @@ export const ModalProvider = ({ children }) => {
             }
         };
 
+        const handleExpressOrderCompleted = (data) => {
+            console.log("🔔 Экспресс-заказ завершён:", data);
+
+            if (!data?.message) return;
+
+            setCompletionNotificationData({
+                title: "Экспресс-заказ завершён",
+                description: `Заказ номер ${data.orderId}: ${data.message}`,
+                orderId: data.orderId,
+                creatorId: data.creatorId,
+                executorId: data.executorId,
+                orderType: "express",
+            });
+        };
+
         const handleOrderCompleted = (data) => {
             console.log("🔔 Уведомление о завершении заказа:", data);
 
@@ -221,17 +259,19 @@ export const ModalProvider = ({ children }) => {
                     orderId: data.orderId,
                     creatorId: data.creatorId,
                     executorId: data.executorId,
-                    orderType: "regular",
+                    orderType: data.orderType || "regular",
                 });
             }
         };
 
         socket.on("orderApproved", handleOrderApproved);
         socket.on("orderCompleted", handleOrderCompleted);
+        socket.on("expressOrderCompleted", handleExpressOrderCompleted);
 
         return () => {
             socket.off("orderApproved", handleOrderApproved);
             socket.off("orderCompleted", handleOrderCompleted);
+            socket.off("expressOrderCompleted", handleExpressOrderCompleted);
         };
     }, [userId]);
 
@@ -251,17 +291,36 @@ export const ModalProvider = ({ children }) => {
         setDebtModalData(null);
     };
 
-    const handleCompleteOrder = async (orderId, creatorId, executorId) => {
+    const handleCompleteOrder = (orderId, creatorId, executorId, orderType = "regular") => {
         setSelectedOrder({
             id: orderId,
             creatorId,
             executorId,
-            orderType: "regular",
+            orderType,
+            isExpress: orderType === "express",
         });
 
         setCompletionNotificationData(null);
         setShowRatingModal(true);
     };
+
+    const canReviewFromCompletionNotification = completionNotificationData
+        ? canReviewOrder({
+            orderType: completionNotificationData.orderType,
+            userId,
+            creatorId: completionNotificationData.creatorId,
+            executorId: completionNotificationData.executorId,
+        })
+        : false;
+
+    const canReviewFromSuccessModal = completionSuccessData
+        ? canReviewOrder({
+            orderType: completionSuccessData.orderType,
+            userId,
+            creatorId: completionSuccessData.creatorId,
+            executorId: completionSuccessData.executorId,
+        })
+        : false;
 
     return (
         <ModalContext.Provider
@@ -356,38 +415,43 @@ export const ModalProvider = ({ children }) => {
                         <p className="modal-text">{completionNotificationData.description}</p>
 
                         <div className="modal-actions">
-                            <button
-                                className="modal-btn modal-btn-primary"
-                                onClick={() =>
-                                    handleCompleteOrder(
-                                        completionNotificationData.orderId,
-                                        completionNotificationData.creatorId,
-                                        completionNotificationData.executorId
-                                    )
-                                }
-                            >
-                                Завершить
-                            </button>
+                            {canReviewFromCompletionNotification && (
+                                <button
+                                    className="modal-btn modal-btn-primary"
+                                    onClick={() =>
+                                        handleCompleteOrder(
+                                            completionNotificationData.orderId,
+                                            completionNotificationData.creatorId,
+                                            completionNotificationData.executorId,
+                                            completionNotificationData.orderType
+                                        )
+                                    }
+                                >
+                                    Завершить
+                                </button>
+                            )}
 
-                            <button
-                                className="modal-btn modal-btn-ghost"
-                                onClick={() =>
-                                    openReviewFromCompletion(
-                                        completionNotificationData.orderId,
-                                        completionNotificationData.creatorId,
-                                        completionNotificationData.executorId,
-                                        "regular"
-                                    )
-                                }
-                            >
-                                Оставить отзыв
-                            </button>
+                            {canReviewFromCompletionNotification && (
+                                <button
+                                    className="modal-btn modal-btn-ghost"
+                                    onClick={() =>
+                                        openReviewFromCompletion(
+                                            completionNotificationData.orderId,
+                                            completionNotificationData.creatorId,
+                                            completionNotificationData.executorId,
+                                            completionNotificationData.orderType
+                                        )
+                                    }
+                                >
+                                    Оставить отзыв
+                                </button>
+                            )}
 
                             <button
                                 className="modal-btn modal-btn-ghost"
                                 onClick={handleCompletionNotificationClose}
                             >
-                                Позже
+                                {canReviewFromCompletionNotification ? "Позже" : "Закрыть"}
                             </button>
                         </div>
                     </div>
@@ -423,19 +487,21 @@ export const ModalProvider = ({ children }) => {
                         </div>
 
                         <div className="modal-actions">
-                            <button
-                                className="modal-btn modal-btn-primary"
-                                onClick={() =>
-                                    openReviewFromCompletion(
-                                        completionSuccessData.orderId,
-                                        completionSuccessData.creatorId,
-                                        completionSuccessData.executorId,
-                                        completionSuccessData.orderType
-                                    )
-                                }
-                            >
-                                Оставить отзыв
-                            </button>
+                            {canReviewFromSuccessModal && (
+                                <button
+                                    className="modal-btn modal-btn-primary"
+                                    onClick={() =>
+                                        openReviewFromCompletion(
+                                            completionSuccessData.orderId,
+                                            completionSuccessData.creatorId,
+                                            completionSuccessData.executorId,
+                                            completionSuccessData.orderType || "regular"
+                                        )
+                                    }
+                                >
+                                    Оставить отзыв
+                                </button>
+                            )}
 
                             <button
                                 className="modal-btn modal-btn-ghost"

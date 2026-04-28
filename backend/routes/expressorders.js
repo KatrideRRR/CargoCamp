@@ -69,6 +69,18 @@ function canAccessExpressOrder(order, userId) {
     return isParticipant(order, userId) || canViewAvailableExpress(order, userId);
 }
 
+function emitExpressOrderUpdate(io, order) {
+    if (!io || !order) return;
+
+    if (order.creatorId) {
+        io.to(`user_${String(order.creatorId)}`).emit("activeOrdersUpdated");
+    }
+
+    if (order.executorId) {
+        io.to(`user_${String(order.executorId)}`).emit("activeOrdersUpdated");
+    }
+}
+
 async function bumpSavedAddressUsage({ userId, id, transaction }) {
     if (!id) return;
     const addr = await ExpressSavedAddress.findOne({ where: { id, userId }, transaction });
@@ -363,6 +375,9 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
         order.status = "accepted";
         await order.save({ transaction: t });
 
+        const io = req.app.locals.io;
+        emitExpressOrderUpdate(io, order);
+
         // ✅ 4) пробуем сразу списать комиссию (если есть привязанная карта), иначе — в долг
         let paidBySavedCard = false;
         let debtAdded = false;
@@ -484,6 +499,9 @@ router.post("/express-orders/:id/on-the-way", authenticateToken, async (req, res
         order.status = "on_the_way_to_A";
         await order.save();
 
+        const io = req.app.locals.io;
+        emitExpressOrderUpdate(io, order);
+
         await req.logAction({
             req,
             actorUserId: executorId,
@@ -525,6 +543,9 @@ router.post("/express-orders/:id/arrived", authenticateToken, async (req, res) =
         order.status = "arrived_at_A";
         order.arrivedAt = new Date();
         await order.save();
+
+        const io = req.app.locals.io;
+        emitExpressOrderUpdate(io, order);
 
         await req.logAction({
             req,
@@ -571,6 +592,9 @@ router.post("/express-orders/:id/start-waiting", authenticateToken, async (req, 
         order.waitingStartedAt = new Date();
         await order.save();
 
+        const io = req.app.locals.io;
+        emitExpressOrderUpdate(io, order);
+
         await req.logAction({
             req,
             actorUserId: executorId,
@@ -615,6 +639,9 @@ router.post("/express-orders/:id/pick-up", authenticateToken, async (req, res) =
         order.status = "picked_up";
         order.pickedUpAt = new Date();
         await order.save();
+
+        const io = req.app.locals.io;
+        emitExpressOrderUpdate(io, order);
 
         await req.logAction({
             req,
@@ -663,6 +690,9 @@ router.post("/express-orders/:id/start", authenticateToken, async (req, res) => 
         order.startedAt = new Date();
         await order.save();
 
+        const io = req.app.locals.io;
+        emitExpressOrderUpdate(io, order);
+
         await req.logAction({
             req,
             actorUserId: executorId,
@@ -689,7 +719,7 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
         const order = await ExpressOrder.findByPk(id);
         if (!order) return res.status(404).json({ success: false, message: "Заказ не найден" });
 
-        if (order.executorId !== executorId) {
+        if (Number(order.executorId) !== Number(executorId)) {
             return res.status(403).json({ success: false, message: "Только исполнитель" });
         }
 
@@ -702,6 +732,9 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
         order.completedAt = new Date();
         await order.save();
 
+        const io = req.app.locals.io;
+        emitExpressOrderUpdate(io, order);
+
         await req.logAction({
             req,
             actorUserId: executorId,
@@ -713,10 +746,29 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
             meta: { from, to: order.status },
         });
 
-        res.json({ success: true, order });
+        // ✅ уведомляем заказчика, что можно оставить отзыв
+        if (io) {
+            io.to(`user_${order.creatorId}`).emit("expressOrderCompleted", {
+                message: "Экспресс-заказ завершён. Оцените исполнителя.",
+                orderId: order.id,
+                creatorId: order.creatorId,
+                executorId: order.executorId,
+                orderType: "express",
+                type: order.type,
+            });
+
+            // по желанию можно обновить активные заказы у всех участников
+            io.to(`user_${order.creatorId}`).emit("activeOrdersUpdated");
+            io.to(`user_${order.executorId}`).emit("activeOrdersUpdated");
+        }
+
+        return res.json({
+            success: true,
+            order,
+        });
     } catch (e) {
         console.error("express-orders complete error:", e);
-        res.status(500).json({ success: false, message: "Ошибка сервера" });
+        return res.status(500).json({ success: false, message: "Ошибка сервера" });
     }
 });
 

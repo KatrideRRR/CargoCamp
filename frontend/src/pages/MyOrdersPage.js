@@ -233,6 +233,42 @@ const MyOrdersPage = () => {
         }
     };
 
+    useEffect(() => {
+        fetchOrders();
+
+        const checkAuthUser = async () => {
+            try {
+                const token = localStorage.getItem("authToken");
+                const profileResponse = await axiosInstance.get("/auth/profile", {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+
+                if (profileResponse.data.id !== Number(userId)) {
+                    navigate("/");
+                    return;
+                }
+
+                const normalizedUserId = String(profileResponse.data.id);
+
+                socket.emit("register", normalizedUserId);
+                socket.emit("subscribeToNotifications", normalizedUserId);
+            } catch (err) {
+                console.error("Ошибка проверки пользователя:", err);
+                navigate("/login");
+            }
+        };
+
+        checkAuthUser();
+
+        socket.on("orderUpdated", fetchOrders);
+        socket.on("activeOrdersUpdated", fetchOrders);
+
+        return () => {
+            socket.off("orderUpdated", fetchOrders);
+            socket.off("activeOrdersUpdated", fetchOrders);
+        };
+    }, [userId, navigate, setHasNewRequests]);
+
     const getPaymentIcon = (type) => {
         switch (type) {
             case "guarantee":
