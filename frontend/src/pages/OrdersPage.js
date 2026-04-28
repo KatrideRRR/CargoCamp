@@ -1,6 +1,7 @@
 // src/pages/OrdersPage.js
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { ModalContext } from "../components/modalContext";
 import axios from "axios";
 import axiosInstance from "../utils/axiosInstance";
 import Modal from "react-modal";
@@ -99,6 +100,8 @@ const OrdersPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [currentImages, setCurrentImages] = useState([]);
+
+    const { openDebtModal } = useContext(ModalContext);
 
     const creatorsCacheRef = useRef({});
 
@@ -292,6 +295,53 @@ const OrdersPage = () => {
             });
         }
     }, [userId]);
+
+    const savePendingOrderRequest = ({ orderId, proposedSum, comment }) => {
+        sessionStorage.setItem(
+            "pendingOrderRequestAfterDebtPayment",
+            JSON.stringify({
+                orderId,
+                proposedSum,
+                comment: comment || "",
+                createdAt: Date.now(),
+            })
+        );
+    };
+
+    const getPendingOrderRequest = () => {
+        try {
+            const raw = sessionStorage.getItem("pendingOrderRequestAfterDebtPayment");
+            return raw ? JSON.parse(raw) : null;
+        } catch {
+            return null;
+        }
+    };
+
+    const clearPendingOrderRequest = () => {
+        sessionStorage.removeItem("pendingOrderRequestAfterDebtPayment");
+    };
+
+    const submitRegularOrderRequest = useCallback(
+        async ({ orderId, proposedSum, comment }) => {
+            const token = localStorage.getItem("authToken");
+            if (!token) {
+                toast.info("Войдите, чтобы запросить выполнение");
+                navigate("/login");
+                return false;
+            }
+
+            await axiosInstance.post(
+                `/orders/${orderId}/request`,
+                { proposedSum, comment },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            toast.success("Запрос отправлен заказчику!");
+            await fetchBusyState();
+            return true;
+        },
+        [fetchBusyState, navigate]
+    );
 
     useEffect(() => {
         if (!userId) {
@@ -701,6 +751,67 @@ const OrdersPage = () => {
         return "Не задано";
     }, [locLoading, userLocation, locationDraft]);
 
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const debtReturn = params.get("debtReturn") === "1";
+        const resumeRequest = params.get("resumeRequest") === "1";
+
+        if (!debtReturn || !resumeRequest) return;
+
+        const pendingRequest = getPendingOrderRequest();
+        if (!pendingRequest?.orderId || !pendingRequest?.proposedSum) {
+            params.delete("debtReturn");
+            params.delete("resumeRequest");
+            const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+            window.history.replaceState({}, "", newUrl);
+            return;
+        }
+
+        let cancelled = false;
+
+        const resume = async () => {
+            try {
+                // ждём, пока вебхук успеет обновить debt
+                for (let attempt = 0; attempt < 10; attempt++) {
+                    if (cancelled) return;
+
+                    const profileRes = await axiosInstance.get("/auth/profile");
+                    const debt = Number(profileRes.data?.debt || 0);
+
+                    if (debt <= 0) {
+                        await submitRegularOrderRequest({
+                            orderId: pendingRequest.orderId,
+                            proposedSum: pendingRequest.proposedSum,
+                            comment: pendingRequest.comment || "",
+                        });
+
+                        clearPendingOrderRequest();
+
+                        params.delete("debtReturn");
+                        params.delete("resumeRequest");
+                        const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+                        window.history.replaceState({}, "", newUrl);
+                        return;
+                    }
+
+                    await new Promise((resolve) => setTimeout(resolve, 1500));
+                }
+
+                toast.info("Оплата ещё обрабатывается. Попробуйте ещё раз через пару секунд.");
+            } catch (e) {
+                console.error("resume request after debt payment error:", e);
+                toast.error("Не удалось автоматически отправить запрос после оплаты");
+            }
+        };
+
+        resume();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [submitRegularOrderRequest]);
+
     return (
         <div className="orders-page">
             <div className="orders-shell">
@@ -1011,30 +1122,47 @@ const OrdersPage = () => {
                                                                 }
 
                                                                 try {
+                                                                    const proposedSum = prompt("Введите сумму, которую вы хотите получить за выполнение:");
+                                                                    if (!proposedSum) return;
+
+                                                                    const normalizedSum = Number(String(proposedSum).replace(",", ".").trim());
+
+                                                                    if (!Number.isFinite(normalizedSum) || normalizedSum <= 0) {
+                                                                        toast.error("Введите корректную сумму");
+                                                                        return;
+                                                                    }
+
+                                                                    const comment = prompt("Комментарий к заказчику (необязательно):") || "";
+
                                                                     const statusRes = await axiosInstance.get("/orders/me/status", {
                                                                         headers: { Authorization: `Bearer ${token}` },
                                                                     });
 
-                                                                    const debt = statusRes.data?.debt || 0;
+                                                                    const debt = Number(statusRes.data?.debt || 0);
+
                                                                     if (debt > 0) {
-                                                                        toast.error("У вас есть задолженность по комиссии. Сначала погасите её в профиле.");
-                                                                        navigate("/profile");
+                                                                        savePendingOrderRequest({
+                                                                            orderId: order.id,
+                                                                            proposedSum: normalizedSum,
+                                                                            comment,
+                                                                        });
+
+                                                                        openDebtModal({
+                                                                            title: "Есть задолженность по комиссии",
+                                                                            description:
+                                                                                "Чтобы отправить запрос на этот заказ, сначала оплатите задолженность. После оплаты запрос отправится автоматически.",
+                                                                            amount: debt,
+                                                                            returnPath: "/orders?debtReturn=1&resumeRequest=1",
+                                                                        });
+
                                                                         return;
                                                                     }
 
-                                                                    const proposedSum = prompt("Введите сумму, которую вы хотите получить за выполнение:");
-                                                                    if (!proposedSum) return;
-
-                                                                    const comment = prompt("Комментарий к заказчику (необязательно):");
-
-                                                                    await axiosInstance.post(
-                                                                        `/orders/${order.id}/request`,
-                                                                        { proposedSum, comment },
-                                                                        { headers: { Authorization: `Bearer ${token}` } }
-                                                                    );
-
-                                                                    toast.success("Запрос отправлен заказчику!");
-                                                                    await fetchBusyState();
+                                                                    await submitRegularOrderRequest({
+                                                                        orderId: order.id,
+                                                                        proposedSum: normalizedSum,
+                                                                        comment,
+                                                                    });
                                                                 } catch (e) {
                                                                     console.error(e);
                                                                     toast.error(e.response?.data?.message || "Ошибка. Попробуйте позже.");

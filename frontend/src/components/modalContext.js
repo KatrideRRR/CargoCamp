@@ -45,6 +45,9 @@ export const ModalProvider = ({ children }) => {
     const [currUser, setCurrUser] = useState(null);
     const [reviewLoading, setReviewLoading] = useState(false);
 
+    const [debtModalData, setDebtModalData] = useState(null);
+    const [debtPayLoading, setDebtPayLoading] = useState(false);
+
     const [completionSuccessData, setCompletionSuccessData] = useState(null);
 
     useEffect(() => {
@@ -126,7 +129,13 @@ export const ModalProvider = ({ children }) => {
 
     const payDebtFromModal = async () => {
         try {
-            const res = await axiosInstance.post("/payments/debt/create");
+            if (!debtModalData) return;
+
+            setDebtPayLoading(true);
+
+            const res = await axiosInstance.post("/payments/debt/create", {
+                returnPath: debtModalData.returnPath,
+            });
 
             if (!res.data?.success) {
                 toast.error(res.data?.error || "Ошибка оплаты");
@@ -135,6 +144,7 @@ export const ModalProvider = ({ children }) => {
 
             if (res.data.noDebt) {
                 toast.info("Долгов нет");
+                setDebtModalData(null);
                 return;
             }
 
@@ -142,12 +152,18 @@ export const ModalProvider = ({ children }) => {
                 toast.info("Пробуем списать с привязанной карты...");
 
                 setTimeout(async () => {
-                    const refreshed = await axiosInstance.get("/auth/profile");
-                    setCurrUser(refreshed.data);
+                    try {
+                        const refreshed = await axiosInstance.get("/auth/profile");
+                        setCurrUser(refreshed.data);
 
-                    if (Number(refreshed.data.debt || 0) === 0) {
-                        setNotificationData(null);
-                        toast.success("Комиссия оплачена ✅");
+                        if (Number(refreshed.data.debt || 0) === 0) {
+                            setDebtModalData(null);
+                            toast.success("Комиссия оплачена ✅");
+                        }
+                    } catch (e) {
+                        console.error(e);
+                    } finally {
+                        setDebtPayLoading(false);
                     }
                 }, 2500);
 
@@ -158,6 +174,7 @@ export const ModalProvider = ({ children }) => {
         } catch (e) {
             console.error(e);
             toast.error("Ошибка оплаты комиссии");
+            setDebtPayLoading(false);
         }
     };
 
@@ -218,6 +235,22 @@ export const ModalProvider = ({ children }) => {
         };
     }, [userId]);
 
+    const openDebtModal = ({ title, description, amount, returnPath }) => {
+        setDebtModalData({
+            title: title || "Нужно погасить задолженность",
+            description:
+                description ||
+                "У вас есть задолженность по комиссии. Чтобы взять заказ в работу, сначала оплатите её.",
+            amount: Number(amount || 0),
+            returnPath: returnPath || "/profile?debtReturn=1",
+        });
+    };
+
+    const closeDebtModal = () => {
+        if (debtPayLoading) return;
+        setDebtModalData(null);
+    };
+
     const handleCompleteOrder = async (orderId, creatorId, executorId) => {
         setSelectedOrder({
             id: orderId,
@@ -245,6 +278,8 @@ export const ModalProvider = ({ children }) => {
                 setCurrUser,
                 openCompletionSuccessModal,
                 closeCompletionSuccessModal,
+                openDebtModal,
+                closeDebtModal,
             }}
         >
             {children}
@@ -407,6 +442,47 @@ export const ModalProvider = ({ children }) => {
                                 onClick={closeCompletionSuccessModal}
                             >
                                 Закрыть
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {debtModalData && (
+                <div className="modal-overlay">
+                    <div className="modal modal-compact">
+                        <button
+                            className="modal-close"
+                            onClick={closeDebtModal}
+                            aria-label="Закрыть"
+                            type="button"
+                        >
+                            ×
+                        </button>
+
+                        <div className="modal-icon">⚠️</div>
+                        <h2 className="modal-title">{debtModalData.title}</h2>
+                        <p className="modal-text">{debtModalData.description}</p>
+
+                        <div className="modal-note">
+                            К оплате: <b>{Math.round(debtModalData.amount / 100)} ₽</b>
+                        </div>
+
+                        <div className="modal-actions">
+                            <button
+                                className="modal-btn modal-btn-primary"
+                                onClick={payDebtFromModal}
+                                disabled={debtPayLoading}
+                            >
+                                {debtPayLoading ? "Переходим к оплате..." : "Оплатить сейчас"}
+                            </button>
+
+                            <button
+                                className="modal-btn modal-btn-ghost"
+                                onClick={closeDebtModal}
+                                disabled={debtPayLoading}
+                            >
+                                Позже
                             </button>
                         </div>
                     </div>

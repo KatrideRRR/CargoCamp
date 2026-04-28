@@ -87,60 +87,101 @@ router.post('/premium/create', authenticateToken, async (req, res) => {
 router.post('/debt/create', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
+        const { returnPath } = req.body || {};
 
         const user = await User.findByPk(userId);
-        if (!user) return res.status(404).json({ success: false, error: 'Пользователь не найден' });
+        if (!user) {
+            return res.status(404).json({ success: false, error: 'Пользователь не найден' });
+        }
 
         const debtKopecks = Number(user.debt || 0);
-        if (debtKopecks <= 0) return res.json({ success: true, noDebt: true });
+        if (debtKopecks <= 0) {
+            return res.json({ success: true, noDebt: true });
+        }
 
         const amountValue = (debtKopecks / 100).toFixed(2);
         const idempotenceKey = uuidv4();
+
+        const safeReturnPath =
+            typeof returnPath === "string" && returnPath.startsWith("/")
+                ? returnPath
+                : "/profile?debtReturn=1";
+
+        const returnUrl = `${process.env.FRONTEND_URL}${safeReturnPath}`;
 
         const basePayload = {
             amount: { value: amountValue, currency: 'RUB' },
             capture: true,
             description: `Оплата комиссии (задолженность) пользователя #${userId}`,
-            metadata: { type: 'debt', userId: String(userId), expectedKopecks: String(debtKopecks) },
+            metadata: {
+                type: 'debt',
+                userId: String(userId),
+                expectedKopecks: String(debtKopecks),
+            },
             receipt: {
-                customer: { phone: String(user.phone || '').replace(/[^\d+]/g, '') },
-                items: [{
-                    description: `Оплата комиссии (задолженность)`,
-                    quantity: 1,
-                    amount: { value: amountValue, currency: 'RUB' },
-                    vat_code: 1,
-                    payment_mode: 'full_payment',
-                    payment_subject: 'service',
-                }],
+                customer: {
+                    phone: String(user.phone || '').replace(/[^\d+]/g, ''),
+                },
+                items: [
+                    {
+                        description: `Оплата комиссии (задолженность)`,
+                        quantity: 1,
+                        amount: { value: amountValue, currency: 'RUB' },
+                        vat_code: 1,
+                        payment_mode: 'full_payment',
+                        payment_subject: 'service',
+                    }
+                ],
                 tax_system_code: 2,
             },
         };
 
-        // ✅ 1) Автосписание по сохраненной карте
         if (user.yookassa_payment_method_id) {
-            const payment = await yooKassa.createPayment({
-                ...basePayload,
-                payment_method_id: user.yookassa_payment_method_id,
-            }, idempotenceKey);
+            const payment = await yooKassa.createPayment(
+                {
+                    ...basePayload,
+                    payment_method_id: user.yookassa_payment_method_id,
+                },
+                idempotenceKey
+            );
+
+            await req.logAction?.({
+                req,
+                actorUserId: userId,
+                actorRole: "user",
+                actionType: "payment_create",
+                entityType: "payment",
+                paymentId: payment.id,
+                severity: "info",
+                meta: {
+                    provider: "yookassa",
+                    type: "debt",
+                    amount: amountValue,
+                    status: payment.status,
+                    paidBySavedCard: true,
+                },
+            });
 
             return res.json({
                 success: true,
                 paidBySavedCard: true,
                 paymentId: payment.id,
-                status: payment.status, // succeeded / pending и т.д.
+                status: payment.status,
             });
         }
 
-        // ✅ 2) Редирект, если карты нет
-        const payment = await yooKassa.createPayment({
-            ...basePayload,
-            confirmation: {
-                type: 'redirect',
-                return_url: `${process.env.FRONTEND_URL}/profile?debtReturn=1`,
+        const payment = await yooKassa.createPayment(
+            {
+                ...basePayload,
+                confirmation: {
+                    type: 'redirect',
+                    return_url: returnUrl,
+                },
             },
-        }, idempotenceKey);
+            idempotenceKey
+        );
 
-        await req.logAction({
+        await req.logAction?.({
             req,
             actorUserId: userId,
             actorRole: "user",
@@ -150,9 +191,11 @@ router.post('/debt/create', authenticateToken, async (req, res) => {
             severity: "info",
             meta: {
                 provider: "yookassa",
-                type: "premium",
+                type: "debt",
                 amount: amountValue,
                 status: payment.status,
+                paidBySavedCard: false,
+                returnUrl,
             },
         });
 
@@ -164,7 +207,10 @@ router.post('/debt/create', authenticateToken, async (req, res) => {
         });
     } catch (e) {
         console.error('debt/pay error:', e);
-        return res.status(500).json({ success: false, error: e?.message || 'Internal server error' });
+        return res.status(500).json({
+            success: false,
+            error: e?.message || 'Internal server error',
+        });
     }
 });
 
@@ -182,7 +228,7 @@ router.post('/card/bind/create', authenticateToken, async (req, res) => {
             {
                 amount: { value: amountValue, currency: 'RUB' },
                 capture: true,
-                save_payment_method: true, // ✅ сохраняем метод оплаты
+                save_payment_method: true,
                 confirmation: {
                     type: 'redirect',
                     return_url: `${process.env.FRONTEND_URL}/profile?bindReturn=1`,
@@ -201,18 +247,18 @@ router.post('/card/bind/create', authenticateToken, async (req, res) => {
                             description: `Привязка карты (проверочный платеж)`,
                             quantity: 1,
                             amount: { value: amountValue, currency: 'RUB' },
-                            vat_code: 1, // без НДС
+                            vat_code: 1,
                             payment_mode: 'full_payment',
                             payment_subject: 'service',
                         },
                     ],
-                    tax_system_code: 2, // УСН доходы
+                    tax_system_code: 2,
                 },
             },
             idempotenceKey
         );
 
-        await req.logAction({
+        await req.logAction?.({
             req,
             actorUserId: userId,
             actorRole: "user",
@@ -222,8 +268,7 @@ router.post('/card/bind/create', authenticateToken, async (req, res) => {
             severity: "info",
             meta: {
                 provider: "yookassa",
-                type: "premium",
-                duration,
+                type: "bind_card",
                 amount: amountValue,
                 status: payment.status,
             },
