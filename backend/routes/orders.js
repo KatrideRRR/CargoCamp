@@ -1082,11 +1082,15 @@ module.exports = (io) => {
                     completedBy: fullOrder.completedBy
                 };
 
-                const contractPath = path.join(contractsRoot, `contract_${order.id}.pdf`);
-                await generateContractPDF(data, contractPath);
+                try {
+                    const contractPath = path.join(contractsRoot, `contract_${order.id}.pdf`);
+                    await generateContractPDF(data, contractPath);
 
-                fullOrder.contractPath = path.relative(path.join(__dirname, '..'), contractPath);
-                await fullOrder.save();
+                    fullOrder.contractPath = path.relative(path.join(__dirname, ".."), contractPath);
+                    await fullOrder.save();
+                } catch (pdfError) {
+                    console.error("Ошибка генерации договора:", pdfError);
+                }
             }
 
             io.emit("orderUpdated");

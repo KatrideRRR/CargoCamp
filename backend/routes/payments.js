@@ -151,7 +151,6 @@ router.post('/debt/create', authenticateToken, async (req, res) => {
             meta: {
                 provider: "yookassa",
                 type: "premium",
-                duration,
                 amount: amountValue,
                 status: payment.status,
             },
