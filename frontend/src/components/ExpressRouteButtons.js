@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react";
 import axiosInstance from "../utils/axiosInstance";
-import { FaLocationArrow } from "react-icons/fa";
+import { FaMapMarkedAlt } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 const getMyGeo = () =>
@@ -39,7 +39,7 @@ const ExpressRouteButtons = ({
                                  orderId,
                                  navMode = "none",
                                  className = "",
-                                 buttonClassName = "express-btn express-btnNav",
+                                 buttonClassName = "express-secondaryBtn",
                              }) => {
     const [busyMode, setBusyMode] = useState(null);
 
@@ -81,7 +81,7 @@ const ExpressRouteButtons = ({
     if (navMode === "none") return null;
 
     return (
-        <div className={className} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div className={className}>
             {navMode === "toA" && (
                 <button
                     type="button"
@@ -89,7 +89,7 @@ const ExpressRouteButtons = ({
                     onClick={(e) => go("toA", e)}
                     disabled={busyMode !== null}
                 >
-                    <FaLocationArrow />
+                    <FaMapMarkedAlt />
                     <span className="btn-text">До точки A</span>
                 </button>
             )}
@@ -101,7 +101,7 @@ const ExpressRouteButtons = ({
                     onClick={(e) => go("AtoB", e)}
                     disabled={busyMode !== null}
                 >
-                    <FaLocationArrow />
+                    <FaMapMarkedAlt />
                     <span className="btn-text">Маршрут A→B</span>
                 </button>
             )}

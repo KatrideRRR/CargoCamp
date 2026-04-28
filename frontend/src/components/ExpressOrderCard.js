@@ -11,28 +11,30 @@ import {
     FaPhone,
     FaComments,
     FaExclamationTriangle,
+    FaMapMarkedAlt,
+    FaClipboardCheck,
 } from "react-icons/fa";
 import ExpressRouteButtons from "./ExpressRouteButtons";
 
 function getExpressSteps(type) {
     if (type === "taxi") {
         return [
-            { key: "accepted", label: "Принят" },
-            { key: "on_the_way_to_A", label: "В пути" },
-            { key: "arrived_at_A", label: "На месте" },
-            { key: "waiting_at_A", label: "Ожидание" },
-            { key: "in_progress", label: "В пути" },
-            { key: "completed", label: "Завершён" },
+            { key: "accepted", label: "Принят", icon: <FaClipboardCheck /> },
+            { key: "on_the_way_to_A", label: "В пути", icon: <FaCarSide /> },
+            { key: "arrived_at_A", label: "На месте", icon: <FaCheck /> },
+            { key: "waiting_at_A", label: "Ожидание", icon: <FaHourglassHalf /> },
+            { key: "in_progress", label: "Поездка", icon: <FaPlay /> },
+            { key: "completed", label: "Завершён", icon: <FaFlagCheckered /> },
         ];
     }
 
     return [
-        { key: "accepted", label: "Принят" },
-        { key: "on_the_way_to_A", label: "В пути" },
-        { key: "arrived_at_A", label: "На месте" },
-        { key: "picked_up", label: "Забрал" },
-        { key: "in_progress", label: "Доставка" },
-        { key: "completed", label: "Завершён" },
+        { key: "accepted", label: "Принят", icon: <FaClipboardCheck /> },
+        { key: "on_the_way_to_A", label: "В пути", icon: <FaCarSide /> },
+        { key: "arrived_at_A", label: "На месте", icon: <FaCheck /> },
+        { key: "picked_up", label: "Забрал", icon: <FaBoxOpen /> },
+        { key: "in_progress", label: "Доставка", icon: <FaPlay /> },
+        { key: "completed", label: "Завершён", icon: <FaFlagCheckered /> },
     ];
 }
 
@@ -187,14 +189,6 @@ const ExpressOrderCard = ({
                 : "Подтвердить, что вы забрали заказ?"
         );
 
-    const start = () =>
-        doAction(
-            () => axiosInstance.post(`/express/express-orders/${order.id}/start`),
-            order.type === "taxi"
-                ? "Подтвердить, что клиент сел в машину и поездка началась?"
-                : "Подтвердить начало доставки?"
-        );
-
     const complete = () =>
         doAction(
             async () => {
@@ -218,7 +212,7 @@ const ExpressOrderCard = ({
 
         if (order.type === "taxi") {
             if (order.status === "accepted") {
-                return { label: "Еду к точке", icon: <FaCarSide />, onClick: onTheWay };
+                return { label: "Еду к точке A", icon: <FaCarSide />, onClick: onTheWay };
             }
             if (order.status === "on_the_way_to_A") {
                 return { label: "Я на месте", icon: <FaCheck />, onClick: arrived };
@@ -242,7 +236,7 @@ const ExpressOrderCard = ({
             }
         } else {
             if (order.status === "accepted") {
-                return { label: "Еду к точке", icon: <FaCarSide />, onClick: onTheWay };
+                return { label: "Еду к точке A", icon: <FaCarSide />, onClick: onTheWay };
             }
             if (order.status === "on_the_way_to_A") {
                 return { label: "Я на месте", icon: <FaCheck />, onClick: arrived };
@@ -276,7 +270,6 @@ const ExpressOrderCard = ({
             if (["accepted", "on_the_way_to_A", "arrived_at_A", "waiting_at_A"].includes(order.status)) {
                 return "toA";
             }
-
             if (["in_progress", "completed"].includes(order.status)) {
                 return "AtoB";
             }
@@ -286,7 +279,6 @@ const ExpressOrderCard = ({
             if (["accepted", "on_the_way_to_A", "arrived_at_A"].includes(order.status)) {
                 return "toA";
             }
-
             if (["picked_up", "in_progress", "completed"].includes(order.status)) {
                 return "AtoB";
             }
@@ -336,30 +328,47 @@ const ExpressOrderCard = ({
                     Создан {new Date(order.created_at || order.createdAt).toLocaleString()}
                 </div>
 
-                <div className="express-stepper">
-                    {steps.map((step, index) => {
-                        const state =
-                            index < currentStepIndex
-                                ? "done"
-                                : index === currentStepIndex
-                                    ? "active"
-                                    : "idle";
+                <div className="express-stepperOuter">
+                    <div className="express-stepperPremium">
+                        {steps.map((step, index) => {
+                            const state =
+                                index < currentStepIndex
+                                    ? "done"
+                                    : index === currentStepIndex
+                                        ? "active"
+                                        : "idle";
 
-                        return (
-                            <div key={step.key} className={`express-step ${state}`}>
-                                <div className="express-stepCircle">{index + 1}</div>
-                                <div className="express-stepLabel">{step.label}</div>
-                            </div>
-                        );
-                    })}
+                            const isLast = index === steps.length - 1;
+
+                            return (
+                                <div key={step.key} className={`express-stepPremium ${state}`}>
+                                    <div className="express-stepPremiumTop">
+                                        <div className="express-stepPremiumCircle">
+                                            {step.icon}
+                                        </div>
+
+                                        {!isLast && (
+                                            <div
+                                                className={`express-stepPremiumLine ${
+                                                    index < currentStepIndex ? "done" : ""
+                                                }`}
+                                            />
+                                        )}
+                                    </div>
+
+                                    <div className="express-stepPremiumLabel">{step.label}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
 
-                <div className="express-statusBar">
+                <div className="express-statusBar premium-statusBar">
                     {statusText}
                 </div>
 
                 <div className="order-details">
-                    <div className="express-ab">
+                    <div className="express-ab premium-routeBox">
                         <div className="express-abItem">
                             <div className="express-abLabel">Откуда</div>
                             <div className="express-abValue">{order.fromAddress}</div>
@@ -379,36 +388,10 @@ const ExpressOrderCard = ({
                         </p>
                     ) : null}
 
-                    <div className="active-buttons express-mainButtons">
-                        <button
-                            className="call-button"
-                            onClick={() => onCallUser?.(order)}
-                        >
-                            <FaPhone />
-                            <span className="btn-text">Позвонить</span>
-                        </button>
-
-                        <button
-                            className="message-button"
-                            onClick={() => onOpenChat?.(order.id)}
-                        >
-                            <FaComments />
-                            <span className="btn-text">Чат</span>
-                        </button>
-
-                        <button
-                            className="dispute-button"
-                            onClick={() => onOpenDispute?.(order)}
-                        >
-                            <FaExclamationTriangle />
-                            <span className="btn-text">Проблема</span>
-                        </button>
-                    </div>
-
                     {nextAction && !["completed", "cancelled"].includes(order.status) && isExecutor && (
-                        <div className="express-mainActionRow">
+                        <div className="express-primaryActionWrap">
                             <button
-                                className="express-btn express-btnMain express-btnMainAccent"
+                                className="express-primaryActionBtn"
                                 type="button"
                                 disabled={busy}
                                 onClick={nextAction.onClick}
@@ -416,21 +399,53 @@ const ExpressOrderCard = ({
                                 title={nextAction.label}
                             >
                                 {nextAction.icon}
-                                <span className="btn-text">{nextAction.label}</span>
+                                <span>{nextAction.label}</span>
                             </button>
                         </div>
                     )}
 
-                    <div className="express-actionsRow">
-                        {isExecutor ? (
-                            <ExpressRouteButtons orderId={order.id} navMode={navMode} />
-                        ) : (
-                            <div />
+                    <div className="express-secondaryActions">
+                        <button
+                            className="express-secondaryBtn"
+                            onClick={() => onCallUser?.(order)}
+                            type="button"
+                        >
+                            <FaPhone />
+                            <span className="btn-text">Позвонить</span>
+                        </button>
+
+                        <button
+                            className="express-secondaryBtn"
+                            onClick={() => onOpenChat?.(order.id)}
+                            type="button"
+                        >
+                            <FaComments />
+                            <span className="btn-text">Чат</span>
+                        </button>
+
+
+
+                        {isExecutor && navMode !== "none" && (
+                            <ExpressRouteButtons
+                                orderId={order.id}
+                                navMode={navMode}
+                                className="express-routeButtonsPremium"
+                                buttonClassName="express-secondaryBtn"
+                            />
                         )}
 
-                        {canCancel && !["completed", "cancelled"].includes(order.status) ? (
+                        <button
+                            className="express-secondaryBtn express-secondaryBtnWarn"
+                            onClick={() => onOpenDispute?.(order)}
+                            type="button"
+                        >
+                            <FaExclamationTriangle />
+                            <span className="btn-text">Проблема</span>
+                        </button>
+
+                        {canCancel && !["completed", "cancelled"].includes(order.status) && (
                             <button
-                                className="express-btn express-btnCancel"
+                                className="express-secondaryBtn express-secondaryBtnDanger"
                                 type="button"
                                 disabled={busy}
                                 onClick={cancel}
@@ -440,8 +455,6 @@ const ExpressOrderCard = ({
                                 <FaTimes />
                                 <span className="btn-text">Отменить</span>
                             </button>
-                        ) : (
-                            <div />
                         )}
                     </div>
 
