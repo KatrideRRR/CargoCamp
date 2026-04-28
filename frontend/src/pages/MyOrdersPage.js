@@ -10,6 +10,16 @@ import { FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity } from "r
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
+const getRouteOrAddress = (order) => {
+    if (order.kind === "express") {
+        const from = order.fromAddress || "—";
+        const to = order.toAddress || "—";
+        return `${from} → ${to}`;
+    }
+
+    return order.address || "—";
+};
+
 const MyOrdersPage = () => {
     const { userId } = useParams();
     const location = useLocation();
@@ -386,6 +396,16 @@ const MyOrdersPage = () => {
                                                     </div>
                                                 </>
                                             )}
+                                        </div>
+
+                                        <div className={styles.routeBox}>
+    <span className={styles.routeLabel}>
+        {isExpress ? "Маршрут" : "Адрес"}
+    </span>
+
+                                            <span className={`${styles.routeValue} ${isExpress ? styles.routeValueExpress : ""}`}>
+        {getRouteOrAddress(order)}
+    </span>
                                         </div>
 
                                         {/* Images (compact) */}
