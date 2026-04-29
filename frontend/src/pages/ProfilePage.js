@@ -10,7 +10,7 @@ import PaymentProviderSelect from "../components/PaymentProviderSelect";
 const apiUrl = process.env.REACT_APP_API_URL;
 
 // ✅ временно для скринов ЮKassa
-const CARD_BIND_SCREENSHOT_MODE = true;
+const CARD_BIND_SCREENSHOT_MODE = false;
 
 function looksLikeCoordsString(v) {
     if (!v) return false;
@@ -317,13 +317,30 @@ const ProfilePage = () => {
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        if (
+
+        const shouldRefresh =
             params.get("bindReturn") === "1" ||
             params.get("debtReturn") === "1" ||
-            params.get("premiumReturn") === "1"
-        ) {
-            setTimeout(() => window.location.reload(), 1500);
-        }
+            params.get("premiumReturn") === "1";
+
+        if (!shouldRefresh) return;
+
+        const timer = setTimeout(async () => {
+            try {
+                await fetchProfileData();
+                await loadDebtStatus();
+
+                const cleanUrl = window.location.pathname;
+                window.history.replaceState({}, "", cleanUrl);
+            } catch (e) {
+                console.error("refresh after payment return error:", e);
+                window.location.reload();
+            }
+        }, 1800);
+
+        return () => clearTimeout(timer);
+
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const saveLocation = async ({ address, lat, lng, source }) => {
@@ -522,15 +539,25 @@ const ProfilePage = () => {
             const res = await axios.post(
                 `${apiUrl}/api/payments/card/bind/create`,
                 {},
-                { headers: { Authorization: `Bearer ${token}` } }
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
             );
 
-            if (!res.data?.success) return toast.error(res.data?.error || "Ошибка привязки карты");
+            if (!res.data?.success) {
+                return toast.error(res.data?.error || "Ошибка привязки карты");
+            }
+
+            if (!res.data.confirmationUrl) {
+                return toast.error("Ссылка на привязку карты не получена");
+            }
 
             window.location.href = res.data.confirmationUrl;
         } catch (e) {
             console.error("bind card error:", e);
-            toast.error("Ошибка привязки карты");
+            toast.error(e.response?.data?.error || "Ошибка привязки карты");
         }
     };
 
@@ -554,7 +581,16 @@ const ProfilePage = () => {
 
             if (res.data?.success) {
                 toast.success("Карта успешно удалена");
-                window.location.reload();
+
+                setPaymentMethodId(null);
+                setProfile((prev) => ({
+                    ...prev,
+                    yookassaPaymentMethodId: null,
+                    cardLastFour: null,
+                    cardType: null,
+                }));
+
+                setShowUnbindConfirm(false);
             } else {
                 toast.error(res.data?.error || "Ошибка при удалении карты");
             }

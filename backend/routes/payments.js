@@ -1,10 +1,10 @@
-const { v4: uuidv4 } = require("uuid");const express = require('express');
+const { v4: uuidv4 } = require("uuid");
+const express = require("express");
 const router = express.Router();
 const { Order, User } = require('../models'); // sequelize models
 const db = require("../models");
 const authenticateToken = require('../middlewares/userAuth'); // если нужен
 const { randomUUID } = require('crypto');
-const idempotenceKey = randomUUID();
 const yooKassa = require('../config/yookassaClient');
 const { sendOrderPush } = require("../utils/orderPushService");
 
@@ -141,6 +141,7 @@ router.post('/debt/create', authenticateToken, async (req, res) => {
                 {
                     ...basePayload,
                     payment_method_id: user.yookassa_payment_method_id,
+                    capture: true
                 },
                 idempotenceKey
             );
@@ -217,39 +218,47 @@ router.post('/debt/create', authenticateToken, async (req, res) => {
 router.post('/card/bind/create', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
+        const bindToken = uuidv4();
 
         const user = await User.findByPk(userId);
         if (!user) return res.status(404).json({ success: false, error: 'Пользователь не найден' });
 
         const idempotenceKey = uuidv4();
-        const amountValue = '1.00';
 
         const payment = await yooKassa.createPayment(
             {
-                amount: { value: amountValue, currency: 'RUB' },
+                amount: {
+                    value: "1.00",
+                    currency: "RUB",
+                },
+
                 capture: true,
                 save_payment_method: true,
+
                 confirmation: {
-                    type: 'redirect',
-                    return_url: `${process.env.FRONTEND_URL}/profile?bindReturn=1`,
+                    type: "redirect",
+                    return_url: `${process.env.FRONTEND_URL}/profile?bindReturn=1&bindToken=${bindToken}`,
                 },
+
                 description: `Привязка карты пользователя #${userId}`,
+
                 metadata: {
-                    type: 'bind_card',
+                    type: "bind_card",
                     userId: String(userId),
+                    bindToken,
                 },
                 receipt: {
                     customer: {
-                        phone: String(user.phone || '').replace(/[^\d+]/g, ''),
+                        phone: String(user.phone || "").replace(/[^\d+]/g, ""),
                     },
                     items: [
                         {
-                            description: `Привязка карты (проверочный платеж)`,
+                            description: "Привязка карты",
                             quantity: 1,
-                            amount: { value: amountValue, currency: 'RUB' },
+                            amount: { value: "1.00", currency: "RUB" },
                             vat_code: 1,
-                            payment_mode: 'full_payment',
-                            payment_subject: 'service',
+                            payment_mode: "full_payment",
+                            payment_subject: "service",
                         },
                     ],
                     tax_system_code: 2,
@@ -269,7 +278,7 @@ router.post('/card/bind/create', authenticateToken, async (req, res) => {
             meta: {
                 provider: "yookassa",
                 type: "bind_card",
-                amount: amountValue,
+                amount: "0.00",
                 status: payment.status,
             },
         });
@@ -281,8 +290,11 @@ router.post('/card/bind/create', authenticateToken, async (req, res) => {
             status: payment.status,
         });
     } catch (e) {
-        console.error('card/bind/create error:', e);
-        return res.status(500).json({ success: false, error: e?.message || 'Internal server error' });
+        console.error("card/bind/create error:", e);
+        return res.status(500).json({
+            success: false,
+            error: e?.message || "Internal server error",
+        });
     }
 });
 
@@ -582,21 +594,33 @@ router.post('/yookassa/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
 
-        // ====== 3) Bind Card ======
-        if (meta.type === 'bind_card') {
+// ====== 3) Bind Card ======
+        if (meta.type === "bind_card") {
             const userId = Number(meta.userId);
 
             const user = await User.findByPk(userId);
             if (!user) return res.sendStatus(200);
 
-            // ЮKassa возвращает сохраненный метод оплаты внутри payment_method
             const pm = payment.payment_method;
             const pmId = pm?.id || null;
+            const isSaved = pm?.saved === true;
+
             const last4 = pm?.card?.last4 || null;
             const cardType = pm?.card?.card_type || null;
 
-            if (!pmId) {
-                console.warn('bind_card succeeded but payment_method.id missing', payment?.id);
+            /**
+             * Важно:
+             * ЮKassa рекомендует сохранять payment_method.id только после того,
+             * как payment_method.saved стало true.
+             */
+            if (!pmId || !isSaved) {
+                console.warn("bind_card: payment_method is not saved", {
+                    paymentId: payment?.id,
+                    pmId,
+                    saved: pm?.saved,
+                    status: payment?.status,
+                });
+
                 return res.sendStatus(200);
             }
 
@@ -604,7 +628,23 @@ router.post('/yookassa/webhook', async (req, res) => {
                 yookassa_payment_method_id: pmId,
                 yookassa_payment_method_saved_at: new Date(),
                 cardLastFour: last4,
-                cardType: cardType,
+                cardType,
+            });
+
+            await req.logAction?.({
+                req,
+                actorUserId: userId,
+                actorRole: "webhook",
+                actionType: "card_bound",
+                entityType: "user",
+                paymentId: payment.id,
+                severity: "info",
+                meta: {
+                    provider: "yookassa",
+                    paymentMethodId: pmId,
+                    cardLastFour: last4,
+                    cardType,
+                },
             });
 
             return res.sendStatus(200);
@@ -711,6 +751,72 @@ router.post('/yookassa/webhook', async (req, res) => {
     } catch (e) {
         console.error('yookassa webhook error:', e);
         return res.sendStatus(200);
+    }
+});
+
+router.get("/card/bind/status", authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { paymentId } = req.query;
+
+        if (!paymentId) {
+            return res.status(400).json({
+                success: false,
+                error: "paymentId обязателен",
+            });
+        }
+
+        const user = await User.findByPk(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: "Пользователь не найден",
+            });
+        }
+
+        const payment = await yooKassa.getPayment(paymentId);
+        const meta = payment?.metadata || {};
+
+        if (meta.type !== "bind_card" || Number(meta.userId) !== Number(userId)) {
+            return res.status(403).json({
+                success: false,
+                error: "Нет доступа к этому платежу",
+            });
+        }
+
+        const pm = payment.payment_method;
+        const pmId = pm?.id || null;
+        const isSaved = pm?.saved === true;
+
+        if (payment.status === "succeeded" && pmId && isSaved) {
+            await user.update({
+                yookassa_payment_method_id: pmId,
+                yookassa_payment_method_saved_at: new Date(),
+                cardLastFour: pm?.card?.last4 || null,
+                cardType: pm?.card?.card_type || null,
+            });
+
+            return res.json({
+                success: true,
+                bound: true,
+                status: payment.status,
+                cardLastFour: pm?.card?.last4 || null,
+                cardType: pm?.card?.card_type || null,
+            });
+        }
+
+        return res.json({
+            success: true,
+            bound: false,
+            status: payment.status,
+            saved: pm?.saved === true,
+        });
+    } catch (e) {
+        console.error("card/bind/status error:", e);
+        return res.status(500).json({
+            success: false,
+            error: e?.message || "Internal error",
+        });
     }
 });
 
