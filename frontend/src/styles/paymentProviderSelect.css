@@ -1,0 +1,116 @@
+.payment-provider-box {
+    width: 100%;
+    display: grid;
+    gap: 10px;
+}
+
+.payment-provider-title {
+    font-size: 0.9rem;
+    font-weight: 900;
+    color: #0f172a;
+    text-align: left;
+}
+
+.payment-provider-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.payment-provider-card {
+    min-height: 72px;
+    padding: 10px;
+    border-radius: 16px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.62);
+    cursor: pointer;
+
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    text-align: left;
+
+    backdrop-filter: blur(14px) saturate(180%);
+    -webkit-backdrop-filter: blur(14px) saturate(180%);
+
+    box-shadow:
+            0 10px 22px rgba(15, 23, 42, 0.07),
+            inset 0 1px 0 rgba(255, 255, 255, 0.55);
+
+    transition:
+            transform 0.08s ease,
+            border-color 0.16s ease,
+            background 0.16s ease,
+            box-shadow 0.16s ease;
+}
+
+.payment-provider-card:hover {
+    background: rgba(255, 255, 255, 0.76);
+}
+
+.payment-provider-card:active {
+    transform: translateY(1px);
+}
+
+.payment-provider-card.active {
+    border-color: rgba(29, 78, 216, 0.38);
+    background: rgba(29, 78, 216, 0.10);
+    box-shadow:
+            0 14px 28px rgba(29, 78, 216, 0.10),
+            inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.payment-provider-card:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.payment-provider-icon {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    border-radius: 12px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 18px;
+    font-weight: 1000;
+}
+
+.payment-provider-icon-yookassa {
+    background: rgba(29, 78, 216, 0.12);
+    color: rgba(29, 78, 216, 0.98);
+    border: 1px solid rgba(29, 78, 216, 0.18);
+}
+
+.payment-provider-icon-tbank {
+    background: rgba(250, 204, 21, 0.22);
+    color: #111827;
+    border: 1px solid rgba(250, 204, 21, 0.42);
+}
+
+.payment-provider-info {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.payment-provider-info b {
+    font-size: 0.9rem;
+    line-height: 1.1;
+    color: #0f172a;
+}
+
+.payment-provider-info small {
+    font-size: 0.72rem;
+    line-height: 1.15;
+    color: #64748b;
+}
+
+@media (max-width: 380px) {
+    .payment-provider-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -100,6 +100,11 @@ module.exports = (sequelize) => {
                 type: DataTypes.STRING,
                 allowNull: true,
             },
+            promotionPaymentProvider: {
+                type: DataTypes.STRING,
+                allowNull: true,
+                defaultValue: null,
+            },
             promotionPaidAt: {
                 type: DataTypes.DATE,
                 allowNull: true,

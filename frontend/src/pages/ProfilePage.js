@@ -6,7 +6,7 @@ import axios from "axios";
 import "../styles/ProfilePage.css";
 import AgreementModal from "../components/AgreementModal";
 import YandexMapModal from "../components/YandexMapModal";
-
+import PaymentProviderSelect from "../components/PaymentProviderSelect";
 const apiUrl = process.env.REACT_APP_API_URL;
 
 // ✅ временно для скринов ЮKassa
@@ -70,6 +70,9 @@ const ProfilePage = () => {
 
     const navigate = useNavigate();
     const { logout, isAuthenticated } = useAuth();
+
+    const [selectedPremiumProvider, setSelectedPremiumProvider] = useState("yookassa");
+    const [selectedDebtProvider, setSelectedDebtProvider] = useState("yookassa");
 
     const YM_KEY = process.env.REACT_APP_YANDEX_API_KEY;
 
@@ -405,19 +408,64 @@ const ProfilePage = () => {
             if (!token) return toast.error("Вы не авторизованы");
             if (!debtAmount || debtAmount <= 0) return toast.info("Долгов нет");
 
+            const endpoint =
+                selectedDebtProvider === "tbank"
+                    ? "/api/tbank-payments/debt/create"
+                    : "/api/payments/debt/create";
+
             const res = await axios.post(
-                `${apiUrl}/api/payments/debt/create`,
-                {},
-                { headers: { Authorization: `Bearer ${token}` } }
+                `${apiUrl}${endpoint}`,
+                {
+                    returnPath: "/profile?debtReturn=1",
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
             );
 
-            if (!res.data?.success) return toast.error(res.data?.error || "Ошибка создания платежа");
-            if (res.data.noDebt) return toast.info("Долгов нет");
+            if (!res.data?.success) {
+                return toast.error(res.data?.error || "Ошибка создания платежа");
+            }
+
+            if (res.data.noDebt) {
+                return toast.info("Долгов нет");
+            }
+
+            /**
+             * Это актуально для ЮKassa, если есть сохранённая карта.
+             * У Т-Банка сейчас будет обычный редирект.
+             */
+            if (res.data.paidBySavedCard) {
+                toast.info("Пробуем списать с привязанной карты...");
+
+                setTimeout(async () => {
+                    await loadDebtStatus();
+
+                    try {
+                        const refreshed = await axios.get(`${apiUrl}/api/auth/profile`, {
+                            headers: { Authorization: `Bearer ${token}` },
+                        });
+
+                        setProfile(refreshed.data);
+                        setPaymentMethodId(refreshed.data.yookassaPaymentMethodId || null);
+                    } catch (e) {
+                        console.error("profile refresh after debt pay error:", e);
+                    }
+                }, 2500);
+
+                return;
+            }
+
+            if (!res.data.confirmationUrl) {
+                return toast.error("Ссылка на оплату не получена");
+            }
 
             window.location.href = res.data.confirmationUrl;
         } catch (e) {
             console.error("handlePayDebt error:", e);
-            toast.error("Ошибка при оплате задолженности");
+            toast.error(e.response?.data?.error || "Ошибка при оплате задолженности");
         }
     };
 
@@ -426,18 +474,33 @@ const ProfilePage = () => {
             const token = localStorage.getItem("authToken");
             if (!token) return toast.error("Вы не авторизованы");
 
+            const endpoint =
+                selectedPremiumProvider === "tbank"
+                    ? "/api/tbank-payments/premium/create"
+                    : "/api/payments/premium/create";
+
             const res = await axios.post(
-                `${apiUrl}/api/payments/premium/create`,
+                `${apiUrl}${endpoint}`,
                 { duration },
-                { headers: { Authorization: `Bearer ${token}` } }
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
             );
 
-            if (!res.data?.success) return toast.error(res.data?.error || "Ошибка создания платежа");
+            if (!res.data?.success) {
+                return toast.error(res.data?.error || "Ошибка создания платежа");
+            }
+
+            if (!res.data.confirmationUrl) {
+                return toast.error("Ссылка на оплату не получена");
+            }
 
             window.location.href = res.data.confirmationUrl;
         } catch (e) {
-            console.error(e);
-            toast.error("Ошибка при оплате Premium");
+            console.error("handleBuyPremium error:", e);
+            toast.error(e.response?.data?.error || "Ошибка при оплате Premium");
         }
     };
 
@@ -691,6 +754,15 @@ const ProfilePage = () => {
                                 <div className="alert-title">Задолженность по комиссии</div>
                                 <div className="alert-text">{(debtAmount / 100).toFixed(2)} ₽</div>
                             </div>
+
+                            <div style={{ width: "100%", marginTop: 10, marginBottom: 10 }}>
+                                <PaymentProviderSelect
+                                    selectedProvider={selectedDebtProvider}
+                                    onSelect={setSelectedDebtProvider}
+                                    disabled={loading}
+                                />
+                            </div>
+
                             <button className="btn btn-danger" onClick={handlePayDebt}>
                                 Оплатить
                             </button>
@@ -705,6 +777,12 @@ const ProfilePage = () => {
                             <p className="card-subtitle">{subscriptionLabel}</p>
                         </div>
                     </div>
+
+                    <PaymentProviderSelect
+                        selectedProvider={selectedPremiumProvider}
+                        onSelect={setSelectedPremiumProvider}
+                        disabled={loading}
+                    />
 
                     <div className="grid-2">
                         <button className="btn btn-primary" onClick={() => handleBuyPremium("7d")}>

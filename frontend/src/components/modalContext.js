@@ -5,6 +5,7 @@ import axiosInstance from "../utils/axiosInstance";
 import "../styles/modalContext.css";
 import axios from "axios";
 import ReviewModal from "../components/ReviewModal";
+import PaymentProviderSelect from "../components/PaymentProviderSelect";
 
 export const ModalContext = createContext(null);
 
@@ -65,6 +66,9 @@ export const ModalProvider = ({ children }) => {
     const [debtPayLoading, setDebtPayLoading] = useState(false);
 
     const [completionSuccessData, setCompletionSuccessData] = useState(null);
+
+    const [selectedDebtProvider, setSelectedDebtProvider] = useState("yookassa");
+    const [selectedNotificationDebtProvider, setSelectedNotificationDebtProvider] = useState("yookassa");
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -151,54 +155,12 @@ export const ModalProvider = ({ children }) => {
     };
 
     const payDebtFromModal = async () => {
-        try {
-            if (!debtModalData) return;
+        if (!debtModalData) return;
 
-            setDebtPayLoading(true);
-
-            const res = await axiosInstance.post("/payments/debt/create", {
-                returnPath: debtModalData.returnPath,
-            });
-
-            if (!res.data?.success) {
-                toast.error(res.data?.error || "Ошибка оплаты");
-                return;
-            }
-
-            if (res.data.noDebt) {
-                toast.info("Долгов нет");
-                setDebtModalData(null);
-                return;
-            }
-
-            if (res.data.paidBySavedCard) {
-                toast.info("Пробуем списать с привязанной карты...");
-
-                setTimeout(async () => {
-                    try {
-                        const refreshed = await axiosInstance.get("/auth/profile");
-                        setCurrUser(refreshed.data);
-
-                        if (Number(refreshed.data.debt || 0) === 0) {
-                            setDebtModalData(null);
-                            toast.success("Комиссия оплачена ✅");
-                        }
-                    } catch (e) {
-                        console.error(e);
-                    } finally {
-                        setDebtPayLoading(false);
-                    }
-                }, 2500);
-
-                return;
-            }
-
-            window.location.href = res.data.confirmationUrl;
-        } catch (e) {
-            console.error(e);
-            toast.error("Ошибка оплаты комиссии");
-            setDebtPayLoading(false);
-        }
+        await payDebt({
+            returnPath: debtModalData.returnPath,
+            provider: selectedDebtProvider,
+        });
     };
 
     const handleNotificationClose = () => {
@@ -291,6 +253,77 @@ export const ModalProvider = ({ children }) => {
         setDebtModalData(null);
     };
 
+    const payDebt = async ({ returnPath, provider }) => {
+        try {
+            setDebtPayLoading(true);
+
+            const endpoint =
+                provider === "tbank"
+                    ? "/tbank-payments/debt/create"
+                    : "/payments/debt/create";
+
+            const res = await axiosInstance.post(endpoint, {
+                returnPath: returnPath || "/profile?debtReturn=1",
+            });
+
+            if (!res.data?.success) {
+                toast.error(res.data?.error || "Ошибка оплаты");
+                setDebtPayLoading(false);
+                return;
+            }
+
+            if (res.data.noDebt) {
+                toast.info("Долгов нет");
+                setDebtModalData(null);
+                setNotificationData(null);
+                setDebtPayLoading(false);
+                return;
+            }
+
+            /**
+             * Это актуально для ЮKassa, если есть сохранённая карта.
+             * Для Т-Банка сейчас будет обычный редирект.
+             */
+            if (res.data.paidBySavedCard) {
+                toast.info("Пробуем списать с привязанной карты...");
+
+                setTimeout(async () => {
+                    try {
+                        const refreshed = await axiosInstance.get("/auth/profile");
+                        setCurrUser(refreshed.data);
+
+                        if (Number(refreshed.data.debt || 0) === 0) {
+                            setDebtModalData(null);
+                            setNotificationData(null);
+                            toast.success("Комиссия оплачена ✅");
+                        } else {
+                            toast.info("Платёж обрабатывается. Проверьте статус чуть позже.");
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        toast.error("Не удалось обновить профиль после оплаты");
+                    } finally {
+                        setDebtPayLoading(false);
+                    }
+                }, 2500);
+
+                return;
+            }
+
+            if (!res.data.confirmationUrl) {
+                toast.error("Ссылка на оплату не получена");
+                setDebtPayLoading(false);
+                return;
+            }
+
+            window.location.href = res.data.confirmationUrl;
+        } catch (e) {
+            console.error(e);
+            toast.error(e.response?.data?.error || "Ошибка оплаты комиссии");
+            setDebtPayLoading(false);
+        }
+    };
+
     const handleCompleteOrder = (orderId, creatorId, executorId, orderType = "regular") => {
         setSelectedOrder({
             id: orderId,
@@ -373,13 +406,28 @@ export const ModalProvider = ({ children }) => {
                             </>
                         ) : notificationData.debt > 0 ? (
                             <>
+                                <PaymentProviderSelect
+                                    selectedProvider={selectedNotificationDebtProvider}
+                                    onSelect={setSelectedNotificationDebtProvider}
+                                    disabled={debtPayLoading}
+                                />
+
                                 <div className="modal-note">
                                     Комиссия: <b>{Math.round(notificationData.debt / 100)} ₽</b>
                                 </div>
 
                                 <div className="modal-actions">
-                                    <button className="modal-btn modal-btn-primary" onClick={payDebtFromModal}>
-                                        Оплатить сейчас
+                                    <button
+                                        className="modal-btn modal-btn-primary"
+                                        onClick={() =>
+                                            payDebt({
+                                                returnPath: "/profile?debtReturn=1",
+                                                provider: selectedNotificationDebtProvider,
+                                            })
+                                        }
+                                        disabled={debtPayLoading}
+                                    >
+                                        {debtPayLoading ? "Переходим к оплате..." : "Оплатить сейчас"}
                                     </button>
 
                                     <button className="modal-btn modal-btn-ghost" onClick={handleNotificationClose}>
@@ -534,6 +582,12 @@ export const ModalProvider = ({ children }) => {
                             К оплате: <b>{Math.round(debtModalData.amount / 100)} ₽</b>
                         </div>
 
+                        <PaymentProviderSelect
+                            selectedProvider={selectedDebtProvider}
+                            onSelect={setSelectedDebtProvider}
+                            disabled={debtPayLoading}
+                        />
+
                         <div className="modal-actions">
                             <button
                                 className="modal-btn modal-btn-primary"
@@ -545,7 +599,7 @@ export const ModalProvider = ({ children }) => {
 
                             <button
                                 className="modal-btn modal-btn-ghost"
-                                onClick={closeDebtModal}
+                                onClick={handleNotificationClose}
                                 disabled={debtPayLoading}
                             >
                                 Позже

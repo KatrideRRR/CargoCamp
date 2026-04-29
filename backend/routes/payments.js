@@ -365,7 +365,10 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
             },
         }, idempotenceKey);
 
-        await order.update({ promotionPaymentId: payment.id });
+        await order.update({
+            promotionPaymentId: payment.id,
+            promotionPaymentProvider: "yookassa",
+        });
 
         await req.logAction({
             req,

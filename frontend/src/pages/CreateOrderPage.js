@@ -7,6 +7,7 @@ import "../styles/CreateOrderPage.css";
 import imageCompression from "browser-image-compression";
 import PromotionOptions, { PROMOTION_PRICES } from "../components/PromotionOptions";
 import YandexMapModal from "../components/YandexMapModal";
+import PaymentProviderSelect from "../components/PaymentProviderSelect";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -94,6 +95,7 @@ function CreateOrderPage() {
     const [timeOpen, setTimeOpen] = useState(false);
 
     const [promotion, setPromotion] = useState({ highlight: false, recommended: false, push: false });
+    const [selectedProvider, setSelectedProvider] = useState("yookassa");
 
     // ✅ один источник правды
     const [paymentType] = useState("cash"); // всегда наличные (пока не добавим гарантию/рассрочку)
@@ -404,10 +406,19 @@ function CreateOrderPage() {
             const orderId = response.data.id;
 
             if (promotionTotal > 0) {
+                const endpoint =
+                    selectedProvider === "tbank"
+                        ? "/api/tbank-payments/order/promotion/create"
+                        : "/api/payments/order/promotion/create";
+
                 const payResp = await axios.post(
-                    `${apiUrl}/api/payments/order/promotion/create`,
+                    `${apiUrl}${endpoint}`,
                     { orderId },
-                    { headers: { Authorization: `Bearer ${token}` } }
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
                 );
 
                 if (!payResp.data?.success) {
@@ -742,6 +753,7 @@ function CreateOrderPage() {
                     {/* сумма перенесена сюда */}
                     <div className="glass field">
                         <div className="label">Сумма за работу</div>
+
                         <input
                             className="control"
                             type="number"
@@ -750,12 +762,25 @@ function CreateOrderPage() {
                             onChange={(e) => setFormData((p) => ({ ...p, proposedSum: e.target.value }))}
                             required
                         />
-                        <div className="hint">Эту сумму вы оплачиваете исполнителю. Сейчас оплачивается только продвижение.</div>
+
+                        <div className="hint">
+                            Эту сумму вы оплачиваете исполнителю. Сейчас оплачивается только продвижение.
+                        </div>
                     </div>
 
                     <div className="glass promoBox">
                         <PromotionOptions value={promotion} onChange={setPromotion} />
                     </div>
+
+                    {promotionTotal > 0 && (
+                        <div className="glass field" style={{ marginTop: 10 }}>
+                            <PaymentProviderSelect
+                                selectedProvider={selectedProvider}
+                                onSelect={setSelectedProvider}
+                                disabled={isSubmitting}
+                            />
+                        </div>
+                    )}
 
                     <div className="glass total">
                         <div>

@@ -27,6 +27,7 @@ const disputeRoutes = require("./routes/disputes");
 const expressOrdersRoutes = require("./routes/expressorders");
 const logActionMiddleware = require("./middlewares/logActionMiddleware");
 const allowedOrigins = require("./config/allowedOrigins");
+const tbankPaymentsRoutes = require("./routes/tbankPayments");
 
 const db = require("./models");
 const sequelize = require("./config/database");
@@ -94,6 +95,7 @@ app.use("/api/category", categoryRouter);
 app.use("/api/admin", adminRoutes);
 app.use("/api/payments", payments);
 app.use("/api/express", expressOrdersRoutes);
+app.use("/api/tbank-payments", tbankPaymentsRoutes);
 
 app.post("/api/token", (req, res) => {
     const { token } = req.body;
