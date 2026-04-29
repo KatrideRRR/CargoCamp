@@ -1,5 +1,3 @@
-// backend/routes/tbankPayments.js
-
 const express = require("express");
 const router = express.Router();
 const { Order, User } = require("../models");
@@ -20,15 +18,22 @@ function kopecksToRubString(kopecks) {
     return (Number(kopecks || 0) / 100).toFixed(2);
 }
 
-function buildTBankOrderId(type, id) {
-    return `${type}_${id}_${Date.now()}`;
+function buildTBankOrderId(type, id, extra = null) {
+    return extra
+        ? `${type}_${id}_${extra}_${Date.now()}`
+        : `${type}_${id}_${Date.now()}`;
 }
 
-/**
- * Чек для Т-Банка.
- * Важно: проверь в личном кабинете Т-Банка, какая у тебя система налогообложения.
- * Здесь стоит "usn_income" как аналог твоего tax_system_code: 2 в ЮKassa.
- */
+function parseTBankOrderId(orderId) {
+    const parts = String(orderId || "").split("_");
+
+    return {
+        type: parts[0] || null,
+        id: parts[1] ? Number(parts[1]) : null,
+        extra: parts[2] || null,
+    };
+}
+
 function buildReceipt({ user, amountKopecks, description }) {
     return {
         Taxation: "usn_income",
@@ -47,9 +52,6 @@ function buildReceipt({ user, amountKopecks, description }) {
     };
 }
 
-/**
- * 1) Premium через Т-Банк
- */
 router.post("/premium/create", authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
@@ -79,7 +81,7 @@ router.post("/premium/create", authenticateToken, async (req, res) => {
 
         const addDays = duration === "7d" ? 7 : 30;
         const amountKopecks = rubToKopecks(amountRub);
-        const orderId = buildTBankOrderId("premium", userId);
+        const orderId = buildTBankOrderId("premium", userId, duration);
 
         const description = `Premium ${duration} для пользователя #${userId}`;
 
@@ -137,9 +139,6 @@ router.post("/premium/create", authenticateToken, async (req, res) => {
     }
 });
 
-/**
- * 2) Debt через Т-Банк
- */
 router.post("/debt/create", authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
@@ -225,9 +224,6 @@ router.post("/debt/create", authenticateToken, async (req, res) => {
     }
 });
 
-/**
- * 3) Promotion через Т-Банк
- */
 router.post("/order/promotion/create", authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
@@ -300,7 +296,7 @@ router.post("/order/promotion/create", authenticateToken, async (req, res) => {
         }
 
         const amountKopecks = rubToKopecks(totalRub);
-        const tbankOrderId = buildTBankOrderId("promotion", orderId);
+        const tbankOrderId = buildTBankOrderId("promo", orderId);
         const description = `Продвижение заказа #${orderId}`;
 
         const payment = await requestTBank("Init", {
@@ -362,9 +358,6 @@ router.post("/order/promotion/create", authenticateToken, async (req, res) => {
     }
 });
 
-/**
- * 4) Webhook Т-Банка
- */
 router.post("/webhook", async (req, res) => {
     const io = req.app.locals.io;
 
@@ -375,15 +368,48 @@ router.post("/webhook", async (req, res) => {
 
         if (!isValid) {
             console.warn("⚠️ Invalid TBank webhook token", body);
-            return res.status(403).send("INVALID TOKEN");
+
+            /**
+             * Важно:
+             * Возвращаем 200, чтобы Т-Банк не долбил webhook бесконечно.
+             * Но в логах видим проблему.
+             */
+            return res.status(200).send("OK");
         }
 
         const status = body.Status;
         const paymentId = String(body.PaymentId || "");
         const amountKopecks = Number(body.Amount || 0);
 
+        /**
+         * У тебя в callback сейчас НЕ приходит Data/DATA.
+         * Поэтому основной источник type/userId/orderId — это OrderId.
+         *
+         * Примеры:
+         * premium_1_7d_1777460981363
+         * debt_1_1777460981363
+         * promo_123_1777460981363
+         */
         const data = body.DATA || body.Data || {};
-        const type = data.type;
+        const parsed = parseTBankOrderId(body.OrderId);
+
+        const type = data.type || parsed.type;
+
+        const parsedId = parsed.id;
+
+        const userId = Number(
+            data.userId ||
+            data.user_id ||
+            parsedId
+        );
+
+        const orderId = Number(
+            data.orderId ||
+            data.order_id ||
+            parsedId
+        );
+
+        const duration = data.duration || parsed.extra;
 
         await req.logAction?.({
             req,
@@ -392,7 +418,7 @@ router.post("/webhook", async (req, res) => {
             actionType: `tbank_${status}`,
             entityType: "payment",
             paymentId,
-            orderId: data.orderId ? Number(data.orderId) : null,
+            orderId: type === "promo" || type === "order_promotion" ? orderId : null,
             severity: "info",
             meta: {
                 provider: "tbank",
@@ -400,22 +426,21 @@ router.post("/webhook", async (req, res) => {
                 status,
                 amount: kopecksToRubString(amountKopecks),
                 rawOrderId: body.OrderId,
+                userId: type === "premium" || type === "debt" ? userId : null,
+                duration: type === "premium" ? duration : null,
             },
         });
 
         /**
-         * Для простых платежей нас интересует CONFIRMED.
-         * В Т-Банке успешная оплата обычно приходит как CONFIRMED.
+         * Т-Банк может прислать AUTHORIZED и CONFIRMED.
+         * Для простых платежей финально обрабатываем только CONFIRMED.
          */
         if (status !== "CONFIRMED") {
             return res.status(200).send("OK");
         }
 
-        // ====== Premium ======
+        // ====== 1) Premium ======
         if (type === "premium") {
-            const userId = Number(data.userId);
-            const duration = data.duration;
-
             const addDays =
                 duration === "7d"
                     ? 7
@@ -423,12 +448,21 @@ router.post("/webhook", async (req, res) => {
                         ? 30
                         : 0;
 
-            if (!addDays) return res.status(200).send("OK");
+            if (!userId || !addDays) {
+                console.warn("⚠️ TBank premium webhook: не хватает userId или duration", {
+                    body,
+                    userId,
+                    duration,
+                });
+
+                return res.status(200).send("OK");
+            }
 
             const user = await User.findByPk(userId);
             if (!user) return res.status(200).send("OK");
 
             const now = new Date();
+
             const currentExp = user.subscription_expires_at
                 ? new Date(user.subscription_expires_at)
                 : null;
@@ -449,12 +483,34 @@ router.post("/webhook", async (req, res) => {
                 subscription_expires_at: newExp,
             });
 
+            await req.logAction?.({
+                req,
+                actorUserId: userId,
+                actorRole: "webhook",
+                actionType: "premium_activated",
+                entityType: "user",
+                paymentId,
+                severity: "info",
+                meta: {
+                    provider: "tbank",
+                    duration,
+                    newExpiresAt: newExp,
+                },
+            });
+
             return res.status(200).send("OK");
         }
 
-        // ====== Debt ======
+        // ====== 2) Debt ======
         if (type === "debt") {
-            const userId = Number(data.userId);
+            if (!userId) {
+                console.warn("⚠️ TBank debt webhook: не хватает userId", {
+                    body,
+                    userId,
+                });
+
+                return res.status(200).send("OK");
+            }
 
             const user = await User.findByPk(userId);
             if (!user) return res.status(200).send("OK");
@@ -473,12 +529,35 @@ router.post("/webhook", async (req, res) => {
                     newDebt === 0 ? null : user.commissionDebtOrderId,
             });
 
+            await req.logAction?.({
+                req,
+                actorUserId: userId,
+                actorRole: "webhook",
+                actionType: "debt_paid",
+                entityType: "user",
+                paymentId,
+                severity: "info",
+                meta: {
+                    provider: "tbank",
+                    amount: kopecksToRubString(amountKopecks),
+                    oldDebt: currentDebt,
+                    newDebt,
+                },
+            });
+
             return res.status(200).send("OK");
         }
 
-        // ====== Promotion ======
-        if (type === "order_promotion") {
-            const orderId = Number(data.orderId);
+        // ====== 3) Promotion ======
+        if (type === "promo" || type === "order_promotion" || type === "promotion") {
+            if (!orderId) {
+                console.warn("⚠️ TBank promo webhook: не хватает orderId", {
+                    body,
+                    orderId,
+                });
+
+                return res.status(200).send("OK");
+            }
 
             const order = await Order.findByPk(orderId);
             if (!order) return res.status(200).send("OK");
@@ -506,13 +585,17 @@ router.post("/webhook", async (req, res) => {
                 is_recommended: !!pr.recommended,
                 is_push_notified: !!pr.push,
                 promotionPaidAt: new Date(),
+                promotionPaymentProvider: "tbank",
             });
 
             io?.emit("orderUpdated");
 
             if (pr.push) {
                 try {
-                    const logAction = req.logAction || req.app?.locals?.logAction || null;
+                    const logAction =
+                        req.logAction ||
+                        req.app?.locals?.logAction ||
+                        null;
 
                     await sendOrderPush({
                         db,
@@ -527,6 +610,22 @@ router.post("/webhook", async (req, res) => {
                 }
             }
 
+            await req.logAction?.({
+                req,
+                actorUserId: order.creatorId,
+                actorRole: "webhook",
+                actionType: "promotion_paid",
+                entityType: "order",
+                paymentId,
+                orderId: order.id,
+                severity: "info",
+                meta: {
+                    provider: "tbank",
+                    amount: kopecksToRubString(amountKopecks),
+                    promotionRequested: pr,
+                },
+            });
+
             return res.status(200).send("OK");
         }
 
@@ -536,8 +635,7 @@ router.post("/webhook", async (req, res) => {
 
         /**
          * Важно:
-         * лучше вернуть 200, чтобы банк не долбил webhook бесконечно,
-         * но ошибку записать в логи.
+         * Возвращаем 200, чтобы банк не повторял webhook бесконечно.
          */
         return res.status(200).send("OK");
     }

@@ -11,13 +11,25 @@ if (!TERMINAL_KEY || !PASSWORD) {
     console.warn("⚠️ TBANK_TERMINAL_KEY или TBANK_PASSWORD не заданы в .env");
 }
 
+function normalizeTBankValue(value) {
+    if (value === null || value === undefined) return null;
+
+    if (typeof value === "boolean") {
+        return value ? "true" : "false";
+    }
+
+    return String(value);
+}
+
 /**
  * Токен Т-Банка:
- * 1. Берем только примитивные поля верхнего уровня.
- * 2. Добавляем Password.
- * 3. Сортируем ключи по алфавиту.
- * 4. Склеиваем значения.
- * 5. SHA-256.
+ * 1. Берём только простые поля верхнего уровня.
+ * 2. НЕ берём Token.
+ * 3. НЕ берём вложенные объекты: DATA, Data, Receipt и т.д.
+ * 4. Добавляем Password.
+ * 5. Сортируем ключи.
+ * 6. Склеиваем значения.
+ * 7. SHA-256.
  */
 function makeToken(payload = {}) {
     const tokenPayload = {};
@@ -25,27 +37,25 @@ function makeToken(payload = {}) {
     for (const [key, value] of Object.entries(payload)) {
         if (key === "Token") continue;
 
-        const isPrimitive =
-            typeof value === "string" ||
-            typeof value === "number" ||
-            typeof value === "boolean";
+        // Вложенные объекты в токене не участвуют
+        if (value && typeof value === "object") continue;
 
-        if (isPrimitive || value === null) {
-            tokenPayload[key] = value;
-        }
+        const normalized = normalizeTBankValue(value);
+        if (normalized === null) continue;
+
+        tokenPayload[key] = normalized;
     }
 
-    tokenPayload.Password = PASSWORD;
+    tokenPayload.Password = String(PASSWORD || "");
 
-    const sortedKeys = Object.keys(tokenPayload).sort();
-
-    const concat = sortedKeys
-        .map((key) => String(tokenPayload[key]))
+    const concat = Object.keys(tokenPayload)
+        .sort()
+        .map((key) => tokenPayload[key])
         .join("");
 
     return crypto
         .createHash("sha256")
-        .update(concat)
+        .update(concat, "utf8")
         .digest("hex");
 }
 
@@ -68,11 +78,25 @@ async function requestTBank(method, payload = {}) {
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
+        console.error("❌ TBank HTTP error:", {
+            method,
+            requestBody: body,
+            response: data,
+        });
+
         throw new Error(`TBank HTTP error ${response.status}: ${JSON.stringify(data)}`);
     }
 
     if (!data?.Success) {
-        throw new Error(data?.Message || data?.Details || "TBank request failed");
+        console.error("❌ TBank API error:", {
+            method,
+            requestBody: body,
+            response: data,
+        });
+
+        throw new Error(
+            `${data?.Message || "TBank request failed"}${data?.Details ? `: ${data.Details}` : ""}`
+        );
     }
 
     return data;
@@ -82,8 +106,22 @@ function verifyNotificationToken(body = {}) {
     if (!body?.Token) return false;
 
     const expectedToken = makeToken(body);
+    const receivedToken = body.Token;
 
-    return expectedToken === body.Token;
+    if (expectedToken !== receivedToken) {
+        console.warn("⚠️ TBank token mismatch:", {
+            expectedToken,
+            receivedToken,
+            fields: Object.keys(body)
+                .filter((key) => {
+                    const value = body[key];
+                    return key !== "Token" && !(value && typeof value === "object");
+                })
+                .sort(),
+        });
+    }
+
+    return expectedToken === receivedToken;
 }
 
 module.exports = {
