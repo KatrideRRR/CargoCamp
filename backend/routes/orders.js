@@ -204,6 +204,135 @@ async function removeExecutorFromOtherPendingOrders(Order, executorId, approvedO
     return updatedOrderIds;
 }
 
+function cleanPhoneForPayment(phone) {
+    return String(phone || "").replace(/[^\d+]/g, "");
+}
+
+async function tryPayCommissionFromSavedCard({ req, executor, order, amountKopecks }) {
+    if (!executor.yookassa_payment_method_id) {
+        return {
+            autoPaymentTried: false,
+            autoPaymentPaid: false,
+            autoPaymentProcessing: false,
+            autoPaymentStatus: null,
+            paymentId: null,
+            message: "Карта не привязана.",
+        };
+    }
+
+    const amountValue = (Number(amountKopecks || 0) / 100).toFixed(2);
+
+    try {
+        const payment = await yooKassa.createPayment(
+            {
+                amount: {
+                    value: amountValue,
+                    currency: "RUB",
+                },
+                capture: true,
+                payment_method_id: executor.yookassa_payment_method_id,
+                description: `Комиссия CargoCamp за заказ #${order.id}`,
+                metadata: {
+                    type: "debt",
+                    userId: String(executor.id),
+                    orderId: String(order.id),
+                    expectedKopecks: String(amountKopecks),
+                    source: "order_approve_auto",
+                },
+                receipt: {
+                    customer: {
+                        phone: cleanPhoneForPayment(executor.phone),
+                    },
+                    items: [
+                        {
+                            description: `Комиссия CargoCamp за заказ #${order.id}`,
+                            quantity: 1,
+                            amount: {
+                                value: amountValue,
+                                currency: "RUB",
+                            },
+                            vat_code: 1,
+                            payment_mode: "full_payment",
+                            payment_subject: "service",
+                        },
+                    ],
+                    tax_system_code: 2,
+                },
+            },
+            uuidv4()
+        );
+
+        await req.logAction?.({
+            req,
+            actorUserId: executor.id,
+            actorRole: "user",
+            actionType: "commission_auto_payment_create",
+            entityType: "payment",
+            paymentId: payment.id,
+            orderId: order.id,
+            severity: payment.status === "canceled" ? "warning" : "info",
+            meta: {
+                provider: "yookassa",
+                type: "debt",
+                source: "order_approve_auto",
+                amount: amountValue,
+                status: payment.status,
+            },
+        });
+
+        if (payment.status === "canceled") {
+            return {
+                autoPaymentTried: true,
+                autoPaymentPaid: false,
+                autoPaymentProcessing: false,
+                autoPaymentStatus: payment.status,
+                paymentId: payment.id,
+                message:
+                    "Автоматическое списание не прошло. Комиссия осталась в задолженности.",
+            };
+        }
+
+        return {
+            autoPaymentTried: true,
+            autoPaymentPaid: payment.status === "succeeded",
+            autoPaymentProcessing: payment.status !== "succeeded",
+            autoPaymentStatus: payment.status,
+            paymentId: payment.id,
+            message:
+                payment.status === "succeeded"
+                    ? "Комиссия списана с привязанной карты."
+                    : "Пробуем списать комиссию с привязанной карты.",
+        };
+    } catch (e) {
+        console.error("commission auto payment error:", e);
+
+        await req.logAction?.({
+            req,
+            actorUserId: executor.id,
+            actorRole: "user",
+            actionType: "commission_auto_payment_error",
+            entityType: "payment",
+            orderId: order.id,
+            severity: "warning",
+            meta: {
+                provider: "yookassa",
+                amount: amountValue,
+                error: e?.message,
+            },
+        });
+
+        return {
+            autoPaymentTried: true,
+            autoPaymentPaid: false,
+            autoPaymentProcessing: false,
+            autoPaymentStatus: "error",
+            paymentId: null,
+            message:
+                "Автоматическое списание не удалось. Комиссия осталась в задолженности.",
+        };
+    }
+}
+
 module.exports = (io) => {
 
     router.post('/:id/restore', authenticateToken, async (req, res) => {
@@ -913,13 +1042,48 @@ module.exports = (io) => {
 
             const isCash = order.paymentType === "cash";
             const isRecommended = !!order.is_recommended;
-            const feeRub = isRecommended ? 100 : 200;
-            const debtKopecks = !isPremium && isCash ? feeRub * 100 : 0;
 
-            if (debtKopecks > 0) {
-                await executor.update({ debt: debtKopecks });
+            const feeRub = isRecommended ? 100 : 200;
+            const commissionKopecks = !isPremium && isCash ? feeRub * 100 : 0;
+
+            let finalDebtKopecks = Number(executor.debt || 0);
+
+            let commissionPayment = {
+                autoPaymentTried: false,
+                autoPaymentPaid: false,
+                autoPaymentProcessing: false,
+                autoPaymentStatus: null,
+                paymentId: null,
+                message: "",
+            };
+
+            if (commissionKopecks > 0) {
+                /**
+                 * ВАЖНО:
+                 * Сначала начисляем долг.
+                 * Потом пробуем списать.
+                 * Если списание пройдет, webhook payment.succeeded уменьшит долг.
+                 * Если денег не хватит или payment.canceled — долг останется.
+                 */
+                finalDebtKopecks = Number(executor.debt || 0) + commissionKopecks;
+
+                await executor.update({
+                    debt: finalDebtKopecks,
+                    commissionDebtOrderId: order.id,
+                });
+
+                commissionPayment = await tryPayCommissionFromSavedCard({
+                    req,
+                    executor,
+                    order,
+                    amountKopecks: commissionKopecks,
+                });
             } else {
-                await executor.update({ debt: 0 });
+                /**
+                 * ВАЖНО:
+                 * НЕ ОБНУЛЯЕМ старый долг.
+                 */
+                finalDebtKopecks = Number(executor.debt || 0);
             }
 
             await req.logAction({
@@ -936,8 +1100,14 @@ module.exports = (io) => {
                     finalPriceKopecks: order.finalPriceKopecks,
                     status: order.status,
                     dealStatus: order.dealStatus,
-                    debtKopecks,
+                    commissionKopecks,
+                    debtKopecks: finalDebtKopecks,
                     isPremium,
+                    autoPaymentTried: commissionPayment.autoPaymentTried,
+                    autoPaymentPaid: commissionPayment.autoPaymentPaid,
+                    autoPaymentProcessing: commissionPayment.autoPaymentProcessing,
+                    autoPaymentStatus: commissionPayment.autoPaymentStatus,
+                    autoPaymentId: commissionPayment.paymentId,
                 },
             });
 
@@ -988,13 +1158,50 @@ module.exports = (io) => {
 
             io.emit("orderUpdated");
 
+            let executorMessage = "Ваш запрос на выполнение заказа одобрен!";
+
+            if (commissionKopecks > 0) {
+                if (commissionPayment.autoPaymentPaid) {
+                    executorMessage =
+                        "Ваш запрос одобрен! Комиссия списана с привязанной карты ✅";
+                } else if (commissionPayment.autoPaymentProcessing) {
+                    executorMessage =
+                        "Ваш запрос одобрен! Пробуем списать комиссию с привязанной карты.";
+                } else if (commissionPayment.autoPaymentTried) {
+                    executorMessage =
+                        "Ваш запрос одобрен! Автоматическое списание не прошло, комиссия осталась в задолженности.";
+                } else {
+                    executorMessage =
+                        "Ваш запрос одобрен! Комиссия начислена в задолженность.";
+                }
+            } else if (isPremium) {
+                executorMessage =
+                    "Ваш запрос одобрен! У вас активен Premium — комиссия не требуется.";
+            }
+
             io.to(`user_${fullOrder.executorId}`).emit("orderApproved", {
                 orderId: fullOrder.id,
-                message: "Ваш запрос на выполнение заказа одобрен!",
+                message: executorMessage,
                 isPremium,
-                debt: debtKopecks,
-                needPay: debtKopecks > 0,
-                paid: debtKopecks === 0,
+
+                commissionKopecks,
+
+                debt: finalDebtKopecks,
+
+                needPay:
+                    commissionKopecks > 0 &&
+                    finalDebtKopecks > 0 &&
+                    !commissionPayment.autoPaymentProcessing &&
+                    !commissionPayment.autoPaymentPaid,
+
+                paid:
+                    commissionKopecks === 0 ||
+                    commissionPayment.autoPaymentPaid,
+
+                autoPaymentTried: commissionPayment.autoPaymentTried,
+                autoPaymentPaid: commissionPayment.autoPaymentPaid,
+                autoPaymentProcessing: commissionPayment.autoPaymentProcessing,
+                autoPaymentStatus: commissionPayment.autoPaymentStatus,
             });
 
             io.to(`user_${fullOrder.creatorId}`).emit("orderApproved", {

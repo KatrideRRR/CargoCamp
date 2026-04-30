@@ -189,9 +189,17 @@ export const ModalProvider = ({ children }) => {
                     description: `Заказ номер ${data.orderId}: ${data.message}`,
                     isPremium: isPremiumUser,
                     orderId: data.orderId,
+
                     debt: Number(data.debt || 0),
                     needPay: !!data.needPay,
                     paid: !!data.paid,
+
+                    commissionKopecks: Number(data.commissionKopecks || 0),
+
+                    autoPaymentTried: !!data.autoPaymentTried,
+                    autoPaymentPaid: !!data.autoPaymentPaid,
+                    autoPaymentProcessing: !!data.autoPaymentProcessing,
+                    autoPaymentStatus: data.autoPaymentStatus || null,
                 });
             }
         };
@@ -292,12 +300,29 @@ export const ModalProvider = ({ children }) => {
                         const refreshed = await axiosInstance.get("/auth/profile");
                         setCurrUser(refreshed.data);
 
-                        if (Number(refreshed.data.debt || 0) === 0) {
+                        const freshDebt = Number(refreshed.data.debt || 0);
+
+                        if (freshDebt === 0) {
                             setDebtModalData(null);
                             setNotificationData(null);
                             toast.success("Комиссия оплачена ✅");
                         } else {
-                            toast.info("Платёж обрабатывается. Проверьте статус чуть позже.");
+                            toast.warning(
+                                "Платёж не завершён или не прошёл. Задолженность осталась."
+                            );
+
+                            setNotificationData((prev) =>
+                                prev
+                                    ? {
+                                        ...prev,
+                                        debt: freshDebt,
+                                        needPay: true,
+                                        paid: false,
+                                        autoPaymentProcessing: false,
+                                        autoPaymentPaid: false,
+                                    }
+                                    : prev
+                            );
                         }
                     } catch (e) {
                         console.error(e);
@@ -305,7 +330,7 @@ export const ModalProvider = ({ children }) => {
                     } finally {
                         setDebtPayLoading(false);
                     }
-                }, 2500);
+                }, 3000);
 
                 return;
             }
@@ -404,6 +429,30 @@ export const ModalProvider = ({ children }) => {
                                     </button>
                                 </div>
                             </>
+                        ) : notificationData.autoPaymentPaid ? (
+                            <>
+                                <div className="modal-note modal-note-success">
+                                    Комиссия списана с привязанной карты ✅
+                                </div>
+
+                                <div className="modal-actions">
+                                    <button className="modal-btn modal-btn-primary" onClick={handleNotificationClose}>
+                                        Понятно
+                                    </button>
+                                </div>
+                            </>
+                        ) : notificationData.autoPaymentProcessing ? (
+                            <>
+                                <div className="modal-note">
+                                    Комиссия списывается с привязанной карты. Если платёж не пройдёт, задолженность останется в профиле.
+                                </div>
+
+                                <div className="modal-actions">
+                                    <button className="modal-btn modal-btn-primary" onClick={handleNotificationClose}>
+                                        Понятно
+                                    </button>
+                                </div>
+                            </>
                         ) : notificationData.debt > 0 ? (
                             <>
                                 <PaymentProviderSelect
@@ -413,7 +462,7 @@ export const ModalProvider = ({ children }) => {
                                 />
 
                                 <div className="modal-note">
-                                    Комиссия: <b>{Math.round(notificationData.debt / 100)} ₽</b>
+                                    Комиссия к оплате: <b>{Math.round(notificationData.debt / 100)} ₽</b>
                                 </div>
 
                                 <div className="modal-actions">
@@ -430,7 +479,11 @@ export const ModalProvider = ({ children }) => {
                                         {debtPayLoading ? "Переходим к оплате..." : "Оплатить сейчас"}
                                     </button>
 
-                                    <button className="modal-btn modal-btn-ghost" onClick={handleNotificationClose}>
+                                    <button
+                                        className="modal-btn modal-btn-ghost"
+                                        onClick={handleNotificationClose}
+                                        disabled={debtPayLoading}
+                                    >
                                         Позже
                                     </button>
                                 </div>
@@ -599,7 +652,7 @@ export const ModalProvider = ({ children }) => {
 
                             <button
                                 className="modal-btn modal-btn-ghost"
-                                onClick={handleNotificationClose}
+                                onClick={closeDebtModal}
                                 disabled={debtPayLoading}
                             >
                                 Позже

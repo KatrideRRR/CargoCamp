@@ -141,7 +141,6 @@ router.post('/debt/create', authenticateToken, async (req, res) => {
                 {
                     ...basePayload,
                     payment_method_id: user.yookassa_payment_method_id,
-                    capture: true
                 },
                 idempotenceKey
             );
@@ -153,7 +152,7 @@ router.post('/debt/create', authenticateToken, async (req, res) => {
                 actionType: "payment_create",
                 entityType: "payment",
                 paymentId: payment.id,
-                severity: "info",
+                severity: payment.status === "canceled" ? "warning" : "info",
                 meta: {
                     provider: "yookassa",
                     type: "debt",
@@ -163,11 +162,27 @@ router.post('/debt/create', authenticateToken, async (req, res) => {
                 },
             });
 
+            if (payment.status === "canceled") {
+                return res.json({
+                    success: false,
+                    paidBySavedCard: true,
+                    paymentProcessing: false,
+                    paymentId: payment.id,
+                    status: payment.status,
+                    error:
+                        "Не удалось списать с привязанной карты. Проверьте баланс карты или выберите другой способ оплаты.",
+                });
+            }
+
             return res.json({
                 success: true,
                 paidBySavedCard: true,
+                paymentProcessing: true,
+                paid: false,
                 paymentId: payment.id,
                 status: payment.status,
+                message:
+                    "Платёж создан. Долг будет погашен после подтверждения оплаты.",
             });
         }
 
@@ -517,89 +532,195 @@ router.post('/guarantee/create', authenticateToken, async (req, res) => {
     }
 });
 
-router.post('/yookassa/webhook', async (req, res) => {
+router.post("/yookassa/webhook", async (req, res) => {
+    const io = req.app.locals.io;
 
-    const io = req.app.locals.io; // ✅ вот так
     if (!io) {
         console.warn("⚠️ io is not initialized yet");
     }
 
     try {
         const event = req.body;
-        const allowed = ['payment.waiting_for_capture', 'payment.succeeded', 'payment.canceled'];
-        if (!allowed.includes(event?.event)) return res.sendStatus(200);
+
+        const allowed = [
+            "payment.waiting_for_capture",
+            "payment.succeeded",
+            "payment.canceled",
+        ];
+
+        if (!allowed.includes(event?.event)) {
+            return res.sendStatus(200);
+        }
 
         const payment = event.object;
         const meta = payment?.metadata || {};
+        const paymentStatus = payment?.status;
+        const eventName = event.event;
 
-        await req.logAction({
+        await req.logAction?.({
             req,
             actorUserId: null,
             actorRole: "webhook",
-            actionType: `yookassa_${event.event}`, // например yookassa_payment.succeeded
+            actionType: `yookassa_${eventName}`,
             entityType: "payment",
             paymentId: payment.id,
             orderId: meta.orderId ? Number(meta.orderId) : null,
-            severity: "info",
+            severity: eventName === "payment.canceled" ? "warning" : "info",
             meta: {
                 type: meta.type,
-                status: payment.status,
+                status: paymentStatus,
                 amount: payment.amount?.value,
                 currency: payment.amount?.currency,
             },
         });
 
-        // ====== 1) Premium ======
-        if (meta.type === 'premium') {
+        /**
+         * 1) Premium
+         * ВАЖНО: активируем только при payment.succeeded.
+         */
+        if (meta.type === "premium") {
+            if (eventName !== "payment.succeeded") {
+                return res.sendStatus(200);
+            }
+
             const userId = Number(meta.userId);
             const duration = meta.duration;
-            const addDays = duration === '7d' ? 7 : duration === '30d' ? 30 : 0;
-            if (!addDays) return res.sendStatus(200);
+
+            const addDays =
+                duration === "7d"
+                    ? 7
+                    : duration === "30d"
+                        ? 30
+                        : 0;
+
+            if (!userId || !addDays) {
+                return res.sendStatus(200);
+            }
 
             const user = await User.findByPk(userId);
-            if (!user) return res.sendStatus(200);
+            if (!user) {
+                return res.sendStatus(200);
+            }
 
             const now = new Date();
-            const currentExp = user.subscription_expires_at ? new Date(user.subscription_expires_at) : null;
-            const base = (user.subscription_type === 'premium' && currentExp && currentExp > now) ? currentExp : now;
-            const newExp = new Date(base.getTime() + addDays * 24 * 60 * 60 * 1000);
 
-            user.subscription_type = 'premium';
-            user.subscription_expires_at = newExp;
-            await user.save();
+            const currentExp = user.subscription_expires_at
+                ? new Date(user.subscription_expires_at)
+                : null;
 
-            return res.sendStatus(200);
-        }
+            const base =
+                user.subscription_type === "premium" &&
+                currentExp &&
+                currentExp > now
+                    ? currentExp
+                    : now;
 
-        // ====== 2) Debt ======
-        if (meta.type === 'debt') {
-            const userId = Number(meta.userId);
-            const paidKopecks = Math.round(parseFloat(payment.amount.value) * 100);
-
-            const user = await User.findByPk(userId);
-            if (!user) return res.sendStatus(200);
-
-            const currentDebt = Number(user.debt || 0);
-
-            // optional: защита, если пришел платеж "в никуда"
-            if (currentDebt <= 0) return res.sendStatus(200);
-
-            const newDebt = Math.max(0, currentDebt - paidKopecks);
+            const newExp = new Date(
+                base.getTime() + addDays * 24 * 60 * 60 * 1000
+            );
 
             await user.update({
-                debt: newDebt,
-                commissionDebtOrderId: newDebt === 0 ? null : user.commissionDebtOrderId,
+                subscription_type: "premium",
+                subscription_expires_at: newExp,
             });
 
             return res.sendStatus(200);
         }
 
-// ====== 3) Bind Card ======
+        /**
+         * 2) Debt / Commission
+         * ВАЖНО:
+         * - payment.succeeded => уменьшаем долг
+         * - payment.canceled  => долг НЕ трогаем
+         */
+        if (meta.type === "debt") {
+            const userId = Number(meta.userId);
+            const orderId = meta.orderId ? Number(meta.orderId) : null;
+
+            const user = await User.findByPk(userId);
+            if (!user) {
+                return res.sendStatus(200);
+            }
+
+            if (eventName === "payment.canceled") {
+                await req.logAction?.({
+                    req,
+                    actorUserId: userId,
+                    actorRole: "webhook",
+                    actionType: "debt_payment_canceled",
+                    entityType: "payment",
+                    paymentId: payment.id,
+                    orderId,
+                    severity: "warning",
+                    meta: {
+                        provider: "yookassa",
+                        currentDebt: Number(user.debt || 0),
+                        amount: payment.amount?.value,
+                        reason: payment.cancellation_details || null,
+                    },
+                });
+
+                return res.sendStatus(200);
+            }
+
+            if (eventName !== "payment.succeeded") {
+                return res.sendStatus(200);
+            }
+
+            const paidKopecks = Math.round(
+                parseFloat(payment.amount.value) * 100
+            );
+
+            const currentDebt = Number(user.debt || 0);
+
+            if (currentDebt <= 0) {
+                return res.sendStatus(200);
+            }
+
+            const newDebt = Math.max(0, currentDebt - paidKopecks);
+
+            await user.update({
+                debt: newDebt,
+                commissionDebtOrderId:
+                    newDebt === 0 ? null : user.commissionDebtOrderId,
+            });
+
+            await req.logAction?.({
+                req,
+                actorUserId: userId,
+                actorRole: "webhook",
+                actionType: "debt_payment_succeeded",
+                entityType: "payment",
+                paymentId: payment.id,
+                orderId,
+                severity: "info",
+                meta: {
+                    provider: "yookassa",
+                    paidKopecks,
+                    oldDebt: currentDebt,
+                    newDebt,
+                },
+            });
+
+            return res.sendStatus(200);
+        }
+
+        /**
+         * 3) Bind Card
+         * Сохраняем карту только при payment.succeeded
+         * и только если payment_method.saved === true.
+         */
         if (meta.type === "bind_card") {
+            if (eventName !== "payment.succeeded") {
+                return res.sendStatus(200);
+            }
+
             const userId = Number(meta.userId);
 
             const user = await User.findByPk(userId);
-            if (!user) return res.sendStatus(200);
+            if (!user) {
+                return res.sendStatus(200);
+            }
 
             const pm = payment.payment_method;
             const pmId = pm?.id || null;
@@ -608,11 +729,6 @@ router.post('/yookassa/webhook', async (req, res) => {
             const last4 = pm?.card?.last4 || null;
             const cardType = pm?.card?.card_type || null;
 
-            /**
-             * Важно:
-             * ЮKassa рекомендует сохранять payment_method.id только после того,
-             * как payment_method.saved стало true.
-             */
             if (!pmId || !isSaved) {
                 console.warn("bind_card: payment_method is not saved", {
                     paymentId: payment?.id,
@@ -650,37 +766,59 @@ router.post('/yookassa/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
 
-        // ====== 4) promotion ======
-        if (meta.type === 'order_promotion') {
-            const orderId = Number(meta.orderId);
-            const order = await Order.findByPk(orderId);
-            if (!order) return res.sendStatus(200);
+        /**
+         * 4) Promotion
+         * ВАЖНО: активируем продвижение только при payment.succeeded.
+         */
+        if (meta.type === "order_promotion") {
+            if (eventName !== "payment.succeeded") {
+                return res.sendStatus(200);
+            }
 
-            // защита от "чужого" платежа
-            if (order.promotionPaymentId && order.promotionPaymentId !== payment.id) {
+            const orderId = Number(meta.orderId);
+
+            const order = await Order.findByPk(orderId);
+            if (!order) {
+                return res.sendStatus(200);
+            }
+
+            if (
+                order.promotionPaymentId &&
+                order.promotionPaymentId !== payment.id
+            ) {
                 return res.sendStatus(200);
             }
 
             let pr = order.promotionRequested || {};
+
             if (typeof pr === "string") {
-                try { pr = JSON.parse(pr); } catch { pr = {}; }
+                try {
+                    pr = JSON.parse(pr);
+                } catch {
+                    pr = {};
+                }
             }
+
             await order.update({
-                status: 'pending',
+                status: "pending",
                 is_highlighted: !!pr.highlight,
                 is_recommended: !!pr.recommended,
                 is_push_notified: !!pr.push,
                 promotionPaidAt: new Date(),
             });
 
-            io.emit('orderUpdated');
+            io?.emit("orderUpdated");
 
             if (pr.push) {
                 try {
-                    const logAction = req.logAction || req.app?.locals?.logAction || null;
+                    const logAction =
+                        req.logAction ||
+                        req.app?.locals?.logAction ||
+                        null;
+
                     await sendOrderPush({
-                        db,   // у тебя db уже есть в этом файле (как в остальных местах)
-                        io,   // твой io из сокетов
+                        db,
+                        io,
                         orderId: order.id,
                         radiusKm: 50,
                         limit: 10,
@@ -694,50 +832,54 @@ router.post('/yookassa/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
 
-        // ====== 5) Guarantee (hold/capture) ======
-        if (meta.type === 'guarantee') {
+        /**
+         * 5) Guarantee
+         */
+        if (meta.type === "guarantee") {
             const orderId = Number(meta.orderId);
-            const order = await Order.findByPk(orderId);
-            if (!order) return res.sendStatus(200);
 
-            // защита от "чужого" платежа
-            if (order.yookassa_payment_id && order.yookassa_payment_id !== payment.id) {
+            const order = await Order.findByPk(orderId);
+            if (!order) {
                 return res.sendStatus(200);
             }
 
-            // 1) холд успешен (деньги заморожены)
-            if (event.event === 'payment.waiting_for_capture') {
+            if (
+                order.yookassa_payment_id &&
+                order.yookassa_payment_id !== payment.id
+            ) {
+                return res.sendStatus(200);
+            }
+
+            if (eventName === "payment.waiting_for_capture") {
                 await order.update({
-                    dealStatus: 'funds_held',
-                    yookassa_payment_status: payment.status,
+                    dealStatus: "funds_held",
+                    yookassa_payment_status: paymentStatus,
                     funds_held_at: new Date(),
                 });
 
-                // можно уведомить исполнителя "деньги в гарантии, можно ехать"
-                io.to(`user_${order.executorId}`).emit('guaranteeHeld', {
+                io?.to(`user_${order.executorId}`).emit("guaranteeHeld", {
                     orderId: order.id,
-                    message: 'Заказ оплачен по гарантии. Деньги заморожены ✅ Можно приступать.',
+                    message:
+                        "Заказ оплачен по гарантии. Деньги заморожены ✅ Можно приступать.",
                 });
 
                 return res.sendStatus(200);
             }
 
-            // 2) платеж отменен/не прошел
-            if (event.event === 'payment.canceled') {
+            if (eventName === "payment.canceled") {
                 await order.update({
-                    dealStatus: 'payment_failed',
-                    yookassa_payment_status: payment.status,
+                    dealStatus: "payment_failed",
+                    yookassa_payment_status: paymentStatus,
                     payment_failed_at: new Date(),
                 });
 
                 return res.sendStatus(200);
             }
 
-            // 3) финальное списание (после capture)
-            if (event.event === 'payment.succeeded') {
+            if (eventName === "payment.succeeded") {
                 await order.update({
-                    dealStatus: 'captured',
-                    yookassa_payment_status: payment.status,
+                    dealStatus: "captured",
+                    yookassa_payment_status: paymentStatus,
                     captured_at: new Date(),
                 });
 
@@ -749,7 +891,7 @@ router.post('/yookassa/webhook', async (req, res) => {
 
         return res.sendStatus(200);
     } catch (e) {
-        console.error('yookassa webhook error:', e);
+        console.error("yookassa webhook error:", e);
         return res.sendStatus(200);
     }
 });
