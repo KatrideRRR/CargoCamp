@@ -60,7 +60,6 @@ function generateHTML(data) {
 
       <div class="section">
         <strong>Дата заключения:</strong> ${data.approvalDate}<br>
-        <strong>Место заключения:</strong> ${data.city}
       </div>
 
       <div class="section">
