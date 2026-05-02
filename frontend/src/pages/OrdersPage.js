@@ -1,4 +1,3 @@
-// src/pages/OrdersPage.js
 import React, { useEffect, useMemo, useRef, useState, useCallback, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ModalContext } from "../components/modalContext";
@@ -9,7 +8,6 @@ import { toast } from "react-toastify";
 import { socket } from "../socketClient";
 
 import "../styles/OrdersPage.css";
-import SwipeableMap from "../components/SwipeableMap";
 import YandexMapModal from "../components/YandexMapModal";
 import ExpressRouteButtons from "../components/ExpressRouteButtons";
 
@@ -30,25 +28,27 @@ function looksLikeCoordsString(v) {
 
 async function reverseGeocodeYandex({ lat, lng, apiKey }) {
     if (!apiKey) throw new Error("No Yandex API key");
+
     const url = `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}&geocode=${lng},${lat}&format=json&results=1&kind=house`;
     const r = await fetch(url);
     const data = await r.json();
 
     const first = data?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
-    const text = first?.metaDataProperty?.GeocoderMetaData?.text || first?.name || null;
-    return text;
+    return first?.metaDataProperty?.GeocoderMetaData?.text || first?.name || null;
 }
 
 function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
     const R = 6371;
     const dLat = (lat2 - lat1) * (Math.PI / 180);
     const dLon = (lon2 - lon1) * (Math.PI / 180);
+
     const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(lat1 * (Math.PI / 180)) *
         Math.sin(dLon / 2) *
         Math.sin(dLon / 2) *
         Math.cos(lat2 * (Math.PI / 180));
+
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 }
@@ -64,45 +64,38 @@ const OrdersPage = () => {
         hasAnyBusy: false,
     });
 
-    // server data
     const [ordersRaw, setOrdersRaw] = useState([]);
     const [expressRaw, setExpressRaw] = useState([]);
-
     const [creatorsInfo, setCreatorsInfo] = useState({});
     const [categories, setCategories] = useState([]);
     const [subcategories, setSubcategories] = useState([]);
 
-    // auth/profile
     const [userId, setUserId] = useState(null);
     const [profile, setProfile] = useState(null);
 
-    // location
-    const [userLocation, setUserLocation] = useState(null); // {latitude, longitude}
+    const [userLocation, setUserLocation] = useState(null);
     const [locationDraft, setLocationDraft] = useState("");
     const [locLoading, setLocLoading] = useState(false);
     const [locError, setLocError] = useState(null);
     const [isGeolocationDenied, setIsGeolocationDenied] = useState(false);
-    const [showMapPick, setShowMapPick] = useState(false);
 
-    // UI
+    const [showOrdersMap, setShowOrdersMap] = useState(false);
+    const [showLocationPicker, setShowLocationPicker] = useState(false);
+
     const [drawerOpen, setDrawerOpen] = useState(false);
-    const [isMapVisible, setIsMapVisible] = useState(false);
 
-    // tabs
-    const [activeTab, setActiveTab] = useState("all"); // all | recommended | courier
-
-    // drawer filters
+    const [activeTab, setActiveTab] = useState("all");
     const [selectedCategory, setSelectedCategory] = useState("");
     const [selectedSubcategory, setSelectedSubcategory] = useState("");
     const [useProfileProfessions, setUseProfileProfessions] = useState(true);
 
-    // modal images
+    const [locationMenuOpen, setLocationMenuOpen] = useState(false);
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [currentImages, setCurrentImages] = useState([]);
 
     const { openDebtModal } = useContext(ModalContext);
-
     const creatorsCacheRef = useRef({});
 
     const preferredCategoryIds = useMemo(() => {
@@ -113,9 +106,7 @@ const OrdersPage = () => {
     const preferredCategories = useMemo(() => {
         if (!preferredCategoryIds.length) return [];
         const map = new Map((categories || []).map((c) => [Number(c.id), c]));
-        return preferredCategoryIds
-            .map((id) => map.get(Number(id)))
-            .filter(Boolean);
+        return preferredCategoryIds.map((id) => map.get(Number(id))).filter(Boolean);
     }, [preferredCategoryIds, categories]);
 
     const openModal = (images) => {
@@ -144,48 +135,42 @@ const OrdersPage = () => {
     };
 
     const buildServiceLine = (o) => {
-        const parts = [
-            o?.category?.name,
-            o?.subcategory?.name,
-            o?.service?.name,
-        ].filter(Boolean);
-
+        const parts = [o?.category?.name, o?.subcategory?.name, o?.service?.name].filter(Boolean);
         return parts.length ? parts.join(" • ") : "Не указано";
     };
 
     useEffect(() => {
         const p = new URLSearchParams(window.location.search);
-        const promoReturn = p.get('promoReturn') === '1';
-        const paymentId = p.get('paymentId');
+        const promoReturn = p.get("promoReturn") === "1";
+        const paymentId = p.get("paymentId");
 
         if (!promoReturn || !paymentId) return;
 
         (async () => {
             try {
                 const res = await axiosInstance.get(`/payments/status?paymentId=${encodeURIComponent(paymentId)}`);
-                if (res.data?.status === 'succeeded') {
-                    toast.success('Продвижение оплачено ✅');
-                } else if (res.data?.status === 'pending') {
-                    toast.info('Платёж обрабатывается… обновите страницу через пару секунд');
+
+                if (res.data?.status === "succeeded") {
+                    toast.success("Продвижение оплачено ✅");
+                } else if (res.data?.status === "pending") {
+                    toast.info("Платёж обрабатывается… обновите страницу через пару секунд");
                 } else {
-                    toast.error('Платёж не завершён');
+                    toast.error("Платёж не завершён");
                 }
-            } catch (e) {
-                toast.error('Не удалось проверить платёж');
+            } catch {
+                toast.error("Не удалось проверить платёж");
             } finally {
-                // чистим URL чтобы не повторялось
-                p.delete('promoReturn');
-                p.delete('paymentId');
-                const newUrl = `${window.location.pathname}${p.toString() ? `?${p.toString()}` : ''}`;
-                window.history.replaceState({}, '', newUrl);
+                p.delete("promoReturn");
+                p.delete("paymentId");
+                const newUrl = `${window.location.pathname}${p.toString() ? `?${p.toString()}` : ""}`;
+                window.history.replaceState({}, "", newUrl);
             }
         })();
     }, []);
 
-    // ---------- API: fetch base data ----------
     useEffect(() => {
-        axios
-            .get(`${apiUrl}/api/category`)
+        axiosInstance
+            .get("/category")
             .then((res) => setCategories(res.data || []))
             .catch(() => setCategories([]));
     }, []);
@@ -196,10 +181,11 @@ const OrdersPage = () => {
                 const res = await axiosInstance.get("/auth/profile");
                 setProfile(res.data);
                 setUserId(res.data?.id || null);
-            } catch (e) {
+            } catch {
                 console.info("OrdersPage: profile not loaded (maybe not logged in).");
             }
         };
+
         fetchProfile();
     }, []);
 
@@ -216,10 +202,10 @@ const OrdersPage = () => {
 
         fetchOrders();
         socket.on("orderUpdated", fetchOrders);
+
         return () => socket.off("orderUpdated", fetchOrders);
     }, []);
 
-    // EXPRESS: доступные created + executorId null
     const fetchExpress = useCallback(async () => {
         try {
             const res = await axiosInstance.get("/express/express-orders/available");
@@ -269,12 +255,7 @@ const OrdersPage = () => {
                 hasBusyTaxi = expressOrders.some((o) => {
                     const isExecutor = Number(o.executorId) === Number(userId);
                     const isTaxi = String(o.type) === "taxi";
-                    const activeStatuses = [
-                        "accepted",
-                        "on_the_way_to_A",
-                        "arrived_at_A",
-                        "in_progress",
-                    ];
+                    const activeStatuses = ["accepted", "on_the_way_to_A", "arrived_at_A", "in_progress"];
                     return isExecutor && isTaxi && activeStatuses.includes(String(o.status));
                 });
             }
@@ -386,7 +367,6 @@ const OrdersPage = () => {
 
     useEffect(() => {
         fetchExpress();
-
         socket.on("orderUpdated", fetchExpress);
         socket.on("expressOrdersUpdated", fetchExpress);
 
@@ -396,37 +376,26 @@ const OrdersPage = () => {
         };
     }, [fetchExpress]);
 
-    // normalize express -> "order-like"
     const expressAsOrders = useMemo(() => {
         return (expressRaw || []).map((e) => ({
-            // IMPORTANT: уникальный ключ, чтобы React не путался
             id: `e-${e.id}`,
             express: true,
             expressId: e.id,
             taxi_courier: true,
-            expressType: e.type, // taxi | courier
-
+            expressType: e.type,
             createdAt: e.createdAt || e.created_at,
-
-            // geo: берем точку А как координаты заказа (для карты и радиуса)
             coordinates: `${Number(e.fromLat)},${Number(e.fromLng)}`,
-
-            // UI mapping
             address: `${e.fromAddress} → ${e.toAddress}`,
             description: e.description || "",
             proposedSum: Number(e.totalPrice ?? 0),
             paymentType: e.paymentType,
-
             images: [],
-            // чтобы блок "Категория/Подкатегория/Услуга" не был пустым
             category: { name: e.type === "taxi" ? "Такси" : "Курьер" },
             subcategory: e.subcategory ? { name: e.subcategory } : null,
             service: null,
-
             creatorId: e.creatorId,
             executorId: e.executorId,
-            status: "pending", // чтобы кнопка "Запросить выполнение" НЕ показывалась для экспресса (см. ниже)
-
+            status: "pending",
             is_recommended: false,
             is_highlighted: false,
         }));
@@ -438,14 +407,12 @@ const OrdersPage = () => {
         return [...a, ...b];
     }, [ordersRaw, expressAsOrders]);
 
-    // ---------- creators info (ВАЖНО: с учётом express) ----------
     useEffect(() => {
-        const ids = [
-            ...new Set((allRaw || []).map((o) => o.creatorId).filter(Boolean)),
-        ];
+        const ids = [...new Set((allRaw || []).map((o) => o.creatorId).filter(Boolean))];
         if (!ids.length) return;
 
         const missing = ids.filter((id) => !creatorsCacheRef.current[id]);
+
         if (!missing.length) {
             setCreatorsInfo({ ...creatorsCacheRef.current });
             return;
@@ -456,16 +423,19 @@ const OrdersPage = () => {
                 const results = await Promise.allSettled(
                     missing.map((id) => axiosInstance.get(`/auth/${id}`))
                 );
+
                 results.forEach((r, idx) => {
                     const id = missing[idx];
-                    if (r.status === "fulfilled") creatorsCacheRef.current[id] = r.value.data;
+                    if (r.status === "fulfilled") {
+                        creatorsCacheRef.current[id] = r.value.data;
+                    }
                 });
+
                 setCreatorsInfo({ ...creatorsCacheRef.current });
             } catch {}
         })();
     }, [allRaw]);
 
-    // ---------- location: profile -> gps -> manual/map ----------
     useEffect(() => {
         if (!profile) return;
 
@@ -506,12 +476,17 @@ const OrdersPage = () => {
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
                 setIsGeolocationDenied(false);
+
                 const latitude = pos.coords.latitude;
                 const longitude = pos.coords.longitude;
                 setUserLocation({ latitude, longitude });
 
                 try {
-                    const addr = await reverseGeocodeYandex({ lat: latitude, lng: longitude, apiKey: YM_KEY });
+                    const addr = await reverseGeocodeYandex({
+                        lat: latitude,
+                        lng: longitude,
+                        apiKey: YM_KEY,
+                    });
                     if (addr) setLocationDraft(addr);
                 } catch {}
             },
@@ -521,7 +496,11 @@ const OrdersPage = () => {
     }, [profile, YM_KEY]);
 
     const pullLocationFromProfile = async () => {
-        if (!profile) return toast.info("Профиль ещё не загружен");
+        if (!profile) {
+            toast.info("Профиль ещё не загружен");
+            return;
+        }
+
         const lat = Number(profile.locationLat);
         const lng = Number(profile.locationLng);
 
@@ -556,7 +535,8 @@ const OrdersPage = () => {
             if (!navigator.geolocation) {
                 toast.error("GPS недоступен в браузере");
                 setIsGeolocationDenied(true);
-                return resolve(false);
+                resolve(false);
+                return;
             }
 
             setLocLoading(true);
@@ -571,7 +551,11 @@ const OrdersPage = () => {
                     setIsGeolocationDenied(false);
 
                     try {
-                        const addr = await reverseGeocodeYandex({ lat: latitude, lng: longitude, apiKey: YM_KEY });
+                        const addr = await reverseGeocodeYandex({
+                            lat: latitude,
+                            lng: longitude,
+                            apiKey: YM_KEY,
+                        });
                         if (addr) setLocationDraft(addr);
                     } catch {}
 
@@ -586,17 +570,21 @@ const OrdersPage = () => {
                     setIsGeolocationDenied(true);
                     resolve(false);
                 },
-                { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
             );
         });
 
-    const toggleMap = async () => {
-        if (!isMapVisible) {
-            setIsMapVisible(true);
-            await detectGpsNow();
-        } else {
-            setIsMapVisible(false);
+    const handleOpenOrdersMap = () => {
+        setShowOrdersMap(true);
+
+        if (!userLocation?.latitude || !userLocation?.longitude) {
+            detectGpsNow().catch(() => {});
         }
+    };
+
+    const handleOpenLocationPicker = () => {
+        setLocationMenuOpen(false);
+        setShowLocationPicker(true);
     };
 
     const saveLocationToProfile = async ({ address, lat, lng, source }) => {
@@ -608,6 +596,7 @@ const OrdersPage = () => {
 
         setLocLoading(true);
         setLocError(null);
+
         try {
             const res = await axios.post(
                 `${apiUrl}/api/auth/location/me`,
@@ -634,6 +623,7 @@ const OrdersPage = () => {
             );
             const data = await response.json();
             const pos = data?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject?.Point?.pos;
+
             if (!pos) throw new Error("Адрес не найден");
 
             const [lng, lat] = pos.split(" ").map(Number);
@@ -649,12 +639,12 @@ const OrdersPage = () => {
         }
     };
 
-    // ---------- drawer: dependent selects ----------
     const fetchSubcategories = async (categoryId) => {
         if (!categoryId) {
             setSubcategories([]);
             return;
         }
+
         try {
             const res = await axiosInstance.get(`/category/subcategory/${categoryId}`);
             setSubcategories(res.data || []);
@@ -663,11 +653,9 @@ const OrdersPage = () => {
         }
     };
 
-    // ---------- core filtering (tabs + drawer + geo) ----------
     const visibleOrders = useMemo(() => {
         const base = Array.isArray(allRaw) ? allRaw : [];
 
-        // 0) tabs
         const tabFiltered =
             activeTab === "recommended"
                 ? base.filter((o) => !!o.is_recommended)
@@ -675,7 +663,6 @@ const OrdersPage = () => {
                     ? base.filter((o) => !!o.taxi_courier)
                     : base;
 
-        // 1) preferred professions (НЕ режем taxi_courier)
         const professionFiltered =
             useProfileProfessions && preferredCategoryIds.length > 0
                 ? tabFiltered.filter((o) => {
@@ -686,20 +673,16 @@ const OrdersPage = () => {
                 })
                 : tabFiltered;
 
-        // 2) drawer filters (для express — они не подходят, поэтому НЕ фильтруем их этими полями)
         const hasDrawerFilters = !!(selectedCategory || selectedSubcategory);
-
-        // ✅ ВАЖНО: если мы в табе "all" и включены drawer-фильтры — убираем taxi/courier из выдачи
-        const hideTaxiCourierInAllWhenFiltered =
-            activeTab === "all" && hasDrawerFilters;
+        const hideTaxiCourierInAllWhenFiltered = activeTab === "all" && hasDrawerFilters;
 
         const baseForDrawer = hideTaxiCourierInAllWhenFiltered
-            ? professionFiltered.filter((o) => !o.taxi_courier)  // убрали taxi/courier (включая express)
+            ? professionFiltered.filter((o) => !o.taxi_courier)
             : professionFiltered;
 
         const byCategory = selectedCategory
             ? baseForDrawer.filter((o) => {
-                if (o.express) return true; // оставляем как у тебя (но express уже вырезан выше, если taxi_courier=true)
+                if (o.express) return true;
                 return Number(o.categoryId ?? o.category?.id) === Number(selectedCategory);
             })
             : baseForDrawer;
@@ -711,7 +694,6 @@ const OrdersPage = () => {
             })
             : byCategory;
 
-        // 3) geo 50km always
         if (!userLocation?.latitude || !userLocation?.longitude) return [];
 
         const geoFiltered = bySubcategory
@@ -719,6 +701,7 @@ const OrdersPage = () => {
                 const [lat, lon] = String(order.coordinates || "")
                     .split(",")
                     .map((x) => Number(String(x).trim()));
+
                 if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
 
                 const distance = getDistanceFromLatLonInKm(
@@ -728,19 +711,21 @@ const OrdersPage = () => {
                     lon
                 );
 
-                return { ...order, _distance: distance, latitude: lat, longitude: lon };
+                return {
+                    ...order,
+                    _distance: distance,
+                    latitude: lat,
+                    longitude: lon,
+                };
             })
             .filter((o) => o && o._distance <= RADIUS_KM);
 
-        // 4) sorting: distance ↑ then date ↓
-        geoFiltered.sort((a, b) => {
+        return [...geoFiltered].sort((a, b) => {
             const ad = Number.isFinite(a._distance) ? a._distance : 1e9;
             const bd = Number.isFinite(b._distance) ? b._distance : 1e9;
             if (ad !== bd) return ad - bd;
             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
-
-        return geoFiltered;
     }, [
         allRaw,
         activeTab,
@@ -748,15 +733,16 @@ const OrdersPage = () => {
         selectedCategory,
         selectedSubcategory,
         userLocation,
-        useProfileProfessions
+        useProfileProfessions,
     ]);
 
     const locationStatusText = useMemo(() => {
         if (locLoading) return "Определяем адрес…";
-        if (userLocation?.latitude && userLocation?.longitude) return locationDraft || `Радиус ${RADIUS_KM} км`;
+        if (userLocation?.latitude && userLocation?.longitude) {
+            return locationDraft || `Радиус ${RADIUS_KM} км`;
+        }
         return "Не задано";
     }, [locLoading, userLocation, locationDraft]);
-
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -778,7 +764,6 @@ const OrdersPage = () => {
 
         const resume = async () => {
             try {
-                // ждём, пока вебхук успеет обновить debt
                 for (let attempt = 0; attempt < 10; attempt++) {
                     if (cancelled) return;
 
@@ -821,12 +806,13 @@ const OrdersPage = () => {
     return (
         <div className="orders-page">
             <div className="orders-shell">
-                {/* Top bar */}
                 <div className="orders-top glass">
                     <div className="orders-top-left">
                         <div className="orders-title">Все заказы</div>
+
                         <div className="orders-subtitle">
-                            Радиус: <b>{RADIUS_KM} км</b> • {useProfileProfessions && preferredCategoryIds.length ? "по вашим профессиям" : "все категории"} •{" "}
+                            Радиус: <b>{RADIUS_KM} км</b> •{" "}
+                            {useProfileProfessions && preferredCategoryIds.length ? "по вашим профессиям" : "все категории"} •{" "}
                             Найдено: <b>{visibleOrders.length}</b>
                         </div>
 
@@ -836,19 +822,36 @@ const OrdersPage = () => {
                                 <span className="orders-location-text">{locationStatusText}</span>
                             </div>
 
-                            <details className="loc-menu">
+                            <details
+                                className="loc-menu"
+                                open={locationMenuOpen}
+                                onToggle={(e) => setLocationMenuOpen(Boolean(e.currentTarget.open))}
+                            >
                                 <summary className="loc-summary">
                                     <FaLocationArrow /> Местоположение
                                 </summary>
 
                                 <div className="loc-menu-panel">
-                                    <button className="btn btn-ghost" onClick={pullLocationFromProfile} disabled={locLoading}>
+                                    <button
+                                        className="btn btn-ghost"
+                                        onClick={pullLocationFromProfile}
+                                        disabled={locLoading}
+                                    >
                                         Из профиля
                                     </button>
-                                    <button className="btn btn-ghost" onClick={detectGpsNow} disabled={locLoading}>
+
+                                    <button
+                                        className="btn btn-ghost"
+                                        onClick={detectGpsNow}
+                                        disabled={locLoading}
+                                    >
                                         GPS
                                     </button>
-                                    <button className="btn btn-ghost" onClick={() => setShowMapPick(true)}>
+
+                                    <button
+                                        className="btn btn-ghost"
+                                        onClick={handleOpenLocationPicker}
+                                    >
                                         Выбрать на карте
                                     </button>
                                 </div>
@@ -863,7 +866,11 @@ const OrdersPage = () => {
                                     onChange={(e) => setLocationDraft(e.target.value)}
                                     placeholder="Введите адрес (например: Крым, Белогорск)"
                                 />
-                                <button className="btn btn-primary" disabled={locLoading || !locationDraft.trim()} onClick={() => geocodeAddress(locationDraft)}>
+                                <button
+                                    className="btn btn-primary"
+                                    disabled={locLoading || !locationDraft.trim()}
+                                    onClick={() => geocodeAddress(locationDraft)}
+                                >
                                     Применить
                                 </button>
                             </div>
@@ -873,7 +880,7 @@ const OrdersPage = () => {
                     </div>
 
                     <div className="orders-top-right">
-                        <button className="btn btn-ghost" onClick={toggleMap}>
+                        <button className="btn btn-ghost" onClick={handleOpenOrdersMap}>
                             <FaMapMarkedAlt style={{ marginRight: 8 }} />
                             Карта
                         </button>
@@ -885,7 +892,6 @@ const OrdersPage = () => {
                     </div>
                 </div>
 
-                {/* Tabs row */}
                 <div className="orders-tabs-row glass">
                     <button className={`tab-pill ${activeTab === "all" ? "active" : ""}`} onClick={() => setActiveTab("all")}>
                         Все
@@ -900,8 +906,8 @@ const OrdersPage = () => {
                     </button>
 
                     <span className="tabs-hint">
-            Во вкладке <b>Все</b> приоритетные не поднимаются, только подсвечиваются
-          </span>
+                        Во вкладке <b>Все</b> приоритетные не поднимаются, только подсвечиваются
+                    </span>
                 </div>
 
                 {activeTab === "all" && (selectedCategory || selectedSubcategory) && (
@@ -932,9 +938,7 @@ const OrdersPage = () => {
                                         setSelectedSubcategory("");
                                         setSubcategories([]);
                                         setActiveTab("all");
-
-                                        setUseProfileProfessions(false); // ⭐ вот это делает “сброс” заметным
-
+                                        setUseProfileProfessions(false);
                                         toast.info("Фильтры сброшены. Профессии из профиля временно отключены.");
                                     }}
                                 >
@@ -950,7 +954,6 @@ const OrdersPage = () => {
                                 >
                                     Применять профессии
                                 </button>
-
                             </div>
                         </div>
 
@@ -959,18 +962,11 @@ const OrdersPage = () => {
                                 const found = preferredCategories.find((c) => Number(c.id) === Number(id));
                                 return (
                                     <span key={id} className="pref-chip" title={found?.name || ""}>
-            {found?.name || `Категория #${id}`}
-          </span>
+                                        {found?.name || `Категория #${id}`}
+                                    </span>
                                 );
                             })}
                         </div>
-                    </div>
-                )}
-
-                {/* Map */}
-                {isMapVisible && (
-                    <div className="orders-map glass">
-                        <SwipeableMap orders={visibleOrders} userLocation={userLocation} isOpen={isMapVisible} />
                     </div>
                 )}
 
@@ -988,7 +984,6 @@ const OrdersPage = () => {
                     </div>
                 )}
 
-                {/* Orders list */}
                 <div className="orders-list-wrap">
                     {!userLocation?.latitude || !userLocation?.longitude ? (
                         <div className="empty glass">
@@ -997,7 +992,7 @@ const OrdersPage = () => {
                                 Чтобы показывать ближайшие заказы в радиусе {RADIUS_KM} км, укажи адрес или выбери точку на карте.
                             </div>
                             <div className="empty-actions">
-                                <button className="btn btn-primary" onClick={() => setShowMapPick(true)}>
+                                <button className="btn btn-ghost" onClick={handleOpenLocationPicker}>
                                     Выбрать на карте
                                 </button>
                             </div>
@@ -1033,24 +1028,22 @@ const OrdersPage = () => {
                                         <div className="order-head">
                                             <div className="order-head-left">
                                                 <div className="order-title-row">
-                          <span className="order-number">
-                            {isExpress ? `Экспресс №${displayId}` : `Заказ №${displayId}`}
-                          </span>
+                                                    <span className="order-number">
+                                                        {isExpress ? `Экспресс №${displayId}` : `Заказ №${displayId}`}
+                                                    </span>
 
                                                     {order.is_recommended && <span className="badge badge-priority">В приоритете</span>}
-
                                                     {order.taxi_courier && <span className="badge badge-courier">{courierBadgeText}</span>}
-
                                                     {Number.isFinite(order._distance) && (
                                                         <span className="badge badge-distance">{order._distance.toFixed(1)} км</span>
                                                     )}
                                                 </div>
 
                                                 <div className="order-meta">
-                          <span className="muted">
-                            {creator.username ? `от ${creator.username}` : "от пользователя"} •{" "}
-                              {new Date(order.createdAt).toLocaleString()}
-                          </span>
+                                                    <span className="muted">
+                                                        {creator.username ? `от ${creator.username}` : "от пользователя"} •{" "}
+                                                        {new Date(order.createdAt).toLocaleString()}
+                                                    </span>
                                                 </div>
                                             </div>
 
@@ -1075,7 +1068,9 @@ const OrdersPage = () => {
                                             <div className="order-col">
                                                 <div className="kv">
                                                     <span className="k">{isExpress ? "Маршрут" : "Адрес"}</span>
-                                                    <span className={`v ${isExpress ? "route-line" : ""}`}>{order.address || "—"}</span>
+                                                    <span className={`v ${isExpress ? "route-line" : ""}`}>
+                                                        {order.address || "—"}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1085,7 +1080,9 @@ const OrdersPage = () => {
                                                 {order.images.slice(0, 4).map((img, idx) => (
                                                     <img key={idx} className="thumb" src={`${apiUrl}${img}`} alt={`img-${idx}`} />
                                                 ))}
-                                                {order.images.length > 4 && <div className="thumb-more">+{order.images.length - 4}</div>}
+                                                {order.images.length > 4 && (
+                                                    <div className="thumb-more">+{order.images.length - 4}</div>
+                                                )}
                                             </div>
                                         )}
 
@@ -1104,7 +1101,6 @@ const OrdersPage = () => {
                                                 {creator.complaintsCount || 0}
                                             </Link>
 
-                                            {/* Обычные заказы: старое поведение */}
                                             {!isExpress &&
                                                 userId !== order.creatorId &&
                                                 !order.executorId &&
@@ -1116,6 +1112,7 @@ const OrdersPage = () => {
                                                             title={busyState.hasAnyBusy ? busyHintText : ""}
                                                             onClick={async () => {
                                                                 const token = localStorage.getItem("authToken");
+
                                                                 if (!token) {
                                                                     toast.info("Войдите, чтобы запросить выполнение");
                                                                     navigate("/login");
@@ -1179,14 +1176,11 @@ const OrdersPage = () => {
                                                         </button>
 
                                                         {busyState.hasAnyBusy && (
-                                                            <div className="blocked-order-hint">
-                                                                {busyHintText}
-                                                            </div>
+                                                            <div className="blocked-order-hint">{busyHintText}</div>
                                                         )}
                                                     </div>
                                                 )}
 
-                                            {/* Express: (пока) просто открываем экран экспресс-заказа (если у тебя есть роут) */}
                                             {isExpress && (
                                                 <>
                                                     <ExpressRouteButtons
@@ -1230,9 +1224,7 @@ const OrdersPage = () => {
                                                             </button>
 
                                                             {busyState.hasAnyBusy && (
-                                                                <div className="blocked-order-hint">
-                                                                    {busyHintText}
-                                                                </div>
+                                                                <div className="blocked-order-hint">{busyHintText}</div>
                                                             )}
                                                         </div>
                                                     )}
@@ -1253,7 +1245,7 @@ const OrdersPage = () => {
                                 <button className="btn btn-ghost" onClick={() => setDrawerOpen(true)}>
                                     Открыть фильтры
                                 </button>
-                                <button className="btn btn-primary" onClick={() => setShowMapPick(true)}>
+                                <button className="btn btn-ghost" onClick={handleOpenLocationPicker}>
                                     Выбрать место
                                 </button>
                             </div>
@@ -1261,7 +1253,6 @@ const OrdersPage = () => {
                     )}
                 </div>
 
-                {/* Drawer */}
                 {drawerOpen && (
                     <>
                         <div className="drawer-overlay" onClick={() => setDrawerOpen(false)} />
@@ -1281,12 +1272,11 @@ const OrdersPage = () => {
                                     <label>Категория</label>
                                     <select
                                         value={selectedCategory}
-                                        onChange={async (e) => {
+                                        onChange={(e) => {
                                             const v = e.target.value;
                                             setSelectedCategory(v);
                                             setSelectedSubcategory("");
-
-                                            await fetchSubcategories(v);
+                                            fetchSubcategories(v);
                                         }}
                                     >
                                         <option value="">Все</option>
@@ -1305,11 +1295,7 @@ const OrdersPage = () => {
                                     <label>Подкатегория</label>
                                     <select
                                         value={selectedSubcategory}
-                                        onChange={async (e) => {
-                                            const v = e.target.value;
-                                            setSelectedSubcategory(v);
-
-                                        }}
+                                        onChange={(e) => setSelectedSubcategory(e.target.value)}
                                         disabled={!selectedCategory}
                                     >
                                         <option value="">Все</option>
@@ -1348,26 +1334,46 @@ const OrdersPage = () => {
                     </>
                 )}
 
-                {/* Map picker */}
                 <YandexMapModal
-                    isOpen={showMapPick}
-                    onClose={() => setShowMapPick(false)}
-                    initialLat={profile?.locationLat}
-                    initialLng={profile?.locationLng}
+                    isOpen={showOrdersMap}
+                    onClose={() => setShowOrdersMap(false)}
+                    initialLat={userLocation?.latitude ?? profile?.locationLat}
+                    initialLng={userLocation?.longitude ?? profile?.locationLng}
+                    orders={visibleOrders}
+                    showOrders={true}
+                    onPick={(picked) => {
+                        setLocationDraft(picked.address);
+                        setUserLocation({ latitude: picked.lat, longitude: picked.lng });
+                        setShowOrdersMap(false);
+                    }}
+                />
+
+                <YandexMapModal
+                    isOpen={showLocationPicker}
+                    onClose={() => {
+                        setShowLocationPicker(false);
+                        setLocationMenuOpen(false);
+                    }}
+                    initialLat={userLocation?.latitude ?? profile?.locationLat}
+                    initialLng={userLocation?.longitude ?? profile?.locationLng}
+                    showOrders={false}
+                    orders={[]}
                     onPick={async (picked) => {
                         setLocationDraft(picked.address);
                         setUserLocation({ latitude: picked.lat, longitude: picked.lng });
+
                         await saveLocationToProfile({
                             address: picked.address,
                             lat: picked.lat,
                             lng: picked.lng,
                             source: "map",
                         });
-                        setShowMapPick(false);
+
+                        setShowLocationPicker(false);
+                        setLocationMenuOpen(false);
                     }}
                 />
 
-                {/* Images modal */}
                 <Modal
                     appElement={document.getElementById("root")}
                     isOpen={isModalOpen}
@@ -1402,9 +1408,7 @@ const OrdersPage = () => {
                         },
                     }}
                 >
-                    <button className="img-close" onClick={closeModal}>
-                        ×
-                    </button>
+                    <button className="img-close" onClick={closeModal}>×</button>
 
                     <button
                         className="img-nav left"

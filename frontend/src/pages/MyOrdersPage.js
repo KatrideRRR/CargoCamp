@@ -1,4 +1,3 @@
-import CreateOrderModal from "../components/CreateOrderModal";
 import React, { useState, useEffect, useContext, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import axiosInstance from "../utils/axiosInstance";
@@ -29,8 +28,6 @@ const MyOrdersPage = () => {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -640,8 +637,6 @@ const MyOrdersPage = () => {
                     <p className={styles.noOrders}>Пока нет заказов.</p>
                 )}
             </div>
-
-            <CreateOrderModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
         </div>
     );
 };
