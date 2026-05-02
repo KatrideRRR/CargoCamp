@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {useParams, Link, useNavigate} from 'react-router-dom';
 import axiosInstance from '../utils/axiosInstance';
 import '../styles/OrdersPage.css';
-import { socket } from "../socketClient";
 import Modal from "react-modal";
 import {FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity} from "react-icons/fa";
 import {FiAlertTriangle} from "react-icons/fi";
@@ -128,7 +127,6 @@ const OrderPage = () => {
     if (!order || !creator) {
         return <div className="loading">Загрузка...</div>;
     }
-    const isCreator = order.creatorId === userId;
 
     return (
         <div className="orders-page">

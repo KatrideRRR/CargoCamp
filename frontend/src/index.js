@@ -1,34 +1,37 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo } from 'react';
 import { socket } from "./socketClient";
 import ReactDOM from 'react-dom/client';
 import { useNavigate } from 'react-router-dom';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import 'leaflet/dist/leaflet.css';
 
-import OrdersPage from './pages/OrdersPage';
-import CreateOrderPage from './pages/CreateOrderPage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import ProfilePage from './pages/ProfilePage';
-import ActiveOrdersPage from './pages/ActiveOrdersPage';
-import BottomMenu from './components/BottomMenu';
-import ChatPage from './pages/ChatPage';
 import { AuthProvider } from "./utils/authContext";
 import { UserProvider } from './utils/userContext';
 import { ModalProvider } from './components/modalContext';
-import UserReviewsPage from './pages/UserReviewsPage';
-import OrderHistoryPage from "./pages/OrderHistoryPage";
-import OrderPage from './pages/OrderPage';
-import UserOrdersPage from './pages/UserOrdersPage';
-import MyOrdersPage from './pages/MyOrdersPage';
-import StartPage from './pages/StartPage';
-import CreateExpressOrder from "./pages/CreateExpressOrder";
-import ServiceInfoPage from './pages/ServiceInfoPage';
-import InfoPage from "./pages/InfoPage";
 import Modal from "react-modal";
+
+// УБРАЛИ глобальный leaflet css отсюда
+// import 'leaflet/dist/leaflet.css';
 
 Modal.setAppElement = function () {};
 Modal.setAppElement('#root');
+
+const OrdersPage = lazy(() => import('./pages/OrdersPage'));
+const CreateOrderPage = lazy(() => import('./pages/CreateOrderPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const ActiveOrdersPage = lazy(() => import('./pages/ActiveOrdersPage'));
+const BottomMenu = lazy(() => import('./components/BottomMenu'));
+const ChatPage = lazy(() => import('./pages/ChatPage'));
+const UserReviewsPage = lazy(() => import('./pages/UserReviewsPage'));
+const OrderHistoryPage = lazy(() => import('./pages/OrderHistoryPage'));
+const OrderPage = lazy(() => import('./pages/OrderPage'));
+const UserOrdersPage = lazy(() => import('./pages/UserOrdersPage'));
+const MyOrdersPage = lazy(() => import('./pages/MyOrdersPage'));
+const StartPage = lazy(() => import('./pages/StartPage'));
+const CreateExpressOrder = lazy(() => import('./pages/CreateExpressOrder'));
+const ServiceInfoPage = lazy(() => import('./pages/ServiceInfoPage'));
+const InfoPage = lazy(() => import('./pages/InfoPage'));
 
 function getUserIdFromToken() {
     try {
@@ -47,7 +50,6 @@ function getUserIdFromToken() {
 
 function App() {
     const navigate = useNavigate();
-
     const userId = useMemo(() => getUserIdFromToken(), []);
 
     useEffect(() => {
@@ -61,14 +63,7 @@ function App() {
             }
         };
 
-        const handleReconnect = () => {
-            if (userId) {
-                socket.emit("register", userId);
-            }
-        };
-
         socket.on("connect", handleConnect);
-        socket.on("reconnect", handleReconnect);
 
         if (socket.connected && userId) {
             socket.emit("register", userId);
@@ -76,7 +71,6 @@ function App() {
 
         return () => {
             socket.off("connect", handleConnect);
-            socket.off("reconnect", handleReconnect);
         };
     }, [userId]);
 
@@ -104,25 +98,34 @@ function App() {
         <ModalProvider>
             <AuthProvider>
                 <UserProvider>
-                    <Routes>
-                        <Route path="/" element={<StartPage />} />
-                        <Route path="/register" element={<RegisterPage />} />
-                        <Route path="/login" element={<LoginPage />} />
-                        <Route path="/profile" element={<ProfilePage />} />
-                        <Route path="/orders" element={<OrdersPage />} />
-                        <Route path="/active-orders" element={<ActiveOrdersPage />} />
-                        <Route path="/complaints/:userId" element={<UserReviewsPage />} />
-                        <Route path="/orders-history/:userId" element={<OrderHistoryPage />} />
-                        <Route path="/create-order" element={<CreateOrderPage />} />
-                        <Route path="/messages/:orderId" element={<ChatPage />} />
-                        <Route path="/order/:id" element={<OrderPage />} />
-                        <Route path="/user-orders/:userId" element={<UserOrdersPage />} />
-                        <Route path="/my-orders/:userId" element={<MyOrdersPage />} />
-                        <Route path="/express" element={<CreateExpressOrder />} />
-                        <Route path="/services" element={<ServiceInfoPage />} />
-                        <Route path="/info" element={<InfoPage />} />
-                    </Routes>
-                    <BottomMenu />
+                    <Suspense
+                        fallback={
+                            <div style={{ padding: 24, textAlign: 'center' }}>
+                                Загрузка...
+                            </div>
+                        }
+                    >
+                        <Routes>
+                            <Route path="/" element={<StartPage />} />
+                            <Route path="/register" element={<RegisterPage />} />
+                            <Route path="/login" element={<LoginPage />} />
+                            <Route path="/profile" element={<ProfilePage />} />
+                            <Route path="/orders" element={<OrdersPage />} />
+                            <Route path="/active-orders" element={<ActiveOrdersPage />} />
+                            <Route path="/complaints/:userId" element={<UserReviewsPage />} />
+                            <Route path="/orders-history/:userId" element={<OrderHistoryPage />} />
+                            <Route path="/create-order" element={<CreateOrderPage />} />
+                            <Route path="/messages/:orderId" element={<ChatPage />} />
+                            <Route path="/order/:id" element={<OrderPage />} />
+                            <Route path="/user-orders/:userId" element={<UserOrdersPage />} />
+                            <Route path="/my-orders/:userId" element={<MyOrdersPage />} />
+                            <Route path="/express" element={<CreateExpressOrder />} />
+                            <Route path="/services" element={<ServiceInfoPage />} />
+                            <Route path="/info" element={<InfoPage />} />
+                        </Routes>
+
+                        <BottomMenu />
+                    </Suspense>
                 </UserProvider>
             </AuthProvider>
         </ModalProvider>

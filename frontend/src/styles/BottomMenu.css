@@ -1,184 +1,92 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap");
-
 :root {
-    --bm-bg: rgba(255, 255, 255, 0.58);
-    --bm-border: rgba(255, 255, 255, 0.38);
-    --bm-shadow: 0 -18px 40px rgba(0, 0, 0, 0.08);
+    --bm-bg: #ffffff;
+    --bm-border: rgba(15, 23, 42, 0.08);
+    --bm-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
 
     --bm-text: rgba(15, 23, 42, 0.86);
     --bm-muted: rgba(100, 116, 139, 0.9);
     --bm-active: rgba(29, 78, 216, 0.95);
-    --bm-active-soft: rgba(29, 78, 216, 0.14);
+    --bm-active-soft: rgba(29, 78, 216, 0.1);
 
-    --bm-radius: 22px;
-    --bm-h: 74px;
+    --bm-radius: 18px;
+    --bm-h: 68px;
 
     --badge-bg: rgba(239, 68, 68, 0.95);
-    --badge-border: rgba(255, 255, 255, 0.95);
+    --badge-border: #fff;
 }
 
 .bottom-menu {
     position: fixed;
-    left: 12px;
-    right: 12px;
-    bottom: 12px;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
     height: var(--bm-h);
 
     display: flex;
     justify-content: space-around;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 
     background: var(--bm-bg);
     border: 1px solid var(--bm-border);
     border-radius: var(--bm-radius);
-
-    backdrop-filter: blur(18px) saturate(180%);
-    -webkit-backdrop-filter: blur(18px) saturate(180%);
-
     box-shadow: var(--bm-shadow);
     z-index: 1000;
 }
 
-/* safe-area для iOS */
-@supports (padding: env(safe-area-inset-bottom)) {
-    .bottom-menu {
-        bottom: calc(12px + env(safe-area-inset-bottom));
-    }
-}
-
-/* Общие кнопки */
 .menu-item,
 .navbar-item {
     appearance: none;
     -webkit-tap-highlight-color: transparent;
-
     background: transparent;
     border: none;
     outline: none;
 
-    width: 64px;
-    height: 56px;
-    border-radius: 16px;
+    width: 58px;
+    height: 52px;
+    border-radius: 14px;
 
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: 2px;
 
     color: var(--bm-text);
     cursor: pointer;
-
-    transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease,
-    color 0.18s ease;
     position: relative;
 }
 
-/* hover для десктопа */
-@media (hover: hover) and (pointer: fine) {
-    .menu-item:hover,
-    .navbar-item:hover {
-        background: rgba(255, 255, 255, 0.52);
-        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
-        transform: translateY(-1px);
-        color: var(--bm-active);
-    }
-}
-
-/* tap feedback */
 .menu-item:active,
 .navbar-item:active {
     transform: scale(0.98);
 }
 
-/* Иконки */
-.menu-icon,
-.menu-icon-center {
-    transition: transform 0.2s ease, opacity 0.2s ease;
-    opacity: 0.92;
-}
-
 .menu-label {
-    font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: -0.01em;
-    line-height: 1;
-    color: var(--bm-muted);
+    display: none;
 }
 
-/* Подсветка активного пункта (если захочешь добавить класс .is-active на кнопку) */
 .menu-item.is-active,
 .navbar-item.is-active {
     background: var(--bm-active-soft);
-    border: 1px solid rgba(29, 78, 216, 0.22);
     color: var(--bm-active);
 }
 
-.menu-item.is-active .menu-label,
-.navbar-item.is-active .menu-label {
-    color: var(--bm-active);
-}
-
-/* ===== Центральная кнопка (плавающая) ===== */
 .menu-center {
-    width: 74px;
-    height: 74px;
-    border-radius: 24px;
+    width: 62px;
+    height: 62px;
+    margin-top: -20px;
+    border-radius: 18px;
 
-    margin-top: -30px;
-
-    background: rgba(255, 255, 255, 0.62);
-    border: 1px solid rgba(255, 255, 255, 0.55);
-
-    backdrop-filter: blur(18px) saturate(200%);
-    -webkit-backdrop-filter: blur(18px) saturate(200%);
-
-    box-shadow:
-            0 18px 46px rgba(0, 0, 0, 0.12),
-            0 0 0 1px rgba(29, 78, 216, 0.10) inset;
+    background: #ffffff;
+    border: 1px solid var(--bm-border);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
 
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-.menu-center::before {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    border-radius: 24px;
-    background: radial-gradient(
-            circle at 30% 20%,
-            rgba(29, 78, 216, 0.22),
-            rgba(255, 255, 255, 0) 60%
-    );
-    pointer-events: none;
-}
-
-.menu-center .menu-icon-center {
-    opacity: 0.95;
-}
-
-@media (hover: hover) and (pointer: fine) {
-    .menu-center:hover {
-        transform: translateY(-2px);
-        box-shadow:
-                0 22px 60px rgba(0, 0, 0, 0.14),
-                0 0 0 1px rgba(29, 78, 216, 0.12) inset;
-    }
-
-    .menu-center:hover .menu-icon-center {
-        transform: scale(1.06);
-    }
-}
-
-.menu-center:active {
-    transform: translateY(-1px) scale(0.985);
-}
-
-/* ===== badge ===== */
 .icon-wrapper {
     position: relative;
     display: inline-flex;
@@ -188,77 +96,28 @@
 
 .notification-badge {
     position: absolute;
-    top: -7px;
-    right: -9px;
-
+    top: -6px;
+    right: -8px;
     background: var(--badge-bg);
     color: #fff;
-
     font-size: 10px;
-    font-weight: 900;
-
-    padding: 2px 6px;
+    font-weight: 800;
+    padding: 2px 5px;
     border-radius: 999px;
-
     min-width: 18px;
     height: 18px;
-
     display: inline-flex;
     align-items: center;
     justify-content: center;
-
     border: 2px solid var(--badge-border);
-    box-shadow: 0 10px 20px rgba(239, 68, 68, 0.25);
-
-    transform: translateZ(0);
 }
 
-/* ===== пульс, если хочешь снова включить new-request/new-message ===== */
 .new-request {
-    animation: bmPulse 1.6s infinite;
+    animation: none;
 }
 
-@keyframes bmPulse {
-    0% {
-        box-shadow:
-                0 18px 46px rgba(0, 0, 0, 0.12),
-                0 0 0 0 rgba(29, 78, 216, 0.28);
-    }
-    70% {
-        box-shadow:
-                0 18px 46px rgba(0, 0, 0, 0.12),
-                0 0 0 14px rgba(29, 78, 216, 0);
-    }
-    100% {
-        box-shadow:
-                0 18px 46px rgba(0, 0, 0, 0.12),
-                0 0 0 0 rgba(29, 78, 216, 0);
-    }
-}
-
-/* ===== Mobile: скрываем подписи ===== */
-@media (max-width: 768px) {
-    .menu-label {
-        display: none;
-    }
-
-    .menu-item,
-    .navbar-item {
-        width: 62px;
-        height: 54px;
-    }
-
-    .menu-center {
-        width: 68px;
-        height: 68px;
-        margin-top: -28px;
-        border-radius: 22px;
-    }
-}
-
-/* ===== Desktop: подписи видны ===== */
-@media (min-width: 769px) {
-    .menu-label {
-        display: block;
+@supports (padding: env(safe-area-inset-bottom)) {
+    .bottom-menu {
+        bottom: calc(10px + env(safe-area-inset-bottom));
     }
 }

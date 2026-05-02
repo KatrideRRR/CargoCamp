@@ -1,10 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import "../styles/StartPage.css";
-import { AuthContext } from "../utils/authContext";
-import { useContext } from "react";
 
 export default function StartPage() {
-    const { user } = useContext(AuthContext);
     const navigate = useNavigate();
 
     return (

@@ -58,8 +58,6 @@ const ProfilePage = () => {
     const [categoryPick, setCategoryPick] = useState([]);
     const [catSaving, setCatSaving] = useState(false);
 
-    const [headerCollapsed, setHeaderCollapsed] = useState(false);
-
     // ✅ demo-состояние карты для скринов
     const [demoCardBound, setDemoCardBound] = useState(false);
     const [demoCardData, setDemoCardData] = useState({
@@ -75,31 +73,6 @@ const ProfilePage = () => {
     const [selectedDebtProvider, setSelectedDebtProvider] = useState("yookassa");
 
     const YM_KEY = process.env.REACT_APP_YANDEX_API_KEY;
-
-    useEffect(() => {
-        let ticking = false;
-
-        const onScroll = () => {
-            if (ticking) return;
-            ticking = true;
-
-            requestAnimationFrame(() => {
-                const y = window.scrollY;
-
-                setHeaderCollapsed((prev) => {
-                    if (!prev && y > 80) return true;
-                    if (prev && y < 40) return false;
-                    return prev;
-                });
-
-                ticking = false;
-            });
-        };
-
-        onScroll();
-        window.addEventListener("scroll", onScroll, { passive: true });
-        return () => window.removeEventListener("scroll", onScroll);
-    }, []);
 
     const handleAvatarUpload = async (file) => {
         if (!file) return;
@@ -254,24 +227,6 @@ const ProfilePage = () => {
             setCatSaving(false);
         }
     };
-
-    useEffect(() => {
-        const openAt = 80;
-        const closeAt = 40;
-
-        const onScroll = () => {
-            const y = window.scrollY;
-            setHeaderCollapsed(prev => {
-                if (!prev && y > openAt) return true;
-                if (prev && y < closeAt) return false;
-                return prev;
-            });
-        };
-
-        onScroll();
-        window.addEventListener("scroll", onScroll, { passive: true });
-        return () => window.removeEventListener("scroll", onScroll);
-    }, []);
 
     useEffect(() => {
         if (!profile) return;
@@ -688,7 +643,7 @@ const ProfilePage = () => {
     return (
         <div className="profile-page">
             <div className="profile-shell">
-                <div className={`profile-header glass ${headerCollapsed ? "is-collapsed" : ""}`}>
+                <div className="profile-header glass">
                     <div className="profile-header-top">
                         <div>
                             <h1 className="profile-title">Профиль</h1>
@@ -791,7 +746,7 @@ const ProfilePage = () => {
                                 <div className="alert-text">{(debtAmount / 100).toFixed(2)} ₽</div>
                             </div>
 
-                            <div style={{ width: "100%", marginTop: 10, marginBottom: 10 }}>
+                            <div className="debt-provider-wrap">
                                 <PaymentProviderSelect
                                     selectedProvider={selectedDebtProvider}
                                     onSelect={setSelectedDebtProvider}
@@ -814,11 +769,19 @@ const ProfilePage = () => {
                         </div>
                     </div>
 
-                    <PaymentProviderSelect
-                        selectedProvider={selectedPremiumProvider}
-                        onSelect={setSelectedPremiumProvider}
-                        disabled={loading}
-                    />
+                    <div className="premium-provider-block">
+
+                        <PaymentProviderSelect
+
+                            selectedProvider={selectedPremiumProvider}
+
+                            onSelect={setSelectedPremiumProvider}
+
+                            disabled={loading}
+
+                        />
+
+                    </div>
 
                     <div className="grid-2">
                         <button className="btn btn-primary" onClick={() => handleBuyPremium("7d")}>

@@ -1,5 +1,3 @@
-// frontend/src/components/PaymentProviderSelect.jsx
-
 import React from "react";
 import "../styles/paymentProviderSelect.css";
 
@@ -8,11 +6,13 @@ const PROVIDERS = {
         label: "ЮKassa",
         subtitle: "Карта, СБП, SberPay",
         icon: "Ю",
+        shortLabel: "ЮK",
     },
     tbank: {
         label: "Т-Банк",
         subtitle: "Карта, T-Pay, СБП",
         icon: "T",
+        shortLabel: "Т",
     },
 };
 
@@ -45,6 +45,10 @@ export default function PaymentProviderSelect({
                             <span className="payment-provider-info">
                                 <b>{provider.label}</b>
                                 <small>{provider.subtitle}</small>
+                            </span>
+
+                            <span className="payment-provider-short">
+                                {provider.shortLabel}
                             </span>
                         </button>
                     );
