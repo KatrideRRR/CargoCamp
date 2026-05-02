@@ -6,14 +6,15 @@ export default function StartPage() {
 
     return (
         <div className="start-page-container">
-            <div className="start-page-content animate-in">
+            <div className="start-page-content">
                 <h1 className="title">CargoCamp</h1>
                 <p className="subtitle">Что вы хотите сделать?</p>
 
                 <div className="button-group">
                     <button
                         onClick={() => navigate("/create-order")}
-                        className="role-button glassy"
+                        className="role-button"
+                        type="button"
                     >
                         <div className="emoji">🧾</div>
                         <div className="text">
@@ -24,7 +25,8 @@ export default function StartPage() {
 
                     <button
                         onClick={() => navigate("/express")}
-                        className="role-button glassy"
+                        className="role-button"
+                        type="button"
                     >
                         <div className="emoji">🚕</div>
                         <div className="text">
@@ -35,7 +37,8 @@ export default function StartPage() {
 
                     <button
                         onClick={() => navigate("/orders")}
-                        className="role-button glassy soft"
+                        className="role-button role-button-soft"
+                        type="button"
                     >
                         <div className="emoji">📋</div>
                         <div className="text">
@@ -44,7 +47,6 @@ export default function StartPage() {
                         </div>
                     </button>
                 </div>
-
             </div>
         </div>
     );
