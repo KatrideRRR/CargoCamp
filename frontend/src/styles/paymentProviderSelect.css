@@ -1,15 +1,14 @@
 .payment-provider-box {
     width: 100%;
     display: grid;
-    gap: 10px;
+    gap: 8px;
     min-width: 0;
 }
 
 .payment-provider-title {
-    font-size: 0.9rem;
-    font-weight: 900;
-    color: #0f172a;
-    text-align: left;
+    color: #111827;
+    font-size: 13px;
+    font-weight: 800;
 }
 
 .payment-provider-grid {
@@ -20,75 +19,67 @@
 }
 
 .payment-provider-card {
-    min-height: 64px;
-    padding: 10px 12px;
-    border-radius: 16px;
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    background: rgba(255, 255, 255, 0.62);
-    cursor: pointer;
+    min-height: 56px;
+    padding: 9px 10px;
 
     display: flex;
     align-items: center;
-    gap: 9px;
-    text-align: left;
+    gap: 8px;
+
     min-width: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
 
-    box-shadow:
-            0 8px 18px rgba(15, 23, 42, 0.06),
-            inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    background: #f9fafb;
+    color: #111827;
 
-    transition:
-            transform 0.08s ease,
-            border-color 0.16s ease,
-            background 0.16s ease,
-            box-shadow 0.16s ease;
-}
+    text-align: left;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
 
-.payment-provider-card:hover {
-    background: rgba(255, 255, 255, 0.76);
-}
-
-.payment-provider-card:active {
-    transform: translateY(1px);
+    box-shadow: none;
+    transition: none;
 }
 
 .payment-provider-card.active {
-    border-color: rgba(29, 78, 216, 0.38);
-    background: rgba(29, 78, 216, 0.10);
-    box-shadow:
-            0 10px 20px rgba(29, 78, 216, 0.08),
-            inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    border-color: #2563eb;
+    background: #eff6ff;
+}
+
+.payment-provider-card:active {
+    opacity: 0.75;
 }
 
 .payment-provider-card:disabled {
-    opacity: 0.65;
-    cursor: not-allowed;
+    cursor: default;
+}
+
+.payment-provider-card:disabled:not(.active) {
+    opacity: 0.6;
 }
 
 .payment-provider-icon {
-    width: 34px;
-    height: 34px;
-    flex: 0 0 34px;
-    border-radius: 11px;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
 
     display: inline-flex;
     align-items: center;
     justify-content: center;
 
-    font-size: 17px;
-    font-weight: 1000;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 900;
 }
 
-.payment-provider-icon-yookassa {
-    background: rgba(29, 78, 216, 0.12);
-    color: rgba(29, 78, 216, 0.98);
-    border: 1px solid rgba(29, 78, 216, 0.18);
+.payment-provider-icon.yookassa {
+    background: #dbeafe;
+    color: #1d4ed8;
 }
 
-.payment-provider-icon-tbank {
-    background: rgba(250, 204, 21, 0.22);
+.payment-provider-icon.tbank {
+    background: #fef3c7;
     color: #111827;
-    border: 1px solid rgba(250, 204, 21, 0.42);
 }
 
 .payment-provider-info {
@@ -98,65 +89,31 @@
 }
 
 .payment-provider-info b {
-    font-size: 0.88rem;
+    color: #111827;
+    font-size: 13px;
     line-height: 1.1;
-    color: #0f172a;
-    white-space: nowrap;
+    font-weight: 800;
+
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .payment-provider-info small {
-    font-size: 0.72rem;
-    line-height: 1.15;
-    color: #64748b;
+    color: #6b7280;
+    font-size: 11px;
+    line-height: 1.2;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-/* мобильная версия */
-@media (max-width: 520px) {
-    .payment-provider-title {
-        font-size: 0.82rem;
-    }
-
-    .payment-provider-grid {
-        gap: 6px;
-    }
-
-    .payment-provider-card {
-        min-height: 52px;
-        padding: 8px 10px;
-        gap: 8px;
-        border-radius: 14px;
-    }
-
-    .payment-provider-icon {
-        width: 30px;
-        height: 30px;
-        flex: 0 0 30px;
-        font-size: 15px;
-        border-radius: 10px;
-    }
-
-    .payment-provider-info b {
-        font-size: 0.82rem;
-    }
-
-    .payment-provider-info small {
-        display: none;
-    }
-}
-
-/* совсем узкие экраны — почти только иконки и короткий текст */
-@media (max-width: 380px) {
-    .payment-provider-card {
-        justify-content: center;
-        padding: 8px;
-        gap: 6px;
-    }
-
-    .payment-provider-info b {
-        font-size: 0.78rem;
-    }
+.payment-provider-short {
+    display: none;
+    color: #111827;
+    font-size: 13px;
+    font-weight: 900;
 }
 
 @media (max-width: 520px) {
@@ -167,25 +124,44 @@
     .payment-provider-box {
         gap: 6px;
     }
+
+    .payment-provider-grid {
+        gap: 6px;
+    }
+
+    .payment-provider-card {
+        min-height: 50px;
+        padding: 8px;
+        border-radius: 12px;
+    }
+
+    .payment-provider-icon {
+        width: 28px;
+        height: 28px;
+        flex-basis: 28px;
+        font-size: 14px;
+        border-radius: 9px;
+    }
+
+    .payment-provider-info b {
+        font-size: 12px;
+    }
+
+    .payment-provider-info small {
+        display: none;
+    }
 }
 
-.payment-provider-short {
-    display: none;
-    font-size: 0.82rem;
-    font-weight: 900;
-    color: #0f172a;
-}
+@media (max-width: 360px) {
+    .payment-provider-card {
+        justify-content: center;
+    }
 
-@media (max-width: 380px) {
     .payment-provider-info {
         display: none;
     }
 
     .payment-provider-short {
         display: inline;
-    }
-
-    .payment-provider-card {
-        justify-content: center;
     }
 }
