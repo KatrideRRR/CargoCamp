@@ -1,28 +1,40 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 const UserContext = createContext();
 
-export const UserProvider = ({ children }) => {
-    const [currentUser, setCurrentUser] = useState(
-        JSON.parse(localStorage.getItem('currentUser')) || null
-    );
+function getSavedUser() {
+    try {
+        const saved = localStorage.getItem("currentUser");
+        return saved ? JSON.parse(saved) : null;
+    } catch {
+        localStorage.removeItem("currentUser");
+        return null;
+    }
+}
 
-    // Следим за изменениями currentUser и сохраняем в localStorage
+export const UserProvider = ({ children }) => {
+    const [currentUser, setCurrentUser] = useState(getSavedUser);
+
     useEffect(() => {
         if (currentUser) {
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            localStorage.setItem("currentUser", JSON.stringify(currentUser));
         } else {
-            localStorage.removeItem('currentUser');
+            localStorage.removeItem("currentUser");
         }
     }, [currentUser]);
 
+    const value = useMemo(() => {
+        return {
+            currentUser,
+            setCurrentUser,
+        };
+    }, [currentUser]);
+
     return (
-        <UserContext.Provider value={{ currentUser, setCurrentUser }}>
+        <UserContext.Provider value={value}>
             {children}
         </UserContext.Provider>
     );
 };
 
-export const useUser = () => {
-    return useContext(UserContext);
-};
+export const useUser = () => useContext(UserContext);

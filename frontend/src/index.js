@@ -1,18 +1,16 @@
 import React, { Suspense, lazy, useEffect, useMemo } from 'react';
-import { socket } from "./socketClient";
 import ReactDOM from 'react-dom/client';
-import { useNavigate } from 'react-router-dom';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import Modal from "react-modal";
+
+import { socket } from "./socketClient";
 
 import { AuthProvider } from "./utils/authContext";
 import { UserProvider } from './utils/userContext';
 import { ModalProvider } from './components/modalContext';
-import Modal from "react-modal";
 
-// УБРАЛИ глобальный leaflet css отсюда
-// import 'leaflet/dist/leaflet.css';
+import "./styles/global.css";
 
-Modal.setAppElement = function () {};
 Modal.setAppElement('#root');
 
 const OrdersPage = lazy(() => import('./pages/OrdersPage'));
@@ -39,7 +37,12 @@ function getUserIdFromToken() {
         if (!token) return null;
 
         const payloadBase64 = token.split(".")[1];
-        const payloadJson = atob(payloadBase64.replace(/-/g, "+").replace(/_/g, "/"));
+        if (!payloadBase64) return null;
+
+        const payloadJson = atob(
+            payloadBase64.replace(/-/g, "+").replace(/_/g, "/")
+        );
+
         const payload = JSON.parse(payloadJson);
 
         return payload?.id ?? null;
@@ -53,19 +56,19 @@ function App() {
     const userId = useMemo(() => getUserIdFromToken(), []);
 
     useEffect(() => {
+        if (!userId) return;
+
         if (!socket.connected) {
             socket.connect();
         }
 
         const handleConnect = () => {
-            if (userId) {
-                socket.emit("register", userId);
-            }
+            socket.emit("register", userId);
         };
 
         socket.on("connect", handleConnect);
 
-        if (socket.connected && userId) {
+        if (socket.connected) {
             socket.emit("register", userId);
         }
 
@@ -79,10 +82,10 @@ function App() {
             if (!payload || payload.type !== "order_push") return;
 
             const open = window.confirm(
-                `${payload.title}\n${payload.message}\nОткрыть заказ?`
+                `${payload.title || "Уведомление"}\n${payload.message || ""}\nОткрыть заказ?`
             );
 
-            if (open) {
+            if (open && payload.orderId) {
                 navigate(`/order/${payload.orderId}`);
             }
         };
@@ -100,7 +103,7 @@ function App() {
                 <UserProvider>
                     <Suspense
                         fallback={
-                            <div style={{ padding: 24, textAlign: 'center' }}>
+                            <div className="app-loading">
                                 Загрузка...
                             </div>
                         }
@@ -133,6 +136,7 @@ function App() {
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
+
 root.render(
     <Router>
         <App />
