@@ -210,12 +210,57 @@ export default function YandexMapModal({
                 ? `Экспресс №${order.expressId}`
                 : `Заказ №${order.id}`;
 
+            const price = Number(order.proposedSum ?? 0).toLocaleString("ru-RU");
+
+            const serviceLine = [
+                order?.category?.name,
+                order?.subcategory?.name,
+                order?.service?.name,
+            ]
+                .filter(Boolean)
+                .join(" • ");
+
+            const orderUrl = order.express
+                ? `/orders?expressId=${order.expressId || ""}`
+                : `/order/${order.id}`;
+
+            const balloonBody = `
+    <div class="cc-map-balloon">
+        <div class="cc-map-balloon__address">
+            ${order.address || "Без адреса"}
+        </div>
+
+        ${
+                serviceLine
+                    ? `<div class="cc-map-balloon__service">${serviceLine}</div>`
+                    : ""
+            }
+
+        <div class="cc-map-balloon__meta">
+            <span>${price} ₽</span>
+            ${
+                Number.isFinite(order._distance)
+                    ? `<span>${order._distance.toFixed(1)} км</span>`
+                    : ""
+            }
+        </div>
+
+        <a class="cc-map-balloon__btn" href="${orderUrl}">
+            Открыть заказ
+        </a>
+    </div>
+`;
+
             const placemark = new ymaps.Placemark(
                 coords,
                 {
                     hintContent: title,
-                    balloonContentHeader: title,
-                    balloonContentBody: order.address || "Без адреса",
+                    balloonContentHeader: `
+            <div class="cc-map-balloon__header">
+                ${title}
+            </div>
+        `,
+                    balloonContentBody: balloonBody,
                 },
                 {
                     preset: order.express

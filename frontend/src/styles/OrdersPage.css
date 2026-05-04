@@ -1372,6 +1372,244 @@
 }
 
 /* =========================
+   Yandex order balloon
+========================= */
+
+.cc-map-balloon {
+    min-width: 210px;
+    max-width: 260px;
+
+    display: grid;
+    gap: 8px;
+
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.cc-map-balloon__header {
+    color: #0f172a;
+
+    font-size: 14px;
+    line-height: 1.2;
+    font-weight: 950;
+    letter-spacing: -0.02em;
+}
+
+.cc-map-balloon__address {
+    color: #334155;
+
+    font-size: 13px;
+    line-height: 1.35;
+    font-weight: 750;
+}
+
+.cc-map-balloon__service {
+    padding: 7px 9px;
+
+    border-radius: 13px;
+
+    color: #475569;
+
+    background:
+            linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.82));
+
+    border: 1px solid rgba(226, 232, 240, 0.86);
+
+    font-size: 12px;
+    line-height: 1.3;
+    font-weight: 750;
+}
+
+.cc-map-balloon__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.cc-map-balloon__meta span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 26px;
+    padding: 5px 8px;
+
+    border-radius: 999px;
+
+    color: #2563eb;
+
+    background:
+            linear-gradient(180deg, #ffffff 0%, #f8fbff 46%, #eef6ff 100%);
+
+    border: 1px solid rgba(147, 197, 253, 0.46);
+
+    font-size: 12px;
+    line-height: 1;
+    font-weight: 900;
+}
+
+.cc-map-balloon__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 36px;
+    padding: 8px 11px;
+
+    border-radius: 14px;
+
+    color: #2563eb !important;
+
+    background:
+            radial-gradient(circle at 30% 16%, rgba(255, 255, 255, 1), transparent 34%),
+            linear-gradient(180deg, #ffffff 0%, #f8fbff 46%, #eef6ff 100%);
+
+    border: 1px solid rgba(147, 197, 253, 0.58);
+
+    box-shadow:
+            0 8px 18px rgba(37, 99, 235, 0.1),
+            0 2px 6px rgba(15, 23, 42, 0.035),
+            inset 0 1px 0 rgba(255, 255, 255, 1);
+
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 950;
+    text-decoration: none !important;
+
+    cursor: pointer;
+}
+
+.cc-map-balloon__btn:active {
+    transform: scale(0.985);
+}
+
+/* немного подчистим стандартный balloon Яндекса */
+.ymaps-2-1-79-balloon__content,
+.ymaps-2-1-79-balloon__layout {
+    border-radius: 18px !important;
+}
+
+.ymaps-2-1-79-balloon__content {
+    padding: 12px !important;
+}
+
+.ymaps-2-1-79-balloon__tail {
+    filter: drop-shadow(0 4px 8px rgba(15, 23, 42, 0.12));
+}
+
+/* =========================
+   Map modal buttons
+========================= */
+
+.glass-modal-footer {
+    padding: 13px 14px;
+
+    border-top: 1px solid rgba(226, 232, 240, 0.78);
+
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(248, 250, 252, 0.96));
+}
+
+.glass-picked {
+    margin-bottom: 11px;
+
+    padding: 11px 12px;
+
+    border-radius: 18px;
+
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.78));
+
+    border: 1px solid rgba(226, 232, 240, 0.78);
+
+    box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.9),
+            0 5px 14px rgba(15, 23, 42, 0.035);
+}
+
+.glass-picked-label {
+    margin-bottom: 4px;
+
+    color: var(--orders-muted);
+
+    font-size: 12px;
+    line-height: 1.2;
+    font-weight: 900;
+}
+
+.glass-picked-value {
+    color: var(--orders-text);
+
+    font-size: 13px;
+    line-height: 1.35;
+    font-weight: 750;
+
+    word-break: break-word;
+}
+
+.glass-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+}
+
+.glass-actions .btn {
+    width: 100%;
+    min-height: 42px;
+
+    border-radius: 16px;
+
+    font-size: 13.5px;
+}
+
+.glass-actions .btn.btn-primary {
+    color: var(--orders-primary);
+
+    background:
+            radial-gradient(circle at 30% 16%, rgba(255, 255, 255, 1), transparent 34%),
+            linear-gradient(180deg, #ffffff 0%, #f8fbff 46%, #eef6ff 100%);
+
+    border-color: rgba(147, 197, 253, 0.58);
+
+    box-shadow:
+            0 10px 22px rgba(37, 99, 235, 0.12),
+            0 3px 8px rgba(15, 23, 42, 0.045),
+            inset 0 1px 0 rgba(255, 255, 255, 1),
+            inset 0 -1px 0 rgba(147, 197, 253, 0.24);
+}
+
+.glass-actions .btn.btn-primary:disabled {
+    opacity: 0.48;
+    color: rgba(100, 116, 139, 0.75);
+
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(248, 250, 252, 0.72));
+
+    border-color: rgba(203, 213, 225, 0.7);
+    box-shadow: none;
+}
+
+.glass-actions .btn.btn-ghost {
+    color: #475569;
+
+    background:
+            radial-gradient(circle at 28% 14%, rgba(255, 255, 255, 0.98), transparent 32%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.9));
+
+    border-color: rgba(203, 213, 225, 0.72);
+
+    box-shadow:
+            0 8px 18px rgba(15, 23, 42, 0.055),
+            0 2px 6px rgba(15, 23, 42, 0.035),
+            inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+@media (max-width: 420px) {
+    .glass-actions {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =========================
    Yandex modal
 ========================= */
 
