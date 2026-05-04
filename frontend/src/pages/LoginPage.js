@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import InputMask from "react-input-mask";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -37,6 +38,22 @@ const LoginPage = () => {
     const { setCurrentUser } = useUser();
 
     const phoneDigits = useMemo(() => normalizePhoneClient(phone), [phone]);
+
+    const platform = useMemo(() => {
+        const params = new URLSearchParams(window.location.search);
+        const forcedPlatform = params.get("platform");
+
+        if (forcedPlatform === "ios") return "ios";
+        if (forcedPlatform === "android") return "android";
+        if (forcedPlatform === "web") return "web";
+
+        const currentPlatform = Capacitor.getPlatform();
+
+        if (currentPlatform === "ios") return "ios";
+        if (currentPlatform === "android") return "android";
+
+        return "web";
+    }, []);
 
     const finishLogin = (token, user) => {
         localStorage.setItem("authToken", token);
@@ -211,7 +228,9 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="login-page">
+        <div className={`login-page auth-page auth-page--${platform}`}>
+            <div className="auth-bg auth-bg--one" />
+            <div className="auth-bg auth-bg--two" />
             <div className="login-shell">
                 <div className="login-card glass">
                     <div className="login-head">

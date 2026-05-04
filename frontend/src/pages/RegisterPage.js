@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import ReCAPTCHA from "react-google-recaptcha";
@@ -20,6 +21,22 @@ const RegisterPage = () => {
     const [isAgreementChecked, setIsAgreementChecked] = useState(false);
 
     const navigate = useNavigate();
+
+    const platform = useMemo(() => {
+        const params = new URLSearchParams(window.location.search);
+        const forcedPlatform = params.get("platform");
+
+        if (forcedPlatform === "ios") return "ios";
+        if (forcedPlatform === "android") return "android";
+        if (forcedPlatform === "web") return "web";
+
+        const currentPlatform = Capacitor.getPlatform();
+
+        if (currentPlatform === "ios") return "ios";
+        if (currentPlatform === "android") return "android";
+
+        return "web";
+    }, []);
 
     const handleCaptchaChange = (value) => setCaptchaValue(value);
     const handleOpenModal = () => setIsModalOpen(true);
@@ -63,7 +80,9 @@ const RegisterPage = () => {
     };
 
     return (
-        <div className="register-page">
+        <div className={`register-page auth-page auth-page--${platform}`}>
+            <div className="auth-bg auth-bg--one" />
+            <div className="auth-bg auth-bg--two" />
             <div className="register-shell">
                 <div className="register-card glass">
                     <div className="register-head">
@@ -152,7 +171,6 @@ const RegisterPage = () => {
                                 >
       Политике конфиденциальности
     </span>
-    .
   </span>
                         </div>
 
