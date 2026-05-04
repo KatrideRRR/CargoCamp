@@ -1,64 +1,84 @@
 module.exports = (sequelize, DataTypes) => {
     const Notification = sequelize.define(
-        'Notification',
+        "Notification",
         {
             userId: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
-                references: {
-                    model: 'users',
-                    key: 'id',
-                },
-                onDelete: 'CASCADE',
             },
+
             type: {
                 type: DataTypes.ENUM(
                     "new_message",
                     "order_request",
                     "order_request_approved",
                     "order_started",
+                    "order_completion_requested",
                     "order_completed_by_other",
                     "order_completed",
                     "review_needed",
                     "dispute_opened",
                     "express_status_changed",
+                    "express_arrived",
+                    "express_completed",
+                    "express_cancelled",
                     "debt_created"
                 ),
                 allowNull: false,
             },
+
+            title: {
+                type: DataTypes.STRING,
+                allowNull: true,
+            },
+
+            body: {
+                type: DataTypes.TEXT,
+                allowNull: true,
+            },
+
+            data: {
+                type: DataTypes.JSON,
+                allowNull: true,
+            },
+
             orderType: {
                 type: DataTypes.ENUM("regular", "express"),
                 allowNull: false,
                 defaultValue: "regular",
             },
+
             messageId: {
                 type: DataTypes.INTEGER,
                 allowNull: true,
             },
-            orderId: {  // ✅ Добавляем поле orderId
+
+            orderId: {
                 type: DataTypes.INTEGER,
-                allowNull: false,
-                references: {
-                    model: 'orders',
-                    key: 'id',
-                },
-                onDelete: 'CASCADE',
+                allowNull: true,
             },
+
             isRead: {
                 type: DataTypes.BOOLEAN,
                 defaultValue: false,
             },
         },
         {
-            tableName: 'notifications',
+            tableName: "notifications",
             timestamps: true,
         }
     );
 
     Notification.associate = (models) => {
-        Notification.belongsTo(models.User, { foreignKey: 'id' });
-        Notification.belongsTo(models.Message, { foreignKey: 'id' });
-        Notification.belongsTo(models.Order, { foreignKey: 'orderId' }); // ✅ Добавляем связь с Order
+        Notification.belongsTo(models.User, {
+            foreignKey: "userId",
+            as: "user",
+        });
+
+        Notification.belongsTo(models.Message, {
+            foreignKey: "messageId",
+            as: "message",
+        });
     };
 
     return Notification;

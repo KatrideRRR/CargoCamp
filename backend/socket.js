@@ -14,7 +14,17 @@ async function sendNotifications(userId) {
     try {
         const unreadNotifications = await Notification.findAll({
             where: { userId, isRead: false },
-            attributes: ["id", "type", "orderId"],
+            attributes: [
+                "id",
+                "type",
+                "title",
+                "body",
+                "orderId",
+                "orderType",
+                "messageId",
+                "data",
+                "createdAt",
+            ],
             order: [["id", "DESC"]],
         });
 
@@ -77,12 +87,20 @@ function initializeSocket(server) {
                 socket.data.userId = String(userId);
             }
 
+            const normalizedOrderType = ["regular", "express"].includes(orderType)
+                ? orderType
+                : "regular";
+
             if (orderId) {
-                socket.join(`chat_${String(orderType)}_${String(orderId)}`);
+                socket.join(`chat_${normalizedOrderType}_${String(orderId)}`);
             }
         });
 
         socket.on("markAsRead", async ({ userId, orderId, orderType = "regular" }) => {
+            const normalizedOrderType = ["regular", "express"].includes(orderType)
+                ? orderType
+                : "regular";
+
             try {
                 await Notification.update(
                     { isRead: true },
@@ -90,7 +108,7 @@ function initializeSocket(server) {
                         where: {
                             userId,
                             orderId,
-                            orderType,
+                            orderType: normalizedOrderType,
                             isRead: false,
                         },
                     }

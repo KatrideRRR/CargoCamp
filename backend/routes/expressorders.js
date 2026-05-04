@@ -5,6 +5,7 @@ const authenticateToken = require("../middlewares/userAuth");
 const { v4: uuidv4 } = require("uuid");
 const yooKassa = require("../config/yookassaClient");
 const { sequelize, ExpressOrder, ExpressSavedAddress, User, Order } = require("../models");
+const { notifyUser, notifyMany } = require("../services/notificationService");
 
 /* ================= helpers ================= */
 
@@ -380,9 +381,6 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
         order.status = "accepted";
         await order.save({ transaction: t });
 
-        const io = req.app.locals.io;
-        emitExpressOrderUpdate(io, order);
-
         // ✅ 4) пробуем сразу списать комиссию (если есть привязанная карта), иначе — в долг
         let paidBySavedCard = false;
         let debtAdded = false;
@@ -469,6 +467,31 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
         }
 
         await t.commit();
+
+        const io = req.app.locals.io;
+        emitExpressOrderUpdate(io, order);
+
+        await notifyUser({
+            userId: order.creatorId,
+            type: "express_status_changed",
+            title: "Экспресс-заказ принят",
+            body: `Исполнитель принял ваш ${order.type === "taxi" ? "заказ такси" : "курьерский заказ"} №${order.id}`,
+            orderId: order.id,
+            orderType: "express",
+            data: {
+                creatorId: order.creatorId,
+                executorId: order.executorId,
+                expressType: order.type,
+                status: order.status,
+            },
+            socketEvent: "expressStatusChanged",
+            socketPayload: {
+                orderId: order.id,
+                orderType: "express",
+                status: order.status,
+                message: "Экспресс-заказ принят",
+            },
+        });
 
         if (io) {
             io.emit("expressOrdersUpdated"); // убрать заказ из общего списка
@@ -570,6 +593,42 @@ router.post("/express-orders/:id/arrived", authenticateToken, async (req, res) =
             meta: { from, to: order.status },
         });
 
+        const arrivedTitle =
+            order.type === "taxi"
+                ? "Водитель на месте"
+                : "Курьер на месте";
+
+        const arrivedBody =
+            order.type === "taxi"
+                ? "Выходите, водитель прибыл к точке A"
+                : "Курьер прибыл к точке A. Передайте посылку";
+
+        await notifyUser({
+            userId: order.creatorId,
+            type: "express_arrived",
+            title: arrivedTitle,
+            body: arrivedBody,
+            orderId: order.id,
+            orderType: "express",
+            data: {
+                creatorId: order.creatorId,
+                executorId: order.executorId,
+                expressType: order.type,
+                status: order.status,
+                arrivedAt: order.arrivedAt,
+            },
+            socketEvent: "expressArrived",
+            socketPayload: {
+                orderId: order.id,
+                orderType: "express",
+                type: order.type,
+                status: order.status,
+                creatorId: order.creatorId,
+                executorId: order.executorId,
+                message: arrivedBody,
+            },
+        });
+
         res.json({ success: true, order });
     } catch (e) {
         console.error("express-orders arrived error:", e);
@@ -618,6 +677,29 @@ router.post("/express-orders/:id/start-waiting", authenticateToken, async (req, 
             meta: { from, to: order.status },
         });
 
+        await notifyUser({
+            userId: order.creatorId,
+            type: "express_status_changed",
+            title: "Водитель ожидает",
+            body: `Водитель ожидает вас по заказу №${order.id}`,
+            orderId: order.id,
+            orderType: "express",
+            data: {
+                creatorId: order.creatorId,
+                executorId: order.executorId,
+                expressType: order.type,
+                status: order.status,
+                waitingStartedAt: order.waitingStartedAt,
+            },
+            socketEvent: "expressStatusChanged",
+            socketPayload: {
+                orderId: order.id,
+                orderType: "express",
+                status: order.status,
+                message: "Водитель ожидает клиента",
+            },
+        });
+
         return res.json({ success: true, order });
     } catch (e) {
         console.error("express-orders start-waiting error:", e);
@@ -664,6 +746,29 @@ router.post("/express-orders/:id/pick-up", authenticateToken, async (req, res) =
             entityId: order.id,
             expressOrderId: order.id,
             meta: { from, to: order.status },
+        });
+
+        await notifyUser({
+            userId: order.creatorId,
+            type: "express_status_changed",
+            title: "Посылка у курьера",
+            body: `Курьер забрал посылку по заказу №${order.id}`,
+            orderId: order.id,
+            orderType: "express",
+            data: {
+                creatorId: order.creatorId,
+                executorId: order.executorId,
+                expressType: order.type,
+                status: order.status,
+                pickedUpAt: order.pickedUpAt,
+            },
+            socketEvent: "expressStatusChanged",
+            socketPayload: {
+                orderId: order.id,
+                orderType: "express",
+                status: order.status,
+                message: "Курьер забрал посылку",
+            },
         });
 
         return res.json({ success: true, order });
@@ -759,21 +864,52 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
         });
 
         // ✅ уведомляем заказчика, что можно оставить отзыв
-        if (io) {
-            io.to(`user_${order.creatorId}`).emit("expressOrderCompleted", {
+        await notifyUser({
+            userId: order.creatorId,
+            type: "review_needed",
+            title: "Экспресс-заказ завершён",
+            body: "Оцените исполнителя и оставьте отзыв",
+            orderId: order.id,
+            orderType: "express",
+            data: {
+                creatorId: order.creatorId,
+                executorId: order.executorId,
+                expressType: order.type,
+                status: order.status,
+                completedAt: order.completedAt,
+            },
+            socketEvent: "expressOrderCompleted",
+            socketPayload: {
                 message: "Экспресс-заказ завершён. Оцените исполнителя.",
                 orderId: order.id,
                 creatorId: order.creatorId,
                 executorId: order.executorId,
                 orderType: "express",
                 type: order.type,
-            });
+            },
+        });
 
-            // по желанию можно обновить активные заказы у всех участников
-            io.emit("expressOrdersUpdated");
-            io.to(`user_${order.creatorId}`).emit("activeOrdersUpdated");
-            io.to(`user_${order.executorId}`).emit("activeOrdersUpdated");
-        }
+        await notifyUser({
+            userId: order.executorId,
+            type: "express_completed",
+            title: "Экспресс-заказ завершён",
+            body: `Заказ №${order.id} успешно завершён`,
+            orderId: order.id,
+            orderType: "express",
+            data: {
+                creatorId: order.creatorId,
+                executorId: order.executorId,
+                expressType: order.type,
+                status: order.status,
+                completedAt: order.completedAt,
+            },
+            socketEvent: "expressOrderCompletedForExecutor",
+            socketPayload: {
+                orderId: order.id,
+                orderType: "express",
+                message: "Экспресс-заказ завершён",
+            },
+        });
 
         return res.json({
             success: true,
@@ -812,6 +948,16 @@ router.post("/express-orders/:id/cancel", authenticateToken, async (req, res) =>
         order.dealStatus = "cancelled";
         await order.save();
 
+        const notifyTo = [];
+
+        if (order.creatorId && Number(order.creatorId) !== Number(userId)) {
+            notifyTo.push(order.creatorId);
+        }
+
+        if (order.executorId && Number(order.executorId) !== Number(userId)) {
+            notifyTo.push(order.executorId);
+        }
+
         await req.logAction({
             req,
             actorUserId: userId,
@@ -821,6 +967,28 @@ router.post("/express-orders/:id/cancel", authenticateToken, async (req, res) =>
             entityId: order.id,
             expressOrderId: order.id,
             meta: { from, to: order.status },
+        });
+
+        await notifyMany(notifyTo, {
+            type: "express_cancelled",
+            title: "Экспресс-заказ отменён",
+            body: `Экспресс-заказ №${order.id} отменён`,
+            orderId: order.id,
+            orderType: "express",
+            data: {
+                creatorId: order.creatorId,
+                executorId: order.executorId,
+                cancelledBy: userId,
+                expressType: order.type,
+                status: order.status,
+            },
+            socketEvent: "expressStatusChanged",
+            socketPayload: {
+                orderId: order.id,
+                orderType: "express",
+                status: "cancelled",
+                message: "Экспресс-заказ отменён",
+            },
         });
 
         const io = req.app.locals.io;

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const NodeGeocoder = require('node-geocoder');
 const db = require('../models');
+const { notifyUser, notifyMany } = require("../services/notificationService");
 const authenticateToken = require('../middlewares/userAuth');
 const { Op } = require('sequelize');
 const fs = require("fs");
@@ -819,9 +820,23 @@ module.exports = (io) => {
                 });
             }
 
-            sendOrderRequestToUser(order.creatorId || order.userId, {
+            await notifyUser({
+                userId: order.creatorId || order.userId,
+                type: "order_request",
+                title: "Новый отклик на заказ",
+                body: `Исполнитель хочет выполнить заказ №${order.id}`,
                 orderId: order.id,
-                requesterId: executorId,
+                orderType: "regular",
+                data: {
+                    requesterId: executorId,
+                    proposedSum: safeProposedSum,
+                },
+                socketEvent: `orderRequest:${String(order.creatorId || order.userId)}`,
+                socketPayload: {
+                    orderId: order.id,
+                    requesterId: executorId,
+                    proposedSum: safeProposedSum,
+                },
             });
 
             return res.json({
@@ -1179,29 +1194,47 @@ module.exports = (io) => {
                     "Ваш запрос одобрен! У вас активен Premium — комиссия не требуется.";
             }
 
-            io.to(`user_${fullOrder.executorId}`).emit("orderApproved", {
+            await notifyUser({
+                userId: fullOrder.executorId,
+                type: "order_request_approved",
+                title: "Вас выбрали исполнителем",
+                body: `Ваш отклик на заказ №${fullOrder.id} одобрен`,
                 orderId: fullOrder.id,
-                message: executorMessage,
-                isPremium,
+                orderType: "regular",
+                data: {
+                    creatorId: fullOrder.creatorId,
+                    executorId: fullOrder.executorId,
+                    debt: finalDebtKopecks,
+                    needPay:
+                        commissionKopecks > 0 &&
+                        finalDebtKopecks > 0 &&
+                        !commissionPayment.autoPaymentProcessing &&
+                        !commissionPayment.autoPaymentPaid,
+                },
+                socketEvent: "orderApproved",
+                socketPayload: {
+                    orderId: fullOrder.id,
+                    message: executorMessage,
+                    isPremium,
 
-                commissionKopecks,
+                    commissionKopecks,
+                    debt: finalDebtKopecks,
 
-                debt: finalDebtKopecks,
+                    needPay:
+                        commissionKopecks > 0 &&
+                        finalDebtKopecks > 0 &&
+                        !commissionPayment.autoPaymentProcessing &&
+                        !commissionPayment.autoPaymentPaid,
 
-                needPay:
-                    commissionKopecks > 0 &&
-                    finalDebtKopecks > 0 &&
-                    !commissionPayment.autoPaymentProcessing &&
-                    !commissionPayment.autoPaymentPaid,
+                    paid:
+                        commissionKopecks === 0 ||
+                        commissionPayment.autoPaymentPaid,
 
-                paid:
-                    commissionKopecks === 0 ||
-                    commissionPayment.autoPaymentPaid,
-
-                autoPaymentTried: commissionPayment.autoPaymentTried,
-                autoPaymentPaid: commissionPayment.autoPaymentPaid,
-                autoPaymentProcessing: commissionPayment.autoPaymentProcessing,
-                autoPaymentStatus: commissionPayment.autoPaymentStatus,
+                    autoPaymentTried: commissionPayment.autoPaymentTried,
+                    autoPaymentPaid: commissionPayment.autoPaymentPaid,
+                    autoPaymentProcessing: commissionPayment.autoPaymentProcessing,
+                    autoPaymentStatus: commissionPayment.autoPaymentStatus,
+                },
             });
 
             io.to(`user_${fullOrder.creatorId}`).emit("orderApproved", {
@@ -1271,18 +1304,50 @@ module.exports = (io) => {
             });
 
             if (order.completedBy.includes(order.creatorId) && !order.completedBy.includes(order.executorId)) {
-                io.to(`user_${order.executorId}`).emit("orderCompleted", {
+                await notifyUser({
+                    userId: order.executorId,
+                    type: "order_completion_requested",
+                    title: "Подтвердите завершение заказа",
+                    body: `Заказчик предложил завершить заказ №${order.id}`,
                     orderId: order.id,
-                    message: "Заказчик предложил завершить заказ",
+                    orderType: "regular",
+                    data: {
+                        creatorId: order.creatorId,
+                        executorId: order.executorId,
+                        completedBy: order.completedBy,
+                    },
+                    socketEvent: "orderCompleted",
+                    socketPayload: {
+                        orderId: order.id,
+                        message: "Заказчик предложил завершить заказ",
+                        creatorId: order.creatorId,
+                        executorId: order.executorId,
+                        orderType: "regular",
+                    },
                 });
             }
 
             if (order.completedBy.includes(order.executorId) && !order.completedBy.includes(order.creatorId)) {
-                io.to(`user_${order.creatorId}`).emit("orderCompleted", {
+                await notifyUser({
+                    userId: order.creatorId,
+                    type: "order_completion_requested",
+                    title: "Подтвердите завершение заказа",
+                    body: `Исполнитель предложил завершить заказ №${order.id}`,
                     orderId: order.id,
-                    message: "Исполнитель предложил завершить заказ",
-                    creatorId: order.creatorId,
-                    executorId: order.executorId,
+                    orderType: "regular",
+                    data: {
+                        creatorId: order.creatorId,
+                        executorId: order.executorId,
+                        completedBy: order.completedBy,
+                    },
+                    socketEvent: "orderCompleted",
+                    socketPayload: {
+                        orderId: order.id,
+                        message: "Исполнитель предложил завершить заказ",
+                        creatorId: order.creatorId,
+                        executorId: order.executorId,
+                        orderType: "regular",
+                    },
                 });
             }
 
@@ -1341,6 +1406,29 @@ module.exports = (io) => {
                         paymentType: order.paymentType,
                         dealStatus: order.dealStatus,
                         completedAt: order.completedAt,
+                    },
+                });
+            }
+
+            if (fullyCompleted) {
+                await notifyMany([order.creatorId, order.executorId], {
+                    type: "review_needed",
+                    title: "Заказ завершён",
+                    body: `Заказ №${order.id} завершён. Оставьте отзыв`,
+                    orderId: order.id,
+                    orderType: "regular",
+                    data: {
+                        creatorId: order.creatorId,
+                        executorId: order.executorId,
+                        completedAt: order.completedAt,
+                    },
+                    socketEvent: "reviewNeeded",
+                    socketPayload: {
+                        orderId: order.id,
+                        message: "Заказ завершён. Оставьте отзыв.",
+                        creatorId: order.creatorId,
+                        executorId: order.executorId,
+                        orderType: "regular",
                     },
                 });
             }
@@ -1660,6 +1748,28 @@ module.exports = (io) => {
                 meta: {
                     workStartedAt: order.workStartedAt,
                     executorBeforePhotosCount: beforePhotos.length,
+                },
+            });
+
+            await notifyUser({
+                userId: order.creatorId,
+                type: "order_started",
+                title: "Исполнитель начал работу",
+                body: `По заказу №${order.id} отмечено начало работы`,
+                orderId: order.id,
+                orderType: "regular",
+                data: {
+                    creatorId: order.creatorId,
+                    executorId: order.executorId,
+                    workStartedAt: order.workStartedAt,
+                },
+                socketEvent: "orderStarted",
+                socketPayload: {
+                    orderId: order.id,
+                    creatorId: order.creatorId,
+                    executorId: order.executorId,
+                    workStartedAt: order.workStartedAt,
+                    message: "Исполнитель начал работу",
                 },
             });
 

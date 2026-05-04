@@ -234,14 +234,33 @@ export const ModalProvider = ({ children }) => {
             }
         };
 
+        const handleExpressArrived = (data) => {
+            toast.info(data.message || "Исполнитель прибыл");
+        };
+
+        const handleReviewNeeded = (data) => {
+            setCompletionNotificationData({
+                title: "Заказ завершён",
+                description: `Заказ номер ${data.orderId}: ${data.message || "Оставьте отзыв"}`,
+                orderId: data.orderId,
+                creatorId: data.creatorId,
+                executorId: data.executorId,
+                orderType: data.orderType || "regular",
+            });
+        };
+
         socket.on("orderApproved", handleOrderApproved);
         socket.on("orderCompleted", handleOrderCompleted);
         socket.on("expressOrderCompleted", handleExpressOrderCompleted);
+        socket.on("expressArrived", handleExpressArrived);
+        socket.on("reviewNeeded", handleReviewNeeded);
 
         return () => {
             socket.off("orderApproved", handleOrderApproved);
             socket.off("orderCompleted", handleOrderCompleted);
             socket.off("expressOrderCompleted", handleExpressOrderCompleted);
+            socket.off("reviewNeeded", handleReviewNeeded);
+            socket.off("expressArrived", handleExpressArrived);
         };
     }, [userId]);
 
