@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import {useParams, Link, useNavigate} from 'react-router-dom';
 import axiosInstance from '../utils/axiosInstance';
 import '../styles/OrdersPage.css';
@@ -10,6 +11,23 @@ const apiUrl = process.env.REACT_APP_API_URL;
 
 const OrderPage = () => {
     const navigate = useNavigate();
+
+    const platform = useMemo(() => {
+        const params = new URLSearchParams(window.location.search);
+        const forcedPlatform = params.get("platform");
+
+        if (forcedPlatform === "ios") return "ios";
+        if (forcedPlatform === "android") return "android";
+        if (forcedPlatform === "web") return "web";
+
+        const currentPlatform = Capacitor.getPlatform();
+
+        if (currentPlatform === "ios") return "ios";
+        if (currentPlatform === "android") return "android";
+
+        return "web";
+    }, []);
+
     const { id } = useParams();
     const [order, setOrder] = useState(null);
     const [creator, setCreator] = useState(null);
@@ -129,7 +147,7 @@ const OrderPage = () => {
     }
 
     return (
-        <div className="orders-page">
+        <div className={`orders-page orders-page--${platform} order-detail-page`}>
             <div className="orders-shell">
 
                 <div className="orders-top glass">

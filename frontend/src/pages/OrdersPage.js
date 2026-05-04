@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback, useContext } from "react";
+import { Capacitor } from "@capacitor/core";
 import { Link, useNavigate } from "react-router-dom";
 import { ModalContext } from "../components/modalContext";
 import axios from "axios";
@@ -56,6 +57,22 @@ function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
 const OrdersPage = () => {
     const navigate = useNavigate();
     const YM_KEY = process.env.REACT_APP_YANDEX_API_KEY;
+
+    const platform = useMemo(() => {
+        const params = new URLSearchParams(window.location.search);
+        const forcedPlatform = params.get("platform");
+
+        if (forcedPlatform === "ios") return "ios";
+        if (forcedPlatform === "android") return "android";
+        if (forcedPlatform === "web") return "web";
+
+        const currentPlatform = Capacitor.getPlatform();
+
+        if (currentPlatform === "ios") return "ios";
+        if (currentPlatform === "android") return "android";
+
+        return "web";
+    }, []);
 
     const [busyState, setBusyState] = useState({
         loading: true,
@@ -804,7 +821,7 @@ const OrdersPage = () => {
     }, [submitRegularOrderRequest]);
 
     return (
-        <div className="orders-page">
+        <div className={`orders-page orders-page--${platform}`}>
             <div className="orders-shell">
                 <div className="orders-top glass">
                     <div className="orders-top-left">
@@ -812,13 +829,15 @@ const OrdersPage = () => {
 
                         <div className="orders-subtitle">
                             Радиус: <b>{RADIUS_KM} км</b> •{" "}
-                            {useProfileProfessions && preferredCategoryIds.length ? "по вашим профессиям" : "все категории"} •{" "}
-                            Найдено: <b>{visibleOrders.length}</b>
+                            {useProfileProfessions && preferredCategoryIds.length
+                                ? "по вашим профессиям"
+                                : "все категории"}{" "}
+                            • Найдено: <b>{visibleOrders.length}</b>
                         </div>
 
                         <div className="orders-location-row">
                             <div className="orders-location-pill">
-                                <FaLocationArrow style={{ marginRight: 8 }} />
+                                <FaLocationArrow className="orders-location-main-icon" />
                                 <span className="orders-location-text">{locationStatusText}</span>
                             </div>
 
@@ -827,8 +846,9 @@ const OrdersPage = () => {
                                 open={locationMenuOpen}
                                 onToggle={(e) => setLocationMenuOpen(Boolean(e.currentTarget.open))}
                             >
-                                <summary className="loc-summary">
-                                    <FaLocationArrow /> Местоположение
+                                <summary className="loc-summary" aria-label="Местоположение">
+                                    <FaLocationArrow />
+                                    <span className="loc-summary-text">Местоположение</span>
                                 </summary>
 
                                 <div className="loc-menu-panel">
@@ -864,7 +884,7 @@ const OrdersPage = () => {
                                     className="loc-input"
                                     value={locationDraft}
                                     onChange={(e) => setLocationDraft(e.target.value)}
-                                    placeholder="Введите адрес (например: Крым, Белогорск)"
+                                    placeholder="Введите адрес"
                                 />
                                 <button
                                     className="btn btn-primary"
@@ -878,109 +898,50 @@ const OrdersPage = () => {
 
                         {locError && <div className="orders-error">{locError}</div>}
                     </div>
+                </div>
 
-                    <div className="orders-top-right">
-                        <button className="btn btn-ghost" onClick={handleOpenOrdersMap}>
-                            <FaMapMarkedAlt style={{ marginRight: 8 }} />
-                            Карта
-                        </button>
+                <div className="orders-actions-bar glass">
+                    <button className="btn btn-ghost" onClick={handleOpenOrdersMap}>
+                        <FaMapMarkedAlt />
+                        <span>Карта</span>
+                    </button>
 
-                        <button className="btn btn-primary" onClick={() => setDrawerOpen(true)}>
-                            <FaSlidersH style={{ marginRight: 8 }} />
-                            Фильтры
-                        </button>
-                    </div>
+                    <button className="btn btn-primary" onClick={() => setDrawerOpen(true)}>
+                        <FaSlidersH />
+                        <span>Фильтры</span>
+                    </button>
                 </div>
 
                 <div className="orders-tabs-row glass">
-                    <button className={`tab-pill ${activeTab === "all" ? "active" : ""}`} onClick={() => setActiveTab("all")}>
+                    <button
+                        className={`tab-pill ${activeTab === "all" ? "active" : ""}`}
+                        onClick={() => setActiveTab("all")}
+                    >
                         Все
                     </button>
 
-                    <button className={`tab-pill ${activeTab === "recommended" ? "active" : ""}`} onClick={() => setActiveTab("recommended")}>
+                    <button
+                        className={`tab-pill ${activeTab === "recommended" ? "active" : ""}`}
+                        onClick={() => setActiveTab("recommended")}
+                    >
                         В приоритете
                     </button>
 
-                    <button className={`tab-pill ${activeTab === "courier" ? "active" : ""}`} onClick={() => setActiveTab("courier")}>
+                    <button
+                        className={`tab-pill ${activeTab === "courier" ? "active" : ""}`}
+                        onClick={() => setActiveTab("courier")}
+                    >
                         Курьер / Такси
                     </button>
 
                     <span className="tabs-hint">
-                        Во вкладке <b>Все</b> приоритетные не поднимаются, только подсвечиваются
-                    </span>
+        Приоритетные подсвечиваются, но не поднимаются выше остальных.
+    </span>
                 </div>
 
                 {activeTab === "all" && (selectedCategory || selectedSubcategory) && (
-                    <div className="hint-text">
+                    <div className="hint-text hint-text-panel">
                         Во вкладке «Все» при включённых фильтрах заказы «Курьер/Такси» скрываются.
-                    </div>
-                )}
-
-                {profile && preferredCategoryIds.length > 0 && (
-                    <div className="pref-bar glass">
-                        <div className="pref-bar__top">
-                            <div>
-                                <div className="pref-bar__title">Мои профессии (фильтр из профиля)</div>
-                                <div className="pref-bar__sub">
-                                    Эти категории применяются автоматически. Такси/курьер показываем всегда.
-                                </div>
-                            </div>
-
-                            <div className="pref-bar__actions">
-                                <button className="btn btn-ghost" onClick={() => navigate("/profile")}>
-                                    Изменить в профиле
-                                </button>
-
-                                <button
-                                    className="btn btn-ghost"
-                                    onClick={() => {
-                                        setSelectedCategory("");
-                                        setSelectedSubcategory("");
-                                        setSubcategories([]);
-                                        setActiveTab("all");
-                                        setUseProfileProfessions(false);
-                                        toast.info("Фильтры сброшены. Профессии из профиля временно отключены.");
-                                    }}
-                                >
-                                    Сбросить фильтры
-                                </button>
-
-                                <button
-                                    className="btn btn-ghost"
-                                    onClick={() => {
-                                        setUseProfileProfessions(true);
-                                        toast.info("Фильтр по профессиям из профиля включен.");
-                                    }}
-                                >
-                                    Применять профессии
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="pref-bar__chips">
-                            {preferredCategoryIds.map((id) => {
-                                const found = preferredCategories.find((c) => Number(c.id) === Number(id));
-                                return (
-                                    <span key={id} className="pref-chip" title={found?.name || ""}>
-                                        {found?.name || `Категория #${id}`}
-                                    </span>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
-
-                {profile && preferredCategoryIds.length === 0 && (
-                    <div className="notice glass">
-                        <div className="notice-title">Выберите профессии в профиле</div>
-                        <div className="notice-sub">
-                            Тогда мы будем показывать заказы только по вашим направлениям. Сейчас отображаются все категории (и курьер/такси тоже).
-                        </div>
-                        <div className="notice-actions">
-                            <button className="btn btn-primary" onClick={() => navigate("/profile")}>
-                                Перейти в профиль
-                            </button>
-                        </div>
                     </div>
                 )}
 
@@ -1268,6 +1229,107 @@ const OrdersPage = () => {
                             </div>
 
                             <div className="drawer-body">
+
+                                {profile && (
+                                    <div className="drawer-section drawer-section-professions">
+                                        <div className="drawer-section-head">
+                                            <div>
+                                                <div className="drawer-section-title">
+                                                    Профессии из профиля
+                                                </div>
+
+                                                <div className="drawer-section-sub">
+                                                    {preferredCategoryIds.length > 0
+                                                        ? "Показываем заказы по выбранным направлениям. Такси и курьер остаются видимыми."
+                                                        : "Выберите направления в профиле, чтобы видеть более подходящие заказы."}
+                                                </div>
+                                            </div>
+
+                                            {preferredCategoryIds.length > 0 && (
+                                                <span className={`drawer-status-pill ${useProfileProfessions ? "active" : ""}`}>
+                    {useProfileProfessions ? "Включено" : "Отключено"}
+                </span>
+                                            )}
+                                        </div>
+
+                                        {preferredCategoryIds.length > 0 ? (
+                                            <>
+                                                <div className="pref-bar__chips drawer-profession-chips">
+                                                    {preferredCategoryIds.map((id) => {
+                                                        const found = preferredCategories.find(
+                                                            (c) => Number(c.id) === Number(id)
+                                                        );
+
+                                                        return (
+                                                            <span key={id} className="pref-chip" title={found?.name || ""}>
+                                {found?.name || `Категория #${id}`}
+                            </span>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                <div className="drawer-profession-actions">
+                                                    <button
+                                                        className="btn btn-ghost"
+                                                        onClick={() => navigate("/profile")}
+                                                    >
+                                                        Изменить
+                                                    </button>
+
+                                                    <button
+                                                        className="btn btn-ghost"
+                                                        onClick={() => {
+                                                            setUseProfileProfessions(false);
+                                                            toast.info("Профессии из профиля временно отключены.");
+                                                        }}
+                                                    >
+                                                        Сбросить профессии
+                                                    </button>
+
+                                                    <button
+                                                        className="btn btn-ghost"
+                                                        onClick={() => {
+                                                            setSelectedCategory("");
+                                                            setSelectedSubcategory("");
+                                                            setSubcategories([]);
+                                                            setActiveTab("all");
+                                                            setUseProfileProfessions(false);
+                                                            toast.info("Все фильтры сброшены.");
+                                                        }}
+                                                    >
+                                                        Показать всё
+                                                    </button>
+
+                                                    {!useProfileProfessions && (
+                                                        <button
+                                                            className="btn btn-primary"
+                                                            onClick={() => {
+                                                                setUseProfileProfessions(true);
+                                                                toast.info("Фильтр по профессиям из профиля включен.");
+                                                            }}
+                                                        >
+                                                            Включить профессии
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="drawer-profession-empty">
+                                                <div className="drawer-profession-empty-text">
+                                                    Пока профессии не выбраны. Сейчас отображаются все категории.
+                                                </div>
+
+                                                <button
+                                                    className="btn btn-primary"
+                                                    onClick={() => navigate("/profile")}
+                                                >
+                                                    Выбрать в профиле
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
                                 <div className="field">
                                     <label>Категория</label>
                                     <select
