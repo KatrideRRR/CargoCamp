@@ -1,9 +1,10 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import "../styles/BottomMenu.css";
 import { AuthContext } from "../utils/authContext";
-import { ListTodo, Home, ClipboardList, ArrowUpCircle, UserRound } from "lucide-react";
+import { ListTodo, Home, ClipboardList, PackagePlus, UserRound } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { socket } from "../socketClient";
+import { Capacitor } from "@capacitor/core";
 
 const BottomMenu = () => {
     const navigate = useNavigate();
@@ -12,6 +13,22 @@ const BottomMenu = () => {
 
     const [requestCount, setRequestCount] = useState(0);
     const [messageCount, setMessageCount] = useState(0);
+
+    const platform = useMemo(() => {
+        const params = new URLSearchParams(window.location.search);
+        const forcedPlatform = params.get("platform");
+
+        if (forcedPlatform === "ios") return "ios";
+        if (forcedPlatform === "android") return "android";
+        if (forcedPlatform === "web") return "web";
+
+        const currentPlatform = Capacitor.getPlatform();
+
+        if (currentPlatform === "ios") return "ios";
+        if (currentPlatform === "android") return "android";
+
+        return "web";
+    }, []);
 
     const shouldHide =
         location.pathname.startsWith("/chat") ||
@@ -72,63 +89,75 @@ const BottomMenu = () => {
     }
 
     return (
-        <div className="bottom-menu">
-            <button
-                className={`navbar-item navbar-home ${isActive("/") ? "is-active" : ""}`}
-                onClick={() => navigate("/")}
-                type="button"
-            >
-                <Home size={24} className="menu-icon" />
-                <span className="menu-label">Старт</span>
-            </button>
+        <nav className={`bottom-menu bottom-menu--${platform}`} aria-label="Нижнее меню">
+            <div className="bottom-menu__shell">
+                <div className="bottom-menu__notch" />
+
+                <button
+                    className={`bottom-menu__item ${isActive("/") ? "is-active" : ""}`}
+                    onClick={() => navigate("/")}
+                    type="button"
+                    aria-label="Старт"
+                >
+                    <Home size={22} className="bottom-menu__icon" />
+                    <span className="bottom-menu__label">Старт</span>
+                </button>
+
+                <button
+                    className={`bottom-menu__item ${isActive("/orders") ? "is-active" : ""}`}
+                    onClick={() => navigate("/orders")}
+                    type="button"
+                    aria-label="Заказы"
+                >
+                    <ListTodo size={22} className="bottom-menu__icon" />
+                    <span className="bottom-menu__label">Заказы</span>
+                </button>
+
+                <div className="bottom-menu__spacer" aria-hidden="true" />
+
+                <button
+                    className={`bottom-menu__item ${isActive("/active-orders") ? "is-active" : ""}`}
+                    onClick={handleOpenActive}
+                    type="button"
+                    aria-label="В работе"
+                >
+                <span className="bottom-menu__icon-wrap">
+                    <ClipboardList size={22} className="bottom-menu__icon" />
+                    {messageCount > 0 && (
+                        <span className="bottom-menu__badge">{formatCount(messageCount)}</span>
+                    )}
+                </span>
+                    <span className="bottom-menu__label">В работе</span>
+                </button>
+
+                <button
+                    className={`bottom-menu__item ${isActive("/profile") ? "is-active" : ""}`}
+                    onClick={() => navigate("/profile")}
+                    type="button"
+                    aria-label="Профиль"
+                >
+                    <UserRound size={22} className="bottom-menu__icon" />
+                    <span className="bottom-menu__label">Профиль</span>
+                </button>
+            </div>
 
             <button
-                className={`menu-item menu-left ${isActive("/orders") ? "is-active" : ""}`}
-                onClick={() => navigate("/orders")}
-                type="button"
-            >
-                <ListTodo size={24} className="menu-icon" />
-                <span className="menu-label">Заказы</span>
-            </button>
-
-            <button
-                className={`menu-item menu-center ${
-                    isActive("/my-orders") ? "is-active" : ""
-                } ${requestCount > 0 ? "new-request" : ""}`}
+                className={`bottom-menu__center ${isActive("/my-orders") ? "is-active" : ""} ${
+                    requestCount > 0 ? "has-notification" : ""
+                }`}
                 onClick={handleMyOrdersClick}
                 type="button"
+                aria-label="Мои заказы"
             >
-                <div className="icon-wrapper">
-                    <ArrowUpCircle size={34} className="menu-icon-center" />
+                <span className="bottom-menu__center-shine" />
+                <span className="bottom-menu__icon-wrap">
+<PackagePlus size={30} className="bottom-menu__center-icon" />
                     {requestCount > 0 && (
-                        <span className="notification-badge">{formatCount(requestCount)}</span>
+                        <span className="bottom-menu__badge">{formatCount(requestCount)}</span>
                     )}
-                </div>
+            </span>
             </button>
-
-            <button
-                className={`menu-item menu-right ${isActive("/active-orders") ? "is-active" : ""}`}
-                onClick={handleOpenActive}
-                type="button"
-            >
-                <div className="icon-wrapper">
-                    <ClipboardList size={24} className="menu-icon" />
-                    {messageCount > 0 && (
-                        <span className="notification-badge">{formatCount(messageCount)}</span>
-                    )}
-                </div>
-                <span className="menu-label">В работе</span>
-            </button>
-
-            <button
-                className={`navbar-item navbar-profile ${isActive("/profile") ? "is-active" : ""}`}
-                onClick={() => navigate("/profile")}
-                type="button"
-            >
-                <UserRound size={24} className="menu-icon" />
-                <span className="menu-label">Профиль</span>
-            </button>
-        </div>
+        </nav>
     );
 };
 
