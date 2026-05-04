@@ -273,13 +273,22 @@ const ActiveOrdersPage = () => {
         setCurrentImageIndex((prev) => (prev - 1 + currentImages.length) % currentImages.length);
     };
 
+    const makeRemovedOrderKey = (orderId, view = activeView) => {
+        return `${user.id}_${view}_${orderId}`;
+    };
+
     const handleRemoveOrder = (orderId) => {
+        const key = makeRemovedOrderKey(orderId);
+
         setRemovedOrders((prev) => {
-            const updated = [...prev, orderId];
+            const updated = prev.includes(key) ? prev : [...prev, key];
             localStorage.setItem("removedOrders", JSON.stringify(updated));
             return updated;
         });
-        setOrders((prev) => prev.filter((o) => o.id !== orderId));
+
+        setOrders((prev) =>
+            prev.filter((o) => makeRemovedOrderKey(o.id) !== key)
+        );
     };
 
     const handleRouteClick = (order) => {
@@ -543,7 +552,24 @@ const ActiveOrdersPage = () => {
             setExecutorsInfo(executorsData);
 
             // removed filter
-            const filteredOrders = serverOrders.filter((o) => !removedOrders.includes(o.id));
+            const filteredOrders = serverOrders.filter((o) => {
+                const isExecutor = Number(o.executorId) === Number(user.id);
+                const isCreator = Number(o.creatorId) === Number(user.id);
+
+                const performingKey = `${user.id}_performing_${o.id}`;
+                const createdKey = `${user.id}_created_${o.id}`;
+
+                if (isExecutor && removedOrders.includes(performingKey)) {
+                    return false;
+                }
+
+                if (isCreator && removedOrders.includes(createdKey)) {
+                    return false;
+                }
+
+                return true;
+            });
+
             setOrders(filteredOrders);
 
             // подгрузим данные по спорам
