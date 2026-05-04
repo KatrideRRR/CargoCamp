@@ -1,4 +1,5 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "../styles/ActiveOrdersPage.css";
@@ -17,6 +18,23 @@ const apiUrl = process.env.REACT_APP_API_URL;
 const ActiveOrdersPage = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
+
+    const platform = useMemo(() => {
+        const params = new URLSearchParams(window.location.search);
+        const forcedPlatform = params.get("platform");
+
+        if (forcedPlatform === "ios") return "ios";
+        if (forcedPlatform === "android") return "android";
+        if (forcedPlatform === "web") return "web";
+
+        const currentPlatform = Capacitor.getPlatform();
+
+        if (currentPlatform === "ios") return "ios";
+        if (currentPlatform === "android") return "android";
+
+        return "web";
+    }, []);
+
     const { openCompletionSuccessModal } = useContext(ModalContext);
     const isMobile = useMediaQuery({ maxWidth: 768 });
 
@@ -638,7 +656,7 @@ const ActiveOrdersPage = () => {
     const hasAny = hasAnyVisible;
 
     return (
-        <div className="active-orders">
+        <div className={`active-orders active-orders--${platform}`}>
             <div className="pageContainer">
                 <div className="active-orders-page">
                     <div className="active-orders-container">

@@ -2150,3 +2150,1254 @@ body {
         width: 100%;
     }
 }
+
+/* =========================================================
+   ACTIVE ORDERS — final light premium override
+   вставить в самый конец ActiveOrdersPage.css
+========================================================= */
+
+.active-orders {
+    --ao-bg: #f4f6f8;
+    --ao-text: #0f172a;
+    --ao-muted: #64748b;
+    --ao-soft-text: #475569;
+
+    --ao-primary: #2563eb;
+    --ao-primary-soft: rgba(37, 99, 235, 0.1);
+
+    --ao-danger: #dc2626;
+    --ao-danger-soft: rgba(220, 38, 38, 0.08);
+
+    --ao-success: #16a34a;
+    --ao-success-soft: rgba(22, 163, 74, 0.09);
+
+    --ao-warning: #b45309;
+    --ao-warning-soft: rgba(251, 191, 36, 0.13);
+
+    --ao-border: rgba(226, 232, 240, 0.82);
+    --ao-border-blue: rgba(147, 197, 253, 0.52);
+
+    --ao-radius-xl: 28px;
+    --ao-radius-lg: 22px;
+    --ao-radius-md: 17px;
+    --ao-radius-sm: 14px;
+
+    --ao-bottom-menu-h: 86px;
+
+    --ao-shadow-card:
+            0 18px 50px rgba(15, 23, 42, 0.08),
+            0 6px 18px rgba(15, 23, 42, 0.04);
+
+    --ao-shadow-btn:
+            0 8px 18px rgba(15, 23, 42, 0.055),
+            0 2px 6px rgba(15, 23, 42, 0.035),
+            inset 0 1px 0 rgba(255, 255, 255, 1);
+
+    color: var(--ao-text);
+}
+
+/* ===== page background ===== */
+
+.active-orders .pageContainer {
+    padding: 14px;
+    padding-bottom: calc(18px + var(--ao-bottom-menu-h) + env(safe-area-inset-bottom));
+
+    background:
+            radial-gradient(circle at 18% 4%, rgba(96, 165, 250, 0.18), transparent 30%),
+            radial-gradient(circle at 86% 20%, rgba(191, 219, 254, 0.24), transparent 28%),
+            linear-gradient(180deg, #f8fbff 0%, var(--ao-bg) 46%, #ffffff 100%);
+}
+
+.active-orders .contentWrapper {
+    max-width: 1100px;
+    gap: 12px;
+}
+
+/* ===== glass blocks ===== */
+
+.active-orders .active-orders-topbar,
+.active-orders .order-card,
+.active-orders .no-orders {
+    position: relative;
+    overflow: hidden;
+
+    border-radius: var(--ao-radius-xl);
+
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.82)),
+            rgba(255, 255, 255, 0.92);
+
+    border: 1px solid rgba(255, 255, 255, 0.68);
+
+    box-shadow: var(--ao-shadow-card);
+
+    backdrop-filter: blur(18px) saturate(1.24);
+    -webkit-backdrop-filter: blur(18px) saturate(1.24);
+}
+
+.active-orders .active-orders-topbar::before,
+.active-orders .order-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 82px;
+
+    background:
+            radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.88), transparent 34%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.42), transparent);
+
+    pointer-events: none;
+}
+
+.active-orders .active-orders-topbar > *,
+.active-orders .order-card > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* ===== topbar ===== */
+
+.active-orders .active-orders-topbar {
+    padding: 16px;
+    align-items: center;
+}
+
+.active-orders .active-orders-title {
+    font-size: 30px;
+    line-height: 1.05;
+    font-weight: 950;
+    letter-spacing: -0.05em;
+    color: var(--ao-text);
+}
+
+.active-orders .active-orders-subtitle {
+    margin-top: 7px;
+    font-size: 13px;
+    line-height: 1.35;
+    color: var(--ao-muted);
+    font-weight: 650;
+}
+
+.active-orders .active-orders-switch {
+    display: inline-flex;
+    gap: 8px;
+    padding: 5px;
+
+    border-radius: 999px;
+
+    background: rgba(248, 250, 252, 0.74);
+    border: 1px solid rgba(226, 232, 240, 0.72);
+}
+
+.active-orders .active-switch-btn {
+    min-height: 38px;
+    height: 38px;
+
+    padding: 0 13px;
+
+    border-radius: 999px;
+    border: 1px solid transparent;
+
+    background: transparent;
+
+    color: #475569;
+
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 900;
+
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+
+    white-space: nowrap;
+}
+
+.active-orders .active-switch-btn.active {
+    color: var(--ao-primary);
+
+    background:
+            radial-gradient(circle at 30% 16%, rgba(255, 255, 255, 1), transparent 34%),
+            linear-gradient(180deg, #ffffff 0%, #f8fbff 46%, #eef6ff 100%);
+
+    border-color: rgba(147, 197, 253, 0.58);
+
+    box-shadow:
+            0 8px 18px rgba(37, 99, 235, 0.1),
+            inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+/* ===== regular order card ===== */
+
+.active-orders .orders-list {
+    gap: 12px;
+}
+
+.active-orders .order-card {
+    padding: 15px;
+}
+
+.active-orders .order-card:hover {
+    transform: none;
+}
+
+.active-orders .order-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.active-orders .order-title {
+    font-size: 17px;
+    line-height: 1.15;
+    font-weight: 950;
+    letter-spacing: -0.035em;
+    color: var(--ao-text);
+}
+
+.active-orders .order-subline {
+    margin-top: 9px;
+    padding-top: 10px;
+
+    border-top: 1px solid rgba(226, 232, 240, 0.78);
+
+    color: var(--ao-muted);
+    font-size: 13px;
+    font-weight: 650;
+}
+
+.active-orders .order-header p,
+.active-orders .order-details p,
+.active-orders .express-comment,
+.active-orders .express-meta {
+    color: var(--ao-soft-text);
+    font-size: 13px;
+    line-height: 1.45;
+    font-weight: 650;
+}
+
+.active-orders .order-header p strong,
+.active-orders .order-details p strong,
+.active-orders .express-comment strong,
+.active-orders .express-meta strong {
+    color: var(--ao-text);
+    font-weight: 900;
+}
+
+/* ===== payment ===== */
+
+.active-orders .pay-box,
+.active-orders .express-pay {
+    flex: 0 0 auto;
+
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+
+    padding: 8px 10px;
+
+    border-radius: 18px;
+
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.82));
+
+    border: 1px solid var(--ao-border);
+
+    box-shadow:
+            0 6px 15px rgba(15, 23, 42, 0.045),
+            inset 0 1px 0 rgba(255, 255, 255, 0.92);
+
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.active-orders .pay-icon {
+    width: 34px;
+    height: 34px;
+
+    border-radius: 13px;
+
+    background:
+            linear-gradient(180deg, #ffffff 0%, #f8fbff 46%, #eef6ff 100%);
+
+    border: 1px solid rgba(147, 197, 253, 0.42);
+
+    color: var(--ao-primary);
+}
+
+.active-orders .pay-price {
+    color: var(--ao-text);
+    font-size: 14px;
+    font-weight: 950;
+}
+
+.active-orders .pay-type {
+    color: var(--ao-muted);
+    font-size: 12px;
+    font-weight: 750;
+}
+
+/* ===== role badges ===== */
+
+.active-orders .role-badge-row {
+    gap: 7px;
+    margin-top: 8px;
+}
+
+.active-orders .role-badge,
+.active-orders .express-pill,
+.active-orders .dispute-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 28px;
+    padding: 6px 9px;
+
+    border-radius: 999px;
+
+    font-size: 11.5px;
+    line-height: 1;
+    font-weight: 950;
+
+    border: 1px solid rgba(226, 232, 240, 0.82);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.active-orders .creator-role {
+    color: var(--ao-primary);
+    background: rgba(239, 246, 255, 0.86);
+    border-color: rgba(147, 197, 253, 0.46);
+}
+
+.active-orders .executor-role {
+    color: #15803d;
+    background: rgba(240, 253, 244, 0.9);
+    border-color: rgba(74, 222, 128, 0.26);
+}
+
+.active-orders .express-pillType.taxi,
+.active-orders .express-pillType.courier {
+    color: var(--ao-primary);
+    background: rgba(239, 246, 255, 0.86);
+    border-color: rgba(147, 197, 253, 0.46);
+}
+
+/* =========================================================
+   BUTTONS — compact one-line system
+========================================================= */
+
+.active-orders .active-buttons,
+.active-orders .express-secondaryActions {
+    margin-top: 13px;
+
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+
+    padding-bottom: 2px;
+}
+
+.active-orders .active-buttons::-webkit-scrollbar,
+.active-orders .express-secondaryActions::-webkit-scrollbar {
+    display: none;
+}
+
+.active-orders .call-button,
+.active-orders .message-button,
+.active-orders .route-button,
+.active-orders .complete-button,
+.active-orders .remove-button,
+.active-orders .dispute-button,
+.active-orders .dispute-opened-button,
+.active-orders .express-secondaryBtn,
+.active-orders .express-btnNav,
+.active-orders .express-btnCancel,
+.active-orders .photo-upload-button,
+.active-orders .start-work-button,
+.active-orders .custom-nav-button,
+.active-orders .dispute-cancel-button,
+.active-orders .dispute-submit-button {
+    flex: 0 0 auto;
+
+    min-width: 94px;
+    width: auto;
+    height: 38px;
+    min-height: 38px;
+
+    padding: 0 11px;
+
+    border-radius: 999px;
+    border: 1px solid rgba(203, 213, 225, 0.72);
+
+    background:
+            radial-gradient(circle at 28% 14%, rgba(255, 255, 255, 0.98), transparent 32%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.9));
+
+    color: #334155;
+
+    font-size: 12.5px;
+    line-height: 1;
+    font-weight: 900;
+    letter-spacing: -0.015em;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+
+    cursor: pointer;
+    user-select: none;
+
+    box-shadow: var(--ao-shadow-btn);
+
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+
+    transition:
+            transform 120ms ease,
+            background 150ms ease,
+            border-color 150ms ease,
+            box-shadow 150ms ease,
+            opacity 150ms ease;
+}
+
+.active-orders .call-button:active,
+.active-orders .message-button:active,
+.active-orders .route-button:active,
+.active-orders .complete-button:active,
+.active-orders .remove-button:active,
+.active-orders .dispute-button:active,
+.active-orders .dispute-opened-button:active,
+.active-orders .express-secondaryBtn:active,
+.active-orders .express-primaryActionBtn:active,
+.active-orders .photo-upload-button:active,
+.active-orders .start-work-button:active {
+    transform: scale(0.985);
+}
+
+/* semantic buttons */
+.active-orders .call-button,
+.active-orders .message-button,
+.active-orders .route-button,
+.active-orders .express-secondaryBtn {
+    color: #475569;
+}
+
+.active-orders .complete-button,
+.active-orders .express-primaryActionBtn,
+.active-orders .start-work-button {
+    color: var(--ao-primary);
+
+    background:
+            radial-gradient(circle at 30% 16%, rgba(255, 255, 255, 1), transparent 34%),
+            linear-gradient(180deg, #ffffff 0%, #f8fbff 46%, #eef6ff 100%);
+
+    border-color: rgba(147, 197, 253, 0.58);
+
+    box-shadow:
+            0 10px 22px rgba(37, 99, 235, 0.12),
+            0 3px 8px rgba(15, 23, 42, 0.045),
+            inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+.active-orders .remove-button,
+.active-orders .dispute-button,
+.active-orders .dispute-opened-button,
+.active-orders .express-secondaryBtnWarn,
+.active-orders .express-secondaryBtnDanger {
+    color: var(--ao-danger);
+
+    background:
+            radial-gradient(circle at 28% 14%, rgba(255, 255, 255, 1), transparent 32%),
+            linear-gradient(180deg, #ffffff 0%, #fff7f7 48%, #fef2f2 100%);
+
+    border-color: rgba(248, 113, 113, 0.34);
+
+    box-shadow:
+            0 8px 18px rgba(220, 38, 38, 0.07),
+            0 2px 6px rgba(15, 23, 42, 0.035),
+            inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+.active-orders .dispute-opened-button {
+    color: var(--ao-warning);
+    background:
+            linear-gradient(180deg, #ffffff 0%, #fffbeb 100%);
+    border-color: rgba(245, 158, 11, 0.28);
+}
+
+.active-orders .notification-badge-ios {
+    top: -6px;
+    right: -6px;
+
+    height: 18px;
+    min-width: 18px;
+
+    background: rgba(239, 68, 68, 0.96);
+    box-shadow:
+            0 8px 18px rgba(239, 68, 68, 0.22),
+            0 0 0 2px rgba(255, 255, 255, 0.92);
+}
+
+/* =========================================================
+   EXPRESS CARD
+========================================================= */
+
+.active-orders .express-card {
+    border-color: rgba(74, 222, 128, 0.26);
+
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(240, 253, 244, 0.74)),
+            rgba(255, 255, 255, 0.92);
+
+    box-shadow:
+            0 18px 50px rgba(34, 197, 94, 0.08),
+            0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+.active-orders .order-card.express-card::before {
+    height: 5px;
+    background: linear-gradient(
+            90deg,
+            rgba(74, 222, 128, 0.9),
+            rgba(187, 247, 208, 0.42)
+    );
+}
+
+/* stepper */
+.active-orders .express-stepperOuter {
+    margin-top: 13px;
+    display: flex;
+    justify-content: center;
+    overflow: visible;
+    padding-bottom: 0;
+}
+
+.active-orders .express-stepperPremium {
+    width: 100%;
+    max-width: 760px;
+    min-width: 0;
+
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0;
+}
+
+.active-orders .express-stepPremiumCircle {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+
+    background:
+            linear-gradient(180deg, #ffffff, #f8fafc);
+
+    border: 1px solid rgba(203, 213, 225, 0.72);
+
+    color: var(--ao-muted);
+
+    box-shadow:
+            0 7px 15px rgba(15, 23, 42, 0.06),
+            inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+.active-orders .express-stepPremium.done .express-stepPremiumCircle {
+    color: #15803d;
+    background: rgba(240, 253, 244, 0.9);
+    border-color: rgba(74, 222, 128, 0.26);
+}
+
+.active-orders .express-stepPremium.active .express-stepPremiumCircle {
+    color: var(--ao-warning);
+    background: rgba(255, 251, 235, 0.92);
+    border-color: rgba(245, 158, 11, 0.28);
+    box-shadow:
+            0 8px 18px rgba(245, 158, 11, 0.11),
+            inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+.active-orders .express-stepPremiumLine {
+    height: 3px;
+    background: rgba(203, 213, 225, 0.72);
+}
+
+.active-orders .express-stepPremiumLine.done {
+    background: linear-gradient(90deg, rgba(74, 222, 128, 0.9), rgba(187, 247, 208, 0.72));
+}
+
+.active-orders .express-stepPremiumLabel {
+    color: var(--ao-muted);
+    font-size: 10.5px;
+    font-weight: 850;
+}
+
+/* status */
+.active-orders .premium-statusBar,
+.active-orders .express-statusBar {
+    margin-top: 12px;
+    padding: 11px 12px;
+
+    border-radius: 18px;
+
+    color: var(--ao-text);
+
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.78));
+
+    border: 1px solid var(--ao-border);
+
+    box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.9),
+            0 5px 14px rgba(15, 23, 42, 0.035);
+
+    font-size: 13px;
+    line-height: 1.35;
+    font-weight: 900;
+}
+
+/* route box */
+.active-orders .express-ab {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 10px;
+    align-items: center;
+}
+
+.active-orders .express-abItem {
+    padding: 11px;
+
+    border-radius: 18px;
+
+    background: rgba(248, 250, 252, 0.72);
+    border: 1px solid var(--ao-border);
+
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.active-orders .express-abLabel {
+    color: var(--ao-muted);
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.active-orders .express-abValue {
+    margin-top: 6px;
+    color: var(--ao-text);
+    font-size: 13px;
+    line-height: 1.35;
+    font-weight: 850;
+}
+
+.active-orders .express-abArrow {
+    color: var(--ao-muted);
+    font-weight: 950;
+}
+
+/* main express action */
+.active-orders .express-primaryActionWrap {
+    margin-top: 13px;
+    display: flex;
+    justify-content: center;
+}
+
+.active-orders .express-primaryActionBtn {
+    min-width: 210px;
+    width: auto;
+    min-height: 40px;
+    height: 40px;
+
+    padding: 0 15px;
+
+    border-radius: 999px;
+    border: 1px solid rgba(147, 197, 253, 0.58);
+
+    color: var(--ao-primary);
+
+    background:
+            radial-gradient(circle at 30% 16%, rgba(255, 255, 255, 1), transparent 34%),
+            linear-gradient(180deg, #ffffff 0%, #f8fbff 46%, #eef6ff 100%);
+
+    box-shadow:
+            0 10px 22px rgba(37, 99, 235, 0.12),
+            0 3px 8px rgba(15, 23, 42, 0.045),
+            inset 0 1px 0 rgba(255, 255, 255, 1);
+
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 950;
+}
+
+.active-orders .express-primaryActionBtn:hover {
+    filter: none;
+    transform: none;
+}
+
+/* Express secondary buttons one row */
+.active-orders .express-secondaryActions {
+    justify-content: flex-start;
+}
+
+.active-orders .express-routeButtonsPremium {
+    display: contents;
+}
+
+.active-orders .express-secondaryBtn {
+    min-width: 94px;
+}
+
+.active-orders .express-secondaryBtn .btn-text {
+    display: inline-block;
+    white-space: nowrap;
+}
+
+/* =========================================================
+   DETAILS / PHOTOS
+========================================================= */
+
+.active-orders .order-details {
+    margin-top: 13px;
+    padding-top: 13px;
+
+    border-top: 1px solid rgba(226, 232, 240, 0.78);
+}
+
+.active-orders .order-left {
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+
+    border-bottom: 1px solid rgba(226, 232, 240, 0.78);
+}
+
+.active-orders .image-stack-container {
+    margin-top: 10px;
+}
+
+.active-orders .image-stack {
+    gap: 8px;
+}
+
+.active-orders .order-image,
+.active-orders .protocol-photo {
+    width: 76px;
+    height: 76px;
+
+    border-radius: 16px;
+
+    border: 1px solid var(--ao-border);
+
+    box-shadow:
+            0 5px 12px rgba(15, 23, 42, 0.04),
+            inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.active-orders .photo-protocol-section {
+    margin-top: 14px;
+    gap: 11px;
+}
+
+.active-orders .photo-protocol-title {
+    color: var(--ao-text);
+    font-size: 16px;
+    line-height: 1.2;
+    font-weight: 950;
+    letter-spacing: -0.025em;
+}
+
+.active-orders .photo-protocol-alert {
+    margin: 0;
+
+    padding: 11px 12px;
+
+    border-radius: 17px;
+
+    color: var(--ao-warning);
+
+    background: var(--ao-warning-soft);
+    border: 1px solid rgba(245, 158, 11, 0.24);
+
+    font-size: 13px;
+    line-height: 1.35;
+    font-weight: 750;
+}
+
+.active-orders .photo-protocol-card {
+    padding: 12px;
+
+    border-radius: 20px;
+
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(248, 250, 252, 0.74));
+
+    border: 1px solid var(--ao-border);
+
+    box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.9),
+            0 5px 14px rgba(15, 23, 42, 0.035);
+}
+
+.active-orders .photo-protocol-card.optional {
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(248, 250, 252, 0.66));
+}
+
+.active-orders .photo-protocol-head {
+    margin-bottom: 8px;
+}
+
+.active-orders .photo-protocol-head strong {
+    color: var(--ao-text);
+    font-size: 13.5px;
+    font-weight: 950;
+}
+
+.active-orders .photo-protocol-warning,
+.active-orders .photo-protocol-optional,
+.active-orders .photo-protocol-required {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 26px;
+    padding: 5px 8px;
+
+    border-radius: 999px;
+
+    font-size: 11.5px;
+    line-height: 1;
+    font-weight: 900;
+}
+
+.active-orders .photo-protocol-warning {
+    color: var(--ao-warning);
+    background: rgba(255, 251, 235, 0.9);
+    border: 1px solid rgba(245, 158, 11, 0.24);
+}
+
+.active-orders .photo-protocol-optional {
+    color: var(--ao-primary);
+    background: rgba(239, 246, 255, 0.88);
+    border: 1px solid rgba(147, 197, 253, 0.36);
+}
+
+.active-orders .photo-protocol-hint,
+.active-orders .photo-empty {
+    color: var(--ao-muted);
+    font-size: 13px;
+    line-height: 1.35;
+    font-weight: 650;
+}
+
+.active-orders .photo-upload-button,
+.active-orders .start-work-button {
+    margin-top: 6px;
+    margin-right: 8px;
+    min-width: 140px;
+}
+
+/* =========================================================
+   MODALS
+========================================================= */
+
+.active-orders .custom-modal-overlay {
+    position: fixed;
+    inset: 0;
+
+    background: rgba(15, 23, 42, 0.46);
+
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    padding: 14px;
+}
+
+.active-orders .custom-modal {
+    width: min(920px, 96vw);
+    max-height: 88vh;
+
+    border-radius: 26px;
+
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+
+    border: 1px solid rgba(255, 255, 255, 0.82);
+
+    box-shadow:
+            0 28px 80px rgba(15, 23, 42, 0.28),
+            0 8px 22px rgba(15, 23, 42, 0.16);
+
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.active-orders .custom-modal-content {
+    padding: 16px;
+}
+
+.active-orders .custom-close-button {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid var(--ao-border);
+    color: var(--ao-text);
+    box-shadow: var(--ao-shadow-btn);
+}
+
+.active-orders .custom-modal-image {
+    border-radius: 20px;
+    border: 1px solid var(--ao-border);
+}
+
+/* dispute modal */
+.active-orders .dispute-modal-content {
+    max-width: 560px;
+    padding: 20px;
+}
+
+.active-orders .dispute-modal-title {
+    color: var(--ao-text);
+    font-size: 24px;
+    line-height: 1.1;
+    font-weight: 950;
+    letter-spacing: -0.04em;
+}
+
+.active-orders .dispute-order-info {
+    color: var(--ao-muted);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.active-orders .dispute-form-group label {
+    color: var(--ao-text);
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.active-orders .dispute-input,
+.active-orders .dispute-textarea {
+    border: 1px solid rgba(148, 163, 184, 0.34);
+    border-radius: 17px;
+
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.9));
+
+    color: var(--ao-text);
+
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.active-orders .dispute-input:focus,
+.active-orders .dispute-textarea:focus {
+    border-color: rgba(37, 99, 235, 0.42);
+    box-shadow:
+            0 0 0 4px rgba(37, 99, 235, 0.08),
+            0 10px 24px rgba(37, 99, 235, 0.08);
+}
+
+.active-orders .dispute-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 9px;
+}
+
+.active-orders .dispute-cancel-button,
+.active-orders .dispute-submit-button {
+    min-width: 120px;
+}
+
+.active-orders .dispute-submit-button {
+    color: var(--ao-danger);
+
+    background:
+            radial-gradient(circle at 28% 14%, rgba(255, 255, 255, 1), transparent 32%),
+            linear-gradient(180deg, #ffffff 0%, #fff7f7 48%, #fef2f2 100%);
+
+    border-color: rgba(248, 113, 113, 0.34);
+}
+
+/* empty */
+.active-orders .no-orders {
+    margin: 0;
+    padding: 18px;
+
+    color: var(--ao-muted);
+    font-size: 14px;
+    line-height: 1.35;
+    font-weight: 750;
+}
+
+/* =========================================================
+   PLATFORM
+========================================================= */
+
+.active-orders--ios .active-orders-topbar,
+.active-orders--ios .order-card {
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.66)),
+            rgba(255, 255, 255, 0.62);
+
+    border-color: rgba(255, 255, 255, 0.68);
+
+    backdrop-filter: blur(24px) saturate(1.34);
+    -webkit-backdrop-filter: blur(24px) saturate(1.34);
+
+    box-shadow:
+            0 24px 68px rgba(15, 23, 42, 0.12),
+            0 8px 24px rgba(15, 23, 42, 0.07),
+            inset 0 1px 0 rgba(255, 255, 255, 0.74);
+}
+
+.active-orders--android .active-orders-topbar,
+.active-orders--android .order-card {
+    background: rgba(255, 255, 255, 0.98);
+
+    border-color: rgba(226, 232, 240, 0.92);
+
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+
+    box-shadow:
+            0 12px 34px rgba(15, 23, 42, 0.08),
+            0 3px 10px rgba(15, 23, 42, 0.035);
+}
+
+.active-orders--android .active-orders-topbar::before,
+.active-orders--android .order-card::before {
+    opacity: 0.55;
+}
+
+.active-orders--android .custom-modal-overlay {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 768px) {
+    .active-orders .pageContainer {
+        padding: 10px;
+        padding-bottom: calc(14px + var(--ao-bottom-menu-h) + env(safe-area-inset-bottom));
+    }
+
+    .active-orders .contentWrapper {
+        gap: 10px;
+    }
+
+    .active-orders .active-orders-topbar {
+        padding: 14px;
+        border-radius: 24px;
+    }
+
+    .active-orders .active-orders-title {
+        font-size: 27px;
+    }
+
+    .active-orders .active-orders-subtitle {
+        font-size: 13px;
+    }
+
+    .active-orders .active-orders-switch {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border-radius: 18px;
+        padding: 5px;
+    }
+
+    .active-orders .active-switch-btn {
+        width: 100%;
+        min-width: 0;
+        height: 38px;
+        padding: 0 8px;
+        border-radius: 14px;
+        font-size: 12px;
+    }
+
+    .active-orders .order-card {
+        padding: 13px;
+        border-radius: 24px;
+    }
+
+    .active-orders .order-top {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .active-orders .pay-box,
+    .active-orders .express-pay {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    /*
+      Главное: все кнопки в одну строку на телефоне.
+      Строка скроллится горизонтально, ничего не переносится вниз.
+    */
+    .active-orders .active-buttons,
+    .active-orders .express-secondaryActions {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        justify-content: flex-start !important;
+
+        overflow-x: auto;
+        overflow-y: hidden;
+
+        gap: 7px;
+        padding: 2px 1px 4px;
+    }
+
+    .active-orders .call-button,
+    .active-orders .message-button,
+    .active-orders .route-button,
+    .active-orders .complete-button,
+    .active-orders .remove-button,
+    .active-orders .dispute-button,
+    .active-orders .dispute-opened-button,
+    .active-orders .express-secondaryBtn {
+        width: auto !important;
+        min-width: 44px;
+        height: 44px;
+        min-height: 44px;
+
+        padding: 0 10px;
+
+        border-radius: 15px;
+
+        font-size: 0;
+        gap: 0;
+    }
+
+    .active-orders .call-button svg,
+    .active-orders .message-button svg,
+    .active-orders .route-button svg,
+    .active-orders .complete-button svg,
+    .active-orders .remove-button svg,
+    .active-orders .dispute-button svg,
+    .active-orders .dispute-opened-button svg,
+    .active-orders .express-secondaryBtn svg {
+        font-size: 16px;
+    }
+
+    .active-orders .express-secondaryBtn .btn-text {
+        display: none !important;
+    }
+
+    /*
+      Для express кнопок маршрута можно оставить короткий текст,
+      но только если места хватает. На телефоне делаем иконками.
+    */
+    .active-orders .express-routeButtonsPremium {
+        display: contents !important;
+    }
+
+    .active-orders .express-primaryActionBtn {
+        width: 100%;
+        min-width: 0;
+        height: 44px;
+        min-height: 44px;
+        border-radius: 16px;
+        font-size: 13px;
+    }
+
+    .active-orders .express-ab {
+        grid-template-columns: 1fr;
+    }
+
+    .active-orders .express-abArrow {
+        display: none;
+    }
+
+    .active-orders .express-stepperPremium {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        row-gap: 14px;
+        column-gap: 8px;
+        max-width: 100%;
+    }
+
+    .active-orders .express-stepPremiumTop {
+        justify-content: center;
+        position: relative;
+    }
+
+    .active-orders .express-stepPremiumLine {
+        position: absolute;
+        top: 50%;
+        left: calc(50% + 18px);
+        right: -4px;
+        transform: translateY(-50%);
+        margin: 0;
+        z-index: 1;
+    }
+
+    .active-orders .express-stepPremium:nth-child(3) .express-stepPremiumLine,
+    .active-orders .express-stepPremium:nth-child(6) .express-stepPremiumLine {
+        display: none;
+    }
+
+    .active-orders .express-stepPremiumCircle {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        position: relative;
+        z-index: 2;
+    }
+
+    .active-orders .express-stepPremiumLabel {
+        max-width: 82px;
+        font-size: 10px;
+    }
+
+    .active-orders .order-image,
+    .active-orders .protocol-photo {
+        width: 70px;
+        height: 70px;
+    }
+
+    .active-orders .photo-protocol-head {
+        align-items: flex-start;
+    }
+
+    .active-orders .photo-upload-button,
+    .active-orders .start-work-button {
+        width: 100%;
+        min-width: 0;
+        margin-right: 0;
+    }
+
+    .active-orders .dispute-modal-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .active-orders .dispute-cancel-button,
+    .active-orders .dispute-submit-button {
+        width: 100%;
+    }
+}
+
+@media (max-width: 380px) {
+    .active-orders .active-orders-title {
+        font-size: 25px;
+    }
+
+    .active-orders .active-switch-btn {
+        font-size: 11.5px;
+    }
+
+    .active-orders .order-card {
+        padding: 12px;
+        border-radius: 22px;
+    }
+}
