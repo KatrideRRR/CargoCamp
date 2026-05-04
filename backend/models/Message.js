@@ -6,6 +6,11 @@ module.exports = (sequelize, DataTypes) => {
         senderId: { type: DataTypes.INTEGER, allowNull: false },
         receiverId: { type: DataTypes.INTEGER, allowNull: false },
         orderId: { type: DataTypes.INTEGER, allowNull: false },
+        orderType: {
+            type: DataTypes.ENUM("regular", "express"),
+            allowNull: false,
+            defaultValue: "regular",
+        },
     }, {
         tableName: 'messages',  // ✅ Указываем имя существующей таблицы
         freezeTableName: true,  // ✅ Запрещаем Sequelize менять имя

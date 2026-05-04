@@ -461,18 +461,20 @@ const ActiveOrdersPage = () => {
         }
     };
 
-    const handleOpenChat = (orderId) => {
-        // пометить прочитанным
-        socket.emit("markAsRead", { userId: user.id, orderId });
+    const handleOpenChat = (orderId, orderType = "regular") => {
+        socket.emit("markAsRead", {
+            userId: user.id,
+            orderId,
+            orderType,
+        });
 
-        // локально уберем бейдж без ожидания повторного fetch
         setUnreadOrders((prev) => {
             const updated = { ...prev };
-            delete updated[orderId];
+            delete updated[`${orderType}_${orderId}`];
             return updated;
         });
 
-        navigate(`/messages/${orderId}`);
+        navigate(`/messages/${orderType}/${orderId}`);
     };
 
     // --- fetchers ---
@@ -785,7 +787,7 @@ const ActiveOrdersPage = () => {
                                                             className="message-button"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                handleOpenChat(order.id);
+                                                                handleOpenChat(order.id, "regular");
                                                             }}
                                                         >
                                                             <span className="message-button-content">{isMobile ? <FaComments /> : "Сообщение"}</span>
@@ -1065,7 +1067,7 @@ const ActiveOrdersPage = () => {
                                                     })
                                                 );
                                             }}
-                                            onOpenChat={(orderId) => handleOpenChat(orderId)}
+                                            onOpenChat={(orderId) => handleOpenChat(orderId, "express")}
                                             onOpenDispute={(order) => openDisputeModal(order)}
                                             onCallUser={async (order) => {
                                                 const phone = Number(order.creatorId) === Number(user.id)

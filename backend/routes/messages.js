@@ -5,7 +5,11 @@ const authenticateToken = require("../middlewares/userAuth");
 const { sendNotifications, sendToUser } = require("../socket");
 
 router.post("/", authenticateToken, async (req, res) => {
-    const { content, receiverId, orderId } = req.body;
+    const { content, receiverId, orderId, orderType = "regular" } = req.body;
+
+    const normalizedOrderType = ["regular", "express"].includes(orderType)
+        ? orderType
+        : "regular";
 
     if (!content || !receiverId || !orderId) {
         return res.status(400).json({
@@ -24,6 +28,7 @@ router.post("/", authenticateToken, async (req, res) => {
             senderId: req.user.id,
             receiverId,
             orderId: orderIdInt,
+            orderType: normalizedOrderType,
         });
 
         await req.logAction({
@@ -49,6 +54,9 @@ router.post("/", authenticateToken, async (req, res) => {
 
         sendToUser(receiverId, "receiveMessage", fullMessage);
 
+        const io = req.app.locals.io;
+        io.to(`chat_${normalizedOrderType}_${orderIdInt}`).emit("receiveMessage", fullMessage);
+
         const existingNotification = await Notification.findOne({
             where: {
                 userId: receiverId,
@@ -63,6 +71,7 @@ router.post("/", authenticateToken, async (req, res) => {
                 messageId: message.id,
                 isRead: false,
                 orderId: orderIdInt,
+                orderType: normalizedOrderType,
             });
 
             await sendNotifications(receiverId);
@@ -80,10 +89,40 @@ router.get("/:orderId", authenticateToken, async (req, res) => {
 
     try {
         const messages = await Message.findAll({
-            where: { orderId },
+            where: {
+                orderId,
+                orderType: "regular",
+            },
             include: [
-                { model: User, as: "sender", attributes: ["id", "username"] },
-                { model: User, as: "receiver", attributes: ["id", "username"] },
+                { model: User, as: "sender", attributes: ["id", "username", "avatar"] },
+                { model: User, as: "receiver", attributes: ["id", "username", "avatar"] },
+            ],
+            order: [["createdAt", "ASC"]],
+        });
+
+        res.json(messages);
+    } catch (error) {
+        console.error("Error fetching messages:", error);
+        res.status(500).json({ message: "Server error." });
+    }
+});
+
+router.get("/:orderType/:orderId", authenticateToken, async (req, res) => {
+    const { orderType, orderId } = req.params;
+
+    const normalizedOrderType = ["regular", "express"].includes(orderType)
+        ? orderType
+        : "regular";
+
+    try {
+        const messages = await Message.findAll({
+            where: {
+                orderId,
+                orderType: normalizedOrderType,
+            },
+            include: [
+                { model: User, as: "sender", attributes: ["id", "username", "avatar"] },
+                { model: User, as: "receiver", attributes: ["id", "username", "avatar"] },
             ],
             order: [["createdAt", "ASC"]],
         });

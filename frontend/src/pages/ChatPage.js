@@ -70,7 +70,9 @@ function formatDatePill(value) {
 }
 
 const ChatPage = () => {
-    const { orderId } = useParams();
+    const params = useParams();
+    const orderId = params.orderId;
+    const orderType = params.orderType || "regular";
     const navigate = useNavigate();
     const { currentUser } = useUser();
 
@@ -107,7 +109,11 @@ const ChatPage = () => {
     useEffect(() => {
         if (!currentUser?.id) return;
 
-        socket.emit("joinChat", { userId: currentUser.id, orderId });
+        socket.emit("joinChat", {
+            userId: currentUser.id,
+            orderId,
+            orderType,
+        });
 
         const handleReceiveMessage = (message) => {
             if (String(message.orderId) !== String(orderId)) return;
@@ -132,10 +138,17 @@ const ChatPage = () => {
                 setLoading(true);
                 setError("");
 
-                const { data: orderData } = await axios.get(
-                    `${apiUrl}/api/orders/${orderId}`,
-                    authHeader
-                );
+                const orderUrl =
+                    orderType === "express"
+                        ? `${apiUrl}/api/express/express-orders/${orderId}`
+                        : `${apiUrl}/api/orders/${orderId}`;
+
+                const { data: orderResponse } = await axios.get(orderUrl, authHeader);
+
+                const orderData =
+                    orderType === "express"
+                        ? orderResponse.order || orderResponse
+                        : orderResponse;
 
                 setOrder(orderData);
 
@@ -152,7 +165,7 @@ const ChatPage = () => {
                 setSelectedUser(user);
 
                 const { data: messagesData } = await axios.get(
-                    `${apiUrl}/api/messages/${orderId}`,
+                    `${apiUrl}/api/messages/${orderType}/${orderId}`,
                     authHeader
                 );
 
@@ -185,6 +198,7 @@ const ChatPage = () => {
                 content: newMessage.trim(),
                 receiverId: selectedUser.id,
                 orderId,
+                orderType,
             };
 
             const { data } = await axios.post(
@@ -234,7 +248,12 @@ const ChatPage = () => {
     };
 
     const handleOrderDetails = () => {
-        navigate(`/orders/${orderId}`);
+        if (orderType === "express") {
+            navigate("/active-orders");
+            return;
+        }
+
+        navigate(`/order/${orderId}`);
     };
 
     const groupedMessages = useMemo(() => {

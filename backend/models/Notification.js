@@ -12,17 +12,28 @@ module.exports = (sequelize, DataTypes) => {
                 onDelete: 'CASCADE',
             },
             type: {
-                type: DataTypes.ENUM('new_message'),
+                type: DataTypes.ENUM(
+                    "new_message",
+                    "order_request",
+                    "order_request_approved",
+                    "order_started",
+                    "order_completed_by_other",
+                    "order_completed",
+                    "review_needed",
+                    "dispute_opened",
+                    "express_status_changed",
+                    "debt_created"
+                ),
                 allowNull: false,
+            },
+            orderType: {
+                type: DataTypes.ENUM("regular", "express"),
+                allowNull: false,
+                defaultValue: "regular",
             },
             messageId: {
                 type: DataTypes.INTEGER,
-                allowNull: false,
-                references: {
-                    model: 'messages',
-                    key: 'id',
-                },
-                onDelete: 'CASCADE',
+                allowNull: true,
             },
             orderId: {  // ✅ Добавляем поле orderId
                 type: DataTypes.INTEGER,

@@ -70,18 +70,19 @@ function initializeSocket(server) {
             socket.join(`notifications_${normalizedUserId}`);
         });
 
-        socket.on("joinChat", ({ userId, orderId }) => {
+        socket.on("joinChat", ({ userId, orderId, orderType = "regular" }) => {
             if (userId) {
                 socket.join(`user_${String(userId)}`);
+                socket.join(`notifications_${String(userId)}`);
+                socket.data.userId = String(userId);
             }
 
             if (orderId) {
-                socket.join(`chat_${String(orderId)}`);
+                socket.join(`chat_${String(orderType)}_${String(orderId)}`);
             }
         });
 
-        socket.on("markAsRead", async ({ userId, orderId }) => {
-
+        socket.on("markAsRead", async ({ userId, orderId, orderType = "regular" }) => {
             try {
                 await Notification.update(
                     { isRead: true },
@@ -89,6 +90,7 @@ function initializeSocket(server) {
                         where: {
                             userId,
                             orderId,
+                            orderType,
                             isRead: false,
                         },
                     }

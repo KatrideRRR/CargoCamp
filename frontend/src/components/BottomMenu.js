@@ -10,6 +10,7 @@ const BottomMenu = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useContext(AuthContext);
+    const [debtCount, setDebtCount] = useState(0);
 
     const [requestCount, setRequestCount] = useState(0);
     const [messageCount, setMessageCount] = useState(0);
@@ -37,7 +38,41 @@ const BottomMenu = () => {
     useEffect(() => {
         if (!user?.id || shouldHide) return;
 
-        socket.emit("subscribeToNotifications", user.id);
+        const fetchDebt = async () => {
+            try {
+                const token = localStorage.getItem("authToken");
+                if (!token) return;
+
+                const res = await fetch(`${process.env.REACT_APP_API_URL}/api/orders/me/status`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+
+                const data = await res.json();
+                const debt = Number(data?.debt || 0);
+
+                setDebtCount(debt > 0 ? 1 : 0);
+            } catch (e) {
+                console.error("Ошибка проверки долга:", e);
+            }
+        };
+
+        fetchDebt();
+
+        if (!socket.connected) {
+            socket.connect();
+        }
+
+        const subscribe = () => {
+            socket.emit("register", user.id);
+            socket.emit("subscribeToNotifications", user.id);
+        };
+
+        subscribe();
+
+        socket.on("connect", subscribe);
+        socket.on("reconnect", subscribe);
 
         const handleNewNotification = (notifications) => {
             if (!Array.isArray(notifications)) return;
@@ -59,6 +94,8 @@ const BottomMenu = () => {
         socket.on(orderRequestEvent, handleOrderRequest);
 
         return () => {
+            socket.off("connect", subscribe);
+            socket.off("reconnect", subscribe);
             socket.off("new_notification", handleNewNotification);
             socket.off(orderRequestEvent, handleOrderRequest);
         };
@@ -136,7 +173,12 @@ const BottomMenu = () => {
                     type="button"
                     aria-label="Профиль"
                 >
-                    <UserRound size={22} className="bottom-menu__icon" />
+                    <span className="bottom-menu__icon-wrap">
+    <UserRound size={22} className="bottom-menu__icon" />
+                        {debtCount > 0 && (
+                            <span className="bottom-menu__badge">!</span>
+                        )}
+</span>
                     <span className="bottom-menu__label">Профиль</span>
                 </button>
             </div>

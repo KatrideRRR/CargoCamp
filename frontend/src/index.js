@@ -1,7 +1,8 @@
-import React, { Suspense, lazy, useEffect, useMemo } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import Modal from "react-modal";
+import { useAuth } from "./utils/authContext";
 
 import { socket } from "./socketClient";
 
@@ -31,51 +32,41 @@ const CreateExpressOrder = lazy(() => import('./pages/CreateExpressOrder'));
 const ServiceInfoPage = lazy(() => import('./pages/ServiceInfoPage'));
 const InfoPage = lazy(() => import('./pages/InfoPage'));
 
-function getUserIdFromToken() {
-    try {
-        const token = localStorage.getItem("authToken");
-        if (!token) return null;
-
-        const payloadBase64 = token.split(".")[1];
-        if (!payloadBase64) return null;
-
-        const payloadJson = atob(
-            payloadBase64.replace(/-/g, "+").replace(/_/g, "/")
-        );
-
-        const payload = JSON.parse(payloadJson);
-
-        return payload?.id ?? null;
-    } catch {
-        return null;
-    }
-}
-
-function App() {
-    const navigate = useNavigate();
-    const userId = useMemo(() => getUserIdFromToken(), []);
+function SocketBootstrap() {
+    const { user } = useAuth();
 
     useEffect(() => {
-        if (!userId) return;
+        if (!user?.id) {
+            return;
+        }
 
         if (!socket.connected) {
             socket.connect();
         }
 
-        const handleConnect = () => {
-            socket.emit("register", userId);
+        const registerUser = () => {
+            socket.emit("register", user.id);
+            socket.emit("subscribeToNotifications", user.id);
         };
 
-        socket.on("connect", handleConnect);
+        socket.on("connect", registerUser);
+        socket.on("reconnect", registerUser);
 
         if (socket.connected) {
-            socket.emit("register", userId);
+            registerUser();
         }
 
         return () => {
-            socket.off("connect", handleConnect);
+            socket.off("connect", registerUser);
+            socket.off("reconnect", registerUser);
         };
-    }, [userId]);
+    }, [user?.id]);
+
+    return null;
+}
+
+function App() {
+    const navigate = useNavigate();
 
     useEffect(() => {
         const handlePush = (payload) => {
@@ -100,6 +91,7 @@ function App() {
     return (
         <ModalProvider>
             <AuthProvider>
+                <SocketBootstrap />
                 <UserProvider>
                     <Suspense
                         fallback={
@@ -118,7 +110,7 @@ function App() {
                             <Route path="/complaints/:userId" element={<UserReviewsPage />} />
                             <Route path="/orders-history/:userId" element={<OrderHistoryPage />} />
                             <Route path="/create-order" element={<CreateOrderPage />} />
-                            <Route path="/messages/:orderId" element={<ChatPage />} />
+                            <Route path="/messages/:orderType/:orderId" element={<ChatPage />} />
                             <Route path="/order/:id" element={<OrderPage />} />
                             <Route path="/user-orders/:userId" element={<UserOrdersPage />} />
                             <Route path="/my-orders/:userId" element={<MyOrdersPage />} />
