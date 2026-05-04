@@ -1,5 +1,6 @@
 import { toast } from "react-toastify";
 import React, { useEffect, useMemo, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../utils/authContext";
 import axios from "axios";
@@ -49,6 +50,22 @@ const ProfilePage = () => {
     const { logout, isAuthenticated } = useAuth();
 
     const YM_KEY = process.env.REACT_APP_YANDEX_API_KEY;
+
+    const platform = useMemo(() => {
+        const params = new URLSearchParams(window.location.search);
+        const forcedPlatform = params.get("platform");
+
+        if (forcedPlatform === "ios") return "ios";
+        if (forcedPlatform === "android") return "android";
+        if (forcedPlatform === "web") return "web";
+
+        const currentPlatform = Capacitor.getPlatform();
+
+        if (currentPlatform === "ios") return "ios";
+        if (currentPlatform === "android") return "android";
+
+        return "web";
+    }, []);
 
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -832,7 +849,7 @@ const ProfilePage = () => {
     }
 
     return (
-        <div className="profile-page">
+        <div className={`profile-page profile-page--${platform}`}>
             <div className="profile-shell">
                 <div className="profile-header glass">
                     <div className="profile-header-top">
