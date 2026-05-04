@@ -1,25 +1,38 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 let ymapsLoaderPromise = null;
 
 function loadYMaps(apiKey) {
-    if (window.ymaps) return Promise.resolve(window.ymaps);
-    if (ymapsLoaderPromise) return ymapsLoaderPromise;
+    if (window.ymaps) {
+        return Promise.resolve(window.ymaps);
+    }
+
+    if (ymapsLoaderPromise) {
+        return ymapsLoaderPromise;
+    }
 
     ymapsLoaderPromise = new Promise((resolve, reject) => {
         const existing = document.getElementById("yandex-maps-script");
 
         if (existing) {
-            existing.addEventListener("load", () => resolve(window.ymaps), { once: true });
-            existing.addEventListener("error", reject, { once: true });
+            existing.addEventListener("load", () => resolve(window.ymaps), {
+                once: true,
+            });
+
+            existing.addEventListener("error", reject, {
+                once: true,
+            });
+
             return;
         }
 
         const script = document.createElement("script");
+
         script.id = "yandex-maps-script";
         script.async = true;
         script.src = `https://api-maps.yandex.ru/2.1/?apikey=${apiKey}&lang=ru_RU`;
+
         script.onload = () => resolve(window.ymaps);
         script.onerror = reject;
 
@@ -29,13 +42,24 @@ function loadYMaps(apiKey) {
     return ymapsLoaderPromise;
 }
 
+function getCoordsFromOrder(order) {
+    const raw = String(order?.coordinates || "");
+    const [lat, lng] = raw.split(",").map((x) => Number(String(x).trim()));
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return null;
+    }
+
+    return [lat, lng];
+}
+
 export default function YandexMapModal({
                                            isOpen,
                                            onClose,
                                            initialLat,
                                            initialLng,
                                            onPick,
-                                           showOrders = true,
+                                           showOrders = false,
                                            orders = [],
                                        }) {
     const apiKey = process.env.REACT_APP_YANDEX_API_KEY;
@@ -43,17 +67,21 @@ export default function YandexMapModal({
     const mapNodeRef = useRef(null);
     const mapRef = useRef(null);
     const ymapsRef = useRef(null);
+
     const userPlacemarkRef = useRef(null);
     const ordersCollectionRef = useRef(null);
+
     const clickHandlerRef = useRef(null);
     const dragHandlerRef = useRef(null);
 
     const [loading, setLoading] = useState(false);
     const [picked, setPicked] = useState(null);
     const [error, setError] = useState(null);
-    const [mapReady, setMapReady] = useState(false);
 
-    const safeOrders = useMemo(() => (Array.isArray(orders) ? orders : []), [orders]);
+    const safeOrders = useMemo(() => {
+        if (!Array.isArray(orders)) return [];
+        return orders;
+    }, [orders]);
 
     const initialCenter = useMemo(() => {
         const lat = Number(initialLat);
@@ -63,7 +91,15 @@ export default function YandexMapModal({
             return [lat, lng];
         }
 
+        // Москва как безопасный fallback
         return [55.751244, 37.618423];
+    }, [initialLat, initialLng]);
+
+    const hasInitialCoords = useMemo(() => {
+        const lat = Number(initialLat);
+        const lng = Number(initialLng);
+
+        return Number.isFinite(lat) && Number.isFinite(lng);
     }, [initialLat, initialLng]);
 
     useEffect(() => {
@@ -79,23 +115,32 @@ export default function YandexMapModal({
 
     const reverseGeocode = useCallback(async (lat, lng) => {
         const ymaps = ymapsRef.current;
+
         if (!ymaps) {
             return `Координаты: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
         }
 
         try {
-            const res = await ymaps.geocode([lat, lng], { results: 1 });
+            const res = await ymaps.geocode([lat, lng], {
+                results: 1,
+            });
+
             const first = res.geoObjects.get(0);
-            return first?.getAddressLine?.() || `Координаты: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+
+            return (
+                first?.getAddressLine?.() ||
+                `Координаты: ${lat.toFixed(5)}, ${lng.toFixed(5)}`
+            );
         } catch {
             return `Координаты: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
         }
     }, []);
 
-    const updatePickedPoint = useCallback(
+    const setPickedPoint = useCallback(
         async (lat, lng, shouldCenter = false) => {
             const ymaps = ymapsRef.current;
             const map = mapRef.current;
+
             if (!ymaps || !map) return;
 
             if (!userPlacemarkRef.current) {
@@ -113,7 +158,10 @@ export default function YandexMapModal({
 
                 const dragHandler = async () => {
                     const coords = placemark.geometry.getCoordinates();
-                    await updatePickedPoint(coords[0], coords[1], false);
+
+                    if (!coords || coords.length < 2) return;
+
+                    await setPickedPoint(coords[0], coords[1], false);
                 };
 
                 dragHandlerRef.current = dragHandler;
@@ -123,97 +171,62 @@ export default function YandexMapModal({
             }
 
             if (shouldCenter) {
-                map.setCenter([lat, lng], Math.max(map.getZoom(), 12), { duration: 150 });
+                map.setCenter([lat, lng], Math.max(map.getZoom(), 12));
             }
 
             const address = await reverseGeocode(lat, lng);
-            setPicked({ lat, lng, address });
+
+            setPicked({
+                lat,
+                lng,
+                address,
+            });
         },
         [reverseGeocode]
     );
 
-    const renderOrdersToMap = useCallback(() => {
+    const renderOrders = useCallback(() => {
         const map = mapRef.current;
         const ymaps = ymapsRef.current;
-        const collection = ordersCollectionRef.current;
 
-        if (!map || !ymaps || !collection) return;
+        if (!map || !ymaps) return;
 
-        collection.removeAll();
-
-        if (!showOrders) return;
-
-        const boundsItems = [];
-
-        const selectedCoords = userPlacemarkRef.current?.geometry?.getCoordinates?.();
-        if (Array.isArray(selectedCoords) && selectedCoords.length === 2) {
-            boundsItems.push(selectedCoords);
-        } else {
-            const lat = Number(initialLat);
-            const lng = Number(initialLng);
-            if (Number.isFinite(lat) && Number.isFinite(lng)) {
-                boundsItems.push([lat, lng]);
-            }
+        if (!ordersCollectionRef.current) {
+            ordersCollectionRef.current = new ymaps.GeoObjectCollection();
+            map.geoObjects.add(ordersCollectionRef.current);
         }
 
+        const collection = ordersCollectionRef.current;
+        collection.removeAll();
+
+        if (!showOrders || safeOrders.length === 0) return;
+
         safeOrders.forEach((order) => {
-            const [lat, lng] = String(order.coordinates || "")
-                .split(",")
-                .map((x) => Number(String(x).trim()));
+            const coords = getCoordsFromOrder(order);
 
-            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+            if (!coords) return;
 
-            boundsItems.push([lat, lng]);
+            const title = order.express
+                ? `Экспресс №${order.expressId}`
+                : `Заказ №${order.id}`;
 
             const placemark = new ymaps.Placemark(
-                [lat, lng],
+                coords,
                 {
-                    balloonContentHeader: order.express
-                        ? `Экспресс №${order.expressId}`
-                        : `Заказ №${order.id}`,
-                    balloonContentBody: `
-                        <div style="font-size:13px;line-height:1.4;">
-                            <div><b>${order.address || "Без адреса"}</b></div>
-                            <div style="margin-top:4px;">
-                                ${Number(order.proposedSum || 0).toLocaleString("ru-RU")} ₽
-                            </div>
-                            <div style="margin-top:4px;color:#475569;">
-                                ${order.description || "Без описания"}
-                            </div>
-                        </div>
-                    `,
-                    balloonContentFooter: Number.isFinite(order._distance)
-                        ? `Расстояние: ${order._distance.toFixed(1)} км`
-                        : "",
-                    hintContent: order.express
-                        ? `Экспресс №${order.expressId}`
-                        : `Заказ №${order.id}`,
+                    hintContent: title,
+                    balloonContentHeader: title,
+                    balloonContentBody: order.address || "Без адреса",
                 },
                 {
                     preset: order.express
                         ? "islands#greenDotIcon"
-                        : order.is_recommended
-                            ? "islands#violetDotIcon"
-                            : order.is_highlighted
-                                ? "islands#yellowDotIcon"
-                                : "islands#blueDotIcon",
+                        : "islands#blueDotIcon",
                 }
             );
 
             collection.add(placemark);
         });
-
-        try {
-            if (boundsItems.length > 1) {
-                map.setBounds(boundsItems, {
-                    checkZoomRange: true,
-                    zoomMargin: 40,
-                });
-            } else if (boundsItems.length === 1) {
-                map.setCenter(boundsItems[0], 12);
-            }
-        } catch {}
-    }, [safeOrders, showOrders, initialLat, initialLng]);
+    }, [safeOrders, showOrders]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -230,13 +243,11 @@ export default function YandexMapModal({
                 setLoading(true);
                 setError(null);
                 setPicked(null);
-                setMapReady(false);
 
                 const ymaps = await loadYMaps(apiKey);
                 await ymaps.ready();
 
-                if (cancelled) return;
-                if (!mapNodeRef.current) return;
+                if (cancelled || !mapNodeRef.current) return;
 
                 ymapsRef.current = ymaps;
 
@@ -252,50 +263,37 @@ export default function YandexMapModal({
 
                 const map = new ymaps.Map(mapNodeRef.current, {
                     center: initialCenter,
-                    zoom: 11,
-                    controls: ["zoomControl", "geolocationControl"],
+                    zoom: hasInitialCoords ? 12 : 10,
+                    controls: ["zoomControl"],
                 });
 
                 mapRef.current = map;
 
-                const ordersCollection = new ymaps.GeoObjectCollection();
-                ordersCollectionRef.current = ordersCollection;
-                map.geoObjects.add(ordersCollection);
-
                 const clickHandler = async (e) => {
                     const coords = e.get("coords");
-                    await updatePickedPoint(coords[0], coords[1], !showOrders);
+
+                    if (!coords || coords.length < 2) return;
+
+                    await setPickedPoint(coords[0], coords[1], true);
                 };
 
                 clickHandlerRef.current = clickHandler;
                 map.events.add("click", clickHandler);
 
-                setTimeout(async () => {
+                // Дать контейнеру модалки отрисоваться, затем подогнать карту.
+                requestAnimationFrame(async () => {
                     if (cancelled || !mapRef.current) return;
 
                     try {
                         map.container.fitToViewport();
                     } catch {}
 
-                    const lat = Number(initialLat);
-                    const lng = Number(initialLng);
-
-                    if (Number.isFinite(lat) && Number.isFinite(lng)) {
-                        await updatePickedPoint(lat, lng, false);
-                    } else {
-                        map.setCenter(initialCenter, 11);
+                    if (hasInitialCoords) {
+                        await setPickedPoint(initialCenter[0], initialCenter[1], false);
                     }
 
-                    setMapReady(true);
-
-                    // КЛЮЧЕВОЙ ФИКС:
-                    // после полного создания карты сразу рисуем заказы
-                    setTimeout(() => {
-                        if (!cancelled) {
-                            renderOrdersToMap();
-                        }
-                    }, 0);
-                }, 150);
+                    renderOrders();
+                });
             } catch (e) {
                 console.error(e);
                 setError("Не удалось загрузить Яндекс.Карту");
@@ -310,11 +308,13 @@ export default function YandexMapModal({
 
         return () => {
             cancelled = true;
-            setMapReady(false);
 
             try {
                 if (userPlacemarkRef.current && dragHandlerRef.current) {
-                    userPlacemarkRef.current.events.remove("dragend", dragHandlerRef.current);
+                    userPlacemarkRef.current.events.remove(
+                        "dragend",
+                        dragHandlerRef.current
+                    );
                 }
             } catch {}
 
@@ -343,17 +343,16 @@ export default function YandexMapModal({
         isOpen,
         apiKey,
         initialCenter,
-        initialLat,
-        initialLng,
-        showOrders,
-        updatePickedPoint,
-        renderOrdersToMap,
+        hasInitialCoords,
+        setPickedPoint,
+        renderOrders,
     ]);
 
     useEffect(() => {
-        if (!isOpen || !mapReady) return;
-        renderOrdersToMap();
-    }, [isOpen, mapReady, renderOrdersToMap]);
+        if (!isOpen || !mapRef.current) return;
+
+        renderOrders();
+    }, [isOpen, renderOrders]);
 
     if (!isOpen) return null;
 
@@ -362,22 +361,33 @@ export default function YandexMapModal({
             <div className="glass-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="glass-modal-head">
                     <div>
-                        <div className="glass-modal-title">Выберите точку на карте</div>
+                        <div className="glass-modal-title">
+                            Выберите точку на карте
+                        </div>
+
                         <div className="glass-modal-subtitle">
-                            {showOrders
-                                ? "Синие/цветные метки — заказы, красная метка — ваша точка"
-                                : "Кликните по карте или перетащите красную метку"}
+                            Кликните по карте или перетащите красную метку
                         </div>
                     </div>
 
-                    <button className="glass-icon-btn" onClick={onClose} aria-label="close">
-                        ✖
+                    <button
+                        type="button"
+                        className="glass-icon-btn"
+                        onClick={onClose}
+                        aria-label="Закрыть"
+                    >
+                        ×
                     </button>
                 </div>
 
                 <div className="glass-map-wrap">
                     <div ref={mapNodeRef} className="glass-map" />
-                    {loading && <div className="glass-map-loading">Загрузка карты…</div>}
+
+                    {loading && (
+                        <div className="glass-map-loading">
+                            Загрузка карты…
+                        </div>
+                    )}
                 </div>
 
                 {error && <div className="glass-error">{error}</div>}
@@ -385,14 +395,22 @@ export default function YandexMapModal({
                 <div className="glass-modal-footer">
                     <div className="glass-picked">
                         <div className="glass-picked-label">Выбрано:</div>
-                        <div className="glass-picked-value">{picked?.address || "Ничего не выбрано"}</div>
+                        <div className="glass-picked-value">
+                            {picked?.address || "Ничего не выбрано"}
+                        </div>
                     </div>
 
                     <div className="glass-actions">
-                        <button className="btn btn-ghost" onClick={onClose}>
+                        <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={onClose}
+                        >
                             Отмена
                         </button>
+
                         <button
+                            type="button"
                             className="btn btn-primary"
                             disabled={!picked}
                             onClick={() => onPick?.(picked)}

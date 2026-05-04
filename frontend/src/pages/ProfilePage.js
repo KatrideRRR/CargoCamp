@@ -1302,6 +1302,8 @@ const ProfilePage = () => {
                         onClose={() => setShowMapModal(false)}
                         initialLat={profile?.locationLat}
                         initialLng={profile?.locationLng}
+                        showOrders={false}
+                        orders={[]}
                         onPick={(picked) => {
                             setLocationDraft(picked.address);
 
