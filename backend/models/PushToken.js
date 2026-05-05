@@ -10,7 +10,7 @@ module.exports = (sequelize, DataTypes) => {
             },
 
             token: {
-                type: DataTypes.TEXT,
+                type: DataTypes.STRING(1024),
                 allowNull: false,
             },
 
@@ -21,12 +21,12 @@ module.exports = (sequelize, DataTypes) => {
             },
 
             deviceId: {
-                type: DataTypes.STRING,
+                type: DataTypes.STRING(255),
                 allowNull: true,
             },
 
             appVersion: {
-                type: DataTypes.STRING,
+                type: DataTypes.STRING(50),
                 allowNull: true,
             },
 
@@ -49,7 +49,7 @@ module.exports = (sequelize, DataTypes) => {
                 { fields: ["platform"] },
                 {
                     unique: true,
-                    fields: ["userId", "token"],
+                    fields: ["token"],
                 },
             ],
         }
