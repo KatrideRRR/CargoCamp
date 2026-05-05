@@ -1,8 +1,16 @@
 const express = require("express");
+const crypto = require("crypto");
 const router = express.Router();
 
 const authenticateToken = require("../middlewares/userAuth");
 const { PushToken } = require("../models");
+
+function makeTokenHash(token) {
+    return crypto
+        .createHash("sha256")
+        .update(String(token))
+        .digest("hex");
+}
 
 router.post("/register", authenticateToken, async (req, res) => {
     try {
@@ -25,14 +33,16 @@ router.post("/register", authenticateToken, async (req, res) => {
             ? platform
             : "android";
 
+        const tokenHash = makeTokenHash(token);
+
         const [row, created] = await PushToken.findOrCreate({
             where: {
-                userId,
-                token,
+                tokenHash,
             },
             defaults: {
                 userId,
                 token,
+                tokenHash,
                 platform: safePlatform,
                 deviceId,
                 appVersion,
@@ -43,6 +53,9 @@ router.post("/register", authenticateToken, async (req, res) => {
 
         if (!created) {
             await row.update({
+                userId,
+                token,
+                tokenHash,
                 platform: safePlatform,
                 deviceId,
                 appVersion,
@@ -68,21 +81,24 @@ router.post("/unregister", authenticateToken, async (req, res) => {
         const userId = req.user.id;
         const { token } = req.body;
 
-        if (!token) {
+        if (!token || typeof token !== "string") {
             return res.status(400).json({
                 success: false,
                 message: "Push token is required",
             });
         }
 
+        const tokenHash = makeTokenHash(token);
+
         await PushToken.update(
             {
                 isActive: false,
+                lastSeenAt: new Date(),
             },
             {
                 where: {
                     userId,
-                    token,
+                    tokenHash,
                 },
             }
         );
