@@ -1,4 +1,5 @@
 const { Notification } = require("../models");
+const { sendPushToUser } = require("./pushService");
 const {
     sendNotifications,
     sendToUser,
@@ -58,8 +59,20 @@ async function notifyUser({
         });
     }
 
-    // Здесь позже будет:
-    // await sendPushToUser(userId, { title, body, data: notification.data });
+    sendPushToUser({
+        userId,
+        title: title || "CargoCamp",
+        body: body || "Новое уведомление",
+        data: {
+            notificationId: notification.id,
+            type,
+            orderId: orderId ? String(orderId) : "",
+            orderType: normalizedOrderType,
+            ...(payloadData || {}),
+        },
+    }).catch((e) => {
+        console.error("push send failed:", e);
+    });
 
     return notification;
 }

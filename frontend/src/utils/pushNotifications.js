@@ -1,0 +1,132 @@
+// frontend/src/utils/pushNotifications.js
+
+import { Capacitor } from "@capacitor/core";
+import { PushNotifications } from "@capacitor/push-notifications";
+import axiosInstance from "./axiosInstance";
+
+function getPushPlatform() {
+    const p = Capacitor.getPlatform();
+
+    if (p === "ios") return "ios";
+    if (p === "android") return "android";
+
+    return "web";
+}
+
+function navigateFromPush(data, navigate) {
+    if (!data || !navigate) return;
+
+    const type = data.type;
+    const orderId = data.orderId;
+    const orderType = data.orderType || "regular";
+
+    if (type === "new_message" && orderId) {
+        navigate(`/messages/${orderId}?orderType=${orderType}`);
+        return;
+    }
+
+    if (
+        [
+            "order_request_approved",
+            "order_started",
+            "order_completion_requested",
+            "order_completed",
+            "review_needed",
+            "express_status_changed",
+            "express_arrived",
+            "express_completed",
+            "express_cancelled",
+        ].includes(type)
+    ) {
+        navigate("/active-orders");
+        return;
+    }
+
+    if (type === "order_request") {
+        const userRaw = localStorage.getItem("user");
+        try {
+            const user = userRaw ? JSON.parse(userRaw) : null;
+            if (user?.id) {
+                navigate(`/my-orders/${user.id}`);
+                return;
+            }
+        } catch {}
+
+        navigate("/profile");
+        return;
+    }
+
+    if (type === "debt_created") {
+        navigate("/profile");
+        return;
+    }
+
+    if (orderType === "regular" && orderId) {
+        navigate(`/order/${orderId}`);
+    }
+}
+
+export async function initPushNotifications({ navigate } = {}) {
+    if (!Capacitor.isNativePlatform()) {
+        console.info("Push: web platform, skip native push init");
+        return;
+    }
+
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+        console.info("Push: no auth token, skip");
+        return;
+    }
+
+    let permStatus = await PushNotifications.checkPermissions();
+
+    if (permStatus.receive !== "granted") {
+        permStatus = await PushNotifications.requestPermissions();
+    }
+
+    if (permStatus.receive !== "granted") {
+        console.warn("Push: permission not granted");
+        return;
+    }
+
+    await PushNotifications.register();
+
+    PushNotifications.removeAllListeners();
+
+    PushNotifications.addListener("registration", async (tokenResult) => {
+        try {
+            const pushToken = tokenResult.value;
+
+            if (!pushToken) return;
+
+            await axiosInstance.post("/push/register", {
+                token: pushToken,
+                platform: getPushPlatform(),
+                deviceId: `${getPushPlatform()}-${pushToken.slice(0, 16)}`,
+                appVersion: process.env.REACT_APP_VERSION || null,
+            });
+
+            console.log("✅ Push token registered");
+        } catch (e) {
+            console.error("Push token register API error:", e);
+        }
+    });
+
+    PushNotifications.addListener("registrationError", (error) => {
+        console.error("Push registration error:", error);
+    });
+
+    PushNotifications.addListener("pushNotificationReceived", (notification) => {
+        console.log("Push received:", notification);
+
+        // Когда приложение открыто, можно показать toast.
+        // Но если websocket уже показывает модалку/toast, тут лучше не дублировать.
+    });
+
+    PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
+        console.log("Push action:", action);
+
+        const data = action?.notification?.data || {};
+        navigateFromPush(data, navigate);
+    });
+}

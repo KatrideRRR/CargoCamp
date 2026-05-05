@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import Modal from "react-modal";
 import { useAuth } from "./utils/authContext";
+import { initPushNotifications } from "./utils/pushNotifications";
 
 import { socket } from "./socketClient";
 
@@ -67,6 +68,12 @@ function SocketBootstrap() {
 
 function App() {
     const navigate = useNavigate();
+
+    useEffect(() => {
+        initPushNotifications({ navigate }).catch((e) => {
+            console.error("initPushNotifications error:", e);
+        });
+    }, [navigate]);
 
     useEffect(() => {
         const handlePush = (payload) => {

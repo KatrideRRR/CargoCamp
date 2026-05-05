@@ -21,3 +21,11 @@
 /frontend/build/static/css/main.a5100415.css.map
 /frontend/build/manifest.json
 /frontend/build/robots.txt
+backend/secrets/
+backend/secrets/*.json
+backend/secrets/firebase-service-account.json
+frontend/android/app/google-services.json
+backend/secrets/
+backend/secrets/*.json
+backend/secrets/firebase-service-account.json
+frontend/android/app/google-services.json
