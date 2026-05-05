@@ -5,14 +5,33 @@ const {
     sendToUser,
 } = require("../socket");
 
+function normalizeOrderType(orderType) {
+    return ["regular", "express"].includes(orderType) ? orderType : "regular";
+}
+
+function stringifyPushData(data = {}) {
+    const result = {};
+
+    for (const [key, value] of Object.entries(data || {})) {
+        if (value === null || value === undefined) {
+            result[key] = "";
+        } else if (typeof value === "object") {
+            result[key] = JSON.stringify(value);
+        } else {
+            result[key] = String(value);
+        }
+    }
+
+    return result;
+}
+
 /**
  * Универсальное уведомление пользователю.
  *
- * Сейчас:
  * 1. Создаёт запись Notification в БД
  * 2. Обновляет список уведомлений через socket
  * 3. Шлёт отдельное socket-событие, если передан socketEvent
- * 4. Позже сюда добавим реальный push через Firebase
+ * 4. Шлёт push через Firebase
  */
 async function notifyUser({
                               userId,
@@ -28,21 +47,25 @@ async function notifyUser({
                           }) {
     if (!userId || !type) return null;
 
+    const normalizedOrderType = normalizeOrderType(orderType);
+
+    const payloadData = {
+        ...(data || {}),
+        orderId,
+        orderType: normalizedOrderType,
+        type,
+    };
+
     const notification = await Notification.create({
         userId,
         type,
         title: title || null,
         body: body || null,
         orderId,
-        orderType,
+        orderType: normalizedOrderType,
         messageId,
         isRead: false,
-        data: {
-            ...(data || {}),
-            orderId,
-            orderType,
-            type,
-        },
+        data: payloadData,
     });
 
     await sendNotifications(userId);
@@ -53,7 +76,7 @@ async function notifyUser({
             title,
             body,
             orderId,
-            orderType,
+            orderType: normalizedOrderType,
             notificationId: notification.id,
             ...(socketPayload || {}),
         });
@@ -63,13 +86,10 @@ async function notifyUser({
         userId,
         title: title || "CargoCamp",
         body: body || "Новое уведомление",
-        data: {
+        data: stringifyPushData({
             notificationId: notification.id,
-            type,
-            orderId: orderId ? String(orderId) : "",
-            orderType: normalizedOrderType,
-            ...(payloadData || {}),
-        },
+            ...payloadData,
+        }),
     }).catch((e) => {
         console.error("push send failed:", e);
     });
