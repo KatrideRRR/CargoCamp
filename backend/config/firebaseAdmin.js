@@ -1,5 +1,3 @@
-// backend/config/firebaseAdmin.js
-
 const path = require("path");
 const admin = require("firebase-admin");
 
@@ -18,7 +16,10 @@ function initFirebaseAdmin() {
         return null;
     }
 
-    const fullPath = path.resolve(__dirname, "..", serviceAccountPath);
+    const fullPath = path.isAbsolute(serviceAccountPath)
+        ? serviceAccountPath
+        : path.resolve(__dirname, "..", serviceAccountPath);
+
     const serviceAccount = require(fullPath);
 
     admin.initializeApp({
