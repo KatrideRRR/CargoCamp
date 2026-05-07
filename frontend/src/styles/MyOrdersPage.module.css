@@ -929,3 +929,55 @@
 .routeValueExpress {
     color: rgba(21, 128, 61, 0.98);
 }
+
+.orderManageActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.deleteOrderBtn {
+    border: none;
+    cursor: pointer;
+
+    min-height: 38px;
+    padding: 0 12px;
+
+    border-radius: 999px;
+
+    background: rgba(220, 38, 38, 0.10);
+    border: 1px solid rgba(220, 38, 38, 0.18);
+    color: rgba(185, 28, 28, 0.98);
+
+    font-size: 12px;
+    font-weight: 900;
+    white-space: nowrap;
+
+    backdrop-filter: blur(10px) saturate(160%);
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
+
+    transition: transform 0.08s ease, background 0.18s ease, opacity 0.18s ease;
+}
+
+.deleteOrderBtn:hover {
+    background: rgba(220, 38, 38, 0.14);
+}
+
+.deleteOrderBtn:active {
+    transform: translateY(1px);
+}
+
+.deleteOrderBtn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+    .orderManageActions {
+        justify-content: stretch;
+    }
+
+    .deleteOrderBtn {
+        width: 100%;
+    }
+}

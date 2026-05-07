@@ -189,3 +189,37 @@
         margin: 0 12px 12px;
     }
 }
+/* =========================================================
+   FINAL FIX: Agreement modal safe position
+========================================================= */
+
+.agreement-overlay {
+    z-index: 5000;
+}
+
+.agreement-check,
+.agreement-button {
+    position: relative;
+    z-index: 2;
+}
+
+@media (max-width: 520px) {
+    .agreement-overlay {
+        align-items: center !important;
+        justify-content: center !important;
+
+        padding:
+                calc(12px + env(safe-area-inset-top))
+                10px
+                calc(96px + env(safe-area-inset-bottom)) !important;
+    }
+
+    .agreement-modal {
+        max-height: calc(100vh - 120px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+        border-radius: 18px !important;
+    }
+
+    .agreement-body {
+        max-height: none;
+    }
+}

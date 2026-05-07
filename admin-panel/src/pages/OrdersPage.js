@@ -16,6 +16,30 @@ function OrdersPage() {
     const token = localStorage.getItem("authToken");
     const navigate = useNavigate();
 
+    const renderVisibilityBadge = (order) => {
+        if (order.adminDeleted) {
+            return (
+                <span className="admin-order-visibility-badge admin-deleted">
+                Удалён админом
+            </span>
+            );
+        }
+
+        if (order.creatorHidden) {
+            return (
+                <span className="admin-order-visibility-badge creator-hidden">
+                Скрыт пользователем
+            </span>
+            );
+        }
+
+        return (
+            <span className="admin-order-visibility-badge visible">
+            Видимый
+        </span>
+        );
+    };
+
     useEffect(() => {
         const fetchAll = async () => {
             try {
@@ -185,6 +209,7 @@ function OrdersPage() {
                                 <th>ID заказа</th>
                                 <th>Дата создания</th>
                                 <th>Статус заказа</th>
+                                <th>Видимость</th>
                                 <th>Спор</th>
                                 <th>Действия</th>
                             </tr>
@@ -196,10 +221,11 @@ function OrdersPage() {
                                     <td>{order.id}</td>
                                     <td>{new Date(order.createdAt).toLocaleDateString()}</td>
                                     <td>
-                                            <span className={getStatusClass(order.status)}>
-                                                {order.status}
-                                            </span>
+        <span className={getStatusClass(order.status)}>
+            {order.status}
+        </span>
                                     </td>
+                                    <td>{renderVisibilityBadge(order)}</td>
                                     <td>{renderDisputeBadge(order)}</td>
                                     <td>
                                         <button

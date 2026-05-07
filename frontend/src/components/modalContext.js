@@ -113,7 +113,12 @@ export const ModalProvider = ({ children }) => {
             isExpress: orderType === "express",
         });
 
+        // Важно: перед отзывом закрываем все completion-модалки,
+        // чтобы они не висели под ReviewModal и не открывались цепочкой.
         setCompletionNotificationData(null);
+        setCompletionSuccessData(null);
+
+        setRating(0);
         setShowRatingModal(true);
     };
 
@@ -128,7 +133,7 @@ export const ModalProvider = ({ children }) => {
     const handleSubmitReview = async ({ rating, text }) => {
         if (!selectedOrder?.id) {
             toast.error("Заказ не выбран");
-            return;
+            return false;
         }
 
         try {
@@ -143,12 +148,20 @@ export const ModalProvider = ({ children }) => {
             });
 
             toast.success("Отзыв отправлен");
+
             setShowRatingModal(false);
             setSelectedOrder(null);
             setRating(0);
+
+            // На всякий случай убираем остальные модалки завершения.
+            setCompletionNotificationData(null);
+            setCompletionSuccessData(null);
+
+            return true;
         } catch (e) {
             console.error("Ошибка отправки отзыва:", e);
             toast.error(e.response?.data?.message || "Не удалось отправить отзыв");
+            return false;
         } finally {
             setReviewLoading(false);
         }
@@ -368,17 +381,33 @@ export const ModalProvider = ({ children }) => {
         }
     };
 
-    const handleCompleteOrder = (orderId, creatorId, executorId, orderType = "regular") => {
-        setSelectedOrder({
-            id: orderId,
-            creatorId,
-            executorId,
-            orderType,
-            isExpress: orderType === "express",
-        });
+    const handleCompleteOrder = async (orderId, creatorId, executorId, orderType = "regular") => {
+        try {
+            setCompletionNotificationData(null);
 
-        setCompletionNotificationData(null);
-        setShowRatingModal(true);
+            if (orderType === "express") {
+                // Если для express у тебя отдельный endpoint завершения,
+                // лучше сюда потом поставить его.
+                openReviewFromCompletion(orderId, creatorId, executorId, orderType);
+                return;
+            }
+
+            const res = await axiosInstance.post(`/orders/complete/${orderId}`, {});
+
+            const completedOrder = res.data;
+
+            openReviewFromCompletion(
+                completedOrder?.id || orderId,
+                completedOrder?.creatorId || creatorId,
+                completedOrder?.executorId || executorId,
+                orderType
+            );
+
+            toast.success("Завершение подтверждено");
+        } catch (e) {
+            console.error("Ошибка подтверждения завершения:", e);
+            toast.error(e.response?.data?.message || "Не удалось завершить заказ");
+        }
     };
 
     const canReviewFromCompletionNotification = completionNotificationData
@@ -404,16 +433,21 @@ export const ModalProvider = ({ children }) => {
             value={{
                 openModal: setModalData,
                 closeModal: () => setModalData(null),
+
                 showRatingModal,
                 setShowRatingModal,
                 selectedOrder,
                 setSelectedOrder,
                 rating,
                 setRating,
+
                 currUser,
                 setCurrUser,
+
                 openCompletionSuccessModal,
                 closeCompletionSuccessModal,
+                openReviewFromCompletion,
+
                 openDebtModal,
                 closeDebtModal,
             }}
@@ -548,22 +582,6 @@ export const ModalProvider = ({ children }) => {
                                     }
                                 >
                                     Завершить
-                                </button>
-                            )}
-
-                            {canReviewFromCompletionNotification && (
-                                <button
-                                    className="modal-btn modal-btn-ghost"
-                                    onClick={() =>
-                                        openReviewFromCompletion(
-                                            completionNotificationData.orderId,
-                                            completionNotificationData.creatorId,
-                                            completionNotificationData.executorId,
-                                            completionNotificationData.orderType
-                                        )
-                                    }
-                                >
-                                    Оставить отзыв
                                 </button>
                             )}
 

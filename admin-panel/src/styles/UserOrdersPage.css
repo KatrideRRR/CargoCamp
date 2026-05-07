@@ -322,3 +322,34 @@ body {
         min-width: 180px;
     }
 }
+
+.admin-order-visibility-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 32px;
+    padding: 6px 10px;
+
+    border-radius: 999px;
+
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.admin-order-visibility-badge.visible {
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.admin-order-visibility-badge.creator-hidden {
+    background: #fffbeb;
+    color: #92400e;
+}
+
+.admin-order-visibility-badge.admin-deleted {
+    background: #fef2f2;
+    color: #b91c1c;
+}

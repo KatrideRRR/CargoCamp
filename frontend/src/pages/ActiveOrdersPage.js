@@ -6,7 +6,7 @@ import "../styles/ActiveOrdersPage.css";
 import { useAuth } from "../utils/authContext";
 import { socket } from "../socketClient";
 import { useMediaQuery } from "react-responsive";
-import { FaPhone, FaComments, FaRoute, FaCheck, FaTrash, FaExclamationTriangle } from "react-icons/fa";
+import { FaPhone, FaComments, FaRoute, FaCheck, FaTrash, FaExclamationTriangle, FaPlay } from "react-icons/fa";
 import Modal from "react-modal";
 import axiosInstance from "../utils/axiosInstance";
 import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
@@ -35,7 +35,10 @@ const ActiveOrdersPage = () => {
         return "web";
     }, []);
 
-    const { openCompletionSuccessModal } = useContext(ModalContext);
+    const {
+        openCompletionSuccessModal,
+        openReviewFromCompletion,
+    } = useContext(ModalContext);
     const isMobile = useMediaQuery({ maxWidth: 768 });
 
     const [orders, setOrders] = useState([]);
@@ -454,16 +457,17 @@ const ActiveOrdersPage = () => {
                 prev.map((o) => (o.id === orderId ? updatedOrder : o))
             );
 
-            if (updatedOrder?.status === "completed") {
-                openCompletionSuccessModal(
-                    buildCompletionPayload({
-                        order: updatedOrder,
-                        orderType: "regular",
-                    })
-                );
-            } else {
-                alert("Подтверждение завершения отправлено ✅");
-            }
+            await fetchActiveOrders();
+
+            const creatorId = updatedOrder?.creatorId;
+            const executorId = updatedOrder?.executorId;
+
+            openReviewFromCompletion(
+                updatedOrder?.id || orderId,
+                creatorId,
+                executorId,
+                "regular"
+            );
         } catch (e) {
             console.error(e);
             alert(e.response?.data?.message || "Ошибка при завершении заказа");
@@ -878,6 +882,19 @@ const ActiveOrdersPage = () => {
                                                                     {isMobile ? <FaTrash /> : "Удалить"}
                                                                 </button>
                                                             ) : null
+                                                        ) : isExecutor && !order.workStartedAt ? (
+                                                            <button
+                                                                className="start-main-button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    startWork(order.id);
+                                                                }}
+                                                                disabled={startingWork[order.id]}
+                                                            >
+                                                                {startingWork[order.id]
+                                                                    ? isMobile ? <FaPlay /> : "Запуск..."
+                                                                    : isMobile ? <FaPlay /> : "Начать"}
+                                                            </button>
                                                         ) : (
                                                             <button
                                                                 className="complete-button"
@@ -934,7 +951,7 @@ const ActiveOrdersPage = () => {
                                                             <h4 className="photo-protocol-title">Фото-протокол заказа</h4>
 
                                                             <div className="photo-protocol-alert">
-                                                                Фото ДО и ПОСЛЕ не обязательны, но помогут при споре подтвердить объём, качество и результат работы.
+                                                                Фото ДО и ПОСЛЕ необязательны, но помогают зафиксировать состояние объекта и результат работы.
                                                             </div>
 
                                                             {isExecutor ? (
@@ -961,17 +978,6 @@ const ActiveOrdersPage = () => {
                                                                                 onChange={(e) => uploadOrderPhotos(order.id, "executorBefore", e.target.files)}
                                                                             />
                                                                         </label>
-
-                                                                        <button
-                                                                            className="start-work-button"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                startWork(order.id);
-                                                                            }}
-                                                                            disabled={startingWork[order.id]}
-                                                                        >
-                                                                            {startingWork[order.id] ? "Запуск..." : "Начать работу"}
-                                                                        </button>
                                                                     </div>
 
                                                                     <div className="photo-protocol-card">

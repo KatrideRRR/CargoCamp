@@ -15,9 +15,32 @@ function OrderDetailsPage() {
     const [logsError, setLogsError] = useState(null);
     const [disputeActionLoading, setDisputeActionLoading] = useState({});
     const [resolutionInputs, setResolutionInputs] = useState({});
+    const [orderDeleteLoading, setOrderDeleteLoading] = useState(false);
+    const [orderRestoreLoading, setOrderRestoreLoading] = useState(false);
 
     const token = localStorage.getItem("authToken");
     const navigate = useNavigate();
+
+    const getVisibilityStatus = (order) => {
+        if (order?.adminDeleted) {
+            return {
+                text: "Удалён админом",
+                className: "visibility-badge admin-deleted",
+            };
+        }
+
+        if (order?.creatorHidden) {
+            return {
+                text: "Скрыт пользователем",
+                className: "visibility-badge creator-hidden",
+            };
+        }
+
+        return {
+            text: "Видимый",
+            className: "visibility-badge visible",
+        };
+    };
 
     useEffect(() => {
         if (!token) {
@@ -61,14 +84,62 @@ function OrderDetailsPage() {
     }, [id, token]);
 
     const deleteOrder = async (orderId) => {
+        const ok = window.confirm(
+            "Пометить заказ как удалённый админом? Он останется в базе и логах, но будет отмечен как удалённый."
+        );
+
+        if (!ok) return;
+
         try {
-            await axios.delete(`${apiUrl}/api/admin/orders/${orderId}`, {
+            setOrderDeleteLoading(true);
+
+            const res = await axios.delete(`${apiUrl}/api/admin/orders/${orderId}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
-            navigate("/orders");
+
+            if (res.data?.order) {
+                setOrder(res.data.order);
+            }
+
+            await reloadLogs();
+
+            alert("Заказ помечен как удалённый админом");
         } catch (error) {
             console.error("Ошибка удаления заказа", error);
-            alert("Не удалось удалить заказ");
+            alert(error.response?.data?.message || "Не удалось удалить заказ");
+        } finally {
+            setOrderDeleteLoading(false);
+        }
+    };
+
+    const restoreOrder = async (orderId) => {
+        const ok = window.confirm("Восстановить заказ и вернуть его в видимость?");
+
+        if (!ok) return;
+
+        try {
+            setOrderRestoreLoading(true);
+
+            const res = await axios.patch(
+                `${apiUrl}/api/admin/orders/${orderId}/restore`,
+                {},
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+
+            if (res.data?.order) {
+                setOrder(res.data.order);
+            }
+
+            await reloadLogs();
+
+            alert("Заказ восстановлен");
+        } catch (error) {
+            console.error("Ошибка восстановления заказа", error);
+            alert(error.response?.data?.message || "Не удалось восстановить заказ");
+        } finally {
+            setOrderRestoreLoading(false);
         }
     };
 
@@ -285,6 +356,7 @@ function OrderDetailsPage() {
     }
 
     const disputes = Array.isArray(order.disputes) ? order.disputes : [];
+    const visibilityStatus = getVisibilityStatus(order);
 
     return (
         <div className="order-details-container">
@@ -298,9 +370,24 @@ function OrderDetailsPage() {
                         <button className="message-button" onClick={() => showMessage(order.id)}>
                             Открыть чат
                         </button>
-                        <button className="delete-button" onClick={() => deleteOrder(order.id)}>
-                            Удалить
-                        </button>
+
+                        {order.adminDeleted || order.creatorHidden ? (
+                            <button
+                                className="restore-button"
+                                onClick={() => restoreOrder(order.id)}
+                                disabled={orderRestoreLoading}
+                            >
+                                {orderRestoreLoading ? "Восстанавливаем..." : "Восстановить"}
+                            </button>
+                        ) : (
+                            <button
+                                className="delete-button"
+                                onClick={() => deleteOrder(order.id)}
+                                disabled={orderDeleteLoading}
+                            >
+                                {orderDeleteLoading ? "Удаляем..." : "Удалить"}
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -318,6 +405,40 @@ function OrderDetailsPage() {
                             </span>
                         </span>
                     </div>
+
+                    <div className="info-item">
+                        <span className="info-label">Видимость</span>
+                        <span className="info-value">
+        <span className={visibilityStatus.className}>
+            {visibilityStatus.text}
+        </span>
+    </span>
+                    </div>
+
+                    {order.creatorHidden && (
+                        <div className="info-item">
+                            <span className="info-label">Скрыт пользователем</span>
+                            <span className="info-value">
+            {order.creatorHiddenAt ? new Date(order.creatorHiddenAt).toLocaleString() : "Да"}
+        </span>
+                        </div>
+                    )}
+
+                    {order.adminDeleted && (
+                        <>
+                            <div className="info-item">
+                                <span className="info-label">Удалён админом</span>
+                                <span className="info-value">
+                {order.adminDeletedAt ? new Date(order.adminDeletedAt).toLocaleString() : "Да"}
+            </span>
+                            </div>
+
+                            <div className="info-item">
+                                <span className="info-label">ID админа</span>
+                                <span className="info-value">{order.adminDeletedById || "—"}</span>
+                            </div>
+                        </>
+                    )}
 
                     <div className="info-item">
                         <span className="info-label">Дата создания</span>

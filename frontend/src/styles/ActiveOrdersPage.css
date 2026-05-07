@@ -3401,3 +3401,130 @@ body {
         border-radius: 22px;
     }
 }
+
+/* =========================================================
+   FIX: unread badge over message button
+   ========================================================= */
+
+.active-orders .active-buttons {
+    overflow-x: auto;
+    overflow-y: visible !important;
+
+    padding-top: 8px;
+    padding-right: 8px;
+    padding-bottom: 4px;
+}
+
+.active-orders .message-button {
+    position: relative;
+    overflow: visible !important;
+    z-index: 2;
+}
+
+.active-orders .notification-badge-ios {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+
+    min-width: 19px;
+    height: 19px;
+    padding: 0 6px;
+
+    border-radius: 999px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    background: #ef4444;
+    color: #ffffff;
+
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1;
+
+    box-shadow:
+            0 0 0 2px #ffffff,
+            0 8px 18px rgba(239, 68, 68, 0.25);
+
+    pointer-events: none;
+    z-index: 999;
+}
+
+/* =========================================================
+   START WORK BUTTON IN MAIN ACTIONS
+========================================================= */
+
+.active-orders .start-main-button {
+    flex: 0 0 auto;
+
+    min-width: 94px;
+    width: auto;
+    height: 38px;
+    min-height: 38px;
+
+    padding: 0 11px;
+
+    border-radius: 999px;
+    border: 1px solid rgba(147, 197, 253, 0.58);
+
+    background:
+            radial-gradient(circle at 30% 16%, rgba(255, 255, 255, 1), transparent 34%),
+            linear-gradient(180deg, #ffffff 0%, #f8fbff 46%, #eef6ff 100%);
+
+    color: var(--ao-primary);
+
+    font-size: 12.5px;
+    line-height: 1;
+    font-weight: 900;
+    letter-spacing: -0.015em;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+
+    cursor: pointer;
+    user-select: none;
+
+    box-shadow:
+            0 10px 22px rgba(37, 99, 235, 0.12),
+            0 3px 8px rgba(15, 23, 42, 0.045),
+            inset 0 1px 0 rgba(255, 255, 255, 1);
+
+    transition:
+            transform 120ms ease,
+            background 150ms ease,
+            border-color 150ms ease,
+            box-shadow 150ms ease,
+            opacity 150ms ease;
+}
+
+.active-orders .start-main-button:active {
+    transform: scale(0.985);
+}
+
+.active-orders .start-main-button:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+    .active-orders .start-main-button {
+        width: auto !important;
+        min-width: 44px;
+        height: 44px;
+        min-height: 44px;
+
+        padding: 0 10px;
+
+        border-radius: 15px;
+
+        font-size: 0;
+        gap: 0;
+    }
+
+    .active-orders .start-main-button svg {
+        font-size: 16px;
+    }
+}

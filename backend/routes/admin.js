@@ -491,12 +491,13 @@ router.get('/orders', authMiddleware, adminMiddleware, async (req, res) => {
 
             const activeDispute =
                 disputes.find((d) =>
-                    ['open', 'in_review', 'waiting_creator', 'waiting_executor'].includes(d.status)
+                    ["open", "in_review", "waiting_creator", "waiting_executor"].includes(d.status)
                 ) || null;
 
             return {
                 ...plain,
                 activeDispute,
+                isHiddenByCreator: !!plain.creatorHidden,
             };
         });
 
@@ -507,15 +508,166 @@ router.get('/orders', authMiddleware, adminMiddleware, async (req, res) => {
     }
 });
 
-router.delete('/orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
+router.delete("/orders/:id", authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const order = await Order.findByPk(req.params.id);
-        if (!order) return res.status(404).json({ message: 'Заказ не найден' });
 
-        await order.destroy();
-        res.json({ message: 'Заказ удален' });
+        if (!order) {
+            await req.logAction?.({
+                req,
+                actorUserId: req.user?.id || null,
+                actorRole: "admin",
+                actionType: "admin_order_delete_failed",
+                entityType: "order",
+                entityId: Number(req.params.id),
+                orderId: Number(req.params.id),
+                severity: "warning",
+                success: false,
+                meta: {
+                    reason: "order_not_found",
+                },
+            });
+
+            return res.status(404).json({ message: "Заказ не найден" });
+        }
+
+        if (order.adminDeleted) {
+            return res.status(400).json({
+                message: "Заказ уже помечен как удалённый админом",
+            });
+        }
+
+        const before = {
+            status: order.status,
+            creatorHidden: order.creatorHidden,
+            creatorHiddenAt: order.creatorHiddenAt,
+            adminDeleted: order.adminDeleted,
+            adminDeletedAt: order.adminDeletedAt,
+            adminDeletedById: order.adminDeletedById,
+        };
+
+        order.adminDeleted = true;
+        order.adminDeletedAt = new Date();
+        order.adminDeletedById = req.user?.id || null;
+
+        await order.save();
+
+        await req.logAction?.({
+            req,
+            actorUserId: req.user?.id || null,
+            actorRole: "admin",
+            actionType: "admin_order_soft_deleted",
+            entityType: "order",
+            entityId: order.id,
+            orderId: order.id,
+            severity: "warning",
+            success: true,
+            meta: {
+                before,
+                after: {
+                    status: order.status,
+                    creatorHidden: order.creatorHidden,
+                    creatorHiddenAt: order.creatorHiddenAt,
+                    adminDeleted: order.adminDeleted,
+                    adminDeletedAt: order.adminDeletedAt,
+                    adminDeletedById: order.adminDeletedById,
+                },
+            },
+        });
+
+        req.app.get("io")?.emit("orderUpdated", {
+            orderId: order.id,
+            creatorId: order.creatorId,
+            action: "admin_soft_deleted",
+        });
+
+        res.json({
+            success: true,
+            message: "Заказ помечен как удалённый админом",
+            order,
+        });
     } catch (error) {
-        res.status(500).json({ message: 'Ошибка сервера' });
+        console.error("Ошибка удаления заказа админом:", error);
+
+        await req.logAction?.({
+            req,
+            actorUserId: req.user?.id || null,
+            actorRole: "admin",
+            actionType: "admin_order_delete_failed",
+            entityType: "order",
+            entityId: Number(req.params.id),
+            orderId: Number(req.params.id),
+            severity: "error",
+            success: false,
+            meta: {
+                error: String(error?.message || error),
+            },
+        });
+
+        res.status(500).json({ message: "Ошибка сервера" });
+    }
+});
+
+router.patch("/orders/:id/restore", authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const order = await Order.findByPk(req.params.id);
+
+        if (!order) {
+            return res.status(404).json({ message: "Заказ не найден" });
+        }
+
+        const before = {
+            creatorHidden: order.creatorHidden,
+            creatorHiddenAt: order.creatorHiddenAt,
+            adminDeleted: order.adminDeleted,
+            adminDeletedAt: order.adminDeletedAt,
+            adminDeletedById: order.adminDeletedById,
+        };
+
+        order.creatorHidden = false;
+        order.creatorHiddenAt = null;
+        order.adminDeleted = false;
+        order.adminDeletedAt = null;
+        order.adminDeletedById = null;
+
+        await order.save();
+
+        await req.logAction?.({
+            req,
+            actorUserId: req.user?.id || null,
+            actorRole: "admin",
+            actionType: "admin_order_restored",
+            entityType: "order",
+            entityId: order.id,
+            orderId: order.id,
+            severity: "info",
+            success: true,
+            meta: {
+                before,
+                after: {
+                    creatorHidden: order.creatorHidden,
+                    creatorHiddenAt: order.creatorHiddenAt,
+                    adminDeleted: order.adminDeleted,
+                    adminDeletedAt: order.adminDeletedAt,
+                    adminDeletedById: order.adminDeletedById,
+                },
+            },
+        });
+
+        req.app.get("io")?.emit("orderUpdated", {
+            orderId: order.id,
+            creatorId: order.creatorId,
+            action: "admin_restored",
+        });
+
+        res.json({
+            success: true,
+            message: "Заказ восстановлен",
+            order,
+        });
+    } catch (error) {
+        console.error("Ошибка восстановления заказа:", error);
+        res.status(500).json({ message: "Ошибка сервера" });
     }
 });
 

@@ -203,6 +203,38 @@ module.exports = (sequelize) => {
                 type: DataTypes.DATE,
                 allowNull: true,
             },
+            creatorHidden: {
+                type: DataTypes.BOOLEAN,
+                allowNull: false,
+                defaultValue: false,
+            },
+            creatorHiddenAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
+            adminDeleted: {
+
+                type: DataTypes.BOOLEAN,
+
+                allowNull: false,
+
+                defaultValue: false,
+
+            },
+            adminDeletedAt: {
+
+                type: DataTypes.DATE,
+
+                allowNull: true,
+
+            },
+            adminDeletedById: {
+
+                type: DataTypes.INTEGER,
+
+                allowNull: true,
+
+            },
         },
         {
             sequelize,

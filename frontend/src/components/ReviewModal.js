@@ -23,10 +23,16 @@ export default function ReviewModal({
 
     const handleSubmit = async () => {
         if (!canSubmit) return;
-        await onSubmit?.({ rating, text: text.trim() });
-        // закрываем и чистим
-        setRating(0);
-        setText("");
+
+        const success = await onSubmit?.({
+            rating,
+            text: text.trim(),
+        });
+
+        if (success) {
+            setRating(0);
+            setText("");
+        }
     };
 
     if (!isOpen) return null;

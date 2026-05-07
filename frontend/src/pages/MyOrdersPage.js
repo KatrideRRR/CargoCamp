@@ -33,6 +33,7 @@ const MyOrdersPage = () => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [currentImages, setCurrentImages] = useState([]);
 
+    const [deletingOrderId, setDeletingOrderId] = useState(null);
     const [approving, setApproving] = useState(false);
 
     // UI состояния
@@ -227,6 +228,43 @@ const MyOrdersPage = () => {
             alert(error.response?.data?.message || "Не удалось одобрить исполнителя");
         } finally {
             setApproving(false);
+        }
+    };
+
+    const hideMyOrder = async (order) => {
+        if (!order?.id) return;
+
+        if (order.kind === "express") {
+            alert("Экспресс-заказ лучше отменять, а не удалять. Для него нужна отдельная логика отмены.");
+            return;
+        }
+
+        const allowedStatuses = ["pending", "pending_payment"];
+
+        if (!allowedStatuses.includes(order.status)) {
+            alert("Этот заказ уже нельзя удалить, потому что он уже не в статусе ожидания.");
+            return;
+        }
+
+        const ok = window.confirm(
+            "Удалить заказ из списка? Он больше не будет отображаться в ваших заказах."
+        );
+
+        if (!ok) return;
+
+        try {
+            setDeletingOrderId(order.id);
+
+            await axiosInstance.patch(`/orders/${order.id}/hide-by-creator`);
+
+            setOrders((prev) =>
+                prev.filter((o) => !(o.kind === "regular" && Number(o.id) === Number(order.id)))
+            );
+        } catch (e) {
+            console.error("Ошибка удаления заказа:", e);
+            alert(e.response?.data?.message || "Не удалось удалить заказ");
+        } finally {
+            setDeletingOrderId(null);
         }
     };
 
@@ -440,6 +478,19 @@ const MyOrdersPage = () => {
         {getRouteOrAddress(order)}
     </span>
                                         </div>
+
+                                        {!isExpress && ["pending", "pending_payment"].includes(order.status) && (
+                                            <div className={styles.orderManageActions}>
+                                                <button
+                                                    type="button"
+                                                    className={styles.deleteOrderBtn}
+                                                    onClick={() => hideMyOrder(order)}
+                                                    disabled={deletingOrderId === order.id}
+                                                >
+                                                    {deletingOrderId === order.id ? "Удаляем..." : "Удалить заказ"}
+                                                </button>
+                                            </div>
+                                        )}
 
                                         {/* Images (compact) */}
                                         {hasImages ? (

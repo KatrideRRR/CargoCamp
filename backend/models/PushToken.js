@@ -17,7 +17,6 @@ module.exports = (sequelize, DataTypes) => {
             tokenHash: {
                 type: DataTypes.STRING(64),
                 allowNull: false,
-                field: "token_hash",
             },
 
             platform: {
@@ -29,38 +28,40 @@ module.exports = (sequelize, DataTypes) => {
             deviceId: {
                 type: DataTypes.STRING(255),
                 allowNull: true,
-                field: "device_id",
             },
 
             appVersion: {
-                type: DataTypes.STRING(50),
+                type: DataTypes.STRING(100),
                 allowNull: true,
-                field: "app_version",
             },
 
             isActive: {
                 type: DataTypes.BOOLEAN,
                 allowNull: false,
                 defaultValue: true,
-                field: "is_active",
             },
 
             lastSeenAt: {
                 type: DataTypes.DATE,
                 allowNull: true,
-                field: "last_seen_at",
             },
         },
         {
             tableName: "push_tokens",
             timestamps: true,
-            underscored: true,
             indexes: [
-                { fields: ["user_id"] },
-                { fields: ["platform"] },
                 {
+                    name: "push_tokens_user_id",
+                    fields: ["userId"],
+                },
+                {
+                    name: "push_tokens_platform",
+                    fields: ["platform"],
+                },
+                {
+                    name: "push_tokens_token_hash",
                     unique: true,
-                    fields: ["token_hash"],
+                    fields: ["tokenHash"],
                 },
             ],
         }

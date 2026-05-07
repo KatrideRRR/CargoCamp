@@ -1520,6 +1520,7 @@ module.exports = (io) => {
                 where: {
                     creatorId: userId,
                     status: ["pending", "pending_payment"],
+                    creatorHidden: false,
                 },  // Фильтруем заказы по ID создателя
                 order: [["createdAt", "DESC"]],
                 include: [
@@ -1780,6 +1781,131 @@ module.exports = (io) => {
         } catch (error) {
             console.error("Ошибка начала работы:", error);
             return res.status(500).json({ message: "Ошибка сервера" });
+        }
+    });
+
+    router.patch("/:orderId/hide-by-creator", authenticateToken, async (req, res) => {
+        try {
+            const { orderId } = req.params;
+            const actorUserId = req.user.id;
+
+            const order = await Order.findByPk(orderId);
+
+            if (!order) {
+                return res.status(404).json({ message: "Заказ не найден" });
+            }
+
+            if (Number(order.creatorId) !== Number(actorUserId)) {
+                await req.logAction?.({
+                    req,
+                    actorUserId,
+                    actorRole: "user",
+                    actionType: "order_hide_denied",
+                    entityType: "order",
+                    entityId: order.id,
+                    orderId: order.id,
+                    severity: "warning",
+                    success: false,
+                    meta: {
+                        reason: "not_creator",
+                        creatorId: order.creatorId,
+                        actorUserId,
+                    },
+                });
+
+                return res.status(403).json({
+                    message: "Можно удалить только свой заказ",
+                });
+            }
+
+            const allowedStatuses = ["pending", "pending_payment"];
+
+            if (!allowedStatuses.includes(order.status)) {
+                await req.logAction?.({
+                    req,
+                    actorUserId,
+                    actorRole: "user",
+                    actionType: "order_hide_denied",
+                    entityType: "order",
+                    entityId: order.id,
+                    orderId: order.id,
+                    severity: "warning",
+                    success: false,
+                    meta: {
+                        reason: "status_not_allowed",
+                        status: order.status,
+                        allowedStatuses,
+                    },
+                });
+
+                return res.status(400).json({
+                    message: "Этот заказ уже нельзя удалить. Его можно скрыть только до начала выполнения.",
+                });
+            }
+
+            const before = {
+                status: order.status,
+                creatorHidden: order.creatorHidden,
+                creatorHiddenAt: order.creatorHiddenAt,
+            };
+
+            order.creatorHidden = true;
+            order.creatorHiddenAt = new Date();
+
+            await order.save();
+
+            await req.logAction?.({
+                req,
+                actorUserId,
+                actorRole: "user",
+                actionType: "order_hidden_by_creator",
+                entityType: "order",
+                entityId: order.id,
+                orderId: order.id,
+                severity: "info",
+                success: true,
+                meta: {
+                    before,
+                    after: {
+                        status: order.status,
+                        creatorHidden: order.creatorHidden,
+                        creatorHiddenAt: order.creatorHiddenAt,
+                    },
+                },
+            });
+
+            req.app.get("io")?.emit("orderUpdated", {
+                orderId: order.id,
+                creatorId: order.creatorId,
+                action: "hidden_by_creator",
+            });
+
+            return res.json({
+                success: true,
+                message: "Заказ удалён из видимости",
+                orderId: order.id,
+            });
+        } catch (error) {
+            console.error("Ошибка скрытия заказа:", error);
+
+            await req.logAction?.({
+                req,
+                actorUserId: req.user?.id || null,
+                actorRole: "user",
+                actionType: "order_hide_failed",
+                entityType: "order",
+                entityId: req.params.orderId || null,
+                orderId: req.params.orderId || null,
+                severity: "error",
+                success: false,
+                meta: {
+                    error: String(error?.message || error),
+                },
+            });
+
+            return res.status(500).json({
+                message: "Ошибка при удалении заказа",
+            });
         }
     });
 

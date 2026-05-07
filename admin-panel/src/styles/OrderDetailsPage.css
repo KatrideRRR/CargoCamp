@@ -548,3 +548,73 @@ body {
         margin-left: 0;
     }
 }
+
+.visibility-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 32px;
+    padding: 6px 10px;
+
+    border-radius: 999px;
+
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+    width: fit-content;
+}
+
+.visibility-badge.visible {
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.visibility-badge.creator-hidden {
+    background: #fffbeb;
+    color: #92400e;
+}
+
+.visibility-badge.admin-deleted {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.restore-button {
+    border: none;
+    border-radius: 12px;
+    min-height: 42px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+
+    background: #16a34a;
+    color: #ffffff;
+
+    transition: all 0.2s ease;
+}
+
+.restore-button:hover {
+    background: #15803d;
+    transform: translateY(-1px);
+}
+
+.restore-button:active {
+    transform: translateY(0);
+}
+
+.restore-button:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    transform: none;
+}
+
+@media (max-width: 768px) {
+    .restore-button {
+        width: 100%;
+        font-size: 13px;
+        min-height: 40px;
+    }
+}
