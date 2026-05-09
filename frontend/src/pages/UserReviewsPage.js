@@ -31,27 +31,52 @@ const UserReviewsPage = () => {
         return sum / list.length;
     }, [reviews]);
 
-    useEffect(() => {
-        const run = async () => {
-            try {
+    const fetchReviewsData = async ({ silent = false } = {}) => {
+        try {
+            if (!silent) {
                 setLoading(true);
-                setError(null);
+            }
 
-                const [uRes, rRes] = await Promise.all([
-                    axiosInstance.get(`/auth/user/${userId}`),
-                    axiosInstance.get(`/auth/reviews/user/${userId}`),
-                ]);
+            setError(null);
 
-                setUser(uRes.data);
-                setReviews(rRes.data?.reviews || []);
-            } catch (err) {
-                setError(err.response?.data?.message || "Ошибка загрузки данных");
-            } finally {
+            const [uRes, rRes] = await Promise.all([
+                axiosInstance.get(`/auth/user/${userId}`),
+                axiosInstance.get(`/auth/reviews/user/${userId}`),
+            ]);
+
+            setUser(uRes.data);
+            setReviews(rRes.data?.reviews || []);
+        } catch (err) {
+            setError(err.response?.data?.message || "Ошибка загрузки данных");
+        } finally {
+            if (!silent) {
                 setLoading(false);
+            }
+        }
+    };
+
+    useEffect(() => {
+        fetchReviewsData();
+
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userId]);
+
+    useEffect(() => {
+        const onPullToRefresh = async (e) => {
+            try {
+                await fetchReviewsData({ silent: true });
+            } finally {
+                e.detail?.done?.();
             }
         };
 
-        run();
+        window.addEventListener("appPullToRefresh", onPullToRefresh);
+
+        return () => {
+            window.removeEventListener("appPullToRefresh", onPullToRefresh);
+        };
+
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userId]);
 
     if (loading) return <div className="reviewsPageState">Загрузка...</div>;

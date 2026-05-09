@@ -170,36 +170,6 @@ const MyOrdersPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.search]);
 
-    useEffect(() => {
-        fetchOrders();
-
-        const checkAuthUser = async () => {
-            try {
-                const token = localStorage.getItem("authToken");
-                const profileResponse = await axiosInstance.get("/auth/profile", {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-
-                if (profileResponse.data.id !== Number(userId)) {
-                    navigate("/");
-                    return;
-                }
-
-            } catch (err) {
-                console.error("Ошибка проверки пользователя:", err);
-                navigate("/login");
-            }
-        };
-
-        checkAuthUser();
-
-        socket.on("orderUpdated", fetchOrders);
-
-        return () => {
-            socket.off("orderUpdated", fetchOrders);
-        };
-    }, [userId, navigate, setHasNewRequests]);
-
     const approveExecutor = async (orderId, executorId) => {
         if (approving) return;
         setApproving(true);
@@ -316,6 +286,24 @@ const MyOrdersPage = () => {
                 return <FaQuestionCircle title="Неизвестно" />;
         }
     };
+
+    // --- pull to refresh ---
+    useEffect(() => {
+        const onPullToRefresh = async (e) => {
+            try {
+                await fetchOrders();
+            } finally {
+                e.detail?.done?.();
+            }
+        };
+
+        window.addEventListener("appPullToRefresh", onPullToRefresh);
+
+        return () => {
+            window.removeEventListener("appPullToRefresh", onPullToRefresh);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userId]);
 
     const openModal = (images) => {
         setCurrentImages(images || []);

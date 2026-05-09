@@ -137,10 +137,13 @@ const ChatPage = () => {
         };
     }, [currentUser?.id, orderId, orderType]);
 
-    useEffect(() => {
-        const fetchData = async () => {
+    const fetchChatData = useCallback(
+        async ({ silent = false } = {}) => {
             try {
-                setLoading(true);
+                if (!silent) {
+                    setLoading(true);
+                }
+
                 setError("");
 
                 const orderEndpoint =
@@ -203,14 +206,19 @@ const ChatPage = () => {
 
                 setError("Не удалось загрузить данные чата.");
             } finally {
-                setLoading(false);
+                if (!silent) {
+                    setLoading(false);
+                }
             }
-        };
+        },
+        [orderId, orderType, currentUser?.id, scrollToBottom]
+    );
 
+    useEffect(() => {
         if (orderId && currentUser?.id) {
-            fetchData();
+            fetchChatData();
         }
-    }, [orderId, orderType, currentUser?.id, scrollToBottom]);
+    }, [orderId, currentUser?.id, fetchChatData]);
 
     const handleSendMessage = useCallback(async () => {
         if (!newMessage.trim() || !currentUser || !orderId || !selectedUser) return;
@@ -444,6 +452,26 @@ const ChatPage = () => {
             };
         });
     }, [messages]);
+
+    useEffect(() => {
+        const onPullToRefresh = async (e) => {
+            try {
+                if (messagesContainerRef.current && messagesContainerRef.current.scrollTop > 20) {
+                    return;
+                }
+
+                await fetchChatData({ silent: true });
+            } finally {
+                e.detail?.done?.();
+            }
+        };
+
+        window.addEventListener("appPullToRefresh", onPullToRefresh);
+
+        return () => {
+            window.removeEventListener("appPullToRefresh", onPullToRefresh);
+        };
+    }, [fetchChatData]);
 
     if (loading) {
         return (

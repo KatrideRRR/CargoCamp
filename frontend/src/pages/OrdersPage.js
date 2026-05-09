@@ -198,36 +198,39 @@ const OrdersPage = () => {
             .catch(() => setCategories([]));
     }, []);
 
-    useEffect(() => {
-        const fetchProfile = async () => {
-            try {
-                const res = await axiosInstance.get("/auth/profile");
-                setProfile(res.data);
-                setUserId(res.data?.id || null);
-            } catch {
-                console.info("OrdersPage: profile not loaded (maybe not logged in).");
-            }
-        };
-
-        fetchProfile();
+    const fetchProfile = useCallback(async () => {
+        try {
+            const res = await axiosInstance.get("/auth/profile");
+            setProfile(res.data);
+            setUserId(res.data?.id || null);
+        } catch {
+            console.info("OrdersPage: profile not loaded (maybe not logged in).");
+        }
     }, []);
 
     useEffect(() => {
-        const fetchOrders = async () => {
-            try {
-                const res = await axiosInstance.get("/orders/all");
-                setOrdersRaw(res.data || []);
-            } catch (e) {
-                console.error(e);
-                toast.error("Не удалось загрузить заказы");
-            }
-        };
+        fetchProfile();
+    }, [fetchProfile]);
 
+    const fetchOrders = useCallback(async () => {
+        try {
+            const res = await axiosInstance.get("/orders/all");
+            setOrdersRaw(res.data || []);
+        } catch (e) {
+            console.error(e);
+            toast.error("Не удалось загрузить заказы");
+        }
+    }, []);
+
+    useEffect(() => {
         fetchOrders();
+
         socket.on("orderUpdated", fetchOrders);
 
-        return () => socket.off("orderUpdated", fetchOrders);
-    }, []);
+        return () => {
+            socket.off("orderUpdated", fetchOrders);
+        };
+    }, [fetchOrders]);
 
     const fetchExpress = useCallback(async () => {
         try {
@@ -916,6 +919,28 @@ const OrdersPage = () => {
             setRequestSubmitting(false);
         }
     };
+
+    // --- pull to refresh ---
+    useEffect(() => {
+        const onPullToRefresh = async (e) => {
+            try {
+                await Promise.allSettled([
+                    fetchProfile(),
+                    fetchOrders(),
+                    fetchExpress(),
+                    fetchBusyState(),
+                ]);
+            } finally {
+                e.detail?.done?.();
+            }
+        };
+
+        window.addEventListener("appPullToRefresh", onPullToRefresh);
+
+        return () => {
+            window.removeEventListener("appPullToRefresh", onPullToRefresh);
+        };
+    }, [fetchProfile, fetchOrders, fetchExpress, fetchBusyState]);
 
     return (
         <div className={`orders-page orders-page--${platform}`}>

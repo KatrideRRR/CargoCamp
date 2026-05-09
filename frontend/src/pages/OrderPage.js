@@ -37,34 +37,56 @@ const OrderPage = () => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);  // Индекс текущего изображения
     const [currentImages, setCurrentImages] = useState([]);  // Массив изображений для отображения
 
+    const fetchOrderData = async () => {
+        try {
+            setError(null);
+
+            const response = await axiosInstance.get(`/orders/${id}`);
+            setOrder(response.data);
+
+            const userResponse = await axiosInstance.get(`/auth/${response.data.creatorId}`);
+            setCreator(userResponse.data);
+        } catch (err) {
+            setError(err.response?.data?.message || "Ошибка загрузки заказа");
+        }
+    };
+
+    const fetchUserData = async () => {
+        try {
+            const response = await axiosInstance.get("/auth/profile");
+            setUserId(response.data.id);
+        } catch (err) {
+            console.error("❌ Ошибка получения профиля:", err);
+        }
+    };
+
     useEffect(() => {
-        const fetchOrder = async () => {
-            try {
-                const response = await axiosInstance.get(`/orders/${id}`);
-                setOrder(response.data);
-                console.log(response);
-
-                // Загружаем данные о создателе заказа
-                const userResponse = await axiosInstance.get(`/auth/${response.data.creatorId}`);
-                setCreator(userResponse.data);
-            } catch (err) {
-                setError(err.response?.data?.message || 'Ошибка загрузки заказа');
-            }
-        };
-        const fetchUserData = async () => {
-            try {
-                const response = await axiosInstance.get('/auth/profile');
-                console.log("👤 Данные пользователя:", response.data);
-                setUserId(response.data.id);
-            } catch (err) {
-                console.error("❌ Ошибка получения профиля:", err);
-            }
-        };
-
-        fetchOrder();
+        fetchOrderData();
         fetchUserData();
 
-    }, [userId, id]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id]);
+
+    useEffect(() => {
+        const onPullToRefresh = async (e) => {
+            try {
+                await Promise.allSettled([
+                    fetchOrderData(),
+                    fetchUserData(),
+                ]);
+            } finally {
+                e.detail?.done?.();
+            }
+        };
+
+        window.addEventListener("appPullToRefresh", onPullToRefresh);
+
+        return () => {
+            window.removeEventListener("appPullToRefresh", onPullToRefresh);
+        };
+
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id]);
 
     const openModal = (images) => {
         setCurrentImages(images);

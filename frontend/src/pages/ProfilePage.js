@@ -832,6 +832,31 @@ const ProfilePage = () => {
         }
     };
 
+    useEffect(() => {
+        const onPullToRefresh = async (e) => {
+            try {
+                await Promise.allSettled([
+                    fetchProfileData(),
+                    loadDebtStatus(),
+                    axios
+                        .get(`${apiUrl}/api/category`)
+                        .then((res) => setCategories(res.data || []))
+                        .catch(() => setCategories([])),
+                ]);
+            } finally {
+                e.detail?.done?.();
+            }
+        };
+
+        window.addEventListener("appPullToRefresh", onPullToRefresh);
+
+        return () => {
+            window.removeEventListener("appPullToRefresh", onPullToRefresh);
+        };
+
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     if (loading) {
         return (
             <div className="profile-loading">

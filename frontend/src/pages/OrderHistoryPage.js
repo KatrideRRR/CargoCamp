@@ -107,6 +107,29 @@ const OrderHistoryPage = () => {
         }
     };
 
+    useEffect(() => {
+        const onPullToRefresh = async (e) => {
+            try {
+                setError(null);
+
+                await Promise.allSettled([
+                    fetchCompletedOrders(),
+                    fetchMyReviews(),
+                ]);
+            } finally {
+                e.detail?.done?.();
+            }
+        };
+
+        window.addEventListener("appPullToRefresh", onPullToRefresh);
+
+        return () => {
+            window.removeEventListener("appPullToRefresh", onPullToRefresh);
+        };
+
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userId]);
+
     const sortedOrders = useMemo(() => [...orders].reverse(), [orders]);
 
     if (loading) return <div className="oh-state">Загрузка истории заказов…</div>;

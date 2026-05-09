@@ -658,6 +658,27 @@ const ActiveOrdersPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [navigate, user?.id, token]);
 
+    // --- pull to refresh ---
+    useEffect(() => {
+        const onPullToRefresh = async (e) => {
+            try {
+                await Promise.allSettled([
+                    fetchActiveOrders(),
+                    fetchExpressOrders(),
+                ]);
+            } finally {
+                e.detail?.done?.();
+            }
+        };
+
+        window.addEventListener("appPullToRefresh", onPullToRefresh);
+
+        return () => {
+            window.removeEventListener("appPullToRefresh", onPullToRefresh);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.id, removedOrders]);
+
     if (!user || !user.id) return <p>Загрузка...</p>;
     if (error) return <div className="error-message">{error}</div>;
 

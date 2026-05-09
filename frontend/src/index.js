@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-route
 import Modal from "react-modal";
 import { useAuth } from "./utils/authContext";
 import { initPushNotifications } from "./utils/pushNotifications";
-
+import PullToRefresh from "./components/PullToRefresh";
 import { socket } from "./socketClient";
 
 import { AuthProvider } from "./utils/authContext";
@@ -99,6 +99,7 @@ function App() {
         <ModalProvider>
             <AuthProvider>
                 <SocketBootstrap />
+                <PullToRefresh />
                 <UserProvider>
                     <Suspense
                         fallback={
