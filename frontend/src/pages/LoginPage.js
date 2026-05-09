@@ -110,7 +110,10 @@ const LoginPage = () => {
 
         setBusy(true);
         try {
-            await axios.post(`${apiUrl}/api/auth/send-sms`, { phone: phoneDigits });
+            await axios.post(`${apiUrl}/api/auth/send-sms`, {
+                phone: phoneDigits,
+                purpose: "login",
+            });
             setIsSmsSent(true);
             setMessage("Код отправлен на ваш номер");
         } catch (err) {
@@ -158,7 +161,10 @@ const LoginPage = () => {
         setBusy(true);
         try {
             // можно тот же /send-sms, но на бэке желательно другой текст сообщения (не критично)
-            await axios.post(`${apiUrl}/api/auth/send-sms`, { phone: phoneDigits });
+            await axios.post(`${apiUrl}/api/auth/send-sms`, {
+                phone: phoneDigits,
+                purpose: "password_reset",
+            });
             setResetSent(true);
             setMessage("Код для сброса отправлен на ваш номер");
         } catch (err) {

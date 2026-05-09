@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -19,6 +19,8 @@ const RegisterPage = () => {
     const [isSmsSent, setIsSmsSent] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isAgreementChecked, setIsAgreementChecked] = useState(false);
+    const [smsCooldown, setSmsCooldown] = useState(0);
+    const [smsLoading, setSmsLoading] = useState(false);
 
     const navigate = useNavigate();
 
@@ -38,28 +40,64 @@ const RegisterPage = () => {
         return "web";
     }, []);
 
+    useEffect(() => {
+        if (smsCooldown <= 0) return;
+
+        const timer = setInterval(() => {
+            setSmsCooldown((prev) => Math.max(0, prev - 1));
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [smsCooldown]);
+
     const handleCaptchaChange = (value) => setCaptchaValue(value);
     const handleOpenModal = () => setIsModalOpen(true);
     const handleCloseModal = () => setIsModalOpen(false);
     const handleCheckboxChange = () => setIsAgreementChecked(!isAgreementChecked);
 
     const sendSmsCode = async () => {
+        if (smsLoading || smsCooldown > 0) return;
+
+        setError("");
+
+        if (!phone || phone.replace(/\D/g, "").length < 11) {
+            setError("Введите корректный номер телефона");
+            return;
+        }
+
+        if (!captchaValue) {
+            setError("Подтвердите reCAPTCHA");
+            return;
+        }
+
         try {
-            await axios.post(`${apiUrl}/api/auth/send-sms`, {
+            setSmsLoading(true);
+
+            const res = await axios.post(`${apiUrl}/api/auth/send-sms`, {
                 phone,
                 captchaToken: captchaValue,
                 purpose: "register",
             });
+
             setIsSmsSent(true);
+            setSmsCooldown(Number(res.data?.cooldownSec || 60));
+
             alert("Код подтверждения отправлен на ваш номер");
         } catch (err) {
             console.error("Ошибка отправки SMS:", err);
 
-            if (err.response?.status === 429 && err.response?.data?.waitSec) {
-                setSmsCooldown(err.response.data.waitSec);
+            const waitSec = Number(err.response?.data?.waitSec || 0);
+            if (waitSec > 0) {
+                setSmsCooldown(waitSec);
             }
 
-            setError(err.response?.data?.message || "Ошибка отправки SMS");
+            setError(
+                err.response?.data?.message ||
+                err.response?.data?.error ||
+                "Ошибка отправки SMS"
+            );
+        } finally {
+            setSmsLoading(false);
         }
     };
 
@@ -77,7 +115,6 @@ const RegisterPage = () => {
                 phone,
                 password,
                 smsCode,
-                captchaToken: captchaValue,
             });
 
             const { token } = response.data;
@@ -85,7 +122,13 @@ const RegisterPage = () => {
             alert("Пользователь успешно создан");
             navigate("/profile");
         } catch (err) {
-            setError(err.response?.data?.message || "Ошибка регистрации");
+            console.error("Ошибка регистрации:", err.response?.data || err);
+
+            setError(
+                err.response?.data?.message ||
+                err.response?.data?.error ||
+                "Ошибка регистрации"
+            );
         }
     };
 
@@ -189,10 +232,14 @@ const RegisterPage = () => {
                                 type="button"
                                 className="btn btn-primary"
                                 onClick={sendSmsCode}
-                                disabled={!captchaValue}
+                                disabled={!captchaValue || smsLoading || smsCooldown > 0}
                                 title={!captchaValue ? "Подтвердите reCAPTCHA" : ""}
                             >
-                                Получить код
+                                {smsLoading
+                                    ? "Отправляем..."
+                                    : smsCooldown > 0
+                                        ? `Повторно через ${smsCooldown} сек.`
+                                        : "Получить код"}
                             </button>
                         ) : (
                             <>
@@ -208,9 +255,32 @@ const RegisterPage = () => {
                                     />
                                 </div>
 
-                                <button type="submit" className="btn btn-primary" disabled={!captchaValue}>
-                                    Зарегистрироваться
-                                </button>
+                                <div className="smsActions">
+                                    <button
+                                        type="button"
+                                        className="btn btn-ghost"
+                                        onClick={sendSmsCode}
+                                        disabled={!captchaValue || smsLoading || smsCooldown > 0}
+                                    >
+                                        {smsLoading
+                                            ? "Отправляем..."
+                                            : smsCooldown > 0
+                                                ? `Отправить ещё раз через ${smsCooldown} сек.`
+                                                : "Отправить код ещё раз"}
+                                    </button>
+
+                                    <button
+                                        type="submit"
+                                        className="btn btn-primary"
+                                        disabled={!captchaValue || !smsCode.trim()}
+                                    >
+                                        Зарегистрироваться
+                                    </button>
+                                </div>
+
+                                <div className="register-hint">
+                                    Если номер указан неверно, исправьте его выше и нажмите «Отправить код ещё раз».
+                                </div>
                             </>
                         )}
                     </form>

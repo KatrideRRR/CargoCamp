@@ -619,3 +619,22 @@
         transition: none !important;
     }
 }
+
+.smsActions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+.register-hint {
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.72);
+}
+
+@media (min-width: 520px) {
+    .smsActions {
+        grid-template-columns: 1fr 1fr;
+    }
+}

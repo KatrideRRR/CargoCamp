@@ -199,29 +199,31 @@ router.post("/send-sms", async (req, res) => {
         return res.status(404).json({ message: "Пользователь не найден" });
     }
 
-    if (!captchaToken) {
-        return res.status(400).json({ message: "Капча не пройдена" });
-    }
-
-    try {
-        const captchaResponse = await axios.post(
-            "https://www.google.com/recaptcha/api/siteverify",
-            null,
-            {
-                params: {
-                    secret: SECRET_KEY,
-                    response: captchaToken,
-                },
-                timeout: 10000,
-            }
-        );
-
-        if (!captchaResponse.data?.success) {
-            return res.status(400).json({ message: "Ошибка капчи" });
+    if (purpose === "register") {
+        if (!captchaToken) {
+            return res.status(400).json({ message: "Капча не пройдена" });
         }
-    } catch (error) {
-        console.error("Ошибка проверки reCAPTCHA при отправке SMS:", error?.message);
-        return res.status(500).json({ message: "Ошибка проверки капчи" });
+
+        try {
+            const captchaResponse = await axios.post(
+                "https://www.google.com/recaptcha/api/siteverify",
+                null,
+                {
+                    params: {
+                        secret: SECRET_KEY,
+                        response: captchaToken,
+                    },
+                    timeout: 10000,
+                }
+            );
+
+            if (!captchaResponse.data?.success) {
+                return res.status(400).json({ message: "Ошибка капчи" });
+            }
+        } catch (error) {
+            console.error("Ошибка проверки reCAPTCHA при отправке SMS:", error?.message);
+            return res.status(500).json({ message: "Ошибка проверки капчи" });
+        }
     }
 
     const now = Date.now();
@@ -359,7 +361,7 @@ router.post('/upload-documents', authenticateToken, upload.array('documents', 5)
 });
 
 router.post('/register', async (req, res) => {
-    const { username, phone, password, captchaToken, smsCode } = req.body;
+    const { username, phone, password, smsCode } = req.body;
 
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 дней
@@ -369,8 +371,6 @@ router.post('/register', async (req, res) => {
 
     const entry = smsCodes.get(phoneKey); // {code, expiresAt} | undefined
     const codeSaved = String(entry?.code || "").trim();
-
-    if (!captchaToken) return res.status(400).json({ error: "Капча не пройдена" });
 
     // ✅ проверка что код есть
     if (!entry) return res.status(400).json({ message: "Неверный код" });
@@ -395,28 +395,6 @@ router.post('/register', async (req, res) => {
         smsCodes.set(phoneKey, entry);
 
         return res.status(400).json({ message: "Неверный код" });
-    }
-
-    try {
-        // Проверка reCAPTCHA
-        const response = await axios.post(
-            `https://www.google.com/recaptcha/api/siteverify`,
-            null,
-            {
-                params: {
-                    secret: SECRET_KEY,
-                    response: captchaToken
-                }
-            }
-        );
-
-        if (!response.data.success) {
-            return res.status(400).json({ error: "Ошибка капчи" });
-        }
-
-    } catch (error) {
-        console.error("Ошибка запроса к Google reCAPTCHA:", error);
-        return res.status(500).json({ error: "Ошибка проверки капчи" });
     }
 
     try {
