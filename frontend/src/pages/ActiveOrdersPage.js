@@ -947,6 +947,22 @@ const ActiveOrdersPage = () => {
                                                             <strong>Описание:</strong> {order.description}
                                                         </p>
 
+                                                        {order.contractPath && (
+                                                            <div className="contract-download-row">
+                                                                <a
+                                                                    href={`${apiUrl}/${String(order.contractPath).replace(/\\/g, "/")}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="contract-download-button"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                >
+                                                                    <span className="contract-download-icon">📄</span>
+                                                                    <span className="contract-download-text">Скачать договор</span>
+                                                                    <span className="contract-download-format">PDF</span>
+                                                                </a>
+                                                            </div>
+                                                        )}
+
                                                         <div className="photo-protocol-section">
                                                             <h4 className="photo-protocol-title">Фото-протокол заказа</h4>
 
@@ -1058,20 +1074,6 @@ const ActiveOrdersPage = () => {
                                                                 </>
                                                             ) : null}
                                                         </div>
-
-                                                        {order.contractPath && (
-                                                            <div className="mt-2">
-                                                                <a
-                                                                    href={`${apiUrl}/${String(order.contractPath).replace(/\\/g, "/")}`}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="text-blue-600 underline hover:text-blue-800 transition"
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                >
-                                                                    Скачать договор (PDF)
-                                                                </a>
-                                                            </div>
-                                                        )}
                                                     </div>
                                             </li>
                                         );

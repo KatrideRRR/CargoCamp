@@ -3528,3 +3528,103 @@ body {
         font-size: 16px;
     }
 }
+
+/* =========================================================
+   CONTRACT DOWNLOAD BUTTON
+========================================================= */
+
+.active-orders .contract-download-row {
+    margin: 12px 0 4px;
+    display: flex;
+    justify-content: flex-start;
+}
+
+.active-orders .contract-download-button {
+    text-decoration: none;
+
+    min-height: 42px;
+    padding: 0 12px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    border-radius: 999px;
+
+    background:
+            radial-gradient(circle at 30% 16%, rgba(255, 255, 255, 1), transparent 34%),
+            linear-gradient(180deg, #ffffff 0%, #f8fbff 46%, #eef6ff 100%);
+
+    border: 1px solid rgba(147, 197, 253, 0.58);
+
+    color: var(--ao-primary, #2563eb);
+
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 950;
+    letter-spacing: -0.015em;
+
+    box-shadow:
+            0 10px 22px rgba(37, 99, 235, 0.10),
+            0 3px 8px rgba(15, 23, 42, 0.045),
+            inset 0 1px 0 rgba(255, 255, 255, 1);
+
+    transition:
+            transform 120ms ease,
+            background 150ms ease,
+            border-color 150ms ease,
+            box-shadow 150ms ease;
+}
+
+.active-orders .contract-download-button:hover {
+    transform: translateY(-1px);
+    border-color: rgba(96, 165, 250, 0.72);
+    box-shadow:
+            0 12px 26px rgba(37, 99, 235, 0.14),
+            0 4px 10px rgba(15, 23, 42, 0.055),
+            inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+.active-orders .contract-download-button:active {
+    transform: scale(0.985);
+}
+
+.active-orders .contract-download-icon {
+    font-size: 15px;
+    line-height: 1;
+}
+
+.active-orders .contract-download-text {
+    white-space: nowrap;
+}
+
+.active-orders .contract-download-format {
+    min-height: 24px;
+    padding: 0 7px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 999px;
+
+    background: rgba(37, 99, 235, 0.10);
+    border: 1px solid rgba(147, 197, 253, 0.38);
+
+    color: rgba(30, 64, 175, 0.98);
+
+    font-size: 11px;
+    font-weight: 950;
+}
+
+@media (max-width: 768px) {
+    .active-orders .contract-download-row {
+        justify-content: stretch;
+    }
+
+    .active-orders .contract-download-button {
+        width: 100%;
+        min-height: 44px;
+    }
+}
