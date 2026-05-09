@@ -112,6 +112,12 @@ const OrdersPage = () => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [currentImages, setCurrentImages] = useState([]);
 
+    const [requestModalOpen, setRequestModalOpen] = useState(false);
+    const [requestOrder, setRequestOrder] = useState(null);
+    const [requestSum, setRequestSum] = useState("");
+    const [requestComment, setRequestComment] = useState("");
+    const [requestSubmitting, setRequestSubmitting] = useState(false);
+
     const { openDebtModal } = useContext(ModalContext);
     const creatorsCacheRef = useRef({});
 
@@ -820,6 +826,97 @@ const OrdersPage = () => {
         };
     }, [submitRegularOrderRequest]);
 
+    const openRequestModal = (order) => {
+        setRequestOrder(order);
+        setRequestSum("");
+        setRequestComment("");
+        setRequestModalOpen(true);
+    };
+
+    const closeRequestModal = () => {
+        if (requestSubmitting) return;
+
+        setRequestModalOpen(false);
+        setRequestOrder(null);
+        setRequestSum("");
+        setRequestComment("");
+    };
+
+    const handleRequestSumChange = (e) => {
+        const onlyDigits = e.target.value.replace(/\D/g, "");
+        setRequestSum(onlyDigits);
+    };
+
+    const submitRequestFromModal = async () => {
+        if (!requestOrder?.id) {
+            toast.error("Заказ не выбран");
+            return;
+        }
+
+        const token = localStorage.getItem("authToken");
+
+        if (!token) {
+            toast.info("Войдите, чтобы запросить выполнение");
+            navigate("/login");
+            return;
+        }
+
+        if (busyState.hasAnyBusy) {
+            toast.info(busyHintText);
+            return;
+        }
+
+        const normalizedSum = Number(requestSum);
+
+        if (!Number.isFinite(normalizedSum) || normalizedSum <= 0) {
+            toast.error("Введите сумму цифрами");
+            return;
+        }
+
+        try {
+            setRequestSubmitting(true);
+
+            const statusRes = await axiosInstance.get("/orders/me/status", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            const debt = Number(statusRes.data?.debt || 0);
+
+            if (debt > 0) {
+                savePendingOrderRequest({
+                    orderId: requestOrder.id,
+                    proposedSum: normalizedSum,
+                    comment: requestComment.trim(),
+                });
+
+                closeRequestModal();
+
+                openDebtModal({
+                    title: "Есть задолженность по комиссии",
+                    description:
+                        "Чтобы отправить запрос на этот заказ, сначала оплатите задолженность. После оплаты запрос отправится автоматически.",
+                    amount: debt,
+                    returnPath: "/orders?debtReturn=1&resumeRequest=1",
+                });
+
+                return;
+            }
+
+            await submitRegularOrderRequest({
+                orderId: requestOrder.id,
+                proposedSum: normalizedSum,
+                comment: requestComment.trim(),
+            });
+
+            closeRequestModal();
+        } catch (e) {
+            console.error(e);
+            toast.error(e.response?.data?.message || "Ошибка. Попробуйте позже.");
+        } finally {
+            setRequestSubmitting(false);
+        }
+    };
+
     return (
         <div className={`orders-page orders-page--${platform}`}>
             <div className="orders-shell">
@@ -1071,7 +1168,7 @@ const OrdersPage = () => {
                                                             className="btn btn-primary"
                                                             disabled={busyState.loading || busyState.hasAnyBusy}
                                                             title={busyState.hasAnyBusy ? busyHintText : ""}
-                                                            onClick={async () => {
+                                                            onClick={() => {
                                                                 const token = localStorage.getItem("authToken");
 
                                                                 if (!token) {
@@ -1085,52 +1182,7 @@ const OrdersPage = () => {
                                                                     return;
                                                                 }
 
-                                                                try {
-                                                                    const proposedSum = prompt("Введите сумму, которую вы хотите получить за выполнение:");
-                                                                    if (!proposedSum) return;
-
-                                                                    const normalizedSum = Number(String(proposedSum).replace(",", ".").trim());
-
-                                                                    if (!Number.isFinite(normalizedSum) || normalizedSum <= 0) {
-                                                                        toast.error("Введите корректную сумму");
-                                                                        return;
-                                                                    }
-
-                                                                    const comment = prompt("Комментарий к заказчику (необязательно):") || "";
-
-                                                                    const statusRes = await axiosInstance.get("/orders/me/status", {
-                                                                        headers: { Authorization: `Bearer ${token}` },
-                                                                    });
-
-                                                                    const debt = Number(statusRes.data?.debt || 0);
-
-                                                                    if (debt > 0) {
-                                                                        savePendingOrderRequest({
-                                                                            orderId: order.id,
-                                                                            proposedSum: normalizedSum,
-                                                                            comment,
-                                                                        });
-
-                                                                        openDebtModal({
-                                                                            title: "Есть задолженность по комиссии",
-                                                                            description:
-                                                                                "Чтобы отправить запрос на этот заказ, сначала оплатите задолженность. После оплаты запрос отправится автоматически.",
-                                                                            amount: debt,
-                                                                            returnPath: "/orders?debtReturn=1&resumeRequest=1",
-                                                                        });
-
-                                                                        return;
-                                                                    }
-
-                                                                    await submitRegularOrderRequest({
-                                                                        orderId: order.id,
-                                                                        proposedSum: normalizedSum,
-                                                                        comment,
-                                                                    });
-                                                                } catch (e) {
-                                                                    console.error(e);
-                                                                    toast.error(e.response?.data?.message || "Ошибка. Попробуйте позже.");
-                                                                }
+                                                                openRequestModal(order);
                                                             }}
                                                         >
                                                             {busyState.loading ? "Проверка..." : "Запросить выполнение"}
@@ -1435,6 +1487,80 @@ const OrdersPage = () => {
                         setLocationMenuOpen(false);
                     }}
                 />
+
+                <Modal
+                    appElement={document.getElementById("root")}
+                    isOpen={requestModalOpen}
+                    onRequestClose={closeRequestModal}
+                    contentLabel="Запросить выполнение"
+                    className="request-order-modal"
+                    overlayClassName="request-order-overlay"
+                    parentSelector={() => document.body}
+                >
+                    <div className="request-order-content">
+                        <button
+                            type="button"
+                            className="request-order-close"
+                            onClick={closeRequestModal}
+                            disabled={requestSubmitting}
+                            aria-label="Закрыть"
+                        >
+                            ×
+                        </button>
+
+                        <h2 className="request-order-title">Запросить выполнение</h2>
+
+                        <p className="request-order-subtitle">
+                            Укажите сумму, за которую готовы выполнить заказ, и при желании добавьте комментарий заказчику.
+                        </p>
+
+                        <div className="request-order-field">
+                            <label>Ваша сумма, ₽</label>
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={requestSum}
+                                onChange={handleRequestSumChange}
+                                placeholder="Например: 2500"
+                                className="request-order-input"
+                                autoFocus
+                            />
+                        </div>
+
+                        <div className="request-order-field">
+                            <label>Комментарий</label>
+                            <textarea
+                                value={requestComment}
+                                onChange={(e) => setRequestComment(e.target.value)}
+                                placeholder="Например: могу приехать сегодня после 18:00"
+                                className="request-order-textarea"
+                                rows={4}
+                                maxLength={500}
+                            />
+                        </div>
+
+                        <div className="request-order-actions">
+                            <button
+                                type="button"
+                                className="request-order-btn ghost"
+                                onClick={closeRequestModal}
+                                disabled={requestSubmitting}
+                            >
+                                Отмена
+                            </button>
+
+                            <button
+                                type="button"
+                                className="request-order-btn primary"
+                                onClick={submitRequestFromModal}
+                                disabled={requestSubmitting || !requestSum}
+                            >
+                                {requestSubmitting ? "Отправляем..." : "Отправить запрос"}
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
 
                 <Modal
                     appElement={document.getElementById("root")}
