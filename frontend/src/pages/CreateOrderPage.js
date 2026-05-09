@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import DatePicker from "react-datepicker";
+import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrentLocation";
 import "react-datepicker/dist/react-datepicker.css";
 import { useNavigate } from "react-router-dom";
 import "../styles/CreateOrderPage.css";
@@ -298,43 +299,42 @@ function CreateOrderPage() {
         setMarkerPosition([s.lat, s.lon]);
     };
 
-    const detectGps = () => {
-        if (!navigator.geolocation) {
-            setAddrResolveError("GPS недоступен в браузере");
-            return;
-        }
-
+    const detectGps = async () => {
         setAddrResolving(true);
         setAddrResolveError(null);
 
-        navigator.geolocation.getCurrentPosition(
-            async (pos) => {
-                const lat = pos.coords.latitude;
-                const lng = pos.coords.longitude;
+        try {
+            const location = await getCurrentLocation();
 
-                setMarkerPosition([lat, lng]);
+            const lat = location.latitude;
+            const lng = location.longitude;
 
-                try {
-                    const addr = await reverseGeocodeYandex({ lat, lng, apiKey: YM_KEY });
-                    if (!addr) {
-                        setAddrResolveError("Не удалось распознать адрес по GPS. Введите вручную или выберите на карте.");
-                        return;
-                    }
-                    setFormData((p) => ({ ...p, address: addr }));
-                } catch (e) {
-                    console.error("reverse geocode error:", e);
-                    setAddrResolveError("Не удалось распознать адрес по GPS. Введите вручную или выберите на карте.");
-                } finally {
-                    setAddrResolving(false);
-                }
-            },
-            (err) => {
-                console.error(err);
-                setAddrResolving(false);
-                setAddrResolveError("Не удалось определить координаты по GPS. Введите вручную или выберите на карте.");
-            },
-            { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
-        );
+            setMarkerPosition([lat, lng]);
+            setAddressMode("custom");
+
+            const addr = await reverseGeocodeYandex({
+                lat,
+                lng,
+                apiKey: YM_KEY,
+            });
+
+            if (!addr) {
+                setAddrResolveError(
+                    "Координаты получены, но адрес распознать не удалось. Введите адрес вручную или выберите точку на карте."
+                );
+                return;
+            }
+
+            setFormData((p) => ({
+                ...p,
+                address: addr,
+            }));
+        } catch (err) {
+            console.error("detectGps error:", err);
+            setAddrResolveError(getLocationErrorMessage(err));
+        } finally {
+            setAddrResolving(false);
+        }
     };
 
     const handleDescriptionChange = (e) => {

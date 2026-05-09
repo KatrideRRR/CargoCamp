@@ -2,6 +2,7 @@ import { toast } from "react-toastify";
 import React, { useEffect, useMemo, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { useNavigate } from "react-router-dom";
+import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrentLocation";
 import { useAuth } from "../utils/authContext";
 import axios from "axios";
 
@@ -538,59 +539,64 @@ const ProfilePage = () => {
         }
     };
 
-    const detectGps = () => {
-        if (!navigator.geolocation) {
-            toast.error("GPS недоступен в браузере");
-            return;
-        }
-
+    const detectGps = async () => {
         setLocLoading(true);
         setLocError(null);
 
-        navigator.geolocation.getCurrentPosition(
-            async (pos) => {
-                const lat = pos.coords.latitude;
-                const lng = pos.coords.longitude;
+        try {
+            const pos = await getCurrentLocation({
+                timeout: 25000,
+                maximumAge: 0,
+                enableHighAccuracy: true,
+            });
 
-                try {
-                    const addr = await reverseGeocodeYandex({
+            const lat = pos.latitude;
+            const lng = pos.longitude;
+
+            try {
+                const addr = await reverseGeocodeYandex({
+                    lat,
+                    lng,
+                    apiKey: YM_KEY,
+                });
+
+                if (!addr) {
+                    setLocationDraft(`Координаты: ${lat}, ${lng}`);
+                    setGpsCandidate({
                         lat,
                         lng,
-                        apiKey: YM_KEY,
+                        address: `Координаты: ${lat}, ${lng}`,
                     });
 
-                    if (!addr) {
-                        setLocError(
-                            "Не удалось распознать адрес по GPS. Введите адрес вручную или выберите на карте."
-                        );
-                        setLocLoading(false);
-                        return;
-                    }
-
-                    setLocationDraft(addr);
-                    setGpsCandidate({ lat, lng, address: addr });
-                } catch (e) {
-                    console.error("reverse geocode error:", e);
-                    setLocError(
-                        "Не удалось распознать адрес по GPS. Введите адрес вручную или выберите на карте."
-                    );
-                } finally {
-                    setLocLoading(false);
+                    toast.info("Координаты получены, адрес не распознан");
+                    return;
                 }
-            },
-            (err) => {
-                console.error(err);
-                setLocError(
-                    "Не удалось определить местоположение по GPS. Введите адрес вручную или выберите на карте."
-                );
-                setLocLoading(false);
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 12000,
-                maximumAge: 0,
+
+                setLocationDraft(addr);
+                setGpsCandidate({ lat, lng, address: addr });
+                toast.success("Местоположение определено");
+            } catch (e) {
+                console.error("reverse geocode error:", e);
+
+                setLocationDraft(`Координаты: ${lat}, ${lng}`);
+                setGpsCandidate({
+                    lat,
+                    lng,
+                    address: `Координаты: ${lat}, ${lng}`,
+                });
+
+                toast.info("Координаты получены, адрес не распознан");
             }
-        );
+        } catch (e) {
+            console.error("Profile GPS error:", e);
+
+            const message = getLocationErrorMessage(e);
+
+            setLocError(message);
+            toast.error(message);
+        } finally {
+            setLocLoading(false);
+        }
     };
 
     const handlePayDebt = async () => {

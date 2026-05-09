@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback, useContext } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Link, useNavigate } from "react-router-dom";
+import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrentLocation";
 import { ModalContext } from "../components/modalContext";
 import axios from "axios";
 import axiosInstance from "../utils/axiosInstance";
@@ -499,13 +500,22 @@ const OrdersPage = () => {
             return;
         }
 
-        navigator.geolocation.getCurrentPosition(
-            async (pos) => {
-                setIsGeolocationDenied(false);
+        (async () => {
+            try {
+                setLocLoading(true);
+                setLocError(null);
 
-                const latitude = pos.coords.latitude;
-                const longitude = pos.coords.longitude;
+                const pos = await getCurrentLocation({
+                    timeout: 25000,
+                    maximumAge: 0,
+                    enableHighAccuracy: true,
+                });
+
+                const latitude = pos.latitude;
+                const longitude = pos.longitude;
+
                 setUserLocation({ latitude, longitude });
+                setIsGeolocationDenied(false);
 
                 try {
                     const addr = await reverseGeocodeYandex({
@@ -513,12 +523,18 @@ const OrdersPage = () => {
                         lng: longitude,
                         apiKey: YM_KEY,
                     });
+
                     if (addr) setLocationDraft(addr);
                 } catch {}
-            },
-            () => setIsGeolocationDenied(true),
-            { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
-        );
+
+            } catch (e) {
+                console.error("OrdersPage GPS error:", e);
+                setIsGeolocationDenied(true);
+                setLocError(getLocationErrorMessage(e));
+            } finally {
+                setLocLoading(false);
+            }
+        })();
     }, [profile, YM_KEY]);
 
     const pullLocationFromProfile = async () => {
@@ -557,47 +573,48 @@ const OrdersPage = () => {
     };
 
     const detectGpsNow = () =>
-        new Promise((resolve) => {
-            if (!navigator.geolocation) {
-                toast.error("GPS недоступен в браузере");
+        new Promise(async (resolve) => {
+            try {
+                setLocLoading(true);
+                setLocError(null);
+
+                const pos = await getCurrentLocation({
+                    timeout: 25000,
+                    maximumAge: 0,
+                    enableHighAccuracy: true,
+                });
+
+                const latitude = pos.latitude;
+                const longitude = pos.longitude;
+
+                setUserLocation({ latitude, longitude });
+                setIsGeolocationDenied(false);
+
+                try {
+                    const addr = await reverseGeocodeYandex({
+                        lat: latitude,
+                        lng: longitude,
+                        apiKey: YM_KEY,
+                    });
+
+                    if (addr) setLocationDraft(addr);
+                } catch {}
+
+                toast.success("Местоположение обновлено по GPS");
+                resolve(true);
+            } catch (e) {
+                console.error("detectGpsNow error:", e);
+
+                const message = getLocationErrorMessage(e);
+
+                setLocError(message);
                 setIsGeolocationDenied(true);
+                toast.error(message);
+
                 resolve(false);
-                return;
+            } finally {
+                setLocLoading(false);
             }
-
-            setLocLoading(true);
-            setLocError(null);
-
-            navigator.geolocation.getCurrentPosition(
-                async (pos) => {
-                    const latitude = pos.coords.latitude;
-                    const longitude = pos.coords.longitude;
-
-                    setUserLocation({ latitude, longitude });
-                    setIsGeolocationDenied(false);
-
-                    try {
-                        const addr = await reverseGeocodeYandex({
-                            lat: latitude,
-                            lng: longitude,
-                            apiKey: YM_KEY,
-                        });
-                        if (addr) setLocationDraft(addr);
-                    } catch {}
-
-                    setLocLoading(false);
-                    toast.success("Местоположение обновлено по GPS");
-                    resolve(true);
-                },
-                (err) => {
-                    console.error(err);
-                    setLocLoading(false);
-                    toast.error("Не удалось определить местоположение по GPS");
-                    setIsGeolocationDenied(true);
-                    resolve(false);
-                },
-                { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
-            );
         });
 
     const handleOpenOrdersMap = () => {

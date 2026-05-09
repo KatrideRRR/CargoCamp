@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import "../styles/CreateExpressOrder.css";
 import axiosInstance from "../utils/axiosInstance";
+import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrentLocation";
 import YandexMapModal from "../components/YandexMapModal";
 import ExpressRouteMapModal from "../components/ExpressRouteMapModal";
 import ExpressSavedAddressesBar from "../components/ExpressSavedAddressesBar";
@@ -252,20 +253,46 @@ const CreateExpressOrder = () => {
         load();
     }, []);
 
-    const detectGpsForFrom = () => {
+    const detectGpsForFrom = async () => {
         setError("");
-        if (!navigator.geolocation) {
-            setError("GPS недоступен в браузере");
-            return;
+
+        try {
+            const pos = await getCurrentLocation({
+                timeout: 25000,
+                maximumAge: 0,
+                enableHighAccuracy: true,
+            });
+
+            const lat = pos.latitude;
+            const lng = pos.longitude;
+
+            setField("fromLat", String(lat));
+            setField("fromLng", String(lng));
+
+            try {
+                const url =
+                    `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}` +
+                    `&geocode=${lng},${lat}` +
+                    `&format=json&results=1&kind=house`;
+
+                const r = await fetch(url);
+                const data = await r.json();
+
+                const first = data?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
+                const address =
+                    first?.metaDataProperty?.GeocoderMetaData?.text ||
+                    first?.name ||
+                    `Координаты: ${lat}, ${lng}`;
+
+                setField("fromAddress", address);
+            } catch (e) {
+                console.error("reverse geocode from GPS error:", e);
+                setField("fromAddress", `Координаты: ${lat}, ${lng}`);
+            }
+        } catch (e) {
+            console.error("CreateExpress GPS error:", e);
+            setError(getLocationErrorMessage(e));
         }
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                setField("fromLat", String(pos.coords.latitude));
-                setField("fromLng", String(pos.coords.longitude));
-            },
-            () => setError("Не удалось получить координаты по GPS"),
-            { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
-        );
     };
 
     useEffect(() => {
