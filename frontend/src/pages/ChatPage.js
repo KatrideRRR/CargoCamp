@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Capacitor } from "@capacitor/core";
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import { useParams, useNavigate } from "react-router-dom";
 import "../styles/ChatPage.css";
 import { useUser } from "../utils/userContext";
@@ -96,10 +96,6 @@ const ChatPage = () => {
     const messagesContainerRef = useRef(null);
     const textareaRef = useRef(null);
 
-    const authHeader = useMemo(() => ({
-        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-    }), []);
-
     const selectedUserAvatar = getAvatarUrl(selectedUser);
 
     const scrollToBottom = useCallback((behavior = "smooth") => {
@@ -139,7 +135,7 @@ const ChatPage = () => {
         return () => {
             socket.off("receiveMessage", handleReceiveMessage);
         };
-    }, [currentUser?.id, orderId]);
+    }, [currentUser?.id, orderId, orderType]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -147,12 +143,12 @@ const ChatPage = () => {
                 setLoading(true);
                 setError("");
 
-                const orderUrl =
+                const orderEndpoint =
                     orderType === "express"
-                        ? `${apiUrl}/api/express/express-orders/${orderId}`
-                        : `${apiUrl}/api/orders/${orderId}`;
+                        ? `/express/express-orders/${orderId}`
+                        : `/orders/${orderId}`;
 
-                const { data: orderResponse } = await axios.get(orderUrl, authHeader);
+                const { data: orderResponse } = await axiosInstance.get(orderEndpoint);
 
                 const orderData =
                     orderType === "express"
@@ -162,9 +158,8 @@ const ChatPage = () => {
                 setOrder(orderData);
 
                 try {
-                    const { data: disputeData } = await axios.get(
-                        `${apiUrl}/api/disputes/order/${orderData.id}`,
-                        authHeader
+                    const { data: disputeData } = await axiosInstance.get(
+                        `/disputes/order/${orderData.id}`
                     );
 
                     setOrderDispute(disputeData || null);
@@ -181,19 +176,15 @@ const ChatPage = () => {
                         ? orderData.executorId
                         : orderData.creatorId;
 
-                const { data: user } = await axios.get(
-                    `${apiUrl}/api/auth/${otherUserId}`,
-                    authHeader
-                );
+                const { data: user } = await axiosInstance.get(`/auth/${otherUserId}`);
 
                 setSelectedUser(user);
 
-                const { data: messagesData } = await axios.get(
-                    `${apiUrl}/api/messages/${orderType}/${orderId}`,
-                    authHeader
+                const { data: messagesData } = await axiosInstance.get(
+                    `/messages/${orderType}/${orderId}`
                 );
 
-                setMessages(messagesData);
+                setMessages(Array.isArray(messagesData) ? messagesData : []);
 
                 socket.emit("markAsRead", {
                     userId: currentUser.id,
@@ -204,6 +195,12 @@ const ChatPage = () => {
                 requestAnimationFrame(() => scrollToBottom("auto"));
             } catch (err) {
                 console.error(err);
+
+                if (err?.response?.status === 401) {
+                    setError("Сессия устарела. Выполните вход заново.");
+                    return;
+                }
+
                 setError("Не удалось загрузить данные чата.");
             } finally {
                 setLoading(false);
@@ -213,7 +210,7 @@ const ChatPage = () => {
         if (orderId && currentUser?.id) {
             fetchData();
         }
-    }, [orderId, currentUser?.id, scrollToBottom, authHeader]);
+    }, [orderId, orderType, currentUser?.id, scrollToBottom]);
 
     const handleSendMessage = useCallback(async () => {
         if (!newMessage.trim() || !currentUser || !orderId || !selectedUser) return;
@@ -226,11 +223,7 @@ const ChatPage = () => {
                 orderType,
             };
 
-            const { data } = await axios.post(
-                `${apiUrl}/api/messages`,
-                messageData,
-                authHeader
-            );
+            const { data } = await axiosInstance.post("/messages", messageData);
 
             setMessages((prev) => {
                 const exists = prev.some((msg) => String(msg.id) === String(data.id));
@@ -247,9 +240,15 @@ const ChatPage = () => {
             requestAnimationFrame(() => scrollToBottom());
         } catch (err) {
             console.error(err);
+
+            if (err?.response?.status === 401) {
+                setError("Сессия устарела. Выполните вход заново.");
+                return;
+            }
+
             setError("Не удалось отправить сообщение.");
         }
-    }, [newMessage, currentUser, orderId, selectedUser, scrollToBottom, authHeader]);
+    }, [newMessage, currentUser, orderId, selectedUser, orderType, scrollToBottom]);
 
     const handleInputChange = (e) => {
         setNewMessage(e.target.value);
@@ -349,7 +348,7 @@ const ChatPage = () => {
 
     const fetchOrderDispute = async (targetOrderId) => {
         try {
-            const res = await axios.get(`${apiUrl}/api/disputes/order/${targetOrderId}`, authHeader);
+            const res = await axiosInstance.get(`/disputes/order/${targetOrderId}`);
 
             if (res.data) {
                 setOrderDispute(res.data);
@@ -387,16 +386,12 @@ const ChatPage = () => {
 
             setDisputeLoading(true);
 
-            const res = await axios.post(
-                `${apiUrl}/api/disputes/open`,
-                {
-                    orderId: selectedOrderForDispute.id,
-                    reasonCode: disputeReasonCode,
-                    reason: disputeReason.trim(),
-                    description: disputeDescription.trim(),
-                },
-                authHeader
-            );
+            const res = await axiosInstance.post("/disputes/open", {
+                orderId: selectedOrderForDispute.id,
+                reasonCode: disputeReasonCode,
+                reason: disputeReason.trim(),
+                description: disputeDescription.trim(),
+            });
 
             if (res.data?.dispute) {
                 setOrderDispute(res.data.dispute);
