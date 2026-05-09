@@ -135,7 +135,10 @@ const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString(
 
 const smsCodes = new Map();
 
-const CODE_TTL_MS = 5 * 60 * 1000; // 5 минут
+const CODE_TTL_MS = 5 * 60 * 1000; // код живёт 5 минут
+const SMS_RESEND_COOLDOWN_MS = 60 * 1000; // повторная отправка не чаще 60 сек
+const SMS_MAX_SENDS = 5; // максимум 5 SMS
+const SMS_WINDOW_MS = 15 * 60 * 1000; // за 15 минут
 
 function normalizePhone(raw) {
     const digits = String(raw || "").replace(/\D/g, "");
@@ -174,48 +177,122 @@ router.post("/upload-avatar", authenticateToken, uploadAvatar.single("avatar"), 
     });
 
 router.post("/send-sms", async (req, res) => {
-    const { phone } = req.body;
-    if (!phone) return res.status(400).json({ message: "Введите номер телефона" });
+    const { phone, captchaToken, purpose = "register" } = req.body;
+
+    if (!phone) {
+        return res.status(400).json({ message: "Введите номер телефона" });
+    }
 
     const phoneKey = normalizePhone(phone);
-    if (!phoneKey) return res.status(400).json({ message: "Некорректный номер" });
 
-    const apiId = process.env.SMS_RU_API_ID || "706A8778-9606-1CA6-F061-72BA6F3A60E3"; // временно
-    if (!apiId) return res.status(500).json({ message: "SMS_RU_API_ID не задан" });
+    if (!phoneKey || phoneKey.length !== 11 || !phoneKey.startsWith("7")) {
+        return res.status(400).json({ message: "Некорректный номер телефона" });
+    }
+
+    const existingUser = await User.findOne({ where: { phone: phoneKey } });
+
+    if (purpose === "register" && existingUser) {
+        return res.status(400).json({ message: "Телефон уже используется" });
+    }
+
+    if ((purpose === "login" || purpose === "password_reset") && !existingUser) {
+        return res.status(404).json({ message: "Пользователь не найден" });
+    }
+
+    if (!captchaToken) {
+        return res.status(400).json({ message: "Капча не пройдена" });
+    }
+
+    try {
+        const captchaResponse = await axios.post(
+            "https://www.google.com/recaptcha/api/siteverify",
+            null,
+            {
+                params: {
+                    secret: SECRET_KEY,
+                    response: captchaToken,
+                },
+                timeout: 10000,
+            }
+        );
+
+        if (!captchaResponse.data?.success) {
+            return res.status(400).json({ message: "Ошибка капчи" });
+        }
+    } catch (error) {
+        console.error("Ошибка проверки reCAPTCHA при отправке SMS:", error?.message);
+        return res.status(500).json({ message: "Ошибка проверки капчи" });
+    }
+
+    const now = Date.now();
+    const existing = smsCodes.get(phoneKey);
+
+    if (existing?.lastSentAt && now - existing.lastSentAt < SMS_RESEND_COOLDOWN_MS) {
+        const waitSec = Math.ceil((SMS_RESEND_COOLDOWN_MS - (now - existing.lastSentAt)) / 1000);
+
+        return res.status(429).json({
+            message: `Отправить код повторно можно через ${waitSec} сек.`,
+            waitSec,
+        });
+    }
+
+    let sendHistory = Array.isArray(existing?.sendHistory) ? existing.sendHistory : [];
+
+    sendHistory = sendHistory.filter((time) => now - time < SMS_WINDOW_MS);
+
+    if (sendHistory.length >= SMS_MAX_SENDS) {
+        return res.status(429).json({
+            message: "Слишком много попыток отправки SMS. Попробуйте позже.",
+        });
+    }
+
+    const apiId = process.env.SMS_RU_API_ID;
+
+    if (!apiId) {
+        return res.status(500).json({ message: "SMS_RU_API_ID не задан" });
+    }
 
     const code = generateCode();
-    smsCodes.set(phoneKey, { code, expiresAt: Date.now() + CODE_TTL_MS });
-
 
     try {
         const response = await axios.get("https://sms.ru/sms/send", {
             params: {
                 api_id: apiId,
-                to: phoneKey, // 7978...
+                to: phoneKey,
                 msg: `Ваш код подтверждения: ${code}`,
                 json: 1,
             },
             timeout: 15000,
         });
 
-
         if (response.data?.status === "OK") {
-            return res.json({ message: "Код отправлен" });
+            smsCodes.set(phoneKey, {
+                code,
+                expiresAt: now + CODE_TTL_MS,
+                lastSentAt: now,
+                sendHistory: [...sendHistory, now],
+                attempts: 0,
+            });
+
+            return res.json({
+                message: "Код отправлен",
+                cooldownSec: Math.ceil(SMS_RESEND_COOLDOWN_MS / 1000),
+                expiresInSec: Math.ceil(CODE_TTL_MS / 1000),
+            });
         }
 
+        console.error("[SEND SMS] sms.ru отказал:", response.data);
+
         return res.status(500).json({
-            message: "sms.ru отказал",
-            details: response.data,
+            message: "Не удалось отправить SMS. Попробуйте позже.",
         });
     } catch (error) {
         console.error("[SEND SMS] axios error message:", error?.message);
         console.error("[SEND SMS] status:", error?.response?.status);
         console.error("[SEND SMS] data:", error?.response?.data);
-        console.error("[SEND SMS] config params:", error?.config?.params);
 
         return res.status(500).json({
             message: "Ошибка отправки SMS",
-            details: error?.response?.data || error?.message || "unknown",
         });
     }
 });
@@ -289,7 +366,6 @@ router.post('/register', async (req, res) => {
 
     const phoneKey = normalizePhone(phone);
     const codeFromUser = String(smsCode || "").trim();
-    const userExists = await User.findOne({ where: { phone: phoneKey } });
 
     const entry = smsCodes.get(phoneKey); // {code, expiresAt} | undefined
     const codeSaved = String(entry?.code || "").trim();
@@ -307,6 +383,17 @@ router.post('/register', async (req, res) => {
 
     // ✅ сравнение
     if (codeSaved !== codeFromUser) {
+        entry.attempts = Number(entry.attempts || 0) + 1;
+
+        if (entry.attempts >= 5) {
+            smsCodes.delete(phoneKey);
+            return res.status(400).json({
+                message: "Слишком много неверных попыток. Запросите новый код.",
+            });
+        }
+
+        smsCodes.set(phoneKey, entry);
+
         return res.status(400).json({ message: "Неверный код" });
     }
 
@@ -334,8 +421,11 @@ router.post('/register', async (req, res) => {
 
     try {
         // Проверка на существующего пользователя
-        const userExists = await User.findOne({ where: { phone } });
-        if (userExists) return res.status(400).json({ message: "Телефон уже используется" });
+        const userExists = await User.findOne({ where: { phone: phoneKey } });
+
+        if (userExists) {
+            return res.status(400).json({ message: "Телефон уже используется" });
+        }
 
         // Хеширование пароля
         const hashedPassword = await bcrypt.hash(password, 10);

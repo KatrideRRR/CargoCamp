@@ -45,11 +45,21 @@ const RegisterPage = () => {
 
     const sendSmsCode = async () => {
         try {
-            await axios.post(`${apiUrl}/api/auth/send-sms`, { phone });
+            await axios.post(`${apiUrl}/api/auth/send-sms`, {
+                phone,
+                captchaToken: captchaValue,
+                purpose: "register",
+            });
             setIsSmsSent(true);
             alert("Код подтверждения отправлен на ваш номер");
         } catch (err) {
-            setError("Ошибка отправки SMS");
+            console.error("Ошибка отправки SMS:", err);
+
+            if (err.response?.status === 429 && err.response?.data?.waitSec) {
+                setSmsCooldown(err.response.data.waitSec);
+            }
+
+            setError(err.response?.data?.message || "Ошибка отправки SMS");
         }
     };
 
