@@ -23,6 +23,24 @@ function looksLikeCoordsString(v) {
     return s.startsWith("Координаты:") || /^\d{1,3}\.\d+,\s*\d{1,3}\.\d+$/.test(s);
 }
 
+function isValidOrderCoords(pos) {
+    if (!Array.isArray(pos) || pos.length !== 2) return false;
+
+    const lat = Number(pos[0]);
+    const lng = Number(pos[1]);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+
+    // широта/долгота в допустимых пределах
+    if (lat < -90 || lat > 90) return false;
+    if (lng < -180 || lng > 180) return false;
+
+    // защита от "нулевой точки" 0,0
+    if (Math.abs(lat) < 0.000001 && Math.abs(lng) < 0.000001) return false;
+
+    return true;
+}
+
 function parseYandexGeocoderSuggestions(data) {
     const members = data?.response?.GeoObjectCollection?.featureMember || [];
 
@@ -248,8 +266,12 @@ function CreateOrderPage() {
 
     const handleAddressChange = (e) => {
         const address = e.target.value;
+
         setFormData((p) => ({ ...p, address }));
         setAddressMode("custom");
+
+        // Пользователь начал менять адрес вручную — старые координаты больше нельзя считать точными
+        setMarkerPosition(null);
 
         // чистим если мало символов
         const q = address.trim();
@@ -367,6 +389,13 @@ function CreateOrderPage() {
             return;
         }
 
+        if (!isValidOrderCoords(markerPosition)) {
+            setError("Не удалось определить координаты адреса. Выберите адрес из подсказки, по GPS или на карте.");
+            setAddressOpen(true);
+            setIsSubmitting(false);
+            return;
+        }
+
         if (isSubmitting) return;
         setIsSubmitting(true);
 
@@ -387,9 +416,7 @@ function CreateOrderPage() {
         data.append("promotion", JSON.stringify(promotion));
         images.forEach((img) => data.append("images", img));
 
-        if (markerPosition?.length === 2) {
-            data.append("coordinates", `${markerPosition[0]},${markerPosition[1]}`);
-        }
+        data.append("coordinates", `${Number(markerPosition[0])},${Number(markerPosition[1])}`);
 
         const token = localStorage.getItem("authToken");
         if (!token) {

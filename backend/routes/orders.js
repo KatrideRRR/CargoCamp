@@ -408,12 +408,21 @@ module.exports = (io) => {
 
             const parseLatLng = (v) => {
                 if (!v) return null;
+
                 const raw = Array.isArray(v) ? v[0] : v;
                 if (typeof raw !== "string" || !raw.includes(",")) return null;
+
                 const [latStr, lngStr] = raw.split(",").map((x) => x.trim());
-                const lat = parseFloat(latStr);
-                const lng = parseFloat(lngStr);
+                const lat = Number(latStr);
+                const lng = Number(lngStr);
+
                 if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+                if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+
+                // 0,0 почти всегда означает ошибку определения координат
+                if (Math.abs(lat) < 0.000001 && Math.abs(lng) < 0.000001) return null;
+
                 return { lat, lng };
             };
 
@@ -436,8 +445,27 @@ module.exports = (io) => {
                 }
 
                 const { latitude, longitude } = geoData[0];
-                coordinatesStr = `${latitude},${longitude}`;
-                latlng = { lat: Number(latitude), lng: Number(longitude) };
+
+                latlng = {
+                    lat: Number(latitude),
+                    lng: Number(longitude),
+                };
+
+                if (
+                    !Number.isFinite(latlng.lat) ||
+                    !Number.isFinite(latlng.lng) ||
+                    latlng.lat < -90 ||
+                    latlng.lat > 90 ||
+                    latlng.lng < -180 ||
+                    latlng.lng > 180 ||
+                    (Math.abs(latlng.lat) < 0.000001 && Math.abs(latlng.lng) < 0.000001)
+                ) {
+                    return res.status(400).json({
+                        message: "Не удалось определить корректные координаты адреса. Выберите адрес на карте или уточните адрес.",
+                    });
+                }
+
+                coordinatesStr = `${latlng.lat},${latlng.lng}`;
             }
 
             // 2) Reverse-geocode: если адрес пустой/“Координаты: …” — получаем нормальный адрес
@@ -497,6 +525,12 @@ module.exports = (io) => {
 
             if (parsedProposedSum !== null && !Number.isFinite(parsedProposedSum)) {
                 return res.status(400).json({ message: "Некорректная proposedSum" });
+            }
+
+            if (!coordinatesStr || !latlng) {
+                return res.status(400).json({
+                    message: "Координаты заказа обязательны. Выберите адрес из подсказки, по GPS или на карте.",
+                });
             }
 
             // 3) Сначала создаём заказ БЕЗ финальных путей картинок
