@@ -9,7 +9,6 @@
     gap: 8px;
 
     padding: 8px 12px;
-
     border-radius: 999px;
 
     background: rgba(255, 255, 255, 0.92);
@@ -25,6 +24,7 @@
     pointer-events: none;
 
     transform: translate(-50%, -40px);
+
     transition:
             opacity 160ms ease,
             transform 160ms ease;
@@ -34,7 +34,6 @@
 
 .pull-refresh.visible {
     opacity: 1;
-    transform: translate(-50%, 0);
 }
 
 .pull-refresh-circle {

@@ -118,7 +118,7 @@ export default function PullToRefresh() {
         <div
             className={`pull-refresh ${visible ? "visible" : ""} ${refreshing ? "refreshing" : ""}`}
             style={{
-                transform: `translateY(${visible ? Math.min(pullDistance, TRIGGER_DISTANCE) : 0}px)`,
+                transform: `translate(-50%, ${visible ? Math.min(pullDistance, TRIGGER_DISTANCE) : -40}px)`,
             }}
         >
             <div className="pull-refresh-circle">
