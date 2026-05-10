@@ -99,6 +99,27 @@ export const ModalProvider = ({ children }) => {
         fetchUserData();
     }, []);
 
+    const handleExpressOrderAccepted = (data) => {
+        toast.success(data.message || "Ваш экспресс-заказ приняли в работу");
+    };
+
+    const handleExpressOrderStatusChanged = (data) => {
+        if (!data?.status) return;
+
+        const textByStatus = {
+            accepted: "Экспресс-заказ принят",
+            on_the_way_to_A: data.type === "taxi" ? "Водитель в пути" : "Курьер в пути",
+            arrived_at_A: data.type === "taxi" ? "Водитель на месте" : "Курьер на месте",
+            waiting_at_A: "Водитель ожидает",
+            picked_up: "Курьер забрал посылку",
+            in_progress: data.type === "taxi" ? "Поездка началась" : "Доставка началась",
+            completed: "Экспресс-заказ завершён",
+            cancelled: "Экспресс-заказ отменён",
+        };
+
+        toast.info(data.message || textByStatus[data.status] || "Статус экспресс-заказа обновлён");
+    };
+
     const openReviewFromCompletion = (
         orderId,
         creatorId,
@@ -267,6 +288,8 @@ export const ModalProvider = ({ children }) => {
         socket.on("expressOrderCompleted", handleExpressOrderCompleted);
         socket.on("expressArrived", handleExpressArrived);
         socket.on("reviewNeeded", handleReviewNeeded);
+        socket.on("expressOrderAccepted", handleExpressOrderAccepted);
+        socket.on("expressOrderStatusChanged", handleExpressOrderStatusChanged);
 
         return () => {
             socket.off("orderApproved", handleOrderApproved);
@@ -274,6 +297,8 @@ export const ModalProvider = ({ children }) => {
             socket.off("expressOrderCompleted", handleExpressOrderCompleted);
             socket.off("reviewNeeded", handleReviewNeeded);
             socket.off("expressArrived", handleExpressArrived);
+            socket.off("expressOrderAccepted", handleExpressOrderAccepted);
+            socket.off("expressOrderStatusChanged", handleExpressOrderStatusChanged);
         };
     }, [userId]);
 

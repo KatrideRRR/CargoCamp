@@ -648,10 +648,20 @@ const ActiveOrdersPage = () => {
 
         socket.on("activeOrdersUpdated", onActiveUpdated);
         socket.on("new_notification", onNewNotification);
+        socket.on("expressOrderStatusChanged", onActiveUpdated);
+        socket.on("expressOrderAccepted", onActiveUpdated);
+        socket.on("expressOrderCompleted", onActiveUpdated);
+        socket.on("expressOrderCompletedForExecutor", onActiveUpdated);
+        socket.on("expressStatusChanged", onActiveUpdated);
 
         return () => {
             socket.off("activeOrdersUpdated", onActiveUpdated);
             socket.off("new_notification", onNewNotification);
+            socket.off("expressOrderStatusChanged", onActiveUpdated);
+            socket.off("expressOrderAccepted", onActiveUpdated);
+            socket.off("expressOrderCompleted", onActiveUpdated);
+            socket.off("expressOrderCompletedForExecutor", onActiveUpdated);
+            socket.off("expressStatusChanged", onActiveUpdated);
             // по желанию можно отключать сокет при уходе со страницы
             // socket.disconnect();
         };
@@ -1106,6 +1116,13 @@ const ActiveOrdersPage = () => {
                                             key={`express-${eo.id}`}
                                             order={eo}
                                             userId={user.id}
+                                            onOrderUpdated={(updatedOrder) => {
+                                                setExpressOrders((prev) =>
+                                                    prev.map((item) =>
+                                                        Number(item.id) === Number(updatedOrder.id) ? updatedOrder : item
+                                                    )
+                                                );
+                                            }}
                                             onReload={async () => {
                                                 const r = await axiosInstance.get(`/express/express-orders/me`, {
                                                     params: { mode: "active" },

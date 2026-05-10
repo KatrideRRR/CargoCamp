@@ -112,6 +112,7 @@ const ExpressOrderCard = ({
                               onOpenDispute,
                               onCallUser,
                               onCompletedSuccessfully,
+                              onOrderUpdated,
                           }) => {
     const [busy, setBusy] = useState(false);
 
@@ -153,8 +154,15 @@ const ExpressOrderCard = ({
 
         setBusy(true);
         try {
-            await fn();
+            const res = await fn();
+
+            if (res?.data?.success && res.data.order) {
+                onOrderUpdated?.(res.data.order);
+            }
+
             await onReload?.();
+
+            return res;
         } catch (e) {
             console.error(e);
             alert(e.response?.data?.message || "Ошибка действия");

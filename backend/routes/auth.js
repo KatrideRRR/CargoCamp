@@ -774,6 +774,15 @@ router.post("/review", authenticateToken, async (req, res) => {
             ratingCount: user.ratingCount,
         });
     } catch (e) {
+        if (
+            e?.name === "SequelizeUniqueConstraintError" ||
+            e?.original?.code === "ER_DUP_ENTRY"
+        ) {
+            return res.status(400).json({
+                message: "Вы уже оставляли отзыв по этому заказу",
+            });
+        }
+
         console.error("review error:", e);
         return res.status(500).json({ message: "Ошибка сервера" });
     }

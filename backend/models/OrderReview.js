@@ -74,13 +74,17 @@ module.exports = (sequelize) => {
             indexes: [
                 {
                     unique: true,
-                    fields: ['orderId', 'fromUserId'], // 🔒 1 отзыв на заказ от пользователя
+                    name: "order_reviews_type_order_from_user_unique",
+                    fields: ["orderType", "orderId", "fromUserId"], // 🔒 1 отзыв на один тип заказа от пользователя
                 },
                 {
-                    fields: ['toUserId'],
+                    fields: ["toUserId"],
                 },
                 {
-                    fields: ['orderId'],
+                    fields: ["orderId"],
+                },
+                {
+                    fields: ["orderType"],
                 },
             ],
         }
