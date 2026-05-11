@@ -102,25 +102,43 @@ export const ModalProvider = ({ children }) => {
         fetchUserData();
     }, []);
 
+    const getExpressAcceptedModalKey = (orderId) => {
+        return `express_accepted_modal_shown_${orderId}`;
+    };
+
     const openExpressAcceptedModal = (data) => {
         if (!data?.orderId) return;
 
+        const orderId = data.orderId || data?.data?.orderId;
         const creatorId = data.creatorId || data?.data?.creatorId;
         const executorId = data.executorId || data?.data?.executorId;
         const status = data.status || data?.data?.status;
-        const expressType = data.type || data.expressType || data?.data?.type || data?.data?.expressType;
+        const expressType =
+            data.type ||
+            data.expressType ||
+            data?.data?.type ||
+            data?.data?.expressType;
 
+        if (!orderId) return;
         if (status && status !== "accepted") return;
-
         if (Number(creatorId) !== Number(userId)) return;
+
+        const shownKey = getExpressAcceptedModalKey(orderId);
+
+        // ✅ защита от повторного открытия при каждом new_notification/status update
+        if (localStorage.getItem(shownKey) === "1") {
+            return;
+        }
+
+        localStorage.setItem(shownKey, "1");
 
         setExpressAcceptedData({
             title: data.title || "Экспресс-заказ принят",
             description:
                 data.message ||
                 data.body ||
-                `Исполнитель принял ваш экспресс-заказ №${data.orderId}`,
-            orderId: data.orderId,
+                `Исполнитель принял ваш экспресс-заказ №${orderId}`,
+            orderId,
             creatorId,
             executorId,
             orderType: "express",
@@ -157,9 +175,6 @@ export const ModalProvider = ({ children }) => {
         if (!data?.status) return;
 
         if (data.status === "accepted") {
-            if (Number(data.creatorId) === Number(userId)) {
-                openExpressAcceptedModal(data);
-            }
             return;
         }
 
@@ -268,6 +283,7 @@ export const ModalProvider = ({ children }) => {
     const handleExpressAcceptedClose = () => {
         setExpressAcceptedData(null);
     };
+
 
     const handleSubmitReview = async ({ rating, text }) => {
         if (!selectedOrder?.id) {
@@ -395,35 +411,26 @@ export const ModalProvider = ({ children }) => {
         const handleNewNotification = (notifications) => {
             const list = Array.isArray(notifications) ? notifications : [notifications];
 
-            const acceptedNotification = list.find((n) => {
-                if (!n) return false;
-
+            const reviewNotification = list.find((n) => {
                 const orderType = n.orderType || n?.data?.orderType;
-                const status = n?.data?.status;
-                const expressType = n?.data?.expressType || n?.data?.type;
-
                 return (
                     orderType === "express" &&
-                    n.type === "express_status_changed" &&
-                    status === "accepted" &&
-                    expressType
+                    n.type === "review_needed" &&
+                    n.orderId
                 );
             });
 
-            if (!acceptedNotification) return;
+            if (!reviewNotification) return;
 
-            openExpressAcceptedModal({
-                orderId: acceptedNotification.orderId || acceptedNotification?.data?.orderId,
+            setCompletionNotificationData({
+                title: reviewNotification.title || "Экспресс-заказ завершён",
+                description:
+                    reviewNotification.body ||
+                    `Заказ номер ${reviewNotification.orderId}: Оставьте отзыв`,
+                orderId: reviewNotification.orderId || reviewNotification?.data?.orderId,
+                creatorId: reviewNotification?.data?.creatorId,
+                executorId: reviewNotification?.data?.executorId,
                 orderType: "express",
-                title: acceptedNotification.title || "Экспресс-заказ принят",
-                body: acceptedNotification.body,
-                message: acceptedNotification.body,
-                creatorId: acceptedNotification?.data?.creatorId,
-                executorId: acceptedNotification?.data?.executorId,
-                type: acceptedNotification?.data?.type,
-                expressType: acceptedNotification?.data?.expressType,
-                status: acceptedNotification?.data?.status,
-                data: acceptedNotification.data,
             });
         };
 
@@ -789,9 +796,21 @@ export const ModalProvider = ({ children }) => {
                             ×
                         </button>
 
-                        <div className="modal-icon">⏳</div>
-                        <h2 className="modal-title">{completionNotificationData.title}</h2>
-                        <p className="modal-text">{completionNotificationData.description}</p>
+                        <div className="modal-icon">
+                            {completionNotificationData.orderType === "express" ? "⭐" : "⏳"}
+                        </div>
+
+                        <h2 className="modal-title">
+                            {completionNotificationData.orderType === "express"
+                                ? "Экспресс-заказ завершён"
+                                : completionNotificationData.title}
+                        </h2>
+
+                        <p className="modal-text">
+                            {completionNotificationData.orderType === "express"
+                                ? `Заказ номер ${completionNotificationData.orderId}: оцените исполнителя и оставьте отзыв`
+                                : completionNotificationData.description}
+                        </p>
 
                         <div className="modal-actions">
                             {canReviewFromCompletionNotification && (
@@ -806,7 +825,9 @@ export const ModalProvider = ({ children }) => {
                                         )
                                     }
                                 >
-                                    {completionNotificationData.orderType === "express" ? "Оставить отзыв" : "Завершить"}
+                                    {completionNotificationData.orderType === "express"
+                                        ? "Оставить отзыв"
+                                        : "Завершить"}
                                 </button>
                             )}
 

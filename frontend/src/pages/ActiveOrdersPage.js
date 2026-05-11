@@ -1154,17 +1154,34 @@ const ActiveOrdersPage = () => {
                                     {/* express активные заказы */}
                                     {visibleExpressOrders.map((eo) => (
                                         <ExpressOrderCard
-                                            key={`express-${eo.id}`}
+                                            key={`express-${eo.id}-${eo.status}-${eo.updatedAt || eo.completedAt || ""}`}
                                             order={eo}
                                             userId={user.id}
                                             onOrderUpdated={(updatedOrder) => {
-                                                setExpressOrders((prev) =>
-                                                    prev.map((item) =>
+                                                if (!updatedOrder?.id) return;
+
+                                                setExpressOrders((prev) => {
+                                                    const exists = prev.some(
+                                                        (item) => Number(item.id) === Number(updatedOrder.id)
+                                                    );
+
+                                                    if (!exists) {
+                                                        return [updatedOrder, ...prev];
+                                                    }
+
+                                                    return prev.map((item) =>
                                                         Number(item.id) === Number(updatedOrder.id)
-                                                            ? { ...item, ...updatedOrder }
+                                                            ? {
+                                                                ...item,
+                                                                ...updatedOrder,
+                                                                status: updatedOrder.status ?? item.status,
+                                                                executorId: updatedOrder.executorId ?? item.executorId,
+                                                                creatorId: updatedOrder.creatorId ?? item.creatorId,
+                                                                updatedAt: updatedOrder.updatedAt || new Date().toISOString(),
+                                                            }
                                                             : item
-                                                    )
-                                                );
+                                                    );
+                                                });
                                             }}
                                             onReload={async () => {
                                                 const r = await axiosInstance.get(`/express/express-orders/me`, {

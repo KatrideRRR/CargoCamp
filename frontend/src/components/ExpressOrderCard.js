@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axiosInstance from "../utils/axiosInstance";
 import {
     FaCheck,
@@ -11,7 +11,6 @@ import {
     FaPhone,
     FaComments,
     FaExclamationTriangle,
-    FaMapMarkedAlt,
     FaClipboardCheck,
 } from "react-icons/fa";
 import ExpressRouteButtons from "./ExpressRouteButtons";
@@ -58,8 +57,8 @@ function getExpressCurrentStepIndex(type, status) {
     };
 
     return type === "taxi"
-        ? (taxiMap[status] ?? 0)
-        : (courierMap[status] ?? 0);
+        ? taxiMap[status] ?? 0
+        : courierMap[status] ?? 0;
 }
 
 function getStatusText(type, status, isCreator) {
@@ -115,34 +114,57 @@ const ExpressOrderCard = ({
                               onOrderUpdated,
                           }) => {
     const [busy, setBusy] = useState(false);
+    const [localOrder, setLocalOrder] = useState(order);
     const actionLockRef = useRef(false);
 
-    const isExecutor = Number(order.executorId) === Number(userId);
-    const isCreator = Number(order.creatorId) === Number(userId);
+    useEffect(() => {
+        if (!order?.id) return;
+        setLocalOrder(order);
+    }, [
+        order?.id,
+        order?.status,
+        order?.executorId,
+        order?.creatorId,
+        order?.updatedAt,
+        order?.completedAt,
+        order?.startedAt,
+        order?.arrivedAt,
+        order?.waitingStartedAt,
+        order?.pickedUpAt,
+    ]);
+
+    const currentOrder = localOrder || order;
+
+    const isExecutor = Number(currentOrder.executorId) === Number(userId);
+    const isCreator = Number(currentOrder.creatorId) === Number(userId);
 
     const typeText = useMemo(
-        () => (order.type === "taxi" ? "Такси" : "Курьер"),
-        [order.type]
+        () => (currentOrder.type === "taxi" ? "Такси" : "Курьер"),
+        [currentOrder.type]
     );
 
     const paymentLabel =
-        order.paymentType === "guarantee"
+        currentOrder.paymentType === "guarantee"
             ? "Гарантия"
-            : order.paymentType === "cash"
+            : currentOrder.paymentType === "cash"
                 ? "Наличные"
                 : "Оплата";
 
-    const paymentIcon = order.paymentType === "guarantee" ? "🏦" : "💵";
+    const paymentIcon = currentOrder.paymentType === "guarantee" ? "🏦" : "💵";
 
-    const steps = useMemo(() => getExpressSteps(order.type), [order.type]);
+    const steps = useMemo(
+        () => getExpressSteps(currentOrder.type),
+        [currentOrder.type]
+    );
+
     const currentStepIndex = useMemo(
-        () => getExpressCurrentStepIndex(order.type, order.status),
-        [order.type, order.status]
+        () => getExpressCurrentStepIndex(currentOrder.type, currentOrder.status),
+        [currentOrder.type, currentOrder.status]
     );
 
     const statusText = useMemo(
-        () => getStatusText(order.type, order.status, isCreator),
-        [order.type, order.status, isCreator]
+        () => getStatusText(currentOrder.type, currentOrder.status, isCreator),
+        [currentOrder.type, currentOrder.status, isCreator]
     );
 
     const doAction = async (fn, confirmText = "") => {
@@ -167,26 +189,49 @@ const ExpressOrderCard = ({
             if (res?.data?.success && res.data.order) {
                 const updatedOrder = res.data.order;
 
+                setLocalOrder(updatedOrder);
                 onOrderUpdated?.(updatedOrder);
             }
 
-            onReload?.().catch((e) => {
-                console.warn("Express reload failed:", e);
-            });
+            try {
+                const fresh = await onReload?.();
+
+                if (fresh?.data?.success && Array.isArray(fresh.data.orders)) {
+                    const found = fresh.data.orders.find(
+                        (x) => Number(x.id) === Number(currentOrder.id)
+                    );
+
+                    if (found) {
+                        setLocalOrder(found);
+                        onOrderUpdated?.(found);
+                    }
+                }
+            } catch (reloadError) {
+                console.warn("Express reload failed:", reloadError);
+            }
 
             return res;
         } catch (e) {
             console.error(e);
 
             if (e.response?.status === 409) {
-                alert(e.response?.data?.message || "Статус заказа уже изменился. Обновляем данные.");
+                alert(
+                    e.response?.data?.message ||
+                    "Статус заказа уже изменился. Обновляем данные."
+                );
 
                 try {
                     const fresh = await onReload?.();
 
                     if (fresh?.data?.success && Array.isArray(fresh.data.orders)) {
-                        const found = fresh.data.orders.find((x) => Number(x.id) === Number(order.id));
-                        if (found) onOrderUpdated?.(found);
+                        const found = fresh.data.orders.find(
+                            (x) => Number(x.id) === Number(currentOrder.id)
+                        );
+
+                        if (found) {
+                            setLocalOrder(found);
+                            onOrderUpdated?.(found);
+                        }
                     }
                 } catch {}
 
@@ -199,28 +244,29 @@ const ExpressOrderCard = ({
             actionLockRef.current = false;
         }
     };
+
     const onTheWay = () =>
         doAction(
-            () => axiosInstance.post(`/express/express-orders/${order.id}/on-the-way`),
+            () => axiosInstance.post(`/express/express-orders/${currentOrder.id}/on-the-way`),
             "Подтвердить, что вы выехали к точке A?"
         );
 
     const arrived = () =>
         doAction(
-            () => axiosInstance.post(`/express/express-orders/${order.id}/arrived`),
+            () => axiosInstance.post(`/express/express-orders/${currentOrder.id}/arrived`),
             "Подтвердить, что вы прибыли на место?"
         );
 
     const startWaiting = () =>
         doAction(
-            () => axiosInstance.post(`/express/express-orders/${order.id}/start-waiting`),
+            () => axiosInstance.post(`/express/express-orders/${currentOrder.id}/start-waiting`),
             "Подтвердить начало ожидания клиента?"
         );
 
     const pickUp = () =>
         doAction(
-            () => axiosInstance.post(`/express/express-orders/${order.id}/pick-up`),
-            order.type === "taxi"
+            () => axiosInstance.post(`/express/express-orders/${currentOrder.id}/pick-up`),
+            currentOrder.type === "taxi"
                 ? "Подтвердить, что клиент сел в машину?"
                 : "Подтвердить, что вы забрали заказ?"
         );
@@ -228,10 +274,12 @@ const ExpressOrderCard = ({
     const complete = () =>
         doAction(
             async () => {
-                const res = await axiosInstance.post(`/express/express-orders/${order.id}/complete`);
+                const res = await axiosInstance.post(`/express/express-orders/${currentOrder.id}/complete`);
+
                 if (res.data?.success && res.data?.order) {
                     onCompletedSuccessfully?.(res.data.order);
                 }
+
                 return res;
             },
             "Подтвердить завершение заказа?"
@@ -239,103 +287,122 @@ const ExpressOrderCard = ({
 
     const cancel = () =>
         doAction(
-            () => axiosInstance.post(`/express/express-orders/${order.id}/cancel`),
+            () => axiosInstance.post(`/express/express-orders/${currentOrder.id}/cancel`),
             "Вы уверены, что хотите отменить заказ?"
         );
 
     const nextAction = useMemo(() => {
         if (!isExecutor) return null;
 
-        if (order.type === "taxi") {
-            if (order.status === "accepted") {
+        if (currentOrder.type === "taxi") {
+            if (currentOrder.status === "accepted") {
                 return { label: "Еду к точке A", icon: <FaCarSide />, onClick: onTheWay };
             }
-            if (order.status === "on_the_way_to_A") {
+
+            if (currentOrder.status === "on_the_way_to_A") {
                 return { label: "Я на месте", icon: <FaCheck />, onClick: arrived };
             }
-            if (order.status === "arrived_at_A") {
+
+            if (currentOrder.status === "arrived_at_A") {
                 return { label: "Начать ожидание", icon: <FaHourglassHalf />, onClick: startWaiting };
             }
-            if (order.status === "waiting_at_A") {
+
+            if (currentOrder.status === "waiting_at_A") {
                 return {
                     label: "Клиент в машине",
                     icon: <FaPlay />,
                     onClick: () =>
                         doAction(
-                            () => axiosInstance.post(`/express/express-orders/${order.id}/start`),
+                            () => axiosInstance.post(`/express/express-orders/${currentOrder.id}/start`),
                             "Подтвердить, что клиент сел в машину и поездка началась?"
                         ),
                 };
             }
-            if (order.status === "in_progress") {
+
+            if (currentOrder.status === "in_progress") {
                 return { label: "Завершить заказ", icon: <FaFlagCheckered />, onClick: complete };
             }
-        } else {
-            if (order.status === "accepted") {
+        }
+
+        if (currentOrder.type === "courier") {
+            if (currentOrder.status === "accepted") {
                 return { label: "Еду к точке A", icon: <FaCarSide />, onClick: onTheWay };
             }
-            if (order.status === "on_the_way_to_A") {
+
+            if (currentOrder.status === "on_the_way_to_A") {
                 return { label: "Я на месте", icon: <FaCheck />, onClick: arrived };
             }
-            if (order.status === "arrived_at_A") {
+
+            if (currentOrder.status === "arrived_at_A") {
                 return { label: "Забрал заказ", icon: <FaBoxOpen />, onClick: pickUp };
             }
-            if (order.status === "picked_up") {
+
+            if (currentOrder.status === "picked_up") {
                 return {
                     label: "Начать доставку",
                     icon: <FaPlay />,
                     onClick: () =>
                         doAction(
-                            () => axiosInstance.post(`/express/express-orders/${order.id}/start`),
+                            () => axiosInstance.post(`/express/express-orders/${currentOrder.id}/start`),
                             "Подтвердить начало доставки?"
                         ),
                 };
             }
-            if (order.status === "in_progress") {
+
+            if (currentOrder.status === "in_progress") {
                 return { label: "Завершить заказ", icon: <FaFlagCheckered />, onClick: complete };
             }
         }
 
         return null;
-    }, [isExecutor, order.type, order.status]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+        isExecutor,
+        currentOrder.id,
+        currentOrder.type,
+        currentOrder.status,
+        busy,
+    ]);
 
     const navMode = useMemo(() => {
         if (!isExecutor) return "none";
 
-        if (order.type === "taxi") {
-            if (["accepted", "on_the_way_to_A", "arrived_at_A", "waiting_at_A"].includes(order.status)) {
+        if (currentOrder.type === "taxi") {
+            if (["accepted", "on_the_way_to_A", "arrived_at_A", "waiting_at_A"].includes(currentOrder.status)) {
                 return "toA";
             }
-            if (["in_progress", "completed"].includes(order.status)) {
+
+            if (["in_progress", "completed"].includes(currentOrder.status)) {
                 return "AtoB";
             }
         }
 
-        if (order.type === "courier") {
-            if (["accepted", "on_the_way_to_A", "arrived_at_A"].includes(order.status)) {
+        if (currentOrder.type === "courier") {
+            if (["accepted", "on_the_way_to_A", "arrived_at_A"].includes(currentOrder.status)) {
                 return "toA";
             }
-            if (["picked_up", "in_progress", "completed"].includes(order.status)) {
+
+            if (["picked_up", "in_progress", "completed"].includes(currentOrder.status)) {
                 return "AtoB";
             }
         }
 
         return "none";
-    }, [isExecutor, order.type, order.status]);
+    }, [isExecutor, currentOrder.type, currentOrder.status]);
 
     const canCancel =
         (isCreator &&
-            ["created", "accepted", "on_the_way_to_A", "arrived_at_A", "waiting_at_A"].includes(order.status)) ||
+            ["created", "accepted", "on_the_way_to_A", "arrived_at_A", "waiting_at_A"].includes(currentOrder.status)) ||
         (isExecutor &&
-            ["accepted", "on_the_way_to_A", "arrived_at_A", "waiting_at_A"].includes(order.status));
+            ["accepted", "on_the_way_to_A", "arrived_at_A", "waiting_at_A"].includes(currentOrder.status));
 
     return (
-        <li className={`order-card express-card ${order.type === "taxi" ? "express-taxi" : "express-courier"}`}>
+        <li className={`order-card express-card ${currentOrder.type === "taxi" ? "express-taxi" : "express-courier"}`}>
             <div className="order-header">
                 <div className="order-top">
                     <div className="order-title-wrap">
                         <div className="order-title">
-                            <strong>Экспресс №{order.id}</strong>
+                            <strong>Экспресс №{currentOrder.id}</strong>
                         </div>
 
                         <div className="role-badge-row">
@@ -343,25 +410,29 @@ const ExpressOrderCard = ({
                                 {isCreator ? "Вы заказчик" : "Вы исполнитель"}
                             </span>
 
-                            <span className={`express-pill express-pillType ${order.type}`}>
+                            <span className={`express-pill express-pillType ${currentOrder.type}`}>
                                 {typeText}
                             </span>
                         </div>
                     </div>
 
                     <div className="pay-box express-pay">
-                        <span className="pay-icon" title={paymentLabel}>{paymentIcon}</span>
+                        <span className="pay-icon" title={paymentLabel}>
+                            {paymentIcon}
+                        </span>
+
                         <div className="pay-right">
                             <div className="pay-price">
-                                {Number(order.totalPrice ?? 0).toLocaleString("ru-RU")} ₽
+                                {Number(currentOrder.totalPrice ?? 0).toLocaleString("ru-RU")} ₽
                             </div>
+
                             <div className="pay-type">{paymentLabel}</div>
                         </div>
                     </div>
                 </div>
 
                 <div className="order-subline">
-                    Создан {new Date(order.created_at || order.createdAt).toLocaleString()}
+                    Создан {new Date(currentOrder.created_at || currentOrder.createdAt).toLocaleString()}
                 </div>
 
                 <div className="express-stepperOuter">
@@ -392,7 +463,9 @@ const ExpressOrderCard = ({
                                         )}
                                     </div>
 
-                                    <div className="express-stepPremiumLabel">{step.label}</div>
+                                    <div className="express-stepPremiumLabel">
+                                        {step.label}
+                                    </div>
                                 </div>
                             );
                         })}
@@ -407,24 +480,28 @@ const ExpressOrderCard = ({
                     <div className="express-ab premium-routeBox">
                         <div className="express-abItem">
                             <div className="express-abLabel">Откуда</div>
-                            <div className="express-abValue">{order.fromAddress}</div>
+                            <div className="express-abValue">
+                                {currentOrder.fromAddress}
+                            </div>
                         </div>
 
                         <div className="express-abArrow">→</div>
 
                         <div className="express-abItem">
                             <div className="express-abLabel">Куда</div>
-                            <div className="express-abValue">{order.toAddress}</div>
+                            <div className="express-abValue">
+                                {currentOrder.toAddress}
+                            </div>
                         </div>
                     </div>
 
-                    {order.description ? (
+                    {currentOrder.description ? (
                         <p className="express-comment">
-                            <strong>Комментарий:</strong> {order.description}
+                            <strong>Комментарий:</strong> {currentOrder.description}
                         </p>
                     ) : null}
 
-                    {nextAction && !["completed", "cancelled"].includes(order.status) && isExecutor && (
+                    {nextAction && !["completed", "cancelled"].includes(currentOrder.status) && isExecutor && (
                         <div className="express-primaryActionWrap">
                             <button
                                 className="express-primaryActionBtn"
@@ -435,7 +512,7 @@ const ExpressOrderCard = ({
                                 title={nextAction.label}
                             >
                                 {nextAction.icon}
-                                <span>{nextAction.label}</span>
+                                <span>{busy ? "Обновляем..." : nextAction.label}</span>
                             </button>
                         </div>
                     )}
@@ -443,7 +520,7 @@ const ExpressOrderCard = ({
                     <div className="express-secondaryActions">
                         <button
                             className="express-secondaryBtn"
-                            onClick={() => onCallUser?.(order)}
+                            onClick={() => onCallUser?.(currentOrder)}
                             type="button"
                         >
                             <FaPhone />
@@ -452,18 +529,16 @@ const ExpressOrderCard = ({
 
                         <button
                             className="express-secondaryBtn"
-                            onClick={() => onOpenChat?.(order.id)}
+                            onClick={() => onOpenChat?.(currentOrder.id)}
                             type="button"
                         >
                             <FaComments />
                             <span className="btn-text">Чат</span>
                         </button>
 
-
-
                         {isExecutor && navMode !== "none" && (
                             <ExpressRouteButtons
-                                orderId={order.id}
+                                orderId={currentOrder.id}
                                 navMode={navMode}
                                 className="express-routeButtonsPremium"
                                 buttonClassName="express-secondaryBtn"
@@ -472,14 +547,14 @@ const ExpressOrderCard = ({
 
                         <button
                             className="express-secondaryBtn express-secondaryBtnWarn"
-                            onClick={() => onOpenDispute?.(order)}
+                            onClick={() => onOpenDispute?.(currentOrder)}
                             type="button"
                         >
                             <FaExclamationTriangle />
                             <span className="btn-text">Проблема</span>
                         </button>
 
-                        {canCancel && !["completed", "cancelled"].includes(order.status) && (
+                        {canCancel && !["completed", "cancelled"].includes(currentOrder.status) && (
                             <button
                                 className="express-secondaryBtn express-secondaryBtnDanger"
                                 type="button"
@@ -495,8 +570,8 @@ const ExpressOrderCard = ({
                     </div>
 
                     <p className="express-meta">
-                        <strong>Расстояние:</strong> {order.distanceKm ?? "—"} км •{" "}
-                        <strong>Время:</strong> {order.estimatedTimeMin ?? "—"} мин
+                        <strong>Расстояние:</strong> {currentOrder.distanceKm ?? "—"} км •{" "}
+                        <strong>Время:</strong> {currentOrder.estimatedTimeMin ?? "—"} мин
                     </p>
                 </div>
             </div>

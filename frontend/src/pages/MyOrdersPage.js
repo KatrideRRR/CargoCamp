@@ -92,7 +92,7 @@ const MyOrdersPage = () => {
                 axiosInstance.get(`/orders/creator/${userId}`, {
                     headers: { Authorization: `Bearer ${token}` },
                 }),
-                axiosInstance.get(`/express/express-orders/me?mode=active`, {
+                axiosInstance.get(`/express/express-orders/me?mode=created`, {
                     headers: { Authorization: `Bearer ${token}` },
                 }),
             ]);
@@ -265,22 +265,42 @@ const MyOrdersPage = () => {
             }
         };
 
+        const removeAcceptedExpressFromMyOrders = (payload) => {
+            const orderId = payload?.orderId;
+
+            if (!orderId) {
+                fetchOrders();
+                return;
+            }
+
+            setOrders((prev) =>
+                prev.filter((order) => {
+                    if (order.kind !== "express") return true;
+                    return Number(order.id) !== Number(orderId);
+                })
+            );
+
+            fetchOrders();
+        };
+
         checkAuthUser();
 
         socket.on("orderUpdated", fetchOrders);
         socket.on("activeOrdersUpdated", fetchOrders);
+
         socket.on("expressOrdersUpdated", fetchOrders);
-        socket.on("expressOrderAccepted", fetchOrders);
-        socket.on("expressOrderStatusChanged", fetchOrders);
-        socket.on("expressStatusChanged", fetchOrders);
+        socket.on("expressOrderAccepted", removeAcceptedExpressFromMyOrders);
+        socket.on("expressOrderStatusChanged", removeAcceptedExpressFromMyOrders);
+        socket.on("expressStatusChanged", removeAcceptedExpressFromMyOrders);
 
         return () => {
             socket.off("orderUpdated", fetchOrders);
             socket.off("activeOrdersUpdated", fetchOrders);
+
             socket.off("expressOrdersUpdated", fetchOrders);
-            socket.off("expressOrderAccepted", fetchOrders);
-            socket.off("expressOrderStatusChanged", fetchOrders);
-            socket.off("expressStatusChanged", fetchOrders);
+            socket.off("expressOrderAccepted", removeAcceptedExpressFromMyOrders);
+            socket.off("expressOrderStatusChanged", removeAcceptedExpressFromMyOrders);
+            socket.off("expressStatusChanged", removeAcceptedExpressFromMyOrders);
         };
     }, [userId, navigate, setHasNewRequests]);
 

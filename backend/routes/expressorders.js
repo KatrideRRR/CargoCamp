@@ -204,10 +204,29 @@ router.get("/express-orders/me", authenticateToken, async (req, res) => {
             [Op.or]: [{ creatorId: userId }, { executorId: userId }],
         };
 
-        const where =
-            mode === "history"
-                ? { ...whereBase, status: { [Op.in]: ["completed", "cancelled"] } }
-                : { ...whereBase, status: { [Op.notIn]: ["completed", "cancelled"] } };
+        let where;
+
+        if (mode === "history") {
+            where = {
+                ...whereBase,
+                status: { [Op.in]: ["completed", "cancelled"] },
+            };
+        } else if (mode === "created") {
+            // Для страницы "Мои заказы":
+            // показываем только экспресс-заказы заказчика, которые ещё никто не взял.
+            where = {
+                creatorId: userId,
+                executorId: null,
+                status: "created",
+            };
+        } else {
+            // Для active-orders:
+            // все активные экспресс-заказы, где пользователь заказчик или исполнитель.
+            where = {
+                ...whereBase,
+                status: { [Op.notIn]: ["completed", "cancelled"] },
+            };
+        }
 
         const orders = await ExpressOrder.findAll({
             where,
