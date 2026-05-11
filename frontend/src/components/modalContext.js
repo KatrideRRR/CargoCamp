@@ -6,7 +6,12 @@ import "../styles/modalContext.css";
 import axios from "axios";
 import ReviewModal from "../components/ReviewModal";
 import PaymentProviderSelect from "../components/PaymentProviderSelect";
-import { shouldRemindReview, markReminded } from "../utils/reviewReminder";
+import {
+    shouldRemindReview,
+    markReminded,
+    hasSubmittedReview,
+    markReviewSubmitted,
+} from "../utils/reviewReminder";
 
 export const ModalContext = createContext(null);
 
@@ -57,6 +62,7 @@ export const ModalProvider = ({ children }) => {
     const [notificationData, setNotificationData] = useState(null);
     const [completionNotificationData, setCompletionNotificationData] = useState(null);
     const [expressAcceptedData, setExpressAcceptedData] = useState(null);
+    const [expressCancelledData, setExpressCancelledData] = useState(null);
 
     const [showRatingModal, setShowRatingModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
@@ -178,6 +184,11 @@ export const ModalProvider = ({ children }) => {
             return;
         }
 
+        if (data.status === "cancelled") {
+            openExpressCancelledModal(data);
+            return;
+        }
+
         const expressType = data.type || data.expressType;
 
         const textByStatus = {
@@ -200,6 +211,14 @@ export const ModalProvider = ({ children }) => {
         executorId,
         orderType = "regular"
     ) => {
+        if (!orderId) return;
+
+        // ✅ если отзыв уже отправлен локально — не открываем модалку
+        if (hasSubmittedReview(orderId, orderType)) {
+            toast.info("Вы уже оставили отзыв по этому заказу");
+            return;
+        }
+
         setSelectedOrder({
             id: orderId,
             creatorId,
@@ -208,8 +227,6 @@ export const ModalProvider = ({ children }) => {
             isExpress: orderType === "express",
         });
 
-        // Важно: перед отзывом закрываем все completion-модалки,
-        // чтобы они не висели под ReviewModal и не открывались цепочкой.
         setCompletionNotificationData(null);
         setCompletionSuccessData(null);
 
@@ -223,7 +240,7 @@ export const ModalProvider = ({ children }) => {
         const orderId = payload.orderId;
         const orderType = payload.orderType || "regular";
 
-        if (!shouldRemindReview(orderId)) {
+        if (!shouldRemindReview(orderId, orderType)) {
             return;
         }
 
@@ -242,7 +259,7 @@ export const ModalProvider = ({ children }) => {
             orderType
         );
 
-        markReminded(orderId);
+        markReminded(orderId, orderType);
     };
 
     useEffect(() => {
@@ -284,6 +301,71 @@ export const ModalProvider = ({ children }) => {
         setExpressAcceptedData(null);
     };
 
+    const getExpressCancelledModalKey = (orderId) => {
+        return `express_cancelled_modal_shown_${orderId}`;
+    };
+
+    const openExpressCancelledModal = (data) => {
+        const orderId = data?.orderId || data?.data?.orderId;
+        if (!orderId) return;
+
+        const status = data.status || data?.data?.status;
+        if (status && status !== "cancelled") return;
+
+        const creatorId = data.creatorId || data?.data?.creatorId;
+        const executorId = data.executorId || data?.data?.executorId;
+
+        const isParticipant =
+            Number(userId) === Number(creatorId) ||
+            Number(userId) === Number(executorId);
+
+        if (!isParticipant) return;
+
+        const cancelledBy = data.cancelledBy || data?.data?.cancelledBy;
+        const cancelledByRole = data.cancelledByRole || data?.data?.cancelledByRole;
+
+        const cancelledByMe = Number(cancelledBy) === Number(userId);
+
+        const shownKey = getExpressCancelledModalKey(orderId);
+
+        if (localStorage.getItem(shownKey) === "1") {
+            return;
+        }
+
+        localStorage.setItem(shownKey, "1");
+
+        let cancelledText = "Экспресс-заказ был отменён.";
+
+        if (cancelledByMe) {
+            cancelledText = "Вы отменили экспресс-заказ.";
+        } else if (cancelledByRole === "creator") {
+            cancelledText = "Заказчик отменил экспресс-заказ.";
+        } else if (cancelledByRole === "executor") {
+            cancelledText = "Исполнитель отменил экспресс-заказ.";
+        }
+
+        setCompletionNotificationData(null);
+        setCompletionSuccessData(null);
+        setExpressAcceptedData(null);
+
+        setExpressCancelledData({
+            title: data.title || "Экспресс-заказ отменён",
+            description:
+                data.message ||
+                data.body ||
+                `${cancelledText} Заказ №${orderId}`,
+            orderId,
+            creatorId,
+            executorId,
+            cancelledBy,
+            cancelledByRole,
+            orderType: "express",
+        });
+    };
+
+    const handleExpressCancelledClose = () => {
+        setExpressCancelledData(null);
+    };
 
     const handleSubmitReview = async ({ rating, text }) => {
         if (!selectedOrder?.id) {
@@ -294,13 +376,20 @@ export const ModalProvider = ({ children }) => {
         try {
             setReviewLoading(true);
 
+            const orderType =
+                selectedOrder.orderType ||
+                (selectedOrder.isExpress ? "express" : "regular");
+
             await axiosInstance.post("/auth/review", {
                 orderId: selectedOrder.id,
                 rating,
                 text,
                 isExpress: !!selectedOrder.isExpress,
-                orderType: selectedOrder.orderType || (selectedOrder.isExpress ? "express" : "regular"),
+                orderType,
             });
+
+            // ✅ больше не показываем напоминание по этому заказу
+            markReviewSubmitted(selectedOrder.id, orderType);
 
             toast.success("Отзыв отправлен");
 
@@ -308,13 +397,33 @@ export const ModalProvider = ({ children }) => {
             setSelectedOrder(null);
             setRating(0);
 
-            // На всякий случай убираем остальные модалки завершения.
             setCompletionNotificationData(null);
             setCompletionSuccessData(null);
 
             return true;
         } catch (e) {
             console.error("Ошибка отправки отзыва:", e);
+
+            // ✅ если сервер говорит, что отзыв уже есть — тоже помечаем локально
+            if (
+                e.response?.status === 409 ||
+                String(e.response?.data?.message || "").toLowerCase().includes("уже")
+            ) {
+                const orderType =
+                    selectedOrder.orderType ||
+                    (selectedOrder.isExpress ? "express" : "regular");
+
+                markReviewSubmitted(selectedOrder.id, orderType);
+
+                setShowRatingModal(false);
+                setSelectedOrder(null);
+                setCompletionNotificationData(null);
+                setCompletionSuccessData(null);
+
+                toast.info("Вы уже оставляли отзыв по этому заказу");
+                return true;
+            }
+
             toast.error(e.response?.data?.message || "Не удалось отправить отзыв");
             return false;
         } finally {
@@ -379,13 +488,26 @@ export const ModalProvider = ({ children }) => {
 
             if (!data?.orderId) return;
 
+            const orderId = data.orderId;
+            const orderType = "express";
+
+            if (hasSubmittedReview(orderId, orderType)) {
+                return;
+            }
+
+            if (!shouldRemindReview(orderId, orderType)) {
+                return;
+            }
+
+            markReminded(orderId, orderType);
+
             setCompletionNotificationData({
                 title: "Экспресс-заказ завершён",
-                description: `Заказ номер ${data.orderId}: ${data.message || "Оцените исполнителя и оставьте отзыв"}`,
-                orderId: data.orderId,
+                description: `Заказ номер ${orderId}: ${data.message || "Оцените исполнителя и оставьте отзыв"}`,
+                orderId,
                 creatorId: data.creatorId,
                 executorId: data.executorId,
-                orderType: "express",
+                orderType,
             });
         };
 
@@ -411,6 +533,34 @@ export const ModalProvider = ({ children }) => {
         const handleNewNotification = (notifications) => {
             const list = Array.isArray(notifications) ? notifications : [notifications];
 
+            const cancelledNotification = list.find((n) => {
+                const orderType = n.orderType || n?.data?.orderType;
+
+                return (
+                    orderType === "express" &&
+                    n.type === "express_cancelled" &&
+                    (n.orderId || n?.data?.orderId)
+                );
+            });
+
+            if (cancelledNotification) {
+                openExpressCancelledModal({
+                    orderId: cancelledNotification.orderId || cancelledNotification?.data?.orderId,
+                    title: cancelledNotification.title || "Экспресс-заказ отменён",
+                    body: cancelledNotification.body,
+                    message: cancelledNotification.body,
+                    creatorId: cancelledNotification?.data?.creatorId,
+                    executorId: cancelledNotification?.data?.executorId,
+                    cancelledBy: cancelledNotification?.data?.cancelledBy,
+                    cancelledByRole: cancelledNotification?.data?.cancelledByRole,
+                    status: cancelledNotification?.data?.status || "cancelled",
+                    orderType: "express",
+                    data: cancelledNotification.data,
+                });
+
+                return;
+            }
+
             const reviewNotification = list.find((n) => {
                 const orderType = n.orderType || n?.data?.orderType;
                 return (
@@ -422,6 +572,19 @@ export const ModalProvider = ({ children }) => {
 
             if (!reviewNotification) return;
 
+            const orderId = reviewNotification.orderId || reviewNotification?.data?.orderId;
+            const orderType = "express";
+
+            if (hasSubmittedReview(orderId, orderType)) {
+                return;
+            }
+
+            if (!shouldRemindReview(orderId, orderType)) {
+                return;
+            }
+
+            markReminded(orderId, orderType);
+
             setCompletionNotificationData({
                 title: reviewNotification.title || "Экспресс-заказ завершён",
                 description:
@@ -432,6 +595,11 @@ export const ModalProvider = ({ children }) => {
                 executorId: reviewNotification?.data?.executorId,
                 orderType: "express",
             });
+        };
+
+        const handleExpressOrderCancelled = (data) => {
+
+            openExpressCancelledModal(data);
         };
 
         const handleReviewNeeded = (data) => {
@@ -453,6 +621,7 @@ export const ModalProvider = ({ children }) => {
         socket.on("expressOrderAccepted", handleExpressOrderAccepted);
         socket.on("expressOrderStatusChanged", handleExpressOrderStatusChanged);
         socket.on("new_notification", handleNewNotification);
+        socket.on("expressOrderCancelled", handleExpressOrderCancelled);
 
         return () => {
             socket.off("orderApproved", handleOrderApproved);
@@ -463,6 +632,7 @@ export const ModalProvider = ({ children }) => {
             socket.off("expressOrderAccepted", handleExpressOrderAccepted);
             socket.off("expressOrderStatusChanged", handleExpressOrderStatusChanged);
             socket.off("new_notification", handleNewNotification);
+            socket.off("expressOrderCancelled", handleExpressOrderCancelled);
         };
     }, [userId]);
 
@@ -780,6 +950,55 @@ export const ModalProvider = ({ children }) => {
                                 </button>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {expressCancelledData && (
+                <div className="modal-overlay">
+                    <div className="modal modal-compact">
+                        <button
+                            className="modal-close"
+                            onClick={handleExpressCancelledClose}
+                            aria-label="Закрыть"
+                            type="button"
+                        >
+                            ×
+                        </button>
+
+                        <div className="modal-icon">🚫</div>
+
+                        <h2 className="modal-title">
+                            {expressCancelledData.title || "Экспресс-заказ отменён"}
+                        </h2>
+
+                        <p className="modal-text">
+                            {expressCancelledData.description ||
+                                `Экспресс-заказ №${expressCancelledData.orderId} отменён.`}
+                        </p>
+
+                        <div className="modal-note">
+                            Заказ больше не активен и будет доступен в истории.
+                        </div>
+
+                        <div className="modal-actions">
+                            <button
+                                className="modal-btn modal-btn-primary"
+                                onClick={() => {
+                                    setExpressCancelledData(null);
+                                    window.location.href = "/active-orders";
+                                }}
+                            >
+                                К активным заказам
+                            </button>
+
+                            <button
+                                className="modal-btn modal-btn-ghost"
+                                onClick={handleExpressCancelledClose}
+                            >
+                                Понятно
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

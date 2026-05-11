@@ -538,6 +538,8 @@ const OrdersPage = () => {
     }, [profile, YM_KEY]);
 
     const pullLocationFromProfile = async () => {
+        setLocationMenuOpen(false);
+
         if (!profile) {
             toast.info("Профиль ещё не загружен");
             return;
@@ -574,6 +576,8 @@ const OrdersPage = () => {
 
     const detectGpsNow = () =>
         new Promise(async (resolve) => {
+            setLocationMenuOpen(false);
+
             try {
                 setLocLoading(true);
                 setLocError(null);

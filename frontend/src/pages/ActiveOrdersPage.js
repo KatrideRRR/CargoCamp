@@ -689,6 +689,7 @@ const ActiveOrdersPage = () => {
         socket.on("expressStatusChanged", onAnyOrderUpdate);
         socket.on("expressOrderCompleted", onAnyOrderUpdate);
         socket.on("expressOrderCompletedForExecutor", onAnyOrderUpdate);
+        socket.on("expressOrderCancelled", onAnyOrderUpdate);
 
         reloadAll();
 
@@ -705,6 +706,7 @@ const ActiveOrdersPage = () => {
             socket.off("expressStatusChanged", onAnyOrderUpdate);
             socket.off("expressOrderCompleted", onAnyOrderUpdate);
             socket.off("expressOrderCompletedForExecutor", onAnyOrderUpdate);
+            socket.off("expressOrderCancelled", onAnyOrderUpdate);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [navigate, user?.id, token]);

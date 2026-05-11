@@ -1154,15 +1154,37 @@ router.post("/express-orders/:id/cancel", authenticateToken, async (req, res) =>
         const userId = req.user.id;
         const id = Number(req.params.id);
 
-        const order = await ExpressOrder.findByPk(id);
-        if (!order) return res.status(404).json({ success: false, message: "Заказ не найден" });
-
-        if (!isParticipant(order, userId)) {
-            return res.status(403).json({ success: false, message: "Нет доступа" });
+        if (!Number.isFinite(id) || id <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Некорректный id",
+            });
         }
 
-        const byCreator = order.creatorId === userId;
-        const byExecutor = order.executorId === userId;
+        const order = await ExpressOrder.findByPk(id);
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: "Заказ не найден",
+            });
+        }
+
+        if (!isParticipant(order, userId)) {
+            return res.status(403).json({
+                success: false,
+                message: "Нет доступа",
+            });
+        }
+
+        if (["completed", "cancelled"].includes(order.status)) {
+            return res.status(409).json({
+                success: false,
+                message: `Заказ уже ${order.status === "completed" ? "завершён" : "отменён"}`,
+            });
+        }
+
+        const byCreator = Number(order.creatorId) === Number(userId);
+        const byExecutor = Number(order.executorId) === Number(userId);
 
         const creatorAllowed = [
             "created",
@@ -1180,69 +1202,110 @@ router.post("/express-orders/:id/cancel", authenticateToken, async (req, res) =>
         ].includes(order.status);
 
         if ((byCreator && !creatorAllowed) || (byExecutor && !execAllowed)) {
-            return res.status(409).json({ success: false, message: `Нельзя отменить из статуса ${order.status}` });
+            return res.status(409).json({
+                success: false,
+                message: `Нельзя отменить из статуса ${order.status}`,
+            });
         }
 
         const from = order.status;
+
         order.status = "cancelled";
         order.dealStatus = "cancelled";
+        order.cancelledAt = new Date();
+
         await order.save();
 
-        const notifyTo = [];
+        const cancelledByRole = byCreator ? "creator" : "executor";
 
-        if (order.creatorId && Number(order.creatorId) !== Number(userId)) {
-            notifyTo.push(order.creatorId);
-        }
+        const cancelledByText =
+            cancelledByRole === "creator"
+                ? "заказчиком"
+                : "исполнителем";
 
-        if (order.executorId && Number(order.executorId) !== Number(userId)) {
-            notifyTo.push(order.executorId);
-        }
+        const title = "Экспресс-заказ отменён";
+        const body = `Экспресс-заказ №${order.id} отменён ${cancelledByText}`;
+
+        const socketPayload = buildExpressPayload(order, {
+            from,
+            cancelledBy: userId,
+            cancelledByRole,
+            cancelledAt: order.cancelledAt,
+            message: body,
+        });
 
         await req.logAction({
             req,
             actorUserId: userId,
             actorRole: "user",
-            actionType: "express_status_change",
+            actionType: "express_order_cancel",
             entityType: "express_order",
             entityId: order.id,
             expressOrderId: order.id,
-            meta: { from, to: order.status },
-        });
-
-        await notifyMany(notifyTo, {
-            type: "express_cancelled",
-            title: "Экспресс-заказ отменён",
-            body: `Экспресс-заказ №${order.id} отменён`,
-            orderId: order.id,
-            orderType: "express",
-            data: {
-                creatorId: order.creatorId,
-                executorId: order.executorId,
+            severity: "warn",
+            meta: {
+                from,
+                to: order.status,
                 cancelledBy: userId,
-                expressType: order.type,
-                status: order.status,
-            },
-            socketEvent: "expressStatusChanged",
-            socketPayload: {
-                orderId: order.id,
-                orderType: "express",
-                status: "cancelled",
-                message: "Экспресс-заказ отменён",
+                cancelledByRole,
             },
         });
 
         const io = req.app.locals.io;
 
-        emitExpressStatusToParticipants(io, order, {
-            from,
-            cancelledBy: userId,
-            message: "Экспресс-заказ отменён",
+        const participantIds = [
+            order.creatorId,
+            order.executorId,
+        ].filter(Boolean);
+
+        participantIds.forEach((participantId) => {
+            emitToUserEverywhere(io, participantId, "expressOrderCancelled", socketPayload);
+            emitToUserEverywhere(io, participantId, "expressStatusChanged", socketPayload);
+            emitToUserEverywhere(io, participantId, "expressOrderStatusChanged", socketPayload);
+            emitToUserEverywhere(io, participantId, "activeOrdersUpdated", socketPayload);
+            emitToUserEverywhere(io, participantId, "expressOrdersUpdated", socketPayload);
         });
 
-        res.json({ success: true, order });
+        const notifyTo = participantIds.filter(
+            (participantId) => Number(participantId) !== Number(userId)
+        );
+
+        if (notifyTo.length > 0) {
+            await notifyMany(notifyTo, {
+                type: "express_cancelled",
+                title,
+                body,
+                orderId: order.id,
+                orderType: "express",
+                data: {
+                    orderId: order.id,
+                    creatorId: order.creatorId,
+                    executorId: order.executorId,
+                    cancelledBy: userId,
+                    cancelledByRole,
+                    expressType: order.type,
+                    type: order.type,
+                    status: order.status,
+                    cancelledAt: order.cancelledAt,
+                },
+                socketEvent: "expressOrderCancelled",
+                socketPayload,
+            });
+        }
+
+        return res.json({
+            success: true,
+            order,
+            cancelledBy: userId,
+            cancelledByRole,
+            message: body,
+        });
     } catch (e) {
         console.error("express-orders cancel error:", e);
-        res.status(500).json({ success: false, message: "Ошибка сервера" });
+        return res.status(500).json({
+            success: false,
+            message: "Ошибка сервера",
+        });
     }
 });
 

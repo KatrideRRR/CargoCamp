@@ -527,6 +527,9 @@ const ProfilePage = () => {
 
             toast.success("Местоположение сохранено");
 
+            setAddressSuggestions([]);
+            setAddressQuery("");
+
             setProfile((prev) => ({
                 ...prev,
                 ...res.data.location,
@@ -573,12 +576,16 @@ const ProfilePage = () => {
                 }
 
                 setLocationDraft(addr);
+                setAddressSuggestions([]);
+                setAddressQuery("");
                 setGpsCandidate({ lat, lng, address: addr });
                 toast.success("Местоположение определено");
             } catch (e) {
                 console.error("reverse geocode error:", e);
 
                 setLocationDraft(`Координаты: ${lat}, ${lng}`);
+                setAddressSuggestions([]);
+                setAddressQuery("");
                 setGpsCandidate({
                     lat,
                     lng,
@@ -1354,6 +1361,8 @@ const ProfilePage = () => {
                         orders={[]}
                         onPick={(picked) => {
                             setLocationDraft(picked.address);
+                            setAddressSuggestions([]);
+                            setAddressQuery("");
 
                             saveLocation({
                                 address: picked.address,
