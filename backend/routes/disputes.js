@@ -124,11 +124,16 @@ router.get('/order/:orderId', authMiddleware, async (req, res) => {
         });
 
         if (!dispute) {
-            return res.status(404).json({ message: 'Спор не найден' });
+            return res.json({
+                success: true,
+                dispute: null,
+            });
         }
 
-        return res.json(dispute);
-
+        return res.json({
+            success: true,
+            dispute,
+        });
     } catch (error) {
         console.error('Ошибка получения спора:', error);
         return res.status(500).json({ message: 'Ошибка сервера' });

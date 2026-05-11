@@ -162,12 +162,14 @@ const ActiveOrdersPage = () => {
                 headers: { Authorization: `Bearer ${t}` },
             });
 
-            if (res.data) {
+            const dispute = res.data?.dispute || null;
+
+            if (dispute) {
                 setOrderDisputes((prev) => ({
                     ...prev,
-                    [orderId]: res.data,
+                    [orderId]: dispute,
                 }));
-                return res.data;
+                return dispute;
             }
 
             return null;
@@ -583,11 +585,17 @@ const ActiveOrdersPage = () => {
                         const res = await axios.get(`${apiUrl}/api/disputes/order/${order.id}`, {
                             headers: { Authorization: `Bearer ${t}` },
                         });
-                        return { orderId: order.id, dispute: res.data };
+
+                        const dispute = res.data?.dispute || null;
+
+                        if (!dispute) return null;
+
+                        return {
+                            orderId: order.id,
+                            dispute,
+                        };
                     } catch (e) {
-                        if (e?.response?.status !== 404) {
-                            console.error(`Ошибка загрузки спора для заказа ${order.id}:`, e);
-                        }
+                        console.error(`Ошибка загрузки спора для заказа ${order.id}:`, e);
                         return null;
                     }
                 })
@@ -1119,7 +1127,9 @@ const ActiveOrdersPage = () => {
                                             onOrderUpdated={(updatedOrder) => {
                                                 setExpressOrders((prev) =>
                                                     prev.map((item) =>
-                                                        Number(item.id) === Number(updatedOrder.id) ? updatedOrder : item
+                                                        Number(item.id) === Number(updatedOrder.id)
+                                                            ? { ...item, ...updatedOrder }
+                                                            : item
                                                     )
                                                 );
                                             }}
@@ -1127,9 +1137,12 @@ const ActiveOrdersPage = () => {
                                                 const r = await axiosInstance.get(`/express/express-orders/me`, {
                                                     params: { mode: "active" },
                                                 });
+
                                                 if (r.data?.success) {
                                                     setExpressOrders(Array.isArray(r.data.orders) ? r.data.orders : []);
                                                 }
+
+                                                return r;
                                             }}
                                             onCompletedSuccessfully={(completedOrder) => {
                                                 openCompletionSuccessModal(

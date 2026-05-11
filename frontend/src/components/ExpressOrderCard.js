@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import axiosInstance from "../utils/axiosInstance";
 import {
     FaCheck,
@@ -115,6 +115,29 @@ const ExpressOrderCard = ({
                               onOrderUpdated,
                           }) => {
     const [busy, setBusy] = useState(false);
+    const [localOrder, setLocalOrder] = useState(order);
+    const actionLockRef = useRef(false);
+
+    React.useEffect(() => {
+        if (!order?.id) return;
+
+        setLocalOrder((prev) => {
+            if (!prev || Number(prev.id) !== Number(order.id)) {
+                return order;
+            }
+
+            const prevTime = new Date(prev.updatedAt || prev.updated_at || prev.createdAt || 0).getTime();
+            const nextTime = new Date(order.updatedAt || order.updated_at || order.createdAt || 0).getTime();
+
+            if (!prevTime || !nextTime || nextTime >= prevTime) {
+                return order;
+            }
+
+            return prev;
+        });
+    }, [order]);
+
+    order = localOrder || order;
 
     const isExecutor = Number(order.executorId) === Number(userId);
     const isCreator = Number(order.creatorId) === Number(userId);
@@ -145,32 +168,60 @@ const ExpressOrderCard = ({
     );
 
     const doAction = async (fn, confirmText = "") => {
-        if (busy) return;
+        if (busy || actionLockRef.current) return;
+
+        actionLockRef.current = true;
 
         if (confirmText) {
             const ok = window.confirm(confirmText);
-            if (!ok) return;
+
+            if (!ok) {
+                actionLockRef.current = false;
+                return;
+            }
         }
 
         setBusy(true);
+
         try {
             const res = await fn();
 
             if (res?.data?.success && res.data.order) {
-                onOrderUpdated?.(res.data.order);
+                const updatedOrder = res.data.order;
+
+                setLocalOrder(updatedOrder);
+                onOrderUpdated?.(updatedOrder);
             }
 
-            await onReload?.();
+            onReload?.().catch((e) => {
+                console.warn("Express reload failed:", e);
+            });
 
             return res;
         } catch (e) {
             console.error(e);
+
+            if (e.response?.status === 409) {
+                alert(e.response?.data?.message || "Статус заказа уже изменился. Обновляем данные.");
+
+                try {
+                    const fresh = await onReload?.();
+
+                    if (fresh?.data?.success && Array.isArray(fresh.data.orders)) {
+                        const found = fresh.data.orders.find((x) => Number(x.id) === Number(order.id));
+                        if (found) setLocalOrder(found);
+                    }
+                } catch {}
+
+                return;
+            }
+
             alert(e.response?.data?.message || "Ошибка действия");
         } finally {
             setBusy(false);
+            actionLockRef.current = false;
         }
     };
-
     const onTheWay = () =>
         doAction(
             () => axiosInstance.post(`/express/express-orders/${order.id}/on-the-way`),
