@@ -533,13 +533,29 @@ module.exports = (io) => {
                 });
             }
 
+            const proposedSumRaw = Number(proposedSum);
+
+            if (!Number.isFinite(proposedSumRaw) || proposedSumRaw < 0) {
+                return res.status(400).json({
+                    message: "Некорректная стоимость заказа",
+                });
+            }
+
+            if (proposedSumRaw > 300000) {
+                return res.status(400).json({
+                    message: "Слишком большая стоимость заказа. Проверьте сумму.",
+                });
+            }
+
+            const safeProposedSum = Math.round(proposedSumRaw * 100) / 100;
+
             // 3) Сначала создаём заказ БЕЗ финальных путей картинок
             const newOrder = await Order.create({
                 userId,
                 address,
                 description,
                 workTime,
-                proposedSum: parsedProposedSum,
+                proposedSum: safeProposedSum,
                 coordinates: coordinatesStr,
                 createdAt: new Date().toISOString(),
                 images: [],

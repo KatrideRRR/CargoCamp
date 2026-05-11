@@ -115,29 +115,7 @@ const ExpressOrderCard = ({
                               onOrderUpdated,
                           }) => {
     const [busy, setBusy] = useState(false);
-    const [localOrder, setLocalOrder] = useState(order);
     const actionLockRef = useRef(false);
-
-    React.useEffect(() => {
-        if (!order?.id) return;
-
-        setLocalOrder((prev) => {
-            if (!prev || Number(prev.id) !== Number(order.id)) {
-                return order;
-            }
-
-            const prevTime = new Date(prev.updatedAt || prev.updated_at || prev.createdAt || 0).getTime();
-            const nextTime = new Date(order.updatedAt || order.updated_at || order.createdAt || 0).getTime();
-
-            if (!prevTime || !nextTime || nextTime >= prevTime) {
-                return order;
-            }
-
-            return prev;
-        });
-    }, [order]);
-
-    order = localOrder || order;
 
     const isExecutor = Number(order.executorId) === Number(userId);
     const isCreator = Number(order.creatorId) === Number(userId);
@@ -189,7 +167,6 @@ const ExpressOrderCard = ({
             if (res?.data?.success && res.data.order) {
                 const updatedOrder = res.data.order;
 
-                setLocalOrder(updatedOrder);
                 onOrderUpdated?.(updatedOrder);
             }
 
@@ -209,7 +186,7 @@ const ExpressOrderCard = ({
 
                     if (fresh?.data?.success && Array.isArray(fresh.data.orders)) {
                         const found = fresh.data.orders.find((x) => Number(x.id) === Number(order.id));
-                        if (found) setLocalOrder(found);
+                        if (found) onOrderUpdated?.(found);
                     }
                 } catch {}
 

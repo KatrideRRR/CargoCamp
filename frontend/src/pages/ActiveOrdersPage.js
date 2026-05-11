@@ -4,7 +4,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "../styles/ActiveOrdersPage.css";
 import { useAuth } from "../utils/authContext";
-import { socket } from "../socketClient";
+import { socket, connectSocket } from "../socketClient";
 import { useMediaQuery } from "react-responsive";
 import { FaPhone, FaComments, FaRoute, FaCheck, FaTrash, FaExclamationTriangle, FaPlay } from "react-icons/fa";
 import Modal from "react-modal";
@@ -638,10 +638,7 @@ const ActiveOrdersPage = () => {
 
         if (!user?.id) return;
 
-        socket.emit("register", user.id);
-
-        fetchExpressOrders();
-        fetchActiveOrders();
+        connectSocket(user.id);
 
         const reloadAll = async () => {
             await Promise.allSettled([
@@ -650,38 +647,64 @@ const ActiveOrdersPage = () => {
             ]);
         };
 
-        const onActiveUpdated = () => {
+        const patchExpressOrderFromPayload = (payload) => {
+            if (!payload?.orderId || payload.orderType !== "express") return;
+
+            setExpressOrders((prev) =>
+                prev.map((item) =>
+                    Number(item.id) === Number(payload.orderId)
+                        ? {
+                            ...item,
+                            status: payload.status ?? item.status,
+                            executorId: payload.executorId ?? item.executorId,
+                            creatorId: payload.creatorId ?? item.creatorId,
+                            type: payload.type ?? payload.expressType ?? item.type,
+                            updatedAt: new Date().toISOString(),
+                        }
+                        : item
+                )
+            );
+        };
+
+        const onAnyOrderUpdate = (payload) => {
+            patchExpressOrderFromPayload(payload);
             reloadAll();
         };
 
-        const onNewNotification = () => {
+        const onConnect = () => {
+            socket.emit("register", user.id);
+            socket.emit("subscribeToNotifications", user.id);
             reloadAll();
         };
 
-        const onExpressStatusChanged = () => {
-            reloadAll();
-        };
+        socket.on("connect", onConnect);
+        socket.on("reconnect", onConnect);
 
-        socket.on("activeOrdersUpdated", onActiveUpdated);
-        socket.on("new_notification", onNewNotification);
+        socket.on("activeOrdersUpdated", onAnyOrderUpdate);
+        socket.on("new_notification", onAnyOrderUpdate);
 
-        socket.on("expressOrdersUpdated", onExpressStatusChanged);
-        socket.on("expressOrderAccepted", onExpressStatusChanged);
-        socket.on("expressOrderStatusChanged", onExpressStatusChanged);
-        socket.on("expressStatusChanged", onExpressStatusChanged);
-        socket.on("expressOrderCompleted", onExpressStatusChanged);
-        socket.on("expressOrderCompletedForExecutor", onExpressStatusChanged);
+        socket.on("expressOrdersUpdated", onAnyOrderUpdate);
+        socket.on("expressOrderAccepted", onAnyOrderUpdate);
+        socket.on("expressOrderStatusChanged", onAnyOrderUpdate);
+        socket.on("expressStatusChanged", onAnyOrderUpdate);
+        socket.on("expressOrderCompleted", onAnyOrderUpdate);
+        socket.on("expressOrderCompletedForExecutor", onAnyOrderUpdate);
+
+        reloadAll();
 
         return () => {
-            socket.off("activeOrdersUpdated", onActiveUpdated);
-            socket.off("new_notification", onNewNotification);
+            socket.off("connect", onConnect);
+            socket.off("reconnect", onConnect);
 
-            socket.off("expressOrdersUpdated", onExpressStatusChanged);
-            socket.off("expressOrderAccepted", onExpressStatusChanged);
-            socket.off("expressOrderStatusChanged", onExpressStatusChanged);
-            socket.off("expressStatusChanged", onExpressStatusChanged);
-            socket.off("expressOrderCompleted", onExpressStatusChanged);
-            socket.off("expressOrderCompletedForExecutor", onExpressStatusChanged);
+            socket.off("activeOrdersUpdated", onAnyOrderUpdate);
+            socket.off("new_notification", onAnyOrderUpdate);
+
+            socket.off("expressOrdersUpdated", onAnyOrderUpdate);
+            socket.off("expressOrderAccepted", onAnyOrderUpdate);
+            socket.off("expressOrderStatusChanged", onAnyOrderUpdate);
+            socket.off("expressStatusChanged", onAnyOrderUpdate);
+            socket.off("expressOrderCompleted", onAnyOrderUpdate);
+            socket.off("expressOrderCompletedForExecutor", onAnyOrderUpdate);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [navigate, user?.id, token]);

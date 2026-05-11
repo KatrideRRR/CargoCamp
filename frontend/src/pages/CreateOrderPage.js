@@ -389,6 +389,24 @@ function CreateOrderPage() {
             return;
         }
 
+        const proposedSumRaw = Number(formData.proposedSum);
+
+        if (!Number.isFinite(proposedSumRaw) || proposedSumRaw <= 0) {
+
+            setError("Укажите корректную сумму за работу");
+
+            return;
+
+        }
+
+        if (proposedSumRaw > 300000) {
+
+            setError("Слишком большая стоимость заказа. Максимум 300 000 ₽.");
+
+            return;
+
+        }
+
         if (!isValidOrderCoords(markerPosition)) {
             setError("Не удалось определить координаты адреса. Выберите адрес из подсказки, по GPS или на карте.");
             setAddressOpen(true);
@@ -404,7 +422,7 @@ function CreateOrderPage() {
         data.append("description", formData.description || "");
         data.append("address", formData.address);
         data.append("workTime", formData.workTime ? new Date(formData.workTime).toISOString() : "");
-        data.append("proposedSum", formData.proposedSum || "");
+        data.append("proposedSum", String(Math.round(proposedSumRaw * 100) / 100));
         data.append("paymentType", paymentType);
 
         data.append("categoryId", Number(selectedCategory));
@@ -784,9 +802,36 @@ function CreateOrderPage() {
                         <input
                             className="control"
                             type="number"
+                            min="1"
+                            max="300000"
+                            step="1"
+                            inputMode="numeric"
                             placeholder="Например 1500"
                             value={formData.proposedSum}
-                            onChange={(e) => setFormData((p) => ({ ...p, proposedSum: e.target.value }))}
+                            onChange={(e) => {
+                                const value = e.target.value;
+
+                                if (value === "") {
+                                    setFormData((p) => ({ ...p, proposedSum: "" }));
+                                    return;
+                                }
+
+                                const n = Number(value);
+
+                                if (!Number.isFinite(n)) return;
+
+                                if (n > 300000) {
+                                    setFormData((p) => ({ ...p, proposedSum: "300000" }));
+                                    return;
+                                }
+
+                                if (n < 0) {
+                                    setFormData((p) => ({ ...p, proposedSum: "" }));
+                                    return;
+                                }
+
+                                setFormData((p) => ({ ...p, proposedSum: value }));
+                            }}
                             required
                         />
 

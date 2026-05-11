@@ -11,3 +11,22 @@ export const socket = io(socketUrl, {
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
 });
+
+export function connectSocket(userId) {
+    if (!userId) return;
+
+    if (!socket.connected) {
+        socket.connect();
+    }
+
+    const register = () => {
+        socket.emit("register", userId);
+        socket.emit("subscribeToNotifications", userId);
+    };
+
+    if (socket.connected) {
+        register();
+    } else {
+        socket.once("connect", register);
+    }
+}

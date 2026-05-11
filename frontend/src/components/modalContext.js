@@ -6,6 +6,7 @@ import "../styles/modalContext.css";
 import axios from "axios";
 import ReviewModal from "../components/ReviewModal";
 import PaymentProviderSelect from "../components/PaymentProviderSelect";
+import { shouldRemindReview, markReminded } from "../utils/reviewReminder";
 
 export const ModalContext = createContext(null);
 
@@ -101,34 +102,50 @@ export const ModalProvider = ({ children }) => {
         fetchUserData();
     }, []);
 
+    const openExpressAcceptedModal = (data) => {
+        if (!data?.orderId) return;
+
+        const creatorId = data.creatorId || data?.data?.creatorId;
+        const executorId = data.executorId || data?.data?.executorId;
+        const status = data.status || data?.data?.status;
+        const expressType = data.type || data.expressType || data?.data?.type || data?.data?.expressType;
+
+        if (status && status !== "accepted") return;
+
+        if (Number(creatorId) !== Number(userId)) return;
+
+        setExpressAcceptedData({
+            title: data.title || "Экспресс-заказ принят",
+            description:
+                data.message ||
+                data.body ||
+                `Исполнитель принял ваш экспресс-заказ №${data.orderId}`,
+            orderId: data.orderId,
+            creatorId,
+            executorId,
+            orderType: "express",
+            expressType,
+            status: "accepted",
+        });
+    };
+
     const handleExpressOrderAccepted = (data) => {
-        console.log("🔔 Экспресс-заказ принят:", data);
+        console.log("🔔 Экспресс-заказ принят:", data, "current userId:", userId);
 
         if (!data?.orderId) {
             toast.success(data?.message || "Ваш экспресс-заказ приняли в работу");
             return;
         }
 
-        /**
-         * Заказчику показываем модалку.
-         * Исполнителю можно оставить toast, потому что он сам нажал "принять".
-         */
-        if (Number(data.creatorId) === Number(userId)) {
-            setExpressAcceptedData({
-                title: "Экспресс-заказ принят",
-                description: data.message || `Исполнитель принял ваш экспресс-заказ №${data.orderId}`,
-                orderId: data.orderId,
-                creatorId: data.creatorId,
-                executorId: data.executorId,
-                orderType: "express",
-                expressType: data.type || data.expressType,
-                status: data.status || "accepted",
-            });
+        const creatorId = data.creatorId || data?.data?.creatorId;
+        const executorId = data.executorId || data?.data?.executorId;
 
+        if (Number(creatorId) === Number(userId)) {
+            openExpressAcceptedModal(data);
             return;
         }
 
-        if (Number(data.executorId) === Number(userId)) {
+        if (Number(executorId) === Number(userId)) {
             toast.success(data.message || "Вы приняли экспресс-заказ");
             return;
         }
@@ -138,6 +155,13 @@ export const ModalProvider = ({ children }) => {
 
     const handleExpressOrderStatusChanged = (data) => {
         if (!data?.status) return;
+
+        if (data.status === "accepted") {
+            if (Number(data.creatorId) === Number(userId)) {
+                openExpressAcceptedModal(data);
+            }
+            return;
+        }
 
         const expressType = data.type || data.expressType;
 
@@ -177,6 +201,61 @@ export const ModalProvider = ({ children }) => {
         setRating(0);
         setShowRatingModal(true);
     };
+
+    const openReviewFromPushPayload = (payload) => {
+        if (!payload?.orderId) return;
+
+        const orderId = payload.orderId;
+        const orderType = payload.orderType || "regular";
+
+        if (!shouldRemindReview(orderId)) {
+            return;
+        }
+
+        const creatorId = payload.creatorId;
+        const executorId = payload.executorId;
+
+        if (!creatorId || !executorId) {
+            console.warn("review push payload without creatorId/executorId:", payload);
+            return;
+        }
+
+        openReviewFromCompletion(
+            orderId,
+            creatorId,
+            executorId,
+            orderType
+        );
+
+        markReminded(orderId);
+    };
+
+    useEffect(() => {
+        if (!userId) return;
+
+        const openPendingReview = () => {
+            const raw = localStorage.getItem("pendingReviewFromPush");
+            if (!raw) return;
+
+            try {
+                const payload = JSON.parse(raw);
+                localStorage.removeItem("pendingReviewFromPush");
+                openReviewFromPushPayload(payload);
+            } catch (e) {
+                console.error("openReviewFromPush error:", e);
+                localStorage.removeItem("pendingReviewFromPush");
+            }
+        };
+
+        window.addEventListener("openReviewFromPush", openPendingReview);
+
+        // на случай перехода с пуша
+        openPendingReview();
+
+        return () => {
+            window.removeEventListener("openReviewFromPush", openPendingReview);
+        };
+    }, [userId]);
 
     const openCompletionSuccessModal = (payload) => {
         setCompletionSuccessData(payload);
@@ -313,6 +392,41 @@ export const ModalProvider = ({ children }) => {
             toast.info(data.message || "Исполнитель прибыл");
         };
 
+        const handleNewNotification = (notifications) => {
+            const list = Array.isArray(notifications) ? notifications : [notifications];
+
+            const acceptedNotification = list.find((n) => {
+                if (!n) return false;
+
+                const orderType = n.orderType || n?.data?.orderType;
+                const status = n?.data?.status;
+                const expressType = n?.data?.expressType || n?.data?.type;
+
+                return (
+                    orderType === "express" &&
+                    n.type === "express_status_changed" &&
+                    status === "accepted" &&
+                    expressType
+                );
+            });
+
+            if (!acceptedNotification) return;
+
+            openExpressAcceptedModal({
+                orderId: acceptedNotification.orderId || acceptedNotification?.data?.orderId,
+                orderType: "express",
+                title: acceptedNotification.title || "Экспресс-заказ принят",
+                body: acceptedNotification.body,
+                message: acceptedNotification.body,
+                creatorId: acceptedNotification?.data?.creatorId,
+                executorId: acceptedNotification?.data?.executorId,
+                type: acceptedNotification?.data?.type,
+                expressType: acceptedNotification?.data?.expressType,
+                status: acceptedNotification?.data?.status,
+                data: acceptedNotification.data,
+            });
+        };
+
         const handleReviewNeeded = (data) => {
             setCompletionNotificationData({
                 title: "Заказ завершён",
@@ -331,6 +445,7 @@ export const ModalProvider = ({ children }) => {
         socket.on("reviewNeeded", handleReviewNeeded);
         socket.on("expressOrderAccepted", handleExpressOrderAccepted);
         socket.on("expressOrderStatusChanged", handleExpressOrderStatusChanged);
+        socket.on("new_notification", handleNewNotification);
 
         return () => {
             socket.off("orderApproved", handleOrderApproved);
@@ -340,6 +455,7 @@ export const ModalProvider = ({ children }) => {
             socket.off("expressArrived", handleExpressArrived);
             socket.off("expressOrderAccepted", handleExpressOrderAccepted);
             socket.off("expressOrderStatusChanged", handleExpressOrderStatusChanged);
+            socket.off("new_notification", handleNewNotification);
         };
     }, [userId]);
 
@@ -690,7 +806,7 @@ export const ModalProvider = ({ children }) => {
                                         )
                                     }
                                 >
-                                    Завершить
+                                    {completionNotificationData.orderType === "express" ? "Оставить отзыв" : "Завершить"}
                                 </button>
                             )}
 

@@ -138,7 +138,9 @@ const MyOrdersPage = () => {
 
                 expressOrders = expressData
                     .filter((o) => Number(o.creatorId) === Number(userId))
-                    .filter((o) => o.status !== "completed" && o.status !== "cancelled")
+                    // На странице "Мои заказы" показываем только экспресс-заказы,
+                    // которые ещё никто не взял. После accepted они должны быть в active-orders.
+                    .filter((o) => o.status === "created" && !o.executorId)
                     .map((o) => ({
                         ...o,
                         kind: "express",
@@ -267,10 +269,18 @@ const MyOrdersPage = () => {
 
         socket.on("orderUpdated", fetchOrders);
         socket.on("activeOrdersUpdated", fetchOrders);
+        socket.on("expressOrdersUpdated", fetchOrders);
+        socket.on("expressOrderAccepted", fetchOrders);
+        socket.on("expressOrderStatusChanged", fetchOrders);
+        socket.on("expressStatusChanged", fetchOrders);
 
         return () => {
             socket.off("orderUpdated", fetchOrders);
             socket.off("activeOrdersUpdated", fetchOrders);
+            socket.off("expressOrdersUpdated", fetchOrders);
+            socket.off("expressOrderAccepted", fetchOrders);
+            socket.off("expressOrderStatusChanged", fetchOrders);
+            socket.off("expressStatusChanged", fetchOrders);
         };
     }, [userId, navigate, setHasNewRequests]);
 

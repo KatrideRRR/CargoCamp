@@ -21,7 +21,25 @@ function navigateFromPush(data, navigate) {
     const orderType = data.orderType || "regular";
 
     if (type === "new_message" && orderId) {
-        navigate(`/messages/${orderId}?orderType=${orderType}`);
+        navigate(`/messages/${orderType}/${orderId}`);
+        return;
+    }
+
+    // ✅ пуш о необходимости отзыва
+    if (type === "review_needed" && orderId) {
+        localStorage.setItem(
+            "pendingReviewFromPush",
+            JSON.stringify({
+                orderId,
+                orderType,
+                creatorId: data.creatorId || "",
+                executorId: data.executorId || "",
+                type,
+                openedAt: Date.now(),
+            })
+        );
+
+        navigate("/active-orders?reviewFromPush=1");
         return;
     }
 
@@ -31,7 +49,6 @@ function navigateFromPush(data, navigate) {
             "order_started",
             "order_completion_requested",
             "order_completed",
-            "review_needed",
             "express_status_changed",
             "express_arrived",
             "express_completed",
@@ -119,8 +136,23 @@ export async function initPushNotifications({ navigate } = {}) {
     PushNotifications.addListener("pushNotificationReceived", (notification) => {
         console.log("Push received:", notification);
 
-        // Когда приложение открыто, можно показать toast.
-        // Но если websocket уже показывает модалку/toast, тут лучше не дублировать.
+        const data = notification?.data || {};
+
+        if (data.type === "review_needed" && data.orderId) {
+            localStorage.setItem(
+                "pendingReviewFromPush",
+                JSON.stringify({
+                    orderId: data.orderId,
+                    orderType: data.orderType || "regular",
+                    creatorId: data.creatorId || "",
+                    executorId: data.executorId || "",
+                    type: data.type,
+                    openedAt: Date.now(),
+                })
+            );
+
+            window.dispatchEvent(new CustomEvent("openReviewFromPush"));
+        }
     });
 
     PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
