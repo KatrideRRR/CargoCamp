@@ -254,7 +254,25 @@ router.post("/express-orders", authenticateToken, async (req, res) => {
 
         const bp = Number.isFinite(Number(basePrice)) ? Number(basePrice) : 0;
         const ppk = Number.isFinite(Number(pricePerKm)) ? Number(pricePerKm) : 0;
-        const tp = Number.isFinite(Number(totalPrice)) ? Number(totalPrice) : 0;
+        const tpRaw = Number(totalPrice);
+
+        if (!Number.isFinite(tpRaw) || tpRaw < 0) {
+            await t.rollback();
+            return res.status(400).json({
+                success: false,
+                message: "Некорректная стоимость экспресс-заказа",
+            });
+        }
+
+        if (tpRaw > 300000) {
+            await t.rollback();
+            return res.status(400).json({
+                success: false,
+                message: "Слишком большая стоимость экспресс-заказа. Проверьте маршрут.",
+            });
+        }
+
+        const tp = Math.round(tpRaw * 100) / 100;
 
         const order = await ExpressOrder.create(
             {
@@ -516,50 +534,62 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
         await t.commit();
 
         const io = req.app.locals.io;
-        emitExpressOrderUpdate(io, order);
 
-        await notifyUser({
-            userId: order.creatorId,
-            type: "express_order_accepted",
-            title: "Экспресс-заказ принят",
-            body: `Исполнитель принял ваш ${order.type === "taxi" ? "заказ такси" : "курьерский заказ"} №${order.id}`,
+        const acceptedPayload = {
             orderId: order.id,
             orderType: "express",
-            data: {
-                creatorId: order.creatorId,
-                executorId: order.executorId,
-                expressType: order.type,
-                status: order.status,
-            },
-            socketEvent: "expressOrderAccepted",
-            socketPayload: {
-                orderId: order.id,
-                orderType: "express",
-                creatorId: order.creatorId,
-                executorId: order.executorId,
-                expressType: order.type,
-                status: order.status,
-                message: `Исполнитель принял ваш ${order.type === "taxi" ? "заказ такси" : "курьерский заказ"} №${order.id}`,
-            },
-        });
+            creatorId: order.creatorId,
+            executorId: order.executorId,
+            type: order.type,
+            expressType: order.type,
+            status: order.status,
+            message: `Исполнитель принял ваш ${order.type === "taxi" ? "заказ такси" : "курьерский заказ"} №${order.id}`,
+        };
 
+// 1. Сначала напрямую шлём socket заказчику и исполнителю.
+// Это не зависит от notifyUser/push.
         if (io) {
-            const acceptedPayload = {
-                orderId: order.id,
-                orderType: "express",
-                creatorId: order.creatorId,
-                executorId: order.executorId,
-                type: order.type,
-                expressType: order.type,
-                status: order.status,
-                message: `Исполнитель принял ваш ${order.type === "taxi" ? "заказ такси" : "курьерский заказ"} №${order.id}`,
-            };
-
             io.to(`user_${String(order.creatorId)}`).emit("expressOrderAccepted", acceptedPayload);
+            io.to(`user_${String(order.creatorId)}`).emit("expressOrderStatusChanged", acceptedPayload);
+            io.to(`user_${String(order.creatorId)}`).emit("activeOrdersUpdated", acceptedPayload);
+            io.to(`user_${String(order.creatorId)}`).emit("expressOrdersUpdated", acceptedPayload);
+
             io.to(`user_${String(order.executorId)}`).emit("expressOrderAccepted", {
                 ...acceptedPayload,
                 message: "Вы приняли экспресс-заказ",
             });
+            io.to(`user_${String(order.executorId)}`).emit("expressOrderStatusChanged", {
+                ...acceptedPayload,
+                message: "Вы приняли экспресс-заказ",
+            });
+            io.to(`user_${String(order.executorId)}`).emit("activeOrdersUpdated", acceptedPayload);
+            io.to(`user_${String(order.executorId)}`).emit("expressOrdersUpdated", acceptedPayload);
+
+            io.emit("expressOrdersUpdated", acceptedPayload);
+        }
+
+// 2. Потом пробуем создать уведомление/push.
+// Если push упадёт — заказ НЕ должен ломаться.
+        try {
+            await notifyUser({
+                userId: order.creatorId,
+                type: "express_status_changed",
+                title: "Экспресс-заказ принят",
+                body: `Исполнитель принял ваш ${order.type === "taxi" ? "заказ такси" : "курьерский заказ"} №${order.id}`,
+                orderId: order.id,
+                orderType: "express",
+                data: {
+                    creatorId: order.creatorId,
+                    executorId: order.executorId,
+                    expressType: order.type,
+                    type: order.type,
+                    status: order.status,
+                },
+                socketEvent: "expressOrderAccepted",
+                socketPayload: acceptedPayload,
+            });
+        } catch (notifyError) {
+            console.error("express accept notify error:", notifyError);
         }
 
         return res.json({
@@ -571,7 +601,14 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
             debtAdded,
         });
     } catch (e) {
-        await t.rollback();
+        try {
+            if (!t.finished) {
+                await t.rollback();
+            }
+        } catch (rollbackError) {
+            console.error("express accept rollback error:", rollbackError);
+        }
+
         console.error("express-orders accept error:", e);
         return res.status(500).json({ success: false, message: "Ошибка сервера" });
     }

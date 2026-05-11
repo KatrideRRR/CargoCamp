@@ -8,37 +8,12 @@ function getIo() {
     return io;
 }
 
-function normalizeUserId(userId) {
-    if (!userId) return null;
-    return String(userId);
-}
-
-function joinUserRooms(socket, userId) {
-    const normalizedUserId = normalizeUserId(userId);
-    if (!normalizedUserId) return null;
-
-    socket.join(`user_${normalizedUserId}`);
-    socket.join(`notifications_${normalizedUserId}`);
-    socket.data.userId = normalizedUserId;
-
-    console.log(
-        `✅ socket ${socket.id} joined rooms: user_${normalizedUserId}, notifications_${normalizedUserId}`
-    );
-
-    return normalizedUserId;
-}
-
 async function sendNotifications(userId) {
     if (!io || !userId) return;
 
-    const normalizedUserId = String(userId);
-
     try {
         const unreadNotifications = await Notification.findAll({
-            where: {
-                userId: normalizedUserId,
-                isRead: false,
-            },
+            where: { userId, isRead: false },
             attributes: [
                 "id",
                 "type",
@@ -53,7 +28,7 @@ async function sendNotifications(userId) {
             order: [["id", "DESC"]],
         });
 
-        io.to(`notifications_${normalizedUserId}`).emit(
+        io.to(`notifications_${String(userId)}`).emit(
             "new_notification",
             unreadNotifications
         );
@@ -64,7 +39,6 @@ async function sendNotifications(userId) {
 
 function sendToUser(userId, event, data) {
     if (!io || !userId) return;
-
     io.to(`user_${String(userId)}`).emit(event, data);
 }
 
@@ -88,46 +62,29 @@ function initializeSocket(server) {
     });
 
     io.on("connection", (socket) => {
-        console.log("🟢 socket connected:", socket.id);
 
-        /**
-         * Основная регистрация пользователя.
-         * Используй это событие в приложении после авторизации.
-         */
-        socket.on("register", async (userId) => {
-            const normalizedUserId = joinUserRooms(socket, userId);
+        socket.on("register", (userId) => {
+            if (!userId) return;
 
-            if (normalizedUserId) {
-                await sendNotifications(normalizedUserId);
-            }
+            const normalizedUserId = String(userId);
+
+            socket.join(`user_${normalizedUserId}`);
+            socket.join(`notifications_${normalizedUserId}`);
+            socket.data.userId = normalizedUserId;
         });
 
-        /**
-         * Оставляем старое событие, но теперь оно тоже подписывает
-         * и на user-room, и на notifications-room.
-         */
-        socket.on("subscribeToNotifications", async (userId) => {
-            const normalizedUserId = joinUserRooms(socket, userId);
+        socket.on("subscribeToNotifications", (userId) => {
+            if (!userId) return;
 
-            if (normalizedUserId) {
-                await sendNotifications(normalizedUserId);
-            }
-        });
-
-        /**
-         * Дополнительное явное событие на случай, если где-то удобнее вызвать joinUserRoom.
-         */
-        socket.on("joinUserRoom", async (userId) => {
-            const normalizedUserId = joinUserRooms(socket, userId);
-
-            if (normalizedUserId) {
-                await sendNotifications(normalizedUserId);
-            }
+            const normalizedUserId = String(userId);
+            socket.join(`notifications_${normalizedUserId}`);
         });
 
         socket.on("joinChat", ({ userId, orderId, orderType = "regular" }) => {
             if (userId) {
-                joinUserRooms(socket, userId);
+                socket.join(`user_${String(userId)}`);
+                socket.join(`notifications_${String(userId)}`);
+                socket.data.userId = String(userId);
             }
 
             const normalizedOrderType = ["regular", "express"].includes(orderType)
@@ -135,16 +92,11 @@ function initializeSocket(server) {
                 : "regular";
 
             if (orderId) {
-                const roomName = `chat_${normalizedOrderType}_${String(orderId)}`;
-                socket.join(roomName);
-
-                console.log(`💬 socket ${socket.id} joined chat room: ${roomName}`);
+                socket.join(`chat_${normalizedOrderType}_${String(orderId)}`);
             }
         });
 
         socket.on("markAsRead", async ({ userId, orderId, orderType = "regular" }) => {
-            if (!userId || !orderId) return;
-
             const normalizedOrderType = ["regular", "express"].includes(orderType)
                 ? orderType
                 : "regular";
@@ -169,7 +121,6 @@ function initializeSocket(server) {
         });
 
         socket.on("disconnect", (reason) => {
-            console.log("🔴 socket disconnected:", socket.id, reason);
         });
     });
 

@@ -639,8 +639,6 @@ const ActiveOrdersPage = () => {
         if (!user?.id) return;
 
         socket.emit("register", user.id);
-        socket.emit("subscribeToNotifications", user.id);
-        socket.emit("joinUserRoom", user.id);
 
         fetchExpressOrders();
         fetchActiveOrders();
@@ -668,22 +666,22 @@ const ActiveOrdersPage = () => {
         socket.on("new_notification", onNewNotification);
 
         socket.on("expressOrdersUpdated", onExpressStatusChanged);
-        socket.on("expressOrderStatusChanged", onExpressStatusChanged);
         socket.on("expressOrderAccepted", onExpressStatusChanged);
+        socket.on("expressOrderStatusChanged", onExpressStatusChanged);
+        socket.on("expressStatusChanged", onExpressStatusChanged);
         socket.on("expressOrderCompleted", onExpressStatusChanged);
         socket.on("expressOrderCompletedForExecutor", onExpressStatusChanged);
-        socket.on("expressStatusChanged", onExpressStatusChanged);
 
         return () => {
             socket.off("activeOrdersUpdated", onActiveUpdated);
             socket.off("new_notification", onNewNotification);
 
             socket.off("expressOrdersUpdated", onExpressStatusChanged);
-            socket.off("expressOrderStatusChanged", onExpressStatusChanged);
             socket.off("expressOrderAccepted", onExpressStatusChanged);
+            socket.off("expressOrderStatusChanged", onExpressStatusChanged);
+            socket.off("expressStatusChanged", onExpressStatusChanged);
             socket.off("expressOrderCompleted", onExpressStatusChanged);
             socket.off("expressOrderCompletedForExecutor", onExpressStatusChanged);
-            socket.off("expressStatusChanged", onExpressStatusChanged);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [navigate, user?.id, token]);

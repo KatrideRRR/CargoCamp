@@ -55,6 +55,7 @@ export const ModalProvider = ({ children }) => {
     const [userId, setUserId] = useState(null);
     const [notificationData, setNotificationData] = useState(null);
     const [completionNotificationData, setCompletionNotificationData] = useState(null);
+    const [expressAcceptedData, setExpressAcceptedData] = useState(null);
 
     const [showRatingModal, setShowRatingModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
@@ -69,6 +70,7 @@ export const ModalProvider = ({ children }) => {
 
     const [selectedDebtProvider, setSelectedDebtProvider] = useState("yookassa");
     const [selectedNotificationDebtProvider, setSelectedNotificationDebtProvider] = useState("yookassa");
+
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -100,7 +102,38 @@ export const ModalProvider = ({ children }) => {
     }, []);
 
     const handleExpressOrderAccepted = (data) => {
-        toast.success(data.message || "Ваш экспресс-заказ приняли в работу");
+        console.log("🔔 Экспресс-заказ принят:", data);
+
+        if (!data?.orderId) {
+            toast.success(data?.message || "Ваш экспресс-заказ приняли в работу");
+            return;
+        }
+
+        /**
+         * Заказчику показываем модалку.
+         * Исполнителю можно оставить toast, потому что он сам нажал "принять".
+         */
+        if (Number(data.creatorId) === Number(userId)) {
+            setExpressAcceptedData({
+                title: "Экспресс-заказ принят",
+                description: data.message || `Исполнитель принял ваш экспресс-заказ №${data.orderId}`,
+                orderId: data.orderId,
+                creatorId: data.creatorId,
+                executorId: data.executorId,
+                orderType: "express",
+                expressType: data.type || data.expressType,
+                status: data.status || "accepted",
+            });
+
+            return;
+        }
+
+        if (Number(data.executorId) === Number(userId)) {
+            toast.success(data.message || "Вы приняли экспресс-заказ");
+            return;
+        }
+
+        toast.success(data.message || "Экспресс-заказ принят");
     };
 
     const handleExpressOrderStatusChanged = (data) => {
@@ -151,6 +184,10 @@ export const ModalProvider = ({ children }) => {
 
     const closeCompletionSuccessModal = () => {
         setCompletionSuccessData(null);
+    };
+
+    const handleExpressAcceptedClose = () => {
+        setExpressAcceptedData(null);
     };
 
     const handleSubmitReview = async ({ rating, text }) => {
@@ -211,8 +248,6 @@ export const ModalProvider = ({ children }) => {
         if (!userId) return;
 
         socket.emit("register", userId);
-        socket.emit("subscribeToNotifications", userId);
-        socket.emit("joinUserRoom", userId);
 
         const handleOrderApproved = (data) => {
             console.log("🔔 Заказ одобрен:", data);
@@ -484,6 +519,49 @@ export const ModalProvider = ({ children }) => {
             }}
         >
             {children}
+
+
+            {expressAcceptedData && (
+                <div className="modal-overlay">
+                    <div className="modal modal-compact">
+                        <button
+                            className="modal-close"
+                            onClick={handleExpressAcceptedClose}
+                            aria-label="Закрыть"
+                            type="button"
+                        >
+                            ×
+                        </button>
+
+                        <div className="modal-icon">🚀</div>
+                        <h2 className="modal-title">{expressAcceptedData.title}</h2>
+                        <p className="modal-text">{expressAcceptedData.description}</p>
+
+                        <div className="modal-note modal-note-success">
+                            Исполнитель уже видит заказ в активных и может менять статус выполнения.
+                        </div>
+
+                        <div className="modal-actions">
+                            <button
+                                className="modal-btn modal-btn-primary"
+                                onClick={() => {
+                                    setExpressAcceptedData(null);
+                                    window.location.href = "/active-orders";
+                                }}
+                            >
+                                Открыть активный заказ
+                            </button>
+
+                            <button
+                                className="modal-btn modal-btn-ghost"
+                                onClick={handleExpressAcceptedClose}
+                            >
+                                Понятно
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {notificationData && (
                 <div className="modal-overlay">
