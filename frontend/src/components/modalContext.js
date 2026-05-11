@@ -106,13 +106,15 @@ export const ModalProvider = ({ children }) => {
     const handleExpressOrderStatusChanged = (data) => {
         if (!data?.status) return;
 
+        const expressType = data.type || data.expressType;
+
         const textByStatus = {
             accepted: "Экспресс-заказ принят",
-            on_the_way_to_A: data.type === "taxi" ? "Водитель в пути" : "Курьер в пути",
-            arrived_at_A: data.type === "taxi" ? "Водитель на месте" : "Курьер на месте",
+            on_the_way_to_A: expressType === "taxi" ? "Водитель в пути" : "Курьер в пути",
+            arrived_at_A: expressType === "taxi" ? "Водитель на месте" : "Курьер на месте",
             waiting_at_A: "Водитель ожидает",
             picked_up: "Курьер забрал посылку",
-            in_progress: data.type === "taxi" ? "Поездка началась" : "Доставка началась",
+            in_progress: expressType === "taxi" ? "Поездка началась" : "Доставка началась",
             completed: "Экспресс-заказ завершён",
             cancelled: "Экспресс-заказ отменён",
         };
@@ -208,6 +210,10 @@ export const ModalProvider = ({ children }) => {
     useEffect(() => {
         if (!userId) return;
 
+        socket.emit("register", userId);
+        socket.emit("subscribeToNotifications", userId);
+        socket.emit("joinUserRoom", userId);
+
         const handleOrderApproved = (data) => {
             console.log("🔔 Заказ одобрен:", data);
 
@@ -241,11 +247,11 @@ export const ModalProvider = ({ children }) => {
         const handleExpressOrderCompleted = (data) => {
             console.log("🔔 Экспресс-заказ завершён:", data);
 
-            if (!data?.message) return;
+            if (!data?.orderId) return;
 
             setCompletionNotificationData({
                 title: "Экспресс-заказ завершён",
-                description: `Заказ номер ${data.orderId}: ${data.message}`,
+                description: `Заказ номер ${data.orderId}: ${data.message || "Оцените исполнителя и оставьте отзыв"}`,
                 orderId: data.orderId,
                 creatorId: data.creatorId,
                 executorId: data.executorId,

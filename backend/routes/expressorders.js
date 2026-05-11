@@ -70,16 +70,31 @@ function canAccessExpressOrder(order, userId) {
     return isParticipant(order, userId) || canViewAvailableExpress(order, userId);
 }
 
-function emitExpressOrderUpdate(io, order) {
+function emitExpressOrderUpdate(io, order, payload = {}) {
     if (!io || !order) return;
 
+    const basePayload = {
+        orderId: order.id,
+        orderType: "express",
+        type: order.type,
+        expressType: order.type,
+        status: order.status,
+        creatorId: order.creatorId,
+        executorId: order.executorId,
+        ...payload,
+    };
+
     if (order.creatorId) {
-        io.to(`user_${String(order.creatorId)}`).emit("activeOrdersUpdated");
+        io.to(`user_${String(order.creatorId)}`).emit("activeOrdersUpdated", basePayload);
+        io.to(`user_${String(order.creatorId)}`).emit("expressOrdersUpdated", basePayload);
     }
 
     if (order.executorId) {
-        io.to(`user_${String(order.executorId)}`).emit("activeOrdersUpdated");
+        io.to(`user_${String(order.executorId)}`).emit("activeOrdersUpdated", basePayload);
+        io.to(`user_${String(order.executorId)}`).emit("expressOrdersUpdated", basePayload);
     }
+
+    io.emit("expressOrdersUpdated", basePayload);
 }
 
 function emitExpressStatusToParticipants(io, order, payload = {}) {
@@ -96,27 +111,21 @@ function emitExpressStatusToParticipants(io, order, payload = {}) {
         ...payload,
     };
 
-    // Единое новое событие
-    if (order.creatorId) {
-        io.to(`user_${order.creatorId}`).emit("expressOrderStatusChanged", basePayload);
-        io.to(`user_${order.creatorId}`).emit("activeOrdersUpdated", basePayload);
+    const creatorRoom = order.creatorId ? `user_${String(order.creatorId)}` : null;
+    const executorRoom = order.executorId ? `user_${String(order.executorId)}` : null;
+
+    if (creatorRoom) {
+        io.to(creatorRoom).emit("expressOrderStatusChanged", basePayload);
+        io.to(creatorRoom).emit("expressStatusChanged", basePayload);
+        io.to(creatorRoom).emit("activeOrdersUpdated", basePayload);
     }
 
-    if (order.executorId) {
-        io.to(`user_${order.executorId}`).emit("expressOrderStatusChanged", basePayload);
-        io.to(`user_${order.executorId}`).emit("activeOrdersUpdated", basePayload);
+    if (executorRoom) {
+        io.to(executorRoom).emit("expressOrderStatusChanged", basePayload);
+        io.to(executorRoom).emit("expressStatusChanged", basePayload);
+        io.to(executorRoom).emit("activeOrdersUpdated", basePayload);
     }
 
-    // Старое событие оставляем для совместимости
-    if (order.creatorId) {
-        io.to(`user_${order.creatorId}`).emit("expressStatusChanged", basePayload);
-    }
-
-    if (order.executorId) {
-        io.to(`user_${order.executorId}`).emit("expressStatusChanged", basePayload);
-    }
-
-    // Обновить списки доступных экспресс-заказов
     io.emit("expressOrdersUpdated", basePayload);
 }
 
@@ -535,39 +544,22 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
         });
 
         if (io) {
-            io.to(`user_${order.creatorId}`).emit("expressOrderAccepted", {
+            const acceptedPayload = {
                 orderId: order.id,
                 orderType: "express",
                 creatorId: order.creatorId,
                 executorId: order.executorId,
+                type: order.type,
                 expressType: order.type,
                 status: order.status,
                 message: `Исполнитель принял ваш ${order.type === "taxi" ? "заказ такси" : "курьерский заказ"} №${order.id}`,
-            });
+            };
 
-            io.to(`user_${order.creatorId}`).emit("expressOrderStatusChanged", {
-                orderId: order.id,
-                orderType: "express",
-                creatorId: order.creatorId,
-                executorId: order.executorId,
-                expressType: order.type,
-                status: order.status,
-                message: "Экспресс-заказ принят",
-            });
-
-            io.to(`user_${order.executorId}`).emit("expressOrderStatusChanged", {
-                orderId: order.id,
-                orderType: "express",
-                creatorId: order.creatorId,
-                executorId: order.executorId,
-                expressType: order.type,
-                status: order.status,
+            io.to(`user_${String(order.creatorId)}`).emit("expressOrderAccepted", acceptedPayload);
+            io.to(`user_${String(order.executorId)}`).emit("expressOrderAccepted", {
+                ...acceptedPayload,
                 message: "Вы приняли экспресс-заказ",
             });
-
-            io.emit("expressOrdersUpdated");
-            io.to(`user_${order.creatorId}`).emit("activeOrdersUpdated");
-            io.to(`user_${order.executorId}`).emit("activeOrdersUpdated");
         }
 
         return res.json({
@@ -613,6 +605,37 @@ router.post("/express-orders/:id/on-the-way", authenticateToken, async (req, res
             message: order.type === "taxi"
                 ? "Водитель выехал к точке A"
                 : "Курьер выехал к точке A",
+        });
+
+        await notifyUser({
+            userId: order.creatorId,
+            type: "express_status_changed",
+            title: order.type === "taxi" ? "Водитель в пути" : "Курьер в пути",
+            body: order.type === "taxi"
+                ? `Водитель выехал к вам по заказу №${order.id}`
+                : `Курьер выехал к точке A по заказу №${order.id}`,
+            orderId: order.id,
+            orderType: "express",
+            data: {
+                creatorId: order.creatorId,
+                executorId: order.executorId,
+                expressType: order.type,
+                type: order.type,
+                status: order.status,
+            },
+            socketEvent: "expressOrderStatusChanged",
+            socketPayload: {
+                orderId: order.id,
+                orderType: "express",
+                type: order.type,
+                expressType: order.type,
+                status: order.status,
+                creatorId: order.creatorId,
+                executorId: order.executorId,
+                message: order.type === "taxi"
+                    ? "Водитель выехал к вам"
+                    : "Курьер выехал к точке A",
+            },
         });
 
         await req.logAction({
@@ -914,6 +937,39 @@ router.post("/express-orders/:id/start", authenticateToken, async (req, res) => 
             message: order.type === "taxi"
                 ? "Поездка началась"
                 : "Доставка началась",
+        });
+
+        await notifyUser({
+            userId: order.creatorId,
+            type: "express_status_changed",
+            title: order.type === "taxi" ? "Поездка началась" : "Доставка началась",
+            body: order.type === "taxi"
+                ? `Поездка по заказу №${order.id} началась`
+                : `Доставка по заказу №${order.id} началась`,
+            orderId: order.id,
+            orderType: "express",
+            data: {
+                creatorId: order.creatorId,
+                executorId: order.executorId,
+                expressType: order.type,
+                type: order.type,
+                status: order.status,
+                startedAt: order.startedAt,
+            },
+            socketEvent: "expressOrderStatusChanged",
+            socketPayload: {
+                orderId: order.id,
+                orderType: "express",
+                type: order.type,
+                expressType: order.type,
+                status: order.status,
+                creatorId: order.creatorId,
+                executorId: order.executorId,
+                startedAt: order.startedAt,
+                message: order.type === "taxi"
+                    ? "Поездка началась"
+                    : "Доставка началась",
+            },
         });
 
         await req.logAction({

@@ -9,6 +9,7 @@ export default function PullToRefresh() {
     const startYRef = useRef(0);
     const pullingRef = useRef(false);
     const refreshingRef = useRef(false);
+    const pullDistanceRef = useRef(0);
 
     const [pullDistance, setPullDistance] = useState(0);
     const [refreshing, setRefreshing] = useState(false);
@@ -21,7 +22,13 @@ export default function PullToRefresh() {
         }
 
         const isAtTop = () => {
-            return window.scrollY <= 0 || document.documentElement.scrollTop <= 0;
+            const scrollTop =
+                window.scrollY ||
+                document.documentElement.scrollTop ||
+                document.body.scrollTop ||
+                0;
+
+            return scrollTop <= 2;
         };
 
         const shouldIgnoreTarget = (target) => {
@@ -34,6 +41,17 @@ export default function PullToRefresh() {
             );
         };
 
+        const setDistance = (value) => {
+            pullDistanceRef.current = value;
+            setPullDistance(value);
+        };
+
+        const finishRefresh = () => {
+            refreshingRef.current = false;
+            setRefreshing(false);
+            setDistance(0);
+        };
+
         const onTouchStart = (e) => {
             if (refreshingRef.current) return;
             if (shouldIgnoreTarget(e.target)) return;
@@ -41,6 +59,7 @@ export default function PullToRefresh() {
 
             startYRef.current = e.touches[0].clientY;
             pullingRef.current = true;
+            setDistance(0);
         };
 
         const onTouchMove = (e) => {
@@ -51,39 +70,37 @@ export default function PullToRefresh() {
             const diff = currentY - startYRef.current;
 
             if (diff <= 0) {
-                setPullDistance(0);
+                setDistance(0);
                 return;
             }
 
             const distance = Math.min(PULL_LIMIT, diff * 0.45);
-            setPullDistance(distance);
+            setDistance(distance);
 
             if (distance > 8) {
                 e.preventDefault();
             }
         };
 
-        const onTouchEnd = async () => {
+        const onTouchEnd = () => {
             if (!pullingRef.current || refreshingRef.current) {
                 pullingRef.current = false;
-                setPullDistance(0);
+                setDistance(0);
                 return;
             }
 
             pullingRef.current = false;
 
-            if (pullDistance >= TRIGGER_DISTANCE) {
+            const finalDistance = pullDistanceRef.current;
+
+            if (finalDistance >= TRIGGER_DISTANCE) {
                 refreshingRef.current = true;
                 setRefreshing(true);
-                setPullDistance(TRIGGER_DISTANCE);
+                setDistance(TRIGGER_DISTANCE);
 
                 const event = new CustomEvent("appPullToRefresh", {
                     detail: {
-                        done: () => {
-                            refreshingRef.current = false;
-                            setRefreshing(false);
-                            setPullDistance(0);
-                        },
+                        done: finishRefresh,
                     },
                 });
 
@@ -91,11 +108,12 @@ export default function PullToRefresh() {
 
                 setTimeout(() => {
                     if (refreshingRef.current) {
+                        finishRefresh();
                         window.location.reload();
                     }
-                }, 1200);
+                }, 2500);
             } else {
-                setPullDistance(0);
+                setDistance(0);
             }
         };
 
@@ -110,7 +128,7 @@ export default function PullToRefresh() {
             window.removeEventListener("touchend", onTouchEnd);
             window.removeEventListener("touchcancel", onTouchEnd);
         };
-    }, [pullDistance]);
+    }, []);
 
     const visible = pullDistance > 0 || refreshing;
 
