@@ -677,7 +677,14 @@ router.get("/reviews/user/:userId", async (req, res) => {
 router.post("/review", authenticateToken, async (req, res) => {
     try {
         const fromUserId = req.user.id;
-        const { orderId, rating, text, isExpress } = req.body;
+        const {
+            orderId,
+            rating,
+            text,
+            isExpress,
+            toUserId: requestedToUserId,
+            isCancellationReview,
+        } = req.body;
 
         if (!orderId) {
             return res.status(400).json({ message: "orderId обязателен" });
@@ -712,14 +719,17 @@ router.post("/review", authenticateToken, async (req, res) => {
             return res.status(404).json({ message: "Заказ не найден" });
         }
 
-        // ✅ отзыв только после полного завершения
-        if (targetOrder.status !== "completed") {
+        const isCancelledExpressReview =
+            orderType === "express" &&
+            targetOrder.status === "cancelled" &&
+            isCancellationReview === true;
+
+        if (targetOrder.status !== "completed" && !isCancelledExpressReview) {
             return res.status(400).json({
-                message: "Отзыв можно оставить только после полного завершения заказа",
+                message: "Отзыв можно оставить только после завершения или отмены экспресс-заказа",
             });
         }
 
-        // ✅ только участник заказа
         const isCreator = Number(targetOrder.creatorId) === Number(fromUserId);
         const isExecutor = Number(targetOrder.executorId) === Number(fromUserId);
 
@@ -727,15 +737,34 @@ router.post("/review", authenticateToken, async (req, res) => {
             return res.status(403).json({ message: "Вы не участник этого заказа" });
         }
 
-        const toUserId = isCreator ? targetOrder.executorId : targetOrder.creatorId;
+        let toUserId = isCreator ? targetOrder.executorId : targetOrder.creatorId;
+
+        if (isCancelledExpressReview && requestedToUserId) {
+            const requestedId = Number(requestedToUserId);
+
+            const isValidTarget =
+                requestedId === Number(targetOrder.creatorId) ||
+                requestedId === Number(targetOrder.executorId);
+
+            if (!isValidTarget) {
+                return res.status(400).json({
+                    message: "Нельзя оценить пользователя, который не участвовал в заказе",
+                });
+            }
+
+            if (requestedId === Number(fromUserId)) {
+                return res.status(400).json({
+                    message: "Нельзя оставить отзыв самому себе",
+                });
+            }
+
+            toUserId = requestedId;
+        }
 
         if (!toUserId) {
             return res.status(400).json({ message: "Невозможно определить второго участника" });
         }
 
-        // ✅ запрет повторного отзыва за тот же заказ от того же пользователя
-        // если OrderReview у тебя пока привязан только к orderId, то этого хватит,
-        // но лучше ниже добавить поле orderType в модель OrderReview
         const existing = await OrderReview.findOne({
             where: { orderId, orderType, fromUserId }
         });
@@ -750,7 +779,7 @@ router.post("/review", authenticateToken, async (req, res) => {
             toUserId,
             rating: r,
             text: (text || "").trim() || null,
-            orderType, // если такого поля нет в модели — временно убери эту строку
+            orderType,
         });
 
         const user = await User.findByPk(toUserId);

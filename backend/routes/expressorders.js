@@ -1259,9 +1259,10 @@ router.post("/express-orders/:id/cancel", authenticateToken, async (req, res) =>
         ].filter(Boolean);
 
         participantIds.forEach((participantId) => {
+            // ✅ Отдельное событие именно отмены
             emitToUserEverywhere(io, participantId, "expressOrderCancelled", socketPayload);
-            emitToUserEverywhere(io, participantId, "expressStatusChanged", socketPayload);
-            emitToUserEverywhere(io, participantId, "expressOrderStatusChanged", socketPayload);
+
+            // ✅ Эти события только для обновления списков/карточек
             emitToUserEverywhere(io, participantId, "activeOrdersUpdated", socketPayload);
             emitToUserEverywhere(io, participantId, "expressOrdersUpdated", socketPayload);
         });

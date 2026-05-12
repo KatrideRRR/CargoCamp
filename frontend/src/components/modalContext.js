@@ -184,11 +184,6 @@ export const ModalProvider = ({ children }) => {
             return;
         }
 
-        if (data.status === "cancelled") {
-            openExpressCancelledModal(data);
-            return;
-        }
-
         const expressType = data.type || data.expressType;
 
         const textByStatus = {
@@ -301,19 +296,22 @@ export const ModalProvider = ({ children }) => {
         setExpressAcceptedData(null);
     };
 
-    const getExpressCancelledModalKey = (orderId) => {
-        return `express_cancelled_modal_shown_${orderId}`;
+    const getExpressCancelledModalKey = (orderId, cancelledBy) => {
+        return `express_cancelled_modal_shown_${orderId}_${cancelledBy || "unknown"}`;
     };
 
     const openExpressCancelledModal = (data) => {
-        const orderId = data?.orderId || data?.data?.orderId;
+        const orderId = data?.orderId || data?.id || data?.data?.orderId;
         if (!orderId) return;
 
-        const status = data.status || data?.data?.status;
-        if (status && status !== "cancelled") return;
+        const orderType = data?.orderType || data?.data?.orderType;
+        if (orderType !== "express") return;
 
-        const creatorId = data.creatorId || data?.data?.creatorId;
-        const executorId = data.executorId || data?.data?.executorId;
+        const status = data?.status || data?.data?.status;
+        if (status !== "cancelled") return;
+
+        const creatorId = data?.creatorId || data?.data?.creatorId;
+        const executorId = data?.executorId || data?.data?.executorId;
 
         const isParticipant =
             Number(userId) === Number(creatorId) ||
@@ -321,12 +319,16 @@ export const ModalProvider = ({ children }) => {
 
         if (!isParticipant) return;
 
-        const cancelledBy = data.cancelledBy || data?.data?.cancelledBy;
-        const cancelledByRole = data.cancelledByRole || data?.data?.cancelledByRole;
+        const cancelledBy = data?.cancelledBy || data?.data?.cancelledBy;
+        const cancelledByRole = data?.cancelledByRole || data?.data?.cancelledByRole;
+
+        // ✅ если нет cancelledBy — не открываем,
+        // чтобы модалка не всплывала от старых/общих событий
+        if (!cancelledBy) return;
 
         const cancelledByMe = Number(cancelledBy) === Number(userId);
 
-        const shownKey = getExpressCancelledModalKey(orderId);
+        const shownKey = getExpressCancelledModalKey(orderId, cancelledBy);
 
         if (localStorage.getItem(shownKey) === "1") {
             return;
@@ -349,22 +351,69 @@ export const ModalProvider = ({ children }) => {
         setExpressAcceptedData(null);
 
         setExpressCancelledData({
-            title: data.title || "Экспресс-заказ отменён",
+            title: data?.title || "Экспресс-заказ отменён",
             description:
-                data.message ||
-                data.body ||
+                data?.message ||
+                data?.body ||
                 `${cancelledText} Заказ №${orderId}`,
             orderId,
             creatorId,
             executorId,
             cancelledBy,
             cancelledByRole,
+            cancelledByMe,
             orderType: "express",
         });
     };
 
     const handleExpressCancelledClose = () => {
         setExpressCancelledData(null);
+    };
+
+    const openReviewFromCancellation = () => {
+        if (!expressCancelledData?.orderId) return;
+
+        const {
+            orderId,
+            creatorId,
+            executorId,
+            cancelledBy,
+            cancelledByMe,
+        } = expressCancelledData;
+
+        if (cancelledByMe) {
+            toast.info("Вы отменили заказ сами");
+            return;
+        }
+
+        if (!cancelledBy) {
+            toast.error("Не удалось определить, кого оценивать");
+            return;
+        }
+
+        const orderType = "express";
+
+        if (hasSubmittedReview(orderId, orderType)) {
+            toast.info("Вы уже оставили отзыв по этому заказу");
+            return;
+        }
+
+        setSelectedOrder({
+            id: orderId,
+            creatorId,
+            executorId,
+            toUserId: cancelledBy, // ✅ оцениваем того, кто отменил
+            orderType,
+            isExpress: true,
+            isCancellationReview: true,
+        });
+
+        setExpressCancelledData(null);
+        setCompletionNotificationData(null);
+        setCompletionSuccessData(null);
+
+        setRating(0);
+        setShowRatingModal(true);
     };
 
     const handleSubmitReview = async ({ rating, text }) => {
@@ -386,6 +435,8 @@ export const ModalProvider = ({ children }) => {
                 text,
                 isExpress: !!selectedOrder.isExpress,
                 orderType,
+                toUserId: selectedOrder.toUserId || null,
+                isCancellationReview: !!selectedOrder.isCancellationReview,
             });
 
             // ✅ больше не показываем напоминание по этому заказу
@@ -399,6 +450,7 @@ export const ModalProvider = ({ children }) => {
 
             setCompletionNotificationData(null);
             setCompletionSuccessData(null);
+            setExpressCancelledData(null);
 
             return true;
         } catch (e) {
@@ -535,11 +587,14 @@ export const ModalProvider = ({ children }) => {
 
             const cancelledNotification = list.find((n) => {
                 const orderType = n.orderType || n?.data?.orderType;
+                const status = n?.data?.status;
 
                 return (
                     orderType === "express" &&
                     n.type === "express_cancelled" &&
-                    (n.orderId || n?.data?.orderId)
+                    status === "cancelled" &&
+                    (n.orderId || n?.data?.orderId) &&
+                    n?.data?.cancelledBy
                 );
             });
 
@@ -978,18 +1033,27 @@ export const ModalProvider = ({ children }) => {
                         </p>
 
                         <div className="modal-note">
-                            Заказ больше не активен и будет доступен в истории.
+                            Заказ больше не активен. Вы можете перейти ко всем заказам и выбрать другой.
                         </div>
 
                         <div className="modal-actions">
+                            {!expressCancelledData.cancelledByMe && expressCancelledData.cancelledBy && (
+                                <button
+                                    className="modal-btn modal-btn-primary"
+                                    onClick={openReviewFromCancellation}
+                                >
+                                    Оценить участника
+                                </button>
+                            )}
+
                             <button
                                 className="modal-btn modal-btn-primary"
                                 onClick={() => {
                                     setExpressCancelledData(null);
-                                    window.location.href = "/active-orders";
+                                    window.location.href = "/orders";
                                 }}
                             >
-                                К активным заказам
+                                Ко всем заказам
                             </button>
 
                             <button
