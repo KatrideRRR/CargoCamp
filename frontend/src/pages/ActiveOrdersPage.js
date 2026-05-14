@@ -44,7 +44,15 @@ const ActiveOrdersPage = () => {
     const [orders, setOrders] = useState([]);
     const [expressOrders, setExpressOrders] = useState([]);
 
-    const [activeView, setActiveView] = useState("performing");
+    const [activeView, setActiveView] = useState(() => {
+        const params = new URLSearchParams(window.location.search);
+        const view = params.get("view");
+
+        if (view === "created") return "created";
+        if (view === "performing") return "performing";
+
+        return "performing";
+    });
 
     const [error, setError] = useState(null);
 

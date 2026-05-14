@@ -894,7 +894,7 @@ export const ModalProvider = ({ children }) => {
                                 className="modal-btn modal-btn-primary"
                                 onClick={() => {
                                     setExpressAcceptedData(null);
-                                    window.location.href = "/active-orders";
+                                    window.location.href = "/active-orders?view=created";
                                 }}
                             >
                                 Открыть активный заказ
