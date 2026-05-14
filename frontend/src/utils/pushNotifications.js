@@ -25,6 +25,11 @@ function navigateFromPush(data, navigate) {
         return;
     }
 
+    if (type === "order_push" && orderId) {
+        navigate(`/order/${orderId}`);
+        return;
+    }
+
     // ✅ пуш о необходимости отзыва
     if (type === "review_needed" && orderId) {
         localStorage.setItem(
@@ -106,9 +111,7 @@ export async function initPushNotifications({ navigate } = {}) {
         return;
     }
 
-    await PushNotifications.register();
-
-    PushNotifications.removeAllListeners();
+    await PushNotifications.removeAllListeners();
 
     PushNotifications.addListener("registration", async (tokenResult) => {
         try {
@@ -123,7 +126,6 @@ export async function initPushNotifications({ navigate } = {}) {
                 appVersion: process.env.REACT_APP_VERSION || null,
             });
 
-            console.log("✅ Push token registered");
         } catch (e) {
             console.error("Push token register API error:", e);
         }
@@ -161,4 +163,17 @@ export async function initPushNotifications({ navigate } = {}) {
         const data = action?.notification?.data || {};
         navigateFromPush(data, navigate);
     });
+
+    if (Capacitor.getPlatform() === "android") {
+        await PushNotifications.createChannel({
+            id: "cargocamp_default",
+            name: "CargoCamp уведомления",
+            description: "Основные уведомления CargoCamp",
+            importance: 5,
+            visibility: 1,
+            sound: "default",
+        });
+    }
+
+    await PushNotifications.register();
 }

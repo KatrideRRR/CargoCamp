@@ -1,4 +1,7 @@
 const { Op, Sequelize } = require("sequelize");
+const { Notification } = require("../models");
+const { sendPushToUser } = require("../services/pushService");
+const { sendNotifications, sendToUser } = require("../socket");
 
 function toNum(x) {
     const n = Number(x);
@@ -141,7 +144,49 @@ async function sendOrderPush({
             },
         };
 
-        io.to(`user_${t.userId}`).emit("push_notification", payload);
+        const notification = await Notification.create({
+            userId: t.userId,
+            type: "order_push",
+            title: "Новый заказ рядом",
+            body: `Заказ #${order.id} • ${order.proposedSum || ""} ₽ • ${t.distanceKm.toFixed(1)} км`,
+            orderId: order.id,
+            orderType: "regular",
+            isRead: false,
+            data: {
+                type: "order_push",
+                orderId: order.id,
+                orderType: "regular",
+                categoryId: order.categoryId,
+                subcategoryId: order.subcategoryId,
+                serviceId: order.serviceId,
+                address: order.address,
+                proposedSum: order.proposedSum,
+                distanceKm: Number(t.distanceKm.toFixed(2)),
+            },
+        });
+
+        await sendNotifications(t.userId);
+
+        sendToUser(t.userId, "push_notification", {
+            ...payload,
+            notificationId: notification.id,
+        });
+
+        await sendPushToUser({
+            userId: t.userId,
+            title: "Новый заказ рядом",
+            body: `Заказ #${order.id} • ${order.proposedSum || ""} ₽ • ${t.distanceKm.toFixed(1)} км`,
+            data: {
+                type: "order_push",
+                notificationId: notification.id,
+                orderId: order.id,
+                orderType: "regular",
+                categoryId: order.categoryId,
+                subcategoryId: order.subcategoryId,
+                serviceId: order.serviceId,
+                distanceKm: Number(t.distanceKm.toFixed(2)),
+            },
+        });
 
         if (logAction) {
             await logAction({
@@ -156,8 +201,10 @@ async function sendOrderPush({
                 success: true,
                 meta: {
                     toUserId: t.userId,
+                    notificationId: notification.id,
                     distanceKm: Number(t.distanceKm.toFixed(2)),
                     categoryId,
+                    realPush: true,
                 },
             });
         }
