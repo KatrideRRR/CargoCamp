@@ -716,6 +716,54 @@ const ProfilePage = () => {
                 return;
             }
 
+            /**
+             * ✅ Оплата с привязанной карты.
+             */
+            if (res.data.paidBySavedCard) {
+                if (res.data.paid) {
+                    toast.success("Premium оплачен с привязанной карты ✅");
+
+                    try {
+                        const refreshed = await axios.get(`${apiUrl}/api/auth/profile`, {
+                            headers: { Authorization: `Bearer ${token}` },
+                        });
+
+                        setProfile(refreshed.data);
+                        setPaymentMethodId(refreshed.data.yookassaPaymentMethodId || null);
+                    } catch (e) {
+                        console.error("profile refresh after premium pay error:", e);
+                    }
+
+                    return;
+                }
+
+                toast.info("Платёж с привязанной карты обрабатывается...");
+
+                setTimeout(async () => {
+                    try {
+                        const refreshed = await axios.get(`${apiUrl}/api/auth/profile`, {
+                            headers: { Authorization: `Bearer ${token}` },
+                        });
+
+                        setProfile(refreshed.data);
+                        setPaymentMethodId(refreshed.data.yookassaPaymentMethodId || null);
+
+                        if (refreshed.data.subscriptionType === "premium") {
+                            toast.success("Premium активирован ✅");
+                        } else {
+                            toast.info("Платёж ещё обрабатывается");
+                        }
+                    } catch (e) {
+                        console.error("profile refresh after premium processing error:", e);
+                    }
+                }, 2500);
+
+                return;
+            }
+
+            /**
+             * ✅ Обычный redirect, если карты нет.
+             */
             if (!res.data.confirmationUrl) {
                 toast.error("Ссылка на оплату не получена");
                 return;

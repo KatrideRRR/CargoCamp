@@ -467,12 +467,30 @@ function CreateOrderPage() {
                 );
 
                 if (!payResp.data?.success) {
-                    setError(payResp.data?.error || "Не удалось создать платёж за продвижение");
+                    setError(payResp.data?.error || "Не удалось оплатить продвижение");
                     setIsSubmitting(false);
                     return;
                 }
 
-                window.location.href = payResp.data.confirmationUrl;
+                if (payResp.data.paidBySavedCard) {
+                    if (payResp.data.paid) {
+                        alert("Заказ создан, продвижение оплачено с привязанной карты");
+                        navigate("/orders");
+                        return;
+                    }
+
+                    alert("Заказ создан. Платёж с привязанной карты обрабатывается.");
+                    navigate("/orders");
+                    return;
+                }
+
+                if (payResp.data.confirmationUrl) {
+                    window.location.href = payResp.data.confirmationUrl;
+                    return;
+                }
+
+                setError("Не удалось получить ссылку на оплату");
+                setIsSubmitting(false);
             } else {
                 alert("Заказ успешно создан");
                 navigate("/orders");

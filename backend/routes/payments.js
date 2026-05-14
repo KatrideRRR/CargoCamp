@@ -13,49 +13,185 @@ router.post('/premium/create', authenticateToken, async (req, res) => {
         const userId = req.user.id;
         const { duration } = req.body; // "7d" | "30d"
 
-        const prices = { '7d': '2500.00', '30d': '9000.00' };
+        const prices = {
+            "7d": "2500.00",
+            "30d": "9000.00",
+        };
+
         const amountValue = prices[duration];
-        if (!amountValue) return res.status(400).json({ success: false, error: 'Неверная длительность' });
+
+        if (!amountValue) {
+            return res.status(400).json({
+                success: false,
+                error: "Неверная длительность",
+            });
+        }
 
         const user = await User.findByPk(userId);
-        if (!user) return res.status(404).json({ success: false, error: 'Пользователь не найден' });
 
-        const addDays = duration === '7d' ? 7 : 30;
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: "Пользователь не найден",
+            });
+        }
 
-        const idempotenceKey = require('uuid').v4();
+        const addDays = duration === "7d" ? 7 : 30;
+        const idempotenceKey = uuidv4();
 
-        const payment = await yooKassa.createPayment({
-            amount: { value: amountValue, currency: 'RUB' },
-            capture: true,
-            confirmation: {
-                type: 'redirect',
-                return_url: `${process.env.FRONTEND_URL}/profile?premiumReturn=1`,
+        const basePayload = {
+            amount: {
+                value: amountValue,
+                currency: "RUB",
             },
+            capture: true,
             description: `Premium ${duration} для пользователя #${userId}`,
-            metadata: { type: 'premium', userId: String(userId), duration },
-
-            // ✅ чек обязателен при включенной фискализации
+            metadata: {
+                type: "premium",
+                userId: String(userId),
+                duration,
+            },
             receipt: {
                 customer: {
-                    phone: String(user.phone || '').replace(/[^\d+]/g, ''),
-                    // если появится email — лучше добавить и его:
-                    // email: user.email
+                    phone: String(user.phone || "").replace(/[^\d+]/g, ""),
                 },
                 items: [
                     {
                         description: `Подписка Premium (${addDays} дней)`,
                         quantity: 1,
-                        amount: { value: amountValue, currency: 'RUB' },
-                        vat_code: 1,                 // без НДС  [oai_citation:2‡ЮKassa](https://yookassa.ru/developers/payment-acceptance/receipts/54fz/yoomoney/parameters-values?utm_source=chatgpt.com)
-                        payment_mode: 'full_payment',
-                        payment_subject: 'service',
-                    }
+                        amount: {
+                            value: amountValue,
+                            currency: "RUB",
+                        },
+                        vat_code: 1,
+                        payment_mode: "full_payment",
+                        payment_subject: "service",
+                    },
                 ],
-                tax_system_code: 2, // ✅ УСН (доходы)  [oai_citation:3‡ЮKassa](https://yookassa.ru/developers/payment-acceptance/receipts/54fz/other-services/parameters-values?utm_source=chatgpt.com)
-            }
-        }, idempotenceKey);
+                tax_system_code: 2,
+            },
+        };
 
-        await req.logAction({
+        /**
+         * ✅ 1) Если карта привязана — пробуем списать сразу.
+         */
+        if (user.yookassa_payment_method_id) {
+            const payment = await yooKassa.createPayment(
+                {
+                    ...basePayload,
+                    payment_method_id: user.yookassa_payment_method_id,
+                },
+                idempotenceKey
+            );
+
+            await req.logAction?.({
+                req,
+                actorUserId: userId,
+                actorRole: "user",
+                actionType: "payment_create",
+                entityType: "payment",
+                paymentId: payment.id,
+                severity: payment.status === "canceled" ? "warning" : "info",
+                meta: {
+                    provider: "yookassa",
+                    type: "premium",
+                    duration,
+                    amount: amountValue,
+                    status: payment.status,
+                    paidBySavedCard: true,
+                },
+            });
+
+            if (payment.status === "canceled") {
+                return res.json({
+                    success: false,
+                    paidBySavedCard: true,
+                    paymentProcessing: false,
+                    paymentId: payment.id,
+                    status: payment.status,
+                    error:
+                        "Не удалось списать с привязанной карты. Проверьте баланс карты или выберите другой способ оплаты.",
+                });
+            }
+
+            /**
+             * ✅ Если ЮKassa сразу вернула succeeded —
+             * активируем Premium сразу, не дожидаясь webhook.
+             */
+            if (payment.status === "succeeded") {
+                if (user.premium_last_payment_id !== payment.id) {
+                    const now = new Date();
+
+                    const currentExp = user.subscription_expires_at
+                        ? new Date(user.subscription_expires_at)
+                        : null;
+
+                    const base =
+                        user.subscription_type === "premium" &&
+                        currentExp &&
+                        currentExp > now
+                            ? currentExp
+                            : now;
+
+                    const newExp = new Date(
+                        base.getTime() + addDays * 24 * 60 * 60 * 1000
+                    );
+
+                    await user.update({
+                        subscription_type: "premium",
+                        subscription_expires_at: newExp,
+                        premium_last_payment_id: payment.id,
+                    });
+
+                    await req.logAction?.({
+                        req,
+                        actorUserId: userId,
+                        actorRole: "system",
+                        actionType: "premium_activated",
+                        entityType: "user",
+                        entityId: userId,
+                        paymentId: payment.id,
+                        severity: "info",
+                        meta: {
+                            provider: "yookassa",
+                            duration,
+                            addDays,
+                            subscriptionExpiresAt: newExp,
+                            activatedBy: "saved_card_payment",
+                        },
+                    });
+                }
+            }
+
+            return res.json({
+                success: true,
+                paidBySavedCard: true,
+                paymentProcessing: payment.status !== "succeeded",
+                paid: payment.status === "succeeded",
+                paymentId: payment.id,
+                status: payment.status,
+                message:
+                    payment.status === "succeeded"
+                        ? "Premium оплачен с привязанной карты"
+                        : "Платёж создан. Premium активируется после подтверждения оплаты.",
+            });
+        }
+
+        /**
+         * ✅ 2) Если карты нет — обычная оплата через redirect.
+         */
+        const payment = await yooKassa.createPayment(
+            {
+                ...basePayload,
+                confirmation: {
+                    type: "redirect",
+                    return_url: `${process.env.FRONTEND_URL}/profile?premiumReturn=1&paymentId={payment_id}`,
+                },
+            },
+            idempotenceKey
+        );
+
+        await req.logAction?.({
             req,
             actorUserId: userId,
             actorRole: "user",
@@ -69,18 +205,24 @@ router.post('/premium/create', authenticateToken, async (req, res) => {
                 duration,
                 amount: amountValue,
                 status: payment.status,
+                paidBySavedCard: false,
             },
         });
 
         return res.json({
             success: true,
+            paidBySavedCard: false,
             paymentId: payment.id,
             confirmationUrl: payment.confirmation?.confirmation_url,
             status: payment.status,
         });
     } catch (e) {
-        console.error('premium/create error:', e);
-        return res.status(500).json({ success: false, error: e?.message || 'Internal server error' });
+        console.error("premium/create error:", e);
+
+        return res.status(500).json({
+            success: false,
+            error: e?.message || "Internal server error",
+        });
     }
 });
 
@@ -338,38 +480,82 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const { orderId } = req.body;
-        if (!orderId) return res.status(400).json({ success: false, error: 'orderId обязателен' });
+
+        if (!orderId) {
+            return res.status(400).json({
+                success: false,
+                error: 'orderId обязателен',
+            });
+        }
 
         const user = await User.findByPk(userId);
-        if (!user) return res.status(404).json({ success: false, error: 'Пользователь не найден' });
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: 'Пользователь не найден',
+            });
+        }
 
         const order = await Order.findByPk(orderId);
-        if (!order) return res.status(404).json({ success: false, error: 'Заказ не найден' });
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                error: 'Заказ не найден',
+            });
+        }
 
-        if (order.creatorId !== userId) {
-            return res.status(403).json({ success: false, error: 'Нет доступа к этому заказу' });
+        if (Number(order.creatorId) !== Number(userId)) {
+            return res.status(403).json({
+                success: false,
+                error: 'Нет доступа к этому заказу',
+            });
         }
 
         if (order.status !== 'pending_payment') {
-            return res.status(400).json({ success: false, error: 'Этот заказ не требует оплаты продвижения' });
+            return res.status(400).json({
+                success: false,
+                error: 'Этот заказ не требует оплаты продвижения',
+            });
         }
 
-        const PROMOTION_PRICES = { highlight: 50, recommended: 100, push: 150 };
-        const pr = order.promotionRequested || {};
-        const total = Object.entries(pr).reduce((sum, [k, v]) => (v && PROMOTION_PRICES[k] ? sum + PROMOTION_PRICES[k] : sum), 0);
+        const PROMOTION_PRICES = {
+            highlight: 50,
+            recommended: 100,
+            push: 150,
+        };
 
-        if (total <= 0) return res.status(400).json({ success: false, error: 'Продвижение не выбрано' });
+        let pr = order.promotionRequested || {};
+
+        if (typeof pr === "string") {
+            try {
+                pr = JSON.parse(pr);
+            } catch {
+                pr = {};
+            }
+        }
+
+        const total = Object.entries(pr).reduce((sum, [key, enabled]) => {
+            return enabled && PROMOTION_PRICES[key]
+                ? sum + PROMOTION_PRICES[key]
+                : sum;
+        }, 0);
+
+        if (total <= 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'Продвижение не выбрано',
+            });
+        }
 
         const amountValue = total.toFixed(2);
         const idempotenceKey = uuidv4();
 
-        const payment = await yooKassa.createPayment({
-            amount: { value: amountValue, currency: 'RUB' },
-            capture: true,
-            confirmation: {
-                type: 'redirect',
-                return_url: `${process.env.FRONTEND_URL}/orders?promoReturn=1&orderId=${orderId}`,
+        const basePayload = {
+            amount: {
+                value: amountValue,
+                currency: 'RUB',
             },
+            capture: true,
             description: `Продвижение заказа #${orderId}`,
             metadata: {
                 type: 'order_promotion',
@@ -377,27 +563,143 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
                 userId: String(userId),
             },
             receipt: {
-                customer: { phone: String(user.phone || '').replace(/[^\d+]/g, '') },
+                customer: {
+                    phone: String(user.phone || '').replace(/[^\d+]/g, ''),
+                },
                 items: [
                     {
                         description: `Продвижение заказа #${orderId}`,
                         quantity: 1,
-                        amount: { value: amountValue, currency: 'RUB' },
+                        amount: {
+                            value: amountValue,
+                            currency: 'RUB',
+                        },
                         vat_code: 1,
                         payment_mode: 'full_payment',
                         payment_subject: 'service',
-                    }
+                    },
                 ],
-                tax_system_code: 2, // УСН доходы
+                tax_system_code: 2,
             },
-        }, idempotenceKey);
+        };
+
+        /**
+         * ✅ 1) Если карта привязана — пробуем списать сразу.
+         */
+        if (user.yookassa_payment_method_id) {
+            const payment = await yooKassa.createPayment(
+                {
+                    ...basePayload,
+                    payment_method_id: user.yookassa_payment_method_id,
+                },
+                idempotenceKey
+            );
+
+            await order.update({
+                promotionPaymentId: payment.id,
+                promotionPaymentProvider: "yookassa",
+            });
+
+            await req.logAction?.({
+                req,
+                actorUserId: userId,
+                actorRole: "user",
+                actionType: "payment_create",
+                entityType: "payment",
+                paymentId: payment.id,
+                orderId: Number(orderId),
+                severity: payment.status === "canceled" ? "warning" : "info",
+                meta: {
+                    provider: "yookassa",
+                    type: "order_promotion",
+                    amount: amountValue,
+                    status: payment.status,
+                    paidBySavedCard: true,
+                },
+            });
+
+            if (payment.status === "canceled") {
+                return res.json({
+                    success: false,
+                    paidBySavedCard: true,
+                    paymentProcessing: false,
+                    paymentId: payment.id,
+                    status: payment.status,
+                    error:
+                        "Не удалось списать с привязанной карты. Проверьте баланс карты или выберите другой способ оплаты.",
+                });
+            }
+
+            /**
+             * ✅ Если ЮKassa сразу вернула succeeded — можно активировать продвижение сразу,
+             * не дожидаясь вебхука. Вебхук потом придёт повторно, но ничего страшного.
+             */
+            if (payment.status === "succeeded") {
+                await order.update({
+                    status: "pending",
+                    is_highlighted: !!pr.highlight,
+                    is_recommended: !!pr.recommended,
+                    is_push_notified: !!pr.push,
+                    promotionPaidAt: new Date(),
+                });
+
+                req.app.locals.io?.emit("orderUpdated");
+
+                if (pr.push) {
+                    try {
+                        const logAction =
+                            req.logAction ||
+                            req.app?.locals?.logAction ||
+                            null;
+
+                        await sendOrderPush({
+                            db,
+                            io: req.app.locals.io,
+                            orderId: order.id,
+                            radiusKm: 50,
+                            limit: 10,
+                            logAction,
+                        });
+                    } catch (e) {
+                        console.error("sendOrderPush error:", e);
+                    }
+                }
+            }
+
+            return res.json({
+                success: true,
+                paidBySavedCard: true,
+                paymentProcessing: payment.status !== "succeeded",
+                paid: payment.status === "succeeded",
+                paymentId: payment.id,
+                status: payment.status,
+                message:
+                    payment.status === "succeeded"
+                        ? "Продвижение оплачено с привязанной карты"
+                        : "Платёж создан. Продвижение активируется после подтверждения оплаты.",
+            });
+        }
+
+        /**
+         * ✅ 2) Если карты нет — обычный redirect.
+         */
+        const payment = await yooKassa.createPayment(
+            {
+                ...basePayload,
+                confirmation: {
+                    type: 'redirect',
+                    return_url: `${process.env.FRONTEND_URL}/orders?promoReturn=1&orderId=${orderId}&paymentId={payment_id}`,
+                },
+            },
+            idempotenceKey
+        );
 
         await order.update({
             promotionPaymentId: payment.id,
             promotionPaymentProvider: "yookassa",
         });
 
-        await req.logAction({
+        await req.logAction?.({
             req,
             actorUserId: userId,
             actorRole: "user",
@@ -411,17 +713,24 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
                 type: "order_promotion",
                 amount: amountValue,
                 status: payment.status,
+                paidBySavedCard: false,
             },
         });
 
         return res.json({
             success: true,
+            paidBySavedCard: false,
             paymentId: payment.id,
             confirmationUrl: payment.confirmation?.confirmation_url,
+            status: payment.status,
         });
     } catch (e) {
         console.error('order/promotion/create error:', e);
-        return res.status(500).json({ success: false, error: e?.message || 'Internal server error' });
+
+        return res.status(500).json({
+            success: false,
+            error: e?.message || 'Internal server error',
+        });
     }
 });
 
@@ -598,7 +907,16 @@ router.post("/yookassa/webhook", async (req, res) => {
             }
 
             const user = await User.findByPk(userId);
+
             if (!user) {
+                return res.sendStatus(200);
+            }
+
+            /**
+             * ✅ Защита от двойной активации:
+             * если этот payment.id уже применяли — ничего не делаем.
+             */
+            if (user.premium_last_payment_id === payment.id) {
                 return res.sendStatus(200);
             }
 
@@ -622,6 +940,25 @@ router.post("/yookassa/webhook", async (req, res) => {
             await user.update({
                 subscription_type: "premium",
                 subscription_expires_at: newExp,
+                premium_last_payment_id: payment.id,
+            });
+
+            await req.logAction?.({
+                req,
+                actorUserId: userId,
+                actorRole: "webhook",
+                actionType: "premium_activated",
+                entityType: "user",
+                entityId: userId,
+                paymentId: payment.id,
+                severity: "info",
+                meta: {
+                    provider: "yookassa",
+                    duration,
+                    addDays,
+                    subscriptionExpiresAt: newExp,
+                    activatedBy: "webhook",
+                },
             });
 
             return res.sendStatus(200);
@@ -979,7 +1316,16 @@ router.get('/promotion/status', authenticateToken, async (req, res) => {
         const payment = await yooKassa.getPayment(order.promotionPaymentId);
 
         if (payment.status === 'succeeded' && order.status === 'pending_payment') {
-            const pr = order.promotionRequested || {};
+            let pr = order.promotionRequested || {};
+
+            if (typeof pr === "string") {
+                try {
+                    pr = JSON.parse(pr);
+                } catch {
+                    pr = {};
+                }
+            }
+
             await order.update({
                 status: 'pending',
                 is_highlighted: !!pr.highlight,

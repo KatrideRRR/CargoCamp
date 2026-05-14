@@ -567,9 +567,32 @@ const MyOrdersPage = () => {
                                                                     "/payments/order/promotion/create",
                                                                     { orderId: order.id }
                                                                 );
+
+                                                                if (!res.data?.success) {
+                                                                    alert(res.data?.error || "Не удалось оплатить продвижение");
+                                                                    return;
+                                                                }
+
+                                                                if (res.data.paidBySavedCard) {
+                                                                    if (res.data.paid) {
+                                                                        alert("Продвижение оплачено с привязанной карты");
+                                                                        await fetchOrders();
+                                                                        return;
+                                                                    }
+
+                                                                    alert("Платёж с привязанной карты обрабатывается. Статус обновится после подтверждения.");
+                                                                    setTimeout(fetchOrders, 2000);
+                                                                    return;
+                                                                }
+
                                                                 const url = res.data?.confirmationUrl;
-                                                                if (url) window.location.href = url;
-                                                                else alert("Не удалось получить ссылку на оплату");
+
+                                                                if (url) {
+                                                                    window.location.href = url;
+                                                                    return;
+                                                                }
+
+                                                                alert("Не удалось получить ссылку на оплату");
                                                             } catch (e) {
                                                                 alert(e.response?.data?.error || "Ошибка при создании оплаты");
                                                             }
