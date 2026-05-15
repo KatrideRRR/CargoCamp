@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require("uuid");
 const express = require('express');
 const router = express.Router();
 const NodeGeocoder = require('node-geocoder');
@@ -271,7 +272,7 @@ async function tryPayCommissionFromSavedCard({ req, executor, order, amountKopec
             entityType: "payment",
             paymentId: payment.id,
             orderId: order.id,
-            severity: payment.status === "canceled" ? "warning" : "info",
+            severity: payment.status === "canceled" ? "warn" : "info",
             meta: {
                 provider: "yookassa",
                 type: "debt",
@@ -314,7 +315,7 @@ async function tryPayCommissionFromSavedCard({ req, executor, order, amountKopec
             actionType: "commission_auto_payment_error",
             entityType: "payment",
             orderId: order.id,
-            severity: "warning",
+            severity: "warn",
             meta: {
                 provider: "yookassa",
                 amount: amountValue,
@@ -1854,7 +1855,7 @@ module.exports = (io) => {
                     entityType: "order",
                     entityId: order.id,
                     orderId: order.id,
-                    severity: "warning",
+                    severity: "warn",
                     success: false,
                     meta: {
                         reason: "not_creator",
@@ -1879,7 +1880,7 @@ module.exports = (io) => {
                     entityType: "order",
                     entityId: order.id,
                     orderId: order.id,
-                    severity: "warning",
+                    severity: "warn",
                     success: false,
                     meta: {
                         reason: "status_not_allowed",

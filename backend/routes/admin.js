@@ -521,7 +521,7 @@ router.delete("/orders/:id", authMiddleware, adminMiddleware, async (req, res) =
                 entityType: "order",
                 entityId: Number(req.params.id),
                 orderId: Number(req.params.id),
-                severity: "warning",
+                severity: "warn",
                 success: false,
                 meta: {
                     reason: "order_not_found",
@@ -560,7 +560,7 @@ router.delete("/orders/:id", authMiddleware, adminMiddleware, async (req, res) =
             entityType: "order",
             entityId: order.id,
             orderId: order.id,
-            severity: "warning",
+            severity: "warn",
             success: true,
             meta: {
                 before,

@@ -668,6 +668,10 @@ export const ModalProvider = ({ children }) => {
             });
         };
 
+        const handleOrderPush = (data) => {
+            toast.info(data?.message || data?.body || "Новый подходящий заказ рядом");
+        };
+
         socket.on("orderApproved", handleOrderApproved);
         socket.on("orderCompleted", handleOrderCompleted);
         socket.on("expressOrderCompleted", handleExpressOrderCompleted);
@@ -677,6 +681,7 @@ export const ModalProvider = ({ children }) => {
         socket.on("expressOrderStatusChanged", handleExpressOrderStatusChanged);
         socket.on("new_notification", handleNewNotification);
         socket.on("expressOrderCancelled", handleExpressOrderCancelled);
+        socket.on("push_notification", handleOrderPush);
 
         return () => {
             socket.off("orderApproved", handleOrderApproved);
@@ -688,6 +693,7 @@ export const ModalProvider = ({ children }) => {
             socket.off("expressOrderStatusChanged", handleExpressOrderStatusChanged);
             socket.off("new_notification", handleNewNotification);
             socket.off("expressOrderCancelled", handleExpressOrderCancelled);
+            socket.off("push_notification", handleOrderPush);
         };
     }, [userId]);
 

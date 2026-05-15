@@ -91,7 +91,7 @@ router.post('/premium/create', authenticateToken, async (req, res) => {
                 actionType: "payment_create",
                 entityType: "payment",
                 paymentId: payment.id,
-                severity: payment.status === "canceled" ? "warning" : "info",
+                severity: payment.status === "canceled" ? "warn" : "info",
                 meta: {
                     provider: "yookassa",
                     type: "premium",
@@ -294,7 +294,7 @@ router.post('/debt/create', authenticateToken, async (req, res) => {
                 actionType: "payment_create",
                 entityType: "payment",
                 paymentId: payment.id,
-                severity: payment.status === "canceled" ? "warning" : "info",
+                severity: payment.status === "canceled" ? "warn" : "info",
                 meta: {
                     provider: "yookassa",
                     type: "debt",
@@ -608,7 +608,7 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
                 entityType: "payment",
                 paymentId: payment.id,
                 orderId: Number(orderId),
-                severity: payment.status === "canceled" ? "warning" : "info",
+                severity: payment.status === "canceled" ? "warn" : "info",
                 meta: {
                     provider: "yookassa",
                     type: "order_promotion",
@@ -874,7 +874,7 @@ router.post("/yookassa/webhook", async (req, res) => {
             entityType: "payment",
             paymentId: payment.id,
             orderId: meta.orderId ? Number(meta.orderId) : null,
-            severity: eventName === "payment.canceled" ? "warning" : "info",
+            severity: eventName === "payment.canceled" ? "warn" : "info",
             meta: {
                 type: meta.type,
                 status: paymentStatus,
@@ -988,7 +988,7 @@ router.post("/yookassa/webhook", async (req, res) => {
                     entityType: "payment",
                     paymentId: payment.id,
                     orderId,
-                    severity: "warning",
+                    severity: "warn",
                     meta: {
                         provider: "yookassa",
                         currentDebt: Number(user.debt || 0),
@@ -1333,6 +1333,28 @@ router.get('/promotion/status', authenticateToken, async (req, res) => {
                 is_push_notified: !!pr.push,
                 promotionPaidAt: new Date(),
             });
+
+            io?.emit("orderUpdated");
+
+            if (pr.push) {
+                try {
+                    const logAction =
+                        req.logAction ||
+                        req.app?.locals?.logAction ||
+                        null;
+
+                    await sendOrderPush({
+                        db,
+                        io,
+                        orderId: order.id,
+                        radiusKm: 50,
+                        limit: 10,
+                        logAction,
+                    });
+                } catch (e) {
+                    console.error("sendOrderPush from promotion/status error:", e);
+                }
+            }
         }
 
         return res.json({ success: true, status: payment.status });
