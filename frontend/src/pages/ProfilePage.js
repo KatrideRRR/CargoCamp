@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrentLocation";
 import { useAuth } from "../utils/authContext";
 import axios from "axios";
+import { FaHeadset } from "react-icons/fa";
 
 import "../styles/ProfilePage.css";
 
@@ -1008,6 +1009,15 @@ const ProfilePage = () => {
                                         </span>
                                     </div>
                                 </div>
+
+                                <button
+                                    className="profile-action-button"
+                                    onClick={() => navigate("/support")}
+                                >
+                                    <FaHeadset />
+                                    <span>Поддержка</span>
+                                </button>
+
                             </div>
                         </div>
                     )}

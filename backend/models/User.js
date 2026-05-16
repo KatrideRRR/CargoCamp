@@ -12,6 +12,15 @@ module.exports = (sequelize) => {
             User.hasMany(models.ExpressOrder, { foreignKey: "creatorId", as: "expressCreatedOrders" });
             User.hasMany(models.ExpressOrder, { foreignKey: "executorId", as: "expressTakenOrders" });
 
+            User.hasMany(models.SupportMessage, {
+                foreignKey: "userId",
+                as: "supportMessages",
+            });
+
+            User.hasMany(models.SupportMessage, {
+                foreignKey: "senderId",
+                as: "sentSupportMessages",
+            });
         }
     }
     User.init(

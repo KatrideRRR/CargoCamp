@@ -30,6 +30,7 @@ db.OrderReview = require("./OrderReview")(sequelize, DataTypes);
 db.ActionLog = require("./ActionLog")(sequelize, DataTypes);
 db.Dispute = require("./Dispute")(sequelize, DataTypes);
 db.PushToken = require("./PushToken")(sequelize, DataTypes);
+db.SupportMessage = require("./SupportMessage")(sequelize, DataTypes);
 // ✅ Express (такси/курьер)
 db.ExpressOrder = require("./ExpressOrder")(sequelize, DataTypes);
 db.ExpressSavedAddress = require("./ExpressSavedAddress")(sequelize, DataTypes);

@@ -23,7 +23,8 @@ module.exports = (sequelize, DataTypes) => {
                     "express_completed",
                     "express_cancelled",
                     "debt_created",
-                    "order_push"
+                    "order_push",
+                    "support_reply"
                 ),
                 allowNull: false,
             },

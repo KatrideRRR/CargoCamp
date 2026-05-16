@@ -12,6 +12,7 @@ function Dashboard() {
                     <ul>
                         <li><Link to="/users">Пользователи</Link></li>
                         <li><Link to="/orders">Заказы</Link></li>
+                        <li><Link to="/support">Поддержка</Link></li>
                     </ul>
                 </nav>
             </div>

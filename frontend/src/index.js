@@ -32,6 +32,7 @@ const StartPage = lazy(() => import('./pages/StartPage'));
 const CreateExpressOrder = lazy(() => import('./pages/CreateExpressOrder'));
 const ServiceInfoPage = lazy(() => import('./pages/ServiceInfoPage'));
 const InfoPage = lazy(() => import('./pages/InfoPage'));
+const SupportChatPage = React.lazy(() => import("./pages/SupportChatPage"));
 
 function SocketBootstrap() {
     const { user } = useAuth();
@@ -125,6 +126,7 @@ function App() {
                             <Route path="/express" element={<CreateExpressOrder />} />
                             <Route path="/services" element={<ServiceInfoPage />} />
                             <Route path="/info" element={<InfoPage />} />
+                            <Route path="/support" element={<SupportChatPage />} />
                         </Routes>
 
                         <BottomMenu />

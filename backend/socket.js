@@ -73,6 +73,15 @@ function initializeSocket(server) {
             socket.data.userId = normalizedUserId;
         });
 
+        socket.on("subscribeAdminSupport", () => {
+            socket.join("admins");
+        });
+
+        socket.on("subscribeSupportChat", (userId) => {
+            if (!userId) return;
+            socket.join(`support_user_${userId}`);
+        });
+
         socket.on("subscribeToNotifications", (userId) => {
             if (!userId) return;
 

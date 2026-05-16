@@ -75,3 +75,14 @@ a {
         box-shadow: none;
     }
 }
+
+body.hide-bottom-menu .bottom-menu,
+body.hide-bottom-menu .bottom-navigation,
+body.hide-bottom-menu .bottom-nav,
+body.hide-bottom-menu .mobile-bottom-menu {
+    display: none !important;
+}
+
+body.hide-bottom-menu .page {
+    padding-bottom: 0 !important;
+}
