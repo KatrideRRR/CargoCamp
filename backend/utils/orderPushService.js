@@ -79,23 +79,60 @@ async function sendOrderPush({
 
     const bb = bbox(coords.lat, coords.lng, radiusKm);
 
+    console.log("ORDER PUSH DEBUG:", {
+        orderId: order.id,
+        creatorId: order.creatorId,
+        categoryId,
+        orderCoords: coords,
+        bbox: bb,
+        candidatesCount: candidates.length,
+        scoredCount: scored.length,
+        top: top.map((x) => ({
+            userId: x.userId,
+            distanceKm: x.distanceKm,
+        })),
+    });
 
     const candidates = await User.findAll({
         where: {
+            id: { [Op.ne]: Number(order.creatorId) }, // ✅ не шлём создателю заказа
+
             role: { [Op.ne]: "banned" },
             debt: { [Op.lte]: 0 },
+
             location_lat: { [Op.between]: [bb.minLat, bb.maxLat] },
             location_lng: { [Op.between]: [bb.minLng, bb.maxLng] },
+
             [Op.and]: Sequelize.literal(
                 `JSON_CONTAINS(preferred_category_ids, CAST(${categoryId} AS JSON))`
             ),
         },
-        attributes: ["id", "locationLat", "locationLng", "preferredCategoryIds", "debt", "role"],        limit: 300,
+        attributes: [
+            "id",
+            "locationLat",
+            "locationLng",
+            "preferredCategoryIds",
+            "debt",
+            "role",
+        ],
+        limit: 300,
+    });
+
+    console.log("ORDER PUSH START:", {
+        orderId: order.id,
+        creatorId: order.creatorId,
+        is_push_notified: order.is_push_notified,
+        categoryId,
+        coordinates: order.coordinates,
     });
 
     const scored = [];
 
     for (const u of candidates) {
+        if (Number(u.id) === Number(order.creatorId)) {
+            continue;
+        }
+
         if (alreadySet.has(String(u.id))) {
             continue;
         }

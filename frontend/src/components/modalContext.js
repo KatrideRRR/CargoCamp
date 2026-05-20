@@ -585,6 +585,23 @@ export const ModalProvider = ({ children }) => {
         const handleNewNotification = (notifications) => {
             const list = Array.isArray(notifications) ? notifications : [notifications];
 
+            const orderPushNotification = list.find((n) => {
+                return (
+                    n.type === "order_push" ||
+                    n?.data?.type === "order_push"
+                );
+            });
+
+            if (orderPushNotification) {
+                toast.info(
+                    orderPushNotification.body ||
+                    orderPushNotification?.data?.message ||
+                    "Новый подходящий заказ рядом"
+                );
+
+                return;
+            }
+
             const cancelledNotification = list.find((n) => {
                 const orderType = n.orderType || n?.data?.orderType;
                 const status = n?.data?.status;
