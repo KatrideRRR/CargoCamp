@@ -79,51 +79,18 @@ async function sendOrderPush({
 
     const bb = bbox(coords.lat, coords.lng, radiusKm);
 
-    console.log("ORDER PUSH DEBUG:", {
-        orderId: order.id,
-        creatorId: order.creatorId,
-        categoryId,
-        orderCoords: coords,
-        bbox: bb,
-        candidatesCount: candidates.length,
-        scoredCount: scored.length,
-        top: top.map((x) => ({
-            userId: x.userId,
-            distanceKm: x.distanceKm,
-        })),
-    });
 
     const candidates = await User.findAll({
         where: {
-            id: { [Op.ne]: Number(order.creatorId) }, // ✅ не шлём создателю заказа
-
             role: { [Op.ne]: "banned" },
             debt: { [Op.lte]: 0 },
-
             location_lat: { [Op.between]: [bb.minLat, bb.maxLat] },
             location_lng: { [Op.between]: [bb.minLng, bb.maxLng] },
-
             [Op.and]: Sequelize.literal(
                 `JSON_CONTAINS(preferred_category_ids, CAST(${categoryId} AS JSON))`
             ),
         },
-        attributes: [
-            "id",
-            "locationLat",
-            "locationLng",
-            "preferredCategoryIds",
-            "debt",
-            "role",
-        ],
-        limit: 300,
-    });
-
-    console.log("ORDER PUSH START:", {
-        orderId: order.id,
-        creatorId: order.creatorId,
-        is_push_notified: order.is_push_notified,
-        categoryId,
-        coordinates: order.coordinates,
+        attributes: ["id", "locationLat", "locationLng", "preferredCategoryIds", "debt", "role"],        limit: 300,
     });
 
     const scored = [];
@@ -171,59 +138,41 @@ async function sendOrderPush({
     };
 
     for (const t of top) {
+        const title = "Новый заказ рядом";
+        const body = `Заказ #${order.id} • ${order.proposedSum || ""} ₽ • ${t.distanceKm.toFixed(1)} км`;
+
         const payload = {
             ...payloadBase,
-            title: "Новый заказ рядом",
-            message: `Заказ #${order.id} • ${order.proposedSum || ""} ₽ • ${t.distanceKm.toFixed(1)} км`,
+            title,
+            message: body,
             data: {
                 ...payloadBase.data,
                 distanceKm: Number(t.distanceKm.toFixed(2)),
             },
         };
 
-        const notification = await Notification.create({
-            userId: t.userId,
-            type: "order_push",
-            title: "Новый заказ рядом",
-            body: `Заказ #${order.id} • ${order.proposedSum || ""} ₽ • ${t.distanceKm.toFixed(1)} км`,
-            orderId: order.id,
-            orderType: "regular",
-            isRead: false,
-            data: {
-                type: "order_push",
-                orderId: order.id,
-                orderType: "regular",
-                categoryId: order.categoryId,
-                subcategoryId: order.subcategoryId,
-                serviceId: order.serviceId,
-                address: order.address,
-                proposedSum: order.proposedSum,
-                distanceKm: Number(t.distanceKm.toFixed(2)),
-            },
-        });
+        // 1. Alert/toast в открытом приложении через socket
+        io?.to(`user_${t.userId}`).emit("push_notification", payload);
 
-        await sendNotifications(t.userId);
-
-        sendToUser(t.userId, "push_notification", {
-            ...payload,
-            notificationId: notification.id,
-        });
-
-        await sendPushToUser({
-            userId: t.userId,
-            title: "Новый заказ рядом",
-            body: `Заказ #${order.id} • ${order.proposedSum || ""} ₽ • ${t.distanceKm.toFixed(1)} км`,
-            data: {
-                type: "order_push",
-                notificationId: notification.id,
-                orderId: order.id,
-                orderType: "regular",
-                categoryId: order.categoryId,
-                subcategoryId: order.subcategoryId,
-                serviceId: order.serviceId,
-                distanceKm: Number(t.distanceKm.toFixed(2)),
-            },
-        });
+        // 2. Настоящий push на Android/iOS через Firebase
+        try {
+            await sendPushToUser({
+                userId: t.userId,
+                title,
+                body,
+                data: {
+                    type: "order_push",
+                    orderId: String(order.id),
+                    orderType: "regular",
+                    categoryId: String(order.categoryId || ""),
+                    subcategoryId: String(order.subcategoryId || ""),
+                    serviceId: String(order.serviceId || ""),
+                    distanceKm: String(Number(t.distanceKm.toFixed(2))),
+                },
+            });
+        } catch (e) {
+            console.error("sendPushToUser order_push error:", e);
+        }
 
         if (logAction) {
             await logAction({
@@ -238,7 +187,6 @@ async function sendOrderPush({
                 success: true,
                 meta: {
                     toUserId: t.userId,
-                    notificationId: notification.id,
                     distanceKm: Number(t.distanceKm.toFixed(2)),
                     categoryId,
                     realPush: true,
