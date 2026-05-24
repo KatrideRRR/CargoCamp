@@ -160,6 +160,28 @@ module.exports = (sequelize, DataTypes) => {
                 allowNull: true,
                 field: 'completed_at',
             },
+            creatorHidden: {
+                type: DataTypes.BOOLEAN,
+                allowNull: false,
+                defaultValue: false,
+            },
+            creatorHiddenAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
+            adminDeleted: {
+                type: DataTypes.BOOLEAN,
+                allowNull: false,
+                defaultValue: false,
+            },
+            adminDeletedAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
+            adminDeletedById: {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+            },
         },
         {
             tableName: 'express_orders',

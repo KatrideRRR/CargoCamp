@@ -179,6 +179,8 @@ router.get("/express-orders/available", authenticateToken, async (req, res) => {
         const where = {
             status: "created",
             executorId: null,
+            creatorHidden: false,
+            adminDeleted: false,
             ...(type ? { type } : {}),
         };
 
@@ -218,6 +220,8 @@ router.get("/express-orders/me", authenticateToken, async (req, res) => {
                 creatorId: userId,
                 executorId: null,
                 status: "created",
+                creatorHidden: false,
+                adminDeleted: false,
             };
         } else {
             // Для active-orders:
@@ -225,6 +229,7 @@ router.get("/express-orders/me", authenticateToken, async (req, res) => {
             where = {
                 ...whereBase,
                 status: { [Op.notIn]: ["completed", "cancelled"] },
+                adminDeleted: false,
             };
         }
 
@@ -389,6 +394,102 @@ router.post("/express-orders", authenticateToken, async (req, res) => {
         await t.rollback();
         console.error("express-orders POST error:", e);
         res.status(500).json({ success: false, message: "Ошибка сервера" });
+    }
+});
+
+router.patch("/express-orders/:id/hide-by-creator", authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const id = Number(req.params.id);
+
+        if (!Number.isFinite(id) || id <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Некорректный id экспресс-заказа",
+            });
+        }
+
+        const order = await ExpressOrder.findByPk(id);
+
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: "Экспресс-заказ не найден",
+            });
+        }
+
+        if (Number(order.creatorId) !== Number(userId)) {
+            return res.status(403).json({
+                success: false,
+                message: "Можно удалить только свой экспресс-заказ",
+            });
+        }
+
+        if (order.status !== "created" || order.executorId) {
+            return res.status(409).json({
+                success: false,
+                message: "Этот экспресс-заказ уже нельзя удалить, потому что он уже принят или выполняется.",
+            });
+        }
+
+        const before = {
+            status: order.status,
+            creatorHidden: order.creatorHidden,
+            creatorHiddenAt: order.creatorHiddenAt,
+        };
+
+        order.creatorHidden = true;
+        order.creatorHiddenAt = new Date();
+
+        await order.save();
+
+        await req.logAction?.({
+            req,
+            actorUserId: userId,
+            actorRole: "user",
+            actionType: "express_order_hidden_by_creator",
+            entityType: "express_order",
+            entityId: order.id,
+            expressOrderId: order.id,
+            severity: "info",
+            success: true,
+            meta: {
+                before,
+                after: {
+                    status: order.status,
+                    creatorHidden: order.creatorHidden,
+                    creatorHiddenAt: order.creatorHiddenAt,
+                },
+            },
+        });
+
+        const io = req.app.locals.io;
+
+        if (io) {
+            io.emit("expressOrdersUpdated", buildExpressPayload(order, {
+                action: "hidden_by_creator",
+                message: "Экспресс-заказ скрыт создателем",
+            }));
+
+            io.emit("orderUpdated", {
+                orderId: order.id,
+                orderType: "express",
+                creatorId: order.creatorId,
+                action: "hidden_by_creator",
+            });
+        }
+
+        return res.json({
+            success: true,
+            message: "Экспресс-заказ удалён из видимости",
+            orderId: order.id,
+        });
+    } catch (e) {
+        console.error("express hide-by-creator error:", e);
+        return res.status(500).json({
+            success: false,
+            message: "Ошибка при удалении экспресс-заказа",
+        });
     }
 });
 

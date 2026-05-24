@@ -411,6 +411,162 @@ router.post("/create-express-order", authMiddleware, adminMiddleware, async (req
     }
 });
 
+router.delete("/express-orders/:id", authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const order = await ExpressOrder.findByPk(req.params.id);
+
+        if (!order) {
+            return res.status(404).json({ message: "Экспресс-заказ не найден" });
+        }
+
+        if (order.adminDeleted) {
+            return res.status(400).json({
+                message: "Экспресс-заказ уже помечен как удалённый админом",
+            });
+        }
+
+        const before = {
+            status: order.status,
+            creatorHidden: order.creatorHidden,
+            creatorHiddenAt: order.creatorHiddenAt,
+            adminDeleted: order.adminDeleted,
+            adminDeletedAt: order.adminDeletedAt,
+            adminDeletedById: order.adminDeletedById,
+        };
+
+        order.adminDeleted = true;
+        order.adminDeletedAt = new Date();
+        order.adminDeletedById = req.user?.id || null;
+
+        await order.save();
+
+        await req.logAction?.({
+            req,
+            actorUserId: req.user?.id || null,
+            actorRole: "admin",
+            actionType: "admin_express_order_soft_deleted",
+            entityType: "express_order",
+            entityId: order.id,
+            expressOrderId: order.id,
+            severity: "warn",
+            success: true,
+            meta: {
+                before,
+                after: {
+                    status: order.status,
+                    creatorHidden: order.creatorHidden,
+                    creatorHiddenAt: order.creatorHiddenAt,
+                    adminDeleted: order.adminDeleted,
+                    adminDeletedAt: order.adminDeletedAt,
+                    adminDeletedById: order.adminDeletedById,
+                },
+            },
+        });
+
+        req.app.locals.io?.emit("expressOrdersUpdated", {
+            orderId: order.id,
+            id: order.id,
+            orderType: "express",
+            action: "admin_soft_deleted",
+            creatorId: order.creatorId,
+            executorId: order.executorId,
+            status: order.status,
+        });
+
+        req.app.locals.io?.emit("orderUpdated", {
+            orderId: order.id,
+            orderType: "express",
+            action: "admin_soft_deleted",
+            creatorId: order.creatorId,
+            executorId: order.executorId,
+        });
+
+        res.json({
+            success: true,
+            message: "Экспресс-заказ помечен как удалённый админом",
+            order,
+        });
+    } catch (error) {
+        console.error("Ошибка удаления экспресс-заказа админом:", error);
+        res.status(500).json({ message: "Ошибка сервера" });
+    }
+});
+
+router.patch("/express-orders/:id/restore", authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const order = await ExpressOrder.findByPk(req.params.id);
+
+        if (!order) {
+            return res.status(404).json({ message: "Экспресс-заказ не найден" });
+        }
+
+        const before = {
+            creatorHidden: order.creatorHidden,
+            creatorHiddenAt: order.creatorHiddenAt,
+            adminDeleted: order.adminDeleted,
+            adminDeletedAt: order.adminDeletedAt,
+            adminDeletedById: order.adminDeletedById,
+        };
+
+        order.creatorHidden = false;
+        order.creatorHiddenAt = null;
+        order.adminDeleted = false;
+        order.adminDeletedAt = null;
+        order.adminDeletedById = null;
+
+        await order.save();
+
+        await req.logAction?.({
+            req,
+            actorUserId: req.user?.id || null,
+            actorRole: "admin",
+            actionType: "admin_express_order_restored",
+            entityType: "express_order",
+            entityId: order.id,
+            expressOrderId: order.id,
+            severity: "info",
+            success: true,
+            meta: {
+                before,
+                after: {
+                    creatorHidden: order.creatorHidden,
+                    creatorHiddenAt: order.creatorHiddenAt,
+                    adminDeleted: order.adminDeleted,
+                    adminDeletedAt: order.adminDeletedAt,
+                    adminDeletedById: order.adminDeletedById,
+                },
+            },
+        });
+
+        req.app.locals.io?.emit("expressOrdersUpdated", {
+            orderId: order.id,
+            id: order.id,
+            orderType: "express",
+            action: "admin_restored",
+            creatorId: order.creatorId,
+            executorId: order.executorId,
+            status: order.status,
+        });
+
+        req.app.locals.io?.emit("orderUpdated", {
+            orderId: order.id,
+            orderType: "express",
+            action: "admin_restored",
+            creatorId: order.creatorId,
+            executorId: order.executorId,
+        });
+
+        res.json({
+            success: true,
+            message: "Экспресс-заказ восстановлен",
+            order,
+        });
+    } catch (error) {
+        console.error("Ошибка восстановления экспресс-заказа:", error);
+        res.status(500).json({ message: "Ошибка сервера" });
+    }
+});
+
 router.post('/create-user', authMiddleware, adminMiddleware, async (req, res) => {
     const { username, phone, password } = req.body;
 

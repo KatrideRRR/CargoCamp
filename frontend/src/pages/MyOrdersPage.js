@@ -207,7 +207,32 @@ const MyOrdersPage = () => {
         if (!order?.id) return;
 
         if (order.kind === "express") {
-            alert("Экспресс-заказ лучше отменять, а не удалять. Для него нужна отдельная логика отмены.");
+            if (order.status !== "created" || order.executorId) {
+                alert("Этот экспресс-заказ уже нельзя удалить, потому что он уже принят или выполняется.");
+                return;
+            }
+
+            const ok = window.confirm(
+                "Удалить экспресс-заказ из списка? Он больше не будет отображаться в ваших заказах и в доступных заказах."
+            );
+
+            if (!ok) return;
+
+            try {
+                setDeletingOrderId(order.id);
+
+                await axiosInstance.patch(`/express/express-orders/${order.id}/hide-by-creator`);
+
+                setOrders((prev) =>
+                    prev.filter((o) => !(o.kind === "express" && Number(o.id) === Number(order.id)))
+                );
+            } catch (e) {
+                console.error("Ошибка удаления экспресс-заказа:", e);
+                alert(e.response?.data?.message || "Не удалось удалить экспресс-заказ");
+            } finally {
+                setDeletingOrderId(null);
+            }
+
             return;
         }
 
@@ -497,7 +522,10 @@ const MyOrdersPage = () => {
     </span>
                                         </div>
 
-                                        {!isExpress && ["pending", "pending_payment"].includes(order.status) && (
+                                        {(
+                                            (!isExpress && ["pending", "pending_payment"].includes(order.status)) ||
+                                            (isExpress && order.status === "created" && !order.executorId)
+                                        ) && (
                                             <div className={styles.orderManageActions}>
                                                 <button
                                                     type="button"
