@@ -631,7 +631,11 @@ module.exports = (io) => {
         try {
             // Фильтрация по категории и подкатегории
             const { categoryId, subcategoryId, serviceId } = req.query;
-            const whereClause = { status: 'pending' };
+            const whereClause = {
+                status: "pending",
+                creatorHidden: false,
+                adminDeleted: false,
+            };
 
             if (categoryId) whereClause.categoryId = categoryId;
             if (subcategoryId) whereClause.subcategoryId = subcategoryId;
@@ -1925,7 +1929,7 @@ module.exports = (io) => {
                 },
             });
 
-            req.app.get("io")?.emit("orderUpdated", {
+            io.emit("orderUpdated", {
                 orderId: order.id,
                 creatorId: order.creatorId,
                 action: "hidden_by_creator",

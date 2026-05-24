@@ -575,7 +575,7 @@ router.delete("/orders/:id", authMiddleware, adminMiddleware, async (req, res) =
             },
         });
 
-        req.app.get("io")?.emit("orderUpdated", {
+        req.app.locals.io?.emit("orderUpdated", {
             orderId: order.id,
             creatorId: order.creatorId,
             action: "admin_soft_deleted",
@@ -654,7 +654,7 @@ router.patch("/orders/:id/restore", authMiddleware, adminMiddleware, async (req,
             },
         });
 
-        req.app.get("io")?.emit("orderUpdated", {
+        req.app.locals.io?.emit("orderUpdated", {
             orderId: order.id,
             creatorId: order.creatorId,
             action: "admin_restored",
