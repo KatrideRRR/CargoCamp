@@ -1,5 +1,3 @@
-// backend/services/pushService.js
-
 const { PushToken } = require("../models");
 const { initFirebaseAdmin } = require("../config/firebaseAdmin");
 

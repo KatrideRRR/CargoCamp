@@ -25,12 +25,16 @@ function navigateFromPush(data, navigate) {
         return;
     }
 
+    if (type === "express_available_nearby") {
+        navigate("/orders");
+        return;
+    }
+
     if (type === "order_push" && orderId) {
         navigate(`/order/${orderId}`);
         return;
     }
 
-    // ✅ пуш о необходимости отзыва
     if (type === "review_needed" && orderId) {
         localStorage.setItem(
             "pendingReviewFromPush",

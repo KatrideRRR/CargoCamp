@@ -6,6 +6,7 @@ const { v4: uuidv4 } = require("uuid");
 const yooKassa = require("../config/yookassaClient");
 const { sequelize, ExpressOrder, ExpressSavedAddress, User, Order } = require("../models");
 const { notifyUser, notifyMany } = require("../services/notificationService");
+const { notifyNearbyExpressExecutors } = require("../services/expressPushService");
 
 /* ================= helpers ================= */
 
@@ -389,6 +390,31 @@ router.post("/express-orders", authenticateToken, async (req, res) => {
         await bumpSavedAddressUsage({ userId: creatorId, id: Number(toSavedAddressId) || null, transaction: t });
 
         await t.commit();
+
+        try {
+            await notifyNearbyExpressExecutors({
+                req,
+                order,
+            });
+        } catch (pushError) {
+            console.error("express nearby push error:", pushError);
+
+            await req.logAction?.({
+                req,
+                actorUserId: creatorId,
+                actorRole: "system",
+                actionType: "express_push_failed",
+                entityType: "express_order",
+                entityId: order.id,
+                expressOrderId: order.id,
+                severity: "error",
+                success: false,
+                meta: {
+                    error: String(pushError?.message || pushError),
+                },
+            });
+        }
+
         res.status(201).json({ success: true, order });
     } catch (e) {
         await t.rollback();

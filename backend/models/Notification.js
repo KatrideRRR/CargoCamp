@@ -24,7 +24,8 @@ module.exports = (sequelize, DataTypes) => {
                     "express_cancelled",
                     "debt_created",
                     "order_push",
-                    "support_reply"
+                    "support_reply",
+                    "express_available_nearby"
                 ),
                 allowNull: false,
             },

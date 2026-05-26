@@ -72,13 +72,13 @@ async function notifyUser({
 
     if (socketEvent) {
         sendToUser(userId, socketEvent, {
+            ...(socketPayload || {}),
             type,
             title,
             body,
             orderId,
             orderType: normalizedOrderType,
             notificationId: notification.id,
-            ...(socketPayload || {}),
         });
     }
 

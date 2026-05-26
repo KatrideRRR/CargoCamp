@@ -5,7 +5,9 @@ import Modal from "react-modal";
 import { useAuth } from "./utils/authContext";
 import { initPushNotifications } from "./utils/pushNotifications";
 import PullToRefresh from "./components/PullToRefresh";
-import { socket } from "./socketClient";
+import { socket, connectSocket } from "./socketClient";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 import { AuthProvider } from "./utils/authContext";
 import { UserProvider } from './utils/userContext';
@@ -38,30 +40,9 @@ function SocketBootstrap() {
     const { user } = useAuth();
 
     useEffect(() => {
-        if (!user?.id) {
-            return;
-        }
+        if (!user?.id) return;
 
-        if (!socket.connected) {
-            socket.connect();
-        }
-
-        const registerUser = () => {
-            socket.emit("register", user.id);
-            socket.emit("subscribeToNotifications", user.id);
-        };
-
-        socket.on("connect", registerUser);
-        socket.on("reconnect", registerUser);
-
-        if (socket.connected) {
-            registerUser();
-        }
-
-        return () => {
-            socket.off("connect", registerUser);
-            socket.off("reconnect", registerUser);
-        };
+        connectSocket(user.id);
     }, [user?.id]);
 
     return null;
@@ -93,6 +74,111 @@ function App() {
 
         return () => {
             socket.off("push_notification", handlePush);
+        };
+    }, [navigate]);
+
+    useEffect(() => {
+        const handleExpressNearby = (payload) => {
+            const text =
+                payload?.body ||
+                payload?.message ||
+                "Рядом появился новый экспресс-заказ";
+
+            const open = window.confirm(`${payload?.title || "Новый экспресс-заказ"}\n${text}\nОткрыть список заказов?`);
+
+            if (open) {
+                navigate("/orders");
+            }
+        };
+
+        socket.on("expressOrderNearby", handleExpressNearby);
+
+        return () => {
+            socket.off("expressOrderNearby", handleExpressNearby);
+        };
+    }, [navigate]);
+
+    useEffect(() => {
+        let lastShownNotificationId = null;
+
+        const handleNewNotification = (notifications = []) => {
+            if (!Array.isArray(notifications) || notifications.length === 0) return;
+
+            const latest = notifications[0];
+
+            if (!latest?.id) return;
+            if (latest.id === lastShownNotificationId) return;
+
+            if (latest.type === "express_available_nearby") {
+                return;
+            }
+
+            lastShownNotificationId = latest.id;
+
+            const title = latest.title || "Новое уведомление";
+            const body = latest.body || "";
+
+            const type = latest.type;
+            const orderId = latest.orderId;
+            const orderType = latest.orderType || "regular";
+
+            toast.info(`${title}${body ? `: ${body}` : ""}`, {
+                autoClose: 6000,
+                onClick: () => {
+                    if (type === "new_message" && orderId) {
+                        navigate(`/messages/${orderType}/${orderId}`);
+                        return;
+                    }
+
+                    if (type === "express_available_nearby") {
+                        navigate("/orders");
+                        return;
+                    }
+
+                    if (
+                        [
+                            "express_status_changed",
+                            "express_arrived",
+                            "express_completed",
+                            "express_cancelled",
+                            "order_request_approved",
+                            "order_started",
+                            "order_completion_requested",
+                            "review_needed",
+                        ].includes(type)
+                    ) {
+                        navigate("/active-orders");
+                        return;
+                    }
+
+                    if (type === "order_request") {
+                        const userRaw = localStorage.getItem("user");
+                        try {
+                            const user = userRaw ? JSON.parse(userRaw) : null;
+                            if (user?.id) {
+                                navigate(`/my-orders/${user.id}`);
+                                return;
+                            }
+                        } catch {}
+
+                        navigate("/profile");
+                        return;
+                    }
+
+                    if (orderType === "regular" && orderId) {
+                        navigate(`/order/${orderId}`);
+                        return;
+                    }
+
+                    navigate("/profile");
+                },
+            });
+        };
+
+        socket.on("new_notification", handleNewNotification);
+
+        return () => {
+            socket.off("new_notification", handleNewNotification);
         };
     }, [navigate]);
 
@@ -130,6 +216,15 @@ function App() {
                         </Routes>
 
                         <BottomMenu />
+
+                        <ToastContainer
+                            position="top-center"
+                            autoClose={5000}
+                            newestOnTop
+                            closeOnClick
+                            pauseOnHover
+                        />
+
                     </Suspense>
                 </UserProvider>
             </AuthProvider>
