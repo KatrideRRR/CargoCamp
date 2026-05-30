@@ -1119,6 +1119,12 @@ router.post("/yookassa/webhook", async (req, res) => {
                 return res.sendStatus(200);
             }
 
+            // ✅ Уже обработали именно этот платёж — ничего не делаем
+            if (order.promotionPaymentId === payment.id && order.promotionPaidAt) {
+                return res.sendStatus(200);
+            }
+
+            // ✅ Если у заказа уже есть другой paymentId — не трогаем
             if (
                 order.promotionPaymentId &&
                 order.promotionPaymentId !== payment.id
@@ -1136,17 +1142,21 @@ router.post("/yookassa/webhook", async (req, res) => {
                 }
             }
 
+            const shouldSendPush = !!pr.push && !order.promotionPaidAt;
+
             await order.update({
                 status: "pending",
                 is_highlighted: !!pr.highlight,
                 is_recommended: !!pr.recommended,
                 is_push_notified: !!pr.push,
-                promotionPaidAt: new Date(),
+                promotionPaidAt: order.promotionPaidAt || new Date(),
+                promotionPaymentId: payment.id,
+                promotionPaymentProvider: "yookassa",
             });
 
             io?.emit("orderUpdated");
 
-            if (pr.push) {
+            if (shouldSendPush) {
                 try {
                     const logAction =
                         req.logAction ||

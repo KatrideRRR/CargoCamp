@@ -583,36 +583,45 @@ export const ModalProvider = ({ children }) => {
         };
 
         const handleNewNotification = (notifications) => {
+
             const list = Array.isArray(notifications) ? notifications : [notifications];
 
-            const orderPushNotification = list.find((n) => {
-                return (
-                    n.type === "order_push" ||
-                    n?.data?.type === "order_push"
-                );
+            // ✅ Не обрабатываем order_push здесь,
+
+            // потому что он уже обрабатывается в App через new_notification / push_notification
+
+            const hasOrderPush = list.some((n) => {
+
+                return n.type === "order_push" || n?.data?.type === "order_push";
+
             });
 
-            if (orderPushNotification) {
-                toast.info(
-                    orderPushNotification.body ||
-                    orderPushNotification?.data?.message ||
-                    "Новый подходящий заказ рядом"
-                );
+            if (hasOrderPush) {
 
                 return;
+
             }
 
             const cancelledNotification = list.find((n) => {
+
                 const orderType = n.orderType || n?.data?.orderType;
+
                 const status = n?.data?.status;
 
                 return (
+
                     orderType === "express" &&
+
                     n.type === "express_cancelled" &&
+
                     status === "cancelled" &&
+
                     (n.orderId || n?.data?.orderId) &&
+
                     n?.data?.cancelledBy
+
                 );
+
             });
 
             if (cancelledNotification) {
@@ -685,10 +694,6 @@ export const ModalProvider = ({ children }) => {
             });
         };
 
-        const handleOrderPush = (data) => {
-            toast.info(data?.message || data?.body || "Новый подходящий заказ рядом");
-        };
-
         socket.on("orderApproved", handleOrderApproved);
         socket.on("orderCompleted", handleOrderCompleted);
         socket.on("expressOrderCompleted", handleExpressOrderCompleted);
@@ -698,7 +703,6 @@ export const ModalProvider = ({ children }) => {
         socket.on("expressOrderStatusChanged", handleExpressOrderStatusChanged);
         socket.on("new_notification", handleNewNotification);
         socket.on("expressOrderCancelled", handleExpressOrderCancelled);
-        socket.on("push_notification", handleOrderPush);
 
         return () => {
             socket.off("orderApproved", handleOrderApproved);
@@ -710,7 +714,6 @@ export const ModalProvider = ({ children }) => {
             socket.off("expressOrderStatusChanged", handleExpressOrderStatusChanged);
             socket.off("new_notification", handleNewNotification);
             socket.off("expressOrderCancelled", handleExpressOrderCancelled);
-            socket.off("push_notification", handleOrderPush);
         };
     }, [userId]);
 

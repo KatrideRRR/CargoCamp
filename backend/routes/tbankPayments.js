@@ -562,9 +562,15 @@ router.post("/webhook", async (req, res) => {
             const order = await Order.findByPk(orderId);
             if (!order) return res.status(200).send("OK");
 
+            // ✅ Уже обработали этот платёж
+            if (String(order.promotionPaymentId || "") === String(paymentId) && order.promotionPaidAt) {
+                return res.status(200).send("OK");
+            }
+
+            // ✅ Уже есть другой paymentId
             if (
                 order.promotionPaymentId &&
-                String(order.promotionPaymentId) !== paymentId
+                String(order.promotionPaymentId) !== String(paymentId)
             ) {
                 return res.status(200).send("OK");
             }
@@ -579,18 +585,21 @@ router.post("/webhook", async (req, res) => {
                 }
             }
 
+            const shouldSendPush = !!pr.push && !order.promotionPaidAt;
+
             await order.update({
                 status: "pending",
                 is_highlighted: !!pr.highlight,
                 is_recommended: !!pr.recommended,
                 is_push_notified: !!pr.push,
-                promotionPaidAt: new Date(),
+                promotionPaidAt: order.promotionPaidAt || new Date(),
+                promotionPaymentId: paymentId,
                 promotionPaymentProvider: "tbank",
             });
 
             io?.emit("orderUpdated");
 
-            if (pr.push) {
+            if (shouldSendPush) {
                 try {
                     const logAction =
                         req.logAction ||
