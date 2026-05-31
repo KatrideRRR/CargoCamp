@@ -84,23 +84,43 @@ function App() {
 
     useEffect(() => {
         const handlePush = (payload) => {
+            console.log("🔔 socket push_notification:", payload);
+
             if (!payload) return;
 
+            const type = payload.type || payload?.data?.type;
+
             const isOrderPush =
-                payload.type === "order_push" ||
-                payload.type === "express_available_nearby";
+                type === "order_push" ||
+                type === "express_available_nearby";
 
             if (!isOrderPush) return;
 
-            const targetPath = getOrderTargetPath(payload);
+            const orderType =
+                payload.orderType ||
+                payload?.data?.orderType ||
+                (type === "express_available_nearby" ? "express" : "regular");
+
+            const orderId =
+                payload.orderId ||
+                payload.expressOrderId ||
+                payload.expressId ||
+                payload?.data?.orderId ||
+                payload?.data?.expressOrderId ||
+                payload?.data?.expressId;
 
             const open = window.confirm(
                 `${payload.title || "Уведомление"}\n${payload.message || payload.body || ""}\nОткрыть заказ?`
             );
 
-            if (open && targetPath) {
-                navigate(targetPath);
+            if (!open || !orderId) return;
+
+            if (orderType === "express") {
+                navigate(`/express-order/${orderId}`);
+                return;
             }
+
+            navigate(`/order/${orderId}`);
         };
 
         socket.on("push_notification", handlePush);

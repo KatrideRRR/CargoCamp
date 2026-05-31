@@ -1,7 +1,6 @@
-// frontend/src/utils/pushNotifications.js
-
 import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
+import { LocalNotifications } from "@capacitor/local-notifications";
 import axiosInstance from "./axiosInstance";
 
 function getPushPlatform() {
@@ -127,6 +126,12 @@ export async function initPushNotifications({ navigate } = {}) {
         return;
     }
 
+    let localPerm = await LocalNotifications.checkPermissions();
+
+    if (localPerm.display !== "granted") {
+        localPerm = await LocalNotifications.requestPermissions();
+    }
+
     await PushNotifications.removeAllListeners();
 
     PushNotifications.addListener("registration", async (tokenResult) => {
@@ -151,12 +156,47 @@ export async function initPushNotifications({ navigate } = {}) {
         console.error("Push registration error:", error);
     });
 
-    PushNotifications.addListener("pushNotificationReceived", (notification) => {
-        console.log("Push received:", notification);
+    PushNotifications.addListener("pushNotificationReceived", async (notification) => {
+        console.log("Push received foreground:", notification);
 
         const data = notification?.data || {};
+        const type = data.type;
 
-        if (data.type === "review_needed" && data.orderId) {
+        const title =
+            notification?.title ||
+            data.title ||
+            "CargoCamp";
+
+        const body =
+            notification?.body ||
+            data.body ||
+            data.message ||
+            "Новое уведомление";
+
+        // ✅ Показываем локальное системное уведомление,
+        // когда приложение открыто
+        try {
+            await LocalNotifications.schedule({
+                notifications: [
+                    {
+                        id: Date.now() % 2147483647,
+                        title,
+                        body,
+                        extra: data,
+                        channelId: "cargocamp_default",
+                        sound: "default",
+                        schedule: {
+                            at: new Date(Date.now() + 100),
+                        },
+                    },
+                ],
+            });
+        } catch (e) {
+            console.error("Local notification foreground error:", e);
+        }
+
+        // ✅ Старая логика для отзывов остаётся
+        if (type === "review_needed" && data.orderId) {
             localStorage.setItem(
                 "pendingReviewFromPush",
                 JSON.stringify({
@@ -173,6 +213,13 @@ export async function initPushNotifications({ navigate } = {}) {
         }
     });
 
+    LocalNotifications.addListener("localNotificationActionPerformed", (action) => {
+        console.log("Local notification action:", action);
+
+        const data = action?.notification?.extra || {};
+        navigateFromPush(data, navigate);
+    });
+
     PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
         console.log("Push action:", action);
 
@@ -182,6 +229,17 @@ export async function initPushNotifications({ navigate } = {}) {
 
     if (Capacitor.getPlatform() === "android") {
         await PushNotifications.createChannel({
+            id: "cargocamp_default",
+            name: "CargoCamp уведомления",
+            description: "Основные уведомления CargoCamp",
+            importance: 5,
+            visibility: 1,
+            sound: "default",
+        });
+    }
+
+    if (Capacitor.getPlatform() === "android") {
+        await LocalNotifications.createChannel({
             id: "cargocamp_default",
             name: "CargoCamp уведомления",
             description: "Основные уведомления CargoCamp",
