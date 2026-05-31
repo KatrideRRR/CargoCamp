@@ -183,76 +183,6 @@ const OrderPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, isExpressPage]);
 
-    useEffect(() => {
-        if (isExpressPage) return;
-
-        const params = new URLSearchParams(window.location.search);
-        const debtReturn = params.get("debtReturn") === "1";
-        const resumeRequest = params.get("resumeRequest") === "1";
-
-        if (!debtReturn || !resumeRequest) return;
-
-        const pendingRequest = getPendingOrderRequest();
-
-        if (!pendingRequest?.orderId || !pendingRequest?.proposedSum) {
-            params.delete("debtReturn");
-            params.delete("resumeRequest");
-
-            const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
-            window.history.replaceState({}, "", newUrl);
-
-            return;
-        }
-
-        if (Number(pendingRequest.orderId) !== Number(id)) {
-            return;
-        }
-
-        let cancelled = false;
-
-        const resume = async () => {
-            try {
-                for (let attempt = 0; attempt < 10; attempt++) {
-                    if (cancelled) return;
-
-                    const profileRes = await axiosInstance.get("/auth/profile");
-                    const debt = Number(profileRes.data?.debt || 0);
-
-                    if (debt <= 0) {
-                        await submitRegularOrderRequest({
-                            orderId: pendingRequest.orderId,
-                            proposedSum: pendingRequest.proposedSum,
-                            comment: pendingRequest.comment || "",
-                        });
-
-                        clearPendingOrderRequest();
-
-                        params.delete("debtReturn");
-                        params.delete("resumeRequest");
-
-                        const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
-                        window.history.replaceState({}, "", newUrl);
-
-                        return;
-                    }
-
-                    await new Promise((resolve) => setTimeout(resolve, 1500));
-                }
-
-                toast.info("Оплата ещё обрабатывается. Попробуйте отправить запрос ещё раз через пару секунд.");
-            } catch (e) {
-                console.error("resume request after debt payment error:", e);
-                toast.error("Не удалось автоматически отправить запрос после оплаты");
-            }
-        };
-
-        resume();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [id, isExpressPage, submitRegularOrderRequest]);
-
     const openModal = (images) => {
         setCurrentImages(images || []);
         setCurrentImageIndex(0);
@@ -359,6 +289,76 @@ const OrderPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [navigate, id, isExpressPage]
     );
+
+    useEffect(() => {
+        if (isExpressPage) return;
+
+        const params = new URLSearchParams(window.location.search);
+        const debtReturn = params.get("debtReturn") === "1";
+        const resumeRequest = params.get("resumeRequest") === "1";
+
+        if (!debtReturn || !resumeRequest) return;
+
+        const pendingRequest = getPendingOrderRequest();
+
+        if (!pendingRequest?.orderId || !pendingRequest?.proposedSum) {
+            params.delete("debtReturn");
+            params.delete("resumeRequest");
+
+            const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+            window.history.replaceState({}, "", newUrl);
+
+            return;
+        }
+
+        if (Number(pendingRequest.orderId) !== Number(id)) {
+            return;
+        }
+
+        let cancelled = false;
+
+        const resume = async () => {
+            try {
+                for (let attempt = 0; attempt < 10; attempt++) {
+                    if (cancelled) return;
+
+                    const profileRes = await axiosInstance.get("/auth/profile");
+                    const debt = Number(profileRes.data?.debt || 0);
+
+                    if (debt <= 0) {
+                        await submitRegularOrderRequest({
+                            orderId: pendingRequest.orderId,
+                            proposedSum: pendingRequest.proposedSum,
+                            comment: pendingRequest.comment || "",
+                        });
+
+                        clearPendingOrderRequest();
+
+                        params.delete("debtReturn");
+                        params.delete("resumeRequest");
+
+                        const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+                        window.history.replaceState({}, "", newUrl);
+
+                        return;
+                    }
+
+                    await new Promise((resolve) => setTimeout(resolve, 1500));
+                }
+
+                toast.info("Оплата ещё обрабатывается. Попробуйте отправить запрос ещё раз через пару секунд.");
+            } catch (e) {
+                console.error("resume request after debt payment error:", e);
+                toast.error("Не удалось автоматически отправить запрос после оплаты");
+            }
+        };
+
+        resume();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [id, isExpressPage, submitRegularOrderRequest]);
 
     const submitRequestFromModal = async () => {
         if (!order?.id) {
