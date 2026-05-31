@@ -3628,3 +3628,56 @@ body {
         min-height: 44px;
     }
 }
+
+.completion-waiting-box {
+    margin-top: 10px;
+    padding: 11px 12px;
+
+    display: grid;
+    gap: 4px;
+
+    border-radius: 14px;
+    border: 1px solid rgba(37, 99, 235, 0.22);
+    background: rgba(239, 246, 255, 0.85);
+
+    color: #1e3a8a;
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.completion-waiting-box strong {
+    font-weight: 900;
+}
+
+.completion-waiting-box span {
+    color: #475569;
+    font-weight: 650;
+}
+
+.completion-waiting-box-warning {
+    border-color: rgba(245, 158, 11, 0.28);
+    background: rgba(255, 251, 235, 0.9);
+    color: #92400e;
+}
+
+.waiting-complete-button {
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid rgba(37, 99, 235, 0.22);
+    opacity: 1;
+    cursor: default;
+}
+
+.remind-complete-button {
+    background: #ffffff;
+    color: #2563eb;
+    border: 1px solid rgba(147, 197, 253, 0.65);
+}
+
+.waiting-complete-button,
+.remind-complete-button {
+    min-height: 40px;
+    padding: 9px 12px;
+    border-radius: 12px;
+    font-weight: 800;
+}

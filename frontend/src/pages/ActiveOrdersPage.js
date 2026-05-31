@@ -472,15 +472,46 @@ const ActiveOrdersPage = () => {
             const creatorId = updatedOrder?.creatorId;
             const executorId = updatedOrder?.executorId;
 
-            openReviewFromCompletion(
-                updatedOrder?.id || orderId,
-                creatorId,
-                executorId,
-                "regular"
-            );
+            if (updatedOrder?.status === "completed") {
+                openReviewFromCompletion(
+                    updatedOrder?.id || orderId,
+                    creatorId,
+                    executorId,
+                    "regular"
+                );
+            } else {
+                alert("Вы подтвердили завершение. Ожидаем подтверждение второй стороны.");
+            }
         } catch (e) {
             console.error(e);
             alert(e.response?.data?.message || "Ошибка при завершении заказа");
+        }
+    };
+
+    const remindCompleteOrder = async (orderId) => {
+        try {
+            const t = localStorage.getItem("authToken");
+
+            if (!t) {
+                alert("Вы не авторизованы");
+                navigate("/login");
+                return;
+            }
+
+            await axiosInstance.post(
+                `/orders/${orderId}/remind-complete`,
+                {},
+                {
+                    headers: {
+                        Authorization: `Bearer ${t}`,
+                    },
+                }
+            );
+
+            alert("Напоминание отправлено");
+        } catch (e) {
+            console.error("Ошибка отправки напоминания:", e);
+            alert(e.response?.data?.message || "Не удалось отправить напоминание");
         }
     };
 
@@ -806,8 +837,22 @@ const ActiveOrdersPage = () => {
                             {hasAny ? (
                                 <ul className="orders-list">
                                     {/* обычные активные заказы */}
-                                    {visibleRegularOrders.map((order) => {                                        const isCompletedByUser = Array.isArray(order.completedBy) && order.completedBy.includes(user.id);
-                                        const isWaitingForOther = Array.isArray(order.completedBy) && order.completedBy.length === 1;
+                                    {visibleRegularOrders.map((order) => {
+                                        const completedBy = Array.isArray(order.completedBy)
+                                            ? order.completedBy.map((id) => Number(id)).filter(Number.isFinite)
+                                            : [];
+
+                                        const isCompletedByUser = completedBy.includes(Number(user.id));
+
+                                        const isWaitingForOther =
+                                            order.status !== "completed" &&
+                                            completedBy.length === 1 &&
+                                            isCompletedByUser;
+
+                                        const isWaitingForMe =
+                                            order.status !== "completed" &&
+                                            completedBy.length === 1 &&
+                                            !isCompletedByUser;
 
                                         const isExecutor = order.executorId === user.id;
                                         const isCreator = order.creatorId === user.id;
@@ -835,6 +880,24 @@ const ActiveOrdersPage = () => {
                                                                     </div>
                                                                 )}
                                                             </div>
+
+                                                            {isWaitingForOther && (
+                                                                <div className="completion-waiting-box">
+                                                                    <strong>Вы подтвердили завершение.</strong>
+                                                                    <span>
+            Заказ завершится полностью, когда вторая сторона тоже подтвердит выполнение.
+        </span>
+                                                                </div>
+                                                            )}
+
+                                                            {isWaitingForMe && (
+                                                                <div className="completion-waiting-box completion-waiting-box-warning">
+                                                                    <strong>Вторая сторона уже подтвердила завершение.</strong>
+                                                                    <span>
+            Проверьте результат и нажмите «Подтвердить завершение», если всё в порядке.
+        </span>
+                                                                </div>
+                                                            )}
 
                                                         </div>
 
@@ -952,18 +1015,26 @@ const ActiveOrdersPage = () => {
                                                             </button>
                                                         )}
 
-                                                        {isCompletedByUser ? (
-                                                            isWaitingForOther ? (
+                                                        {isWaitingForOther ? (
+                                                            <>
                                                                 <button
-                                                                    className="remove-button"
+                                                                    className="waiting-complete-button"
+                                                                    disabled
+                                                                    title="Ожидаем подтверждение второй стороны"
+                                                                >
+                                                                    {isMobile ? <FaCheck /> : "Ждём подтверждения"}
+                                                                </button>
+
+                                                                <button
+                                                                    className="remind-complete-button"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        handleRemoveOrder(order.id);
+                                                                        remindCompleteOrder(order.id);
                                                                     }}
                                                                 >
-                                                                    {isMobile ? <FaTrash /> : "Удалить"}
+                                                                    Напомнить
                                                                 </button>
-                                                            ) : null
+                                                            </>
                                                         ) : isExecutor && !order.workStartedAt ? (
                                                             <button
                                                                 className="start-main-button"
@@ -985,7 +1056,7 @@ const ActiveOrdersPage = () => {
                                                                     completeOrderRequest(order.id);
                                                                 }}
                                                             >
-                                                                {isMobile ? <FaCheck /> : "Завершить"}
+                                                                {isMobile ? <FaCheck /> : isWaitingForMe ? "Подтвердить завершение" : "Завершить"}
                                                             </button>
                                                         )}
                                                     </div>

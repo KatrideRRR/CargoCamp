@@ -16,7 +16,7 @@ const uploadExecutorBefore = buildOrderPhotoUploader("executor_before");
 const uploadExecutorAfter = buildOrderPhotoUploader("executor_after");
 const uploadCustomerBefore = buildOrderPhotoUploader("customer_before");
 const uploadCustomerAfter = buildOrderPhotoUploader("customer_after");
-const { sendOrderRequestToUser } = require("../socket");
+const { sendNotifications } = require("../socket");
 
 /* ===============================
    Папки uploads
@@ -624,6 +624,98 @@ module.exports = (io) => {
         } catch (error) {
             console.error("Ошибка при создании заказа:", error);
             return res.status(500).json({ message: "Ошибка сервера" });
+        }
+    });
+
+    router.post("/:id/remind-complete", authenticateToken, async (req, res) => {
+        try {
+            const orderId = Number(req.params.id);
+            const userId = Number(req.user.id);
+
+            if (!Number.isFinite(orderId) || orderId <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Некорректный id заказа",
+                });
+            }
+
+            const order = await Order.findByPk(orderId);
+
+            if (!order) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Заказ не найден",
+                });
+            }
+
+            const creatorId = Number(order.creatorId);
+            const executorId = Number(order.executorId);
+
+            const isParticipant =
+                userId === creatorId || userId === executorId;
+
+            if (!isParticipant) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Нет доступа к заказу",
+                });
+            }
+
+            const completedBy = Array.isArray(order.completedBy)
+                ? order.completedBy.map(Number).filter(Number.isFinite)
+                : [];
+
+            if (!completedBy.includes(userId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Сначала подтвердите завершение со своей стороны",
+                });
+            }
+
+            if (order.status === "completed") {
+                return res.status(400).json({
+                    success: false,
+                    message: "Заказ уже завершён",
+                });
+            }
+
+            const targetUserId =
+                userId === creatorId ? executorId : creatorId;
+
+            if (!targetUserId) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Не удалось определить второго участника",
+                });
+            }
+
+            await notifyUser({
+                userId: targetUserId,
+                type: "order_completion_reminder",
+                title: "Подтвердите завершение заказа",
+                body: `Участник заказа №${order.id} уже подтвердил завершение. Проверьте заказ и подтвердите завершение.`,
+                orderId: order.id,
+                orderType: "regular",
+                data: {
+                    orderId: order.id,
+                    orderType: "regular",
+                    creatorId: order.creatorId,
+                    executorId: order.executorId,
+                },
+            });
+
+            await sendNotifications(targetUserId);
+
+            return res.json({
+                success: true,
+                message: "Напоминание отправлено",
+            });
+        } catch (e) {
+            console.error("remind-complete error:", e);
+            return res.status(500).json({
+                success: false,
+                message: "Ошибка сервера",
+            });
         }
     });
 
