@@ -684,14 +684,40 @@
     background: transparent;
 }
 
-.order-card.creator {
-    border-color: rgba(147, 197, 253, 0.46);
+.order-card.my-order {
+    border-color: rgba(148, 163, 184, 0.24);
     background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(239, 246, 255, 0.74));
+            linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.78));
 }
 
-.order-card.creator::before {
-    background: linear-gradient(90deg, rgba(96, 165, 250, 0.9), rgba(191, 219, 254, 0.35));
+.order-card.my-order::before {
+    background: linear-gradient(90deg, rgba(148, 163, 184, 0.65), rgba(226, 232, 240, 0.35));
+}
+
+.order-card.can-take {
+    border-color: rgba(96, 165, 250, 0.48);
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(239, 246, 255, 0.78));
+}
+
+.order-card.can-take::before {
+    background: linear-gradient(90deg, rgba(37, 99, 235, 0.92), rgba(191, 219, 254, 0.42));
+}
+
+.order-card.can-take .order-number {
+    color: #1d4ed8;
+}
+
+.badge-my-order {
+    color: #475569;
+    background: rgba(248, 250, 252, 0.92);
+    border-color: rgba(148, 163, 184, 0.32);
+}
+
+.badge-can-take {
+    color: #1d4ed8;
+    background: rgba(239, 246, 255, 0.95);
+    border-color: rgba(96, 165, 250, 0.36);
 }
 
 .order-card.highlighted {
@@ -1317,11 +1343,41 @@
     font-size: 13px;
 }
 
-.request-action-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    align-items: flex-start;
+.badge-my-order {
+    color: #475569;
+    background: rgba(248, 250, 252, 0.92);
+    border-color: rgba(148, 163, 184, 0.32);
+}
+
+.badge-can-take {
+    color: #1d4ed8;
+    background: rgba(239, 246, 255, 0.95);
+    border-color: rgba(96, 165, 250, 0.36);
+}
+
+.cc-map-balloon__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: fit-content;
+    min-height: 24px;
+    padding: 5px 8px;
+
+    border-radius: 999px;
+
+    font-size: 11.5px;
+    line-height: 1;
+    font-weight: 900;
+
+    border: 1px solid rgba(226, 232, 240, 0.86);
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.cc-map-balloon__badge-own {
+    color: #475569;
+    background: rgba(248, 250, 252, 0.95);
+    border-color: rgba(148, 163, 184, 0.36);
 }
 
 .blocked-order-hint {
@@ -2520,6 +2576,46 @@
     }
 
     .request-order-btn {
+        width: 100%;
+    }
+}
+
+/* =========================
+   Express detail page
+========================= */
+
+.express-detail-card {
+    border-color: rgba(74, 222, 128, 0.28);
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(240, 253, 244, 0.76));
+}
+
+.express-detail-card::before {
+    background: linear-gradient(90deg, rgba(34, 197, 94, 0.9), rgba(187, 247, 208, 0.42));
+}
+
+.express-detail-route {
+    margin-top: 12px;
+
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.express-nav {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 860px) {
+    .express-detail-route {
+        grid-template-columns: 1fr;
+    }
+
+    .express-nav,
+    .express-nav .btn,
+    .express-nav-btn {
         width: 100%;
     }
 }

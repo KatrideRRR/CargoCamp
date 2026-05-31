@@ -61,6 +61,7 @@ export default function YandexMapModal({
                                            onPick,
                                            showOrders = false,
                                            orders = [],
+                                           currentUserId = null,
                                        }) {
     const apiKey = process.env.REACT_APP_YANDEX_API_KEY;
 
@@ -220,12 +221,26 @@ export default function YandexMapModal({
                 .filter(Boolean)
                 .join(" • ");
 
+            const isOwnOrder =
+                currentUserId &&
+                Number(order.creatorId) === Number(currentUserId);
+
             const orderUrl = order.express
-                ? `/orders?expressId=${order.expressId || ""}`
+                ? `/express-order/${order.expressId}`
                 : `/order/${order.id}`;
+
+            const openButtonText = order.express
+                ? "Открыть экспресс"
+                : "Открыть заказ";
+
+            const ownOrderBadge = isOwnOrder
+                ? `<span class="cc-map-balloon__badge cc-map-balloon__badge-own">Мой заказ</span>`
+                : "";
 
             const balloonBody = `
     <div class="cc-map-balloon">
+        ${ownOrderBadge}
+
         <div class="cc-map-balloon__address">
             ${order.address || "Без адреса"}
         </div>
@@ -246,10 +261,23 @@ export default function YandexMapModal({
         </div>
 
         <a class="cc-map-balloon__btn" href="${orderUrl}">
-            Открыть заказ
+            ${openButtonText}
         </a>
     </div>
 `;
+
+            const placemarkOptions = isOwnOrder
+                ? {
+                    preset: "islands#circleIcon",
+                    iconColor: "#94a3b8",
+                }
+                : order.express
+                    ? {
+                        preset: "islands#greenDotIcon",
+                    }
+                    : {
+                        preset: "islands#blueDotIcon",
+                    };
 
             const placemark = new ymaps.Placemark(
                 coords,
@@ -262,16 +290,12 @@ export default function YandexMapModal({
         `,
                     balloonContentBody: balloonBody,
                 },
-                {
-                    preset: order.express
-                        ? "islands#greenDotIcon"
-                        : "islands#blueDotIcon",
-                }
+                placemarkOptions
             );
 
             collection.add(placemark);
         });
-    }, [safeOrders, showOrders]);
+    }, [safeOrders, showOrders, currentUserId]);
 
     useEffect(() => {
         if (!isOpen) return;

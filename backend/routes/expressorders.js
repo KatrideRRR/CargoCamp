@@ -423,6 +423,55 @@ router.post("/express-orders", authenticateToken, async (req, res) => {
     }
 });
 
+router.get("/express-orders/:id", authenticateToken, async (req, res) => {
+    try {
+        const raw = req.params.id;
+        const id = Number(raw);
+        const userId = req.user.id;
+
+        if (!Number.isFinite(id) || id <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Некорректный id express-заказа",
+            });
+        }
+
+        const order = await ExpressOrder.findByPk(id);
+
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: "Заказ не найден",
+            });
+        }
+
+        const isCreator = Number(order.creatorId) === Number(userId);
+        const isExecutor = Number(order.executorId) === Number(userId);
+
+        const isAvailable =
+            !order.executorId &&
+            ["pending", "created"].includes(String(order.status || "pending"));
+
+        if (!isCreator && !isExecutor && !isAvailable) {
+            return res.status(403).json({
+                success: false,
+                message: "Нет доступа",
+            });
+        }
+
+        return res.json({
+            success: true,
+            order,
+        });
+    } catch (e) {
+        console.error("express-orders/:id GET error:", e);
+        return res.status(500).json({
+            success: false,
+            message: "Ошибка сервера",
+        });
+    }
+});
+
 router.patch("/express-orders/:id/hide-by-creator", authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
@@ -516,36 +565,6 @@ router.patch("/express-orders/:id/hide-by-creator", authenticateToken, async (re
             success: false,
             message: "Ошибка при удалении экспресс-заказа",
         });
-    }
-});
-
-router.get("/express-orders/:id", authenticateToken, async (req, res) => {
-    try {
-        const raw = req.params.id;
-        const id = Number(raw);
-        const userId = req.user.id;
-
-        // ✅ FIX: защита от NaN/пустого/мусора типа "e-12"
-        if (!Number.isFinite(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: "Некорректный id express-заказа",
-            });
-        }
-
-        const order = await ExpressOrder.findByPk(id);
-        if (!order) {
-            return res.status(404).json({ success: false, message: "Заказ не найден" });
-        }
-
-        if (!isParticipant(order, userId)) {
-            return res.status(403).json({ success: false, message: "Нет доступа" });
-        }
-
-        return res.json({ success: true, order });
-    } catch (e) {
-        console.error("express-orders/:id GET error:", e);
-        return res.status(500).json({ success: false, message: "Ошибка сервера" });
     }
 });
 

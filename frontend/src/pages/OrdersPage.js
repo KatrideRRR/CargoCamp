@@ -1105,8 +1105,22 @@ const OrdersPage = () => {
                         <ul className="orders-list">
                             {visibleOrders.map((order) => {
                                 const creator = creatorsInfo[order.creatorId] || {};
-                                const isCreator = order.creatorId === userId;
+                                const isCreator = Number(order.creatorId) === Number(userId);
                                 const isExpress = !!order.express;
+
+                                const canRequestRegular =
+                                    !isExpress &&
+                                    !isCreator &&
+                                    !order.executorId &&
+                                    order.status === "pending";
+
+                                const canAcceptExpress =
+                                    isExpress &&
+                                    !isCreator &&
+                                    !order.executorId &&
+                                    ["pending", "created"].includes(String(order.status || "pending"));
+
+                                const canTakeOrder = canRequestRegular || canAcceptExpress;
 
                                 const displayId = isExpress ? order.expressId : order.id;
 
@@ -1119,7 +1133,8 @@ const OrdersPage = () => {
                                 const cardClass = [
                                     "order-card",
                                     "glass",
-                                    isCreator ? "creator" : "",
+                                    canTakeOrder ? "can-take" : "",
+                                    isCreator ? "my-order" : "",
                                     order.is_highlighted ? "highlighted" : "",
                                     order.is_recommended ? "recommended" : "",
                                     order.taxi_courier ? "courier" : "",
@@ -1135,6 +1150,10 @@ const OrdersPage = () => {
                                                     <span className="order-number">
                                                         {isExpress ? `Экспресс №${displayId}` : `Заказ №${displayId}`}
                                                     </span>
+
+                                                    {isCreator && <span className="badge badge-my-order">Мой заказ</span>}
+
+                                                    {canTakeOrder && <span className="badge badge-can-take">Можно взять</span>}
 
                                                     {order.is_recommended && <span className="badge badge-priority">В приоритете</span>}
                                                     {order.taxi_courier && <span className="badge badge-courier">{courierBadgeText}</span>}
@@ -1205,43 +1224,43 @@ const OrdersPage = () => {
                                                 {creator.complaintsCount || 0}
                                             </Link>
 
-                                            {!isExpress &&
-                                                userId !== order.creatorId &&
-                                                !order.executorId &&
-                                                order.status === "pending" && (
-                                                    <div className="request-action-wrap">
-                                                        <button
-                                                            className="btn btn-primary"
-                                                            disabled={busyState.loading || busyState.hasAnyBusy}
-                                                            title={busyState.hasAnyBusy ? busyHintText : ""}
-                                                            onClick={() => {
-                                                                const token = localStorage.getItem("authToken");
+                                            <div className="order-main-actions">
+                                                <button
+                                                    className="btn btn-ghost"
+                                                    onClick={() =>
+                                                        navigate(isExpress ? `/express-order/${order.expressId}` : `/order/${order.id}`)
+                                                    }
+                                                >
+                                                    Открыть
+                                                </button>
 
-                                                                if (!token) {
-                                                                    toast.info("Войдите, чтобы запросить выполнение");
-                                                                    navigate("/login");
-                                                                    return;
-                                                                }
+                                                {!isExpress && canRequestRegular && (
+                                                    <button
+                                                        className="btn btn-primary"
+                                                        disabled={busyState.loading || busyState.hasAnyBusy}
+                                                        title={busyState.hasAnyBusy ? busyHintText : ""}
+                                                        onClick={() => {
+                                                            const token = localStorage.getItem("authToken");
 
-                                                                if (busyState.hasAnyBusy) {
-                                                                    toast.info(busyHintText);
-                                                                    return;
-                                                                }
+                                                            if (!token) {
+                                                                toast.info("Войдите, чтобы запросить выполнение");
+                                                                navigate("/login");
+                                                                return;
+                                                            }
 
-                                                                openRequestModal(order);
-                                                            }}
-                                                        >
-                                                            {busyState.loading ? "Проверка..." : "Запросить выполнение"}
-                                                        </button>
+                                                            if (busyState.hasAnyBusy) {
+                                                                toast.info(busyHintText);
+                                                                return;
+                                                            }
 
-                                                        {busyState.hasAnyBusy && (
-                                                            <div className="blocked-order-hint">{busyHintText}</div>
-                                                        )}
-                                                    </div>
+                                                            openRequestModal(order);
+                                                        }}
+                                                    >
+                                                        {busyState.loading ? "Проверка..." : "Запросить выполнение"}
+                                                    </button>
                                                 )}
 
-                                            {isExpress && (
-                                                <>
+                                                {isExpress && (
                                                     <ExpressRouteButtons
                                                         orderId={order.expressId}
                                                         canToA={true}
@@ -1249,45 +1268,43 @@ const OrdersPage = () => {
                                                         className="express-nav"
                                                         buttonClassName="btn btn-ghost express-nav-btn"
                                                     />
+                                                )}
 
-                                                    {Number(userId) !== Number(order.creatorId) && (
-                                                        <div className="request-action-wrap">
-                                                            <button
-                                                                className="btn btn-primary"
-                                                                disabled={busyState.loading || busyState.hasAnyBusy}
-                                                                title={busyState.hasAnyBusy ? busyHintText : ""}
-                                                                onClick={async () => {
-                                                                    if (busyState.hasAnyBusy) {
-                                                                        toast.info(busyHintText);
-                                                                        return;
-                                                                    }
+                                                {isExpress && canAcceptExpress && (
+                                                    <button
+                                                        className="btn btn-primary"
+                                                        disabled={busyState.loading || busyState.hasAnyBusy}
+                                                        title={busyState.hasAnyBusy ? busyHintText : ""}
+                                                        onClick={async () => {
+                                                            if (busyState.hasAnyBusy) {
+                                                                toast.info(busyHintText);
+                                                                return;
+                                                            }
 
-                                                                    const confirmed = window.confirm(
-                                                                        `Вы уверены, что хотите взять в работу этот экспресс-заказ №${order.expressId}?`
-                                                                    );
+                                                            const confirmed = window.confirm(
+                                                                `Вы уверены, что хотите взять в работу этот экспресс-заказ №${order.expressId}?`
+                                                            );
 
-                                                                    if (!confirmed) return;
+                                                            if (!confirmed) return;
 
-                                                                    try {
-                                                                        await axiosInstance.post(`/express/express-orders/${order.expressId}/accept`);
-                                                                        toast.success("Заказ принят!");
-                                                                        await fetchExpress();
-                                                                        await fetchBusyState();
-                                                                        navigate("/active-orders");
-                                                                    } catch (e) {
-                                                                        toast.error(e.response?.data?.message || "Ошибка");
-                                                                    }
-                                                                }}
-                                                            >
-                                                                {busyState.loading ? "Проверка..." : "Принять"}
-                                                            </button>
+                                                            try {
+                                                                await axiosInstance.post(`/express/express-orders/${order.expressId}/accept`);
+                                                                toast.success("Заказ принят!");
+                                                                await fetchExpress();
+                                                                await fetchBusyState();
+                                                                navigate("/active-orders");
+                                                            } catch (e) {
+                                                                toast.error(e.response?.data?.message || "Ошибка");
+                                                            }
+                                                        }}
+                                                    >
+                                                        {busyState.loading ? "Проверка..." : "Принять"}
+                                                    </button>
+                                                )}
+                                            </div>
 
-                                                            {busyState.hasAnyBusy && (
-                                                                <div className="blocked-order-hint">{busyHintText}</div>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </>
+                                            {busyState.hasAnyBusy && canTakeOrder && (
+                                                <div className="blocked-order-hint">{busyHintText}</div>
                                             )}
                                         </div>
                                     </li>
@@ -1501,6 +1518,7 @@ const OrdersPage = () => {
                     initialLng={userLocation?.longitude ?? profile?.locationLng}
                     orders={visibleOrders}
                     showOrders={true}
+                    currentUserId={userId}
                     onPick={(picked) => {
                         setLocationDraft(picked.address);
                         setUserLocation({ latitude: picked.lat, longitude: picked.lng });

@@ -207,6 +207,7 @@ function App() {
                             <Route path="/create-order" element={<CreateOrderPage />} />
                             <Route path="/messages/:orderType/:orderId" element={<ChatPage />} />
                             <Route path="/order/:id" element={<OrderPage />} />
+                            <Route path="/express-order/:id" element={<OrderPage />} />
                             <Route path="/user-orders/:userId" element={<UserOrdersPage />} />
                             <Route path="/my-orders/:userId" element={<MyOrdersPage />} />
                             <Route path="/express" element={<CreateExpressOrder />} />
