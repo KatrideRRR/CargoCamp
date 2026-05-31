@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useContext, useCallback } from "react";
+import { ModalContext } from "../components/modalContext";
 import { Capacitor } from "@capacitor/core";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import axiosInstance from "../utils/axiosInstance";
@@ -20,6 +21,8 @@ const OrderPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { id } = useParams();
+
+    const { openDebtModal } = useContext(ModalContext);
 
     const isExpressPage = location.pathname.startsWith("/express-order");
 
@@ -49,8 +52,11 @@ const OrderPage = () => {
     const [currentImages, setCurrentImages] = useState([]);
 
     const [acceptLoading, setAcceptLoading] = useState(false);
-    const [requestLoading, setRequestLoading] = useState(false);
 
+    const [requestModalOpen, setRequestModalOpen] = useState(false);
+    const [requestSum, setRequestSum] = useState("");
+    const [requestComment, setRequestComment] = useState("");
+    const [requestSubmitting, setRequestSubmitting] = useState(false);
     const userId = profile?.id || null;
 
     const normalizeExpressOrder = (e) => {
@@ -177,6 +183,76 @@ const OrderPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, isExpressPage]);
 
+    useEffect(() => {
+        if (isExpressPage) return;
+
+        const params = new URLSearchParams(window.location.search);
+        const debtReturn = params.get("debtReturn") === "1";
+        const resumeRequest = params.get("resumeRequest") === "1";
+
+        if (!debtReturn || !resumeRequest) return;
+
+        const pendingRequest = getPendingOrderRequest();
+
+        if (!pendingRequest?.orderId || !pendingRequest?.proposedSum) {
+            params.delete("debtReturn");
+            params.delete("resumeRequest");
+
+            const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+            window.history.replaceState({}, "", newUrl);
+
+            return;
+        }
+
+        if (Number(pendingRequest.orderId) !== Number(id)) {
+            return;
+        }
+
+        let cancelled = false;
+
+        const resume = async () => {
+            try {
+                for (let attempt = 0; attempt < 10; attempt++) {
+                    if (cancelled) return;
+
+                    const profileRes = await axiosInstance.get("/auth/profile");
+                    const debt = Number(profileRes.data?.debt || 0);
+
+                    if (debt <= 0) {
+                        await submitRegularOrderRequest({
+                            orderId: pendingRequest.orderId,
+                            proposedSum: pendingRequest.proposedSum,
+                            comment: pendingRequest.comment || "",
+                        });
+
+                        clearPendingOrderRequest();
+
+                        params.delete("debtReturn");
+                        params.delete("resumeRequest");
+
+                        const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+                        window.history.replaceState({}, "", newUrl);
+
+                        return;
+                    }
+
+                    await new Promise((resolve) => setTimeout(resolve, 1500));
+                }
+
+                toast.info("Оплата ещё обрабатывается. Попробуйте отправить запрос ещё раз через пару секунд.");
+            } catch (e) {
+                console.error("resume request after debt payment error:", e);
+                toast.error("Не удалось автоматически отправить запрос после оплаты");
+            }
+        };
+
+        resume();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [id, isExpressPage, submitRegularOrderRequest]);
+
     const openModal = (images) => {
         setCurrentImages(images || []);
         setCurrentImageIndex(0);
@@ -197,7 +273,35 @@ const OrderPage = () => {
         setCurrentImageIndex((prevIndex) => (prevIndex - 1 + currentImages.length) % currentImages.length);
     };
 
-    const handleRequestOrder = async (orderId) => {
+    const savePendingOrderRequest = ({ orderId, proposedSum, comment }) => {
+        sessionStorage.setItem(
+            "pendingOrderRequestAfterDebtPayment",
+            JSON.stringify({
+                orderId,
+                proposedSum,
+                comment: comment || "",
+                returnTo: `/order/${orderId}`,
+                createdAt: Date.now(),
+            })
+        );
+    };
+
+    const getPendingOrderRequest = () => {
+        try {
+            const raw = sessionStorage.getItem("pendingOrderRequestAfterDebtPayment");
+            return raw ? JSON.parse(raw) : null;
+        } catch {
+            return null;
+        }
+    };
+
+    const clearPendingOrderRequest = () => {
+        sessionStorage.removeItem("pendingOrderRequestAfterDebtPayment");
+    };
+
+    const openRequestModal = () => {
+        if (!order?.id) return;
+
         const token = localStorage.getItem("authToken");
 
         if (!token) {
@@ -206,20 +310,124 @@ const OrderPage = () => {
             return;
         }
 
-        try {
-            setRequestLoading(true);
+        setRequestSum("");
+        setRequestComment("");
+        setRequestModalOpen(true);
+    };
 
-            await axiosInstance.post(`/orders/${orderId}/request`);
+    const closeRequestModal = () => {
+        if (requestSubmitting) return;
+
+        setRequestModalOpen(false);
+        setRequestSum("");
+        setRequestComment("");
+    };
+
+    const handleRequestSumChange = (e) => {
+        const onlyDigits = e.target.value.replace(/\D/g, "");
+        setRequestSum(onlyDigits);
+    };
+
+    const submitRegularOrderRequest = useCallback(
+        async ({ orderId, proposedSum, comment }) => {
+            const token = localStorage.getItem("authToken");
+
+            if (!token) {
+                toast.info("Войдите, чтобы запросить выполнение");
+                navigate("/login");
+                return false;
+            }
+
+            await axiosInstance.post(
+                `/orders/${orderId}/request`,
+                {
+                    proposedSum,
+                    comment,
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
 
             toast.success("Запрос отправлен заказчику!");
             await fetchOrderData();
-        } catch (error) {
-            console.error("Ошибка при запросе на выполнение заказа:", error);
-            toast.error(error.response?.data?.message || "Ошибка при запросе на выполнение заказа");
+
+            return true;
+        },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [navigate, id, isExpressPage]
+    );
+
+    const submitRequestFromModal = async () => {
+        if (!order?.id) {
+            toast.error("Заказ не выбран");
+            return;
+        }
+
+        const token = localStorage.getItem("authToken");
+
+        if (!token) {
+            toast.info("Войдите, чтобы запросить выполнение");
+            navigate("/login");
+            return;
+        }
+
+        const normalizedSum = Number(requestSum);
+
+        if (!Number.isFinite(normalizedSum) || normalizedSum <= 0) {
+            toast.error("Введите сумму цифрами");
+            return;
+        }
+
+        try {
+            setRequestSubmitting(true);
+
+            const statusRes = await axiosInstance.get("/orders/me/status", {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            const debt = Number(statusRes.data?.debt || 0);
+
+            if (debt > 0) {
+                savePendingOrderRequest({
+                    orderId: order.id,
+                    proposedSum: normalizedSum,
+                    comment: requestComment.trim(),
+                });
+
+                closeRequestModal();
+
+                openDebtModal({
+                    title: "Есть задолженность по комиссии",
+                    description:
+                        "Чтобы отправить запрос на этот заказ, сначала оплатите задолженность. После оплаты запрос отправится автоматически.",
+                    amount: debt,
+                    returnPath: `/order/${order.id}?debtReturn=1&resumeRequest=1`,
+                });
+
+                return;
+            }
+
+            await submitRegularOrderRequest({
+                orderId: order.id,
+                proposedSum: normalizedSum,
+                comment: requestComment.trim(),
+            });
+
+            closeRequestModal();
+        } catch (e) {
+            console.error(e);
+            toast.error(e.response?.data?.message || "Ошибка. Попробуйте позже.");
         } finally {
-            setRequestLoading(false);
+            setRequestSubmitting(false);
         }
     };
+
+
 
     const handleAcceptExpress = async () => {
         if (!order?.expressId) return;
@@ -530,10 +738,10 @@ const OrderPage = () => {
                             {canRequestRegular && (
                                 <button
                                     className="btn btn-primary"
-                                    onClick={() => handleRequestOrder(order.id)}
-                                    disabled={requestLoading}
+                                    onClick={openRequestModal}
+                                    disabled={requestSubmitting}
                                 >
-                                    {requestLoading ? "Отправляем..." : "Запросить выполнение"}
+                                    Запросить выполнение
                                 </button>
                             )}
 
@@ -558,6 +766,82 @@ const OrderPage = () => {
                         </div>
                     </li>
                 </ul>
+
+                <Modal
+                    appElement={document.getElementById("root")}
+                    isOpen={requestModalOpen}
+                    onRequestClose={closeRequestModal}
+                    contentLabel="Запросить выполнение"
+                    className="request-order-modal"
+                    overlayClassName="request-order-overlay"
+                    parentSelector={() => document.body}
+                >
+                    <div className="request-order-content">
+                        <button
+                            type="button"
+                            className="request-order-close"
+                            onClick={closeRequestModal}
+                            disabled={requestSubmitting}
+                            aria-label="Закрыть"
+                        >
+                            ×
+                        </button>
+
+                        <h2 className="request-order-title">Запросить выполнение</h2>
+
+                        <p className="request-order-subtitle">
+                            Укажите сумму, за которую готовы выполнить заказ, и при желании добавьте комментарий заказчику.
+                        </p>
+
+                        <div className="request-order-field">
+                            <label>Ваша сумма, ₽</label>
+
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={requestSum}
+                                onChange={handleRequestSumChange}
+                                placeholder="Например: 2500"
+                                className="request-order-input"
+                                autoFocus
+                            />
+                        </div>
+
+                        <div className="request-order-field">
+                            <label>Комментарий</label>
+
+                            <textarea
+                                value={requestComment}
+                                onChange={(e) => setRequestComment(e.target.value)}
+                                placeholder="Например: могу приехать сегодня после 18:00"
+                                className="request-order-textarea"
+                                rows={4}
+                                maxLength={500}
+                            />
+                        </div>
+
+                        <div className="request-order-actions">
+                            <button
+                                type="button"
+                                className="request-order-btn ghost"
+                                onClick={closeRequestModal}
+                                disabled={requestSubmitting}
+                            >
+                                Отмена
+                            </button>
+
+                            <button
+                                type="button"
+                                className="request-order-btn primary"
+                                onClick={submitRequestFromModal}
+                                disabled={requestSubmitting || !requestSum}
+                            >
+                                {requestSubmitting ? "Отправляем..." : "Отправить запрос"}
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
 
                 <Modal
                     appElement={document.getElementById("root")}
