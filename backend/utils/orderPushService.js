@@ -125,9 +125,12 @@ async function sendOrderPush({
 
     const payloadBase = {
         type: "order_push",
+        orderType: "regular",
         orderId: order.id,
         createdAt: new Date().toISOString(),
         data: {
+            type: "order_push",
+            orderType: "regular",
             orderId: order.id,
             categoryId: order.categoryId,
             subcategoryId: order.subcategoryId,
@@ -145,6 +148,7 @@ async function sendOrderPush({
             ...payloadBase,
             title,
             message: body,
+            body,
             data: {
                 ...payloadBase.data,
                 distanceKm: Number(t.distanceKm.toFixed(2)),

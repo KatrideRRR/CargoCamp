@@ -26,11 +26,23 @@ function navigateFromPush(data, navigate) {
     }
 
     if (type === "express_available_nearby") {
+        const expressId = data.orderId || data.expressOrderId || data.expressId;
+
+        if (expressId) {
+            navigate(`/express-order/${expressId}`);
+            return;
+        }
+
         navigate("/orders");
         return;
     }
 
     if (type === "order_push" && orderId) {
+        if (orderType === "express") {
+            navigate(`/express-order/${orderId}`);
+            return;
+        }
+
         navigate(`/order/${orderId}`);
         return;
     }

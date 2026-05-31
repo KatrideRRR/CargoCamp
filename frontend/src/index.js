@@ -51,6 +51,31 @@ function SocketBootstrap() {
 function App() {
     const navigate = useNavigate();
 
+    const getOrderTargetPath = (payload = {}) => {
+        const type = payload.type || payload?.data?.type;
+        const orderType = payload.orderType || payload?.data?.orderType;
+        const orderId =
+            payload.orderId ||
+            payload.expressOrderId ||
+            payload.expressId ||
+            payload?.data?.orderId ||
+            payload?.data?.expressOrderId ||
+            payload?.data?.expressId;
+
+        if (!orderId) return null;
+
+        const isExpress =
+            orderType === "express" ||
+            type === "express_available_nearby" ||
+            type === "express_status_changed" ||
+            type === "express_arrived" ||
+            type === "express_completed" ||
+            type === "express_cancelled" ||
+            String(payload.expressType || payload?.data?.expressType || "").length > 0;
+
+        return isExpress ? `/express-order/${orderId}` : `/order/${orderId}`;
+    };
+
     useEffect(() => {
         initPushNotifications({ navigate }).catch((e) => {
             console.error("initPushNotifications error:", e);
@@ -59,14 +84,22 @@ function App() {
 
     useEffect(() => {
         const handlePush = (payload) => {
-            if (!payload || payload.type !== "order_push") return;
+            if (!payload) return;
+
+            const isOrderPush =
+                payload.type === "order_push" ||
+                payload.type === "express_available_nearby";
+
+            if (!isOrderPush) return;
+
+            const targetPath = getOrderTargetPath(payload);
 
             const open = window.confirm(
-                `${payload.title || "Уведомление"}\n${payload.message || ""}\nОткрыть заказ?`
+                `${payload.title || "Уведомление"}\n${payload.message || payload.body || ""}\nОткрыть заказ?`
             );
 
-            if (open && payload.orderId) {
-                navigate(`/order/${payload.orderId}`);
+            if (open && targetPath) {
+                navigate(targetPath);
             }
         };
 
@@ -84,7 +117,20 @@ function App() {
                 payload?.message ||
                 "Рядом появился новый экспресс-заказ";
 
-            const open = window.confirm(`${payload?.title || "Новый экспресс-заказ"}\n${text}\nОткрыть список заказов?`);
+            const targetPath = getOrderTargetPath({
+                ...payload,
+                type: payload?.type || "express_available_nearby",
+                orderType: "express",
+            });
+
+            const open = window.confirm(
+                `${payload?.title || "Новый экспресс-заказ"}\n${text}\nОткрыть заказ?`
+            );
+
+            if (open && targetPath) {
+                navigate(targetPath);
+                return;
+            }
 
             if (open) {
                 navigate("/orders");
@@ -109,10 +155,6 @@ function App() {
             if (!latest?.id) return;
             if (latest.id === lastShownNotificationId) return;
 
-            if (latest.type === "express_available_nearby") {
-                return;
-            }
-
             lastShownNotificationId = latest.id;
 
             const title = latest.title || "Новое уведомление";
@@ -131,7 +173,18 @@ function App() {
                     }
 
                     if (type === "express_available_nearby") {
-                        navigate("/orders");
+                        const targetPath = getOrderTargetPath({
+                            ...latest,
+                            orderType: "express",
+                        });
+
+                        navigate(targetPath || "/orders");
+                        return;
+                    }
+
+                    if (type === "order_push" && orderId) {
+                        const targetPath = getOrderTargetPath(latest);
+                        navigate(targetPath || `/order/${orderId}`);
                         return;
                     }
 
@@ -165,8 +218,10 @@ function App() {
                         return;
                     }
 
-                    if (orderType === "regular" && orderId) {
-                        navigate(`/order/${orderId}`);
+                    const targetPath = getOrderTargetPath(latest);
+
+                    if (targetPath) {
+                        navigate(targetPath);
                         return;
                     }
 
