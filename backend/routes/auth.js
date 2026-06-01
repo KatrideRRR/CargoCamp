@@ -570,18 +570,37 @@ router.put('/profile', authenticateToken, async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        if (phone && phone !== user.phone) {
-            const phoneExists = await User.findOne({ where: { phone } });
-            if (phoneExists) {
-                return res.status(400).json({ message: 'Phone already in use' });
+        let phoneKey = null;
+
+        if (phone) {
+            phoneKey = normalizePhone(phone);
+
+            if (!phoneKey || phoneKey.length !== 11 || !phoneKey.startsWith("7")) {
+                return res.status(400).json({ message: "Некорректный номер телефона" });
+            }
+
+            if (phoneKey !== user.phone) {
+                const phoneExists = await User.findOne({ where: { phone: phoneKey } });
+
+                if (phoneExists) {
+                    return res.status(400).json({ message: 'Phone already in use' });
+                }
             }
         }
 
         user.username = username || user.username;
-        user.phone = phone || user.phone;
+        user.phone = phoneKey || user.phone;
+
         await user.save();
 
-        res.json({ message: 'Profile updated', user: { id: user.id, username: user.username, phone: user.phone } });
+        res.json({
+            message: 'Profile updated',
+            user: {
+                id: user.id,
+                username: user.username,
+                phone: user.phone,
+            },
+        });
     } catch (error) {
         console.error('Error updating profile:', error);
         res.status(500).json({ message: 'Server error' });
@@ -625,7 +644,8 @@ router.post("/recover-password", async (req, res) => {
     }
 
     try {
-        const user = await User.findOne({ where: { phone } });
+        const phoneKey = normalizePhone(phone);
+        const user = await User.findOne({ where: { phone: phoneKey } });
         if (!user) {
             return res.status(404).json({ message: "Пользователь не найден" });
         }

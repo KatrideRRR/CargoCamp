@@ -107,6 +107,40 @@ const ActiveOrdersPage = () => {
         }
     };
 
+    const normalizePhoneForTel = (rawPhone) => {
+        const digits = String(rawPhone || "").replace(/\D/g, "");
+
+        if (!digits) return null;
+
+        // 89123456789 -> +79123456789
+        if (digits.length === 11 && digits.startsWith("8")) {
+            return `+7${digits.slice(1)}`;
+        }
+
+        // 79123456789 -> +79123456789
+        if (digits.length === 11 && digits.startsWith("7")) {
+            return `+${digits}`;
+        }
+
+        // 9123456789 -> +79123456789
+        if (digits.length === 10) {
+            return `+7${digits}`;
+        }
+
+        return null;
+    };
+
+    const callPhone = (rawPhone) => {
+        const phoneForTel = normalizePhoneForTel(rawPhone);
+
+        if (!phoneForTel) {
+            alert("Некорректный номер телефона");
+            return;
+        }
+
+        window.location.href = `tel:${phoneForTel}`;
+    };
+
     const buildCompletionPayload = ({ order, orderType }) => {
         if (!order) return null;
 
@@ -952,7 +986,7 @@ const ActiveOrdersPage = () => {
                                                                     ? await getUserPhone(order.executorId)
                                                                     : await getUserPhone(order.creatorId);
                                                                 if (!phone) return alert("Телефон не найден");
-                                                                window.open(`tel:${phone}`);
+                                                                callPhone(phone);
                                                             }}
                                                         >
                                                             {isMobile ? <FaPhone /> : "Позвонить"}
@@ -1295,7 +1329,7 @@ const ActiveOrdersPage = () => {
                                                     return;
                                                 }
 
-                                                window.open(`tel:${phone}`);
+                                                callPhone(phone);
                                             }}
                                         />
                                     ))}
