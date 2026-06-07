@@ -156,48 +156,17 @@ export const ModalProvider = ({ children }) => {
     const handleExpressOrderAccepted = (data) => {
         console.log("🔔 Экспресс-заказ принят:", data, "current userId:", userId);
 
-        if (!data?.orderId) {
-            toast.success(data?.message || "Ваш экспресс-заказ приняли в работу");
-            return;
-        }
+        if (!data?.orderId) return;
 
         const creatorId = data.creatorId || data?.data?.creatorId;
-        const executorId = data.executorId || data?.data?.executorId;
 
         if (Number(creatorId) === Number(userId)) {
             openExpressAcceptedModal(data);
-            return;
         }
-
-        if (Number(executorId) === Number(userId)) {
-            toast.success(data.message || "Вы приняли экспресс-заказ");
-            return;
-        }
-
-        toast.success(data.message || "Экспресс-заказ принят");
     };
 
     const handleExpressOrderStatusChanged = (data) => {
         if (!data?.status) return;
-
-        if (data.status === "accepted") {
-            return;
-        }
-
-        const expressType = data.type || data.expressType;
-
-        const textByStatus = {
-            accepted: "Экспресс-заказ принят",
-            on_the_way_to_A: expressType === "taxi" ? "Водитель в пути" : "Курьер в пути",
-            arrived_at_A: expressType === "taxi" ? "Водитель на месте" : "Курьер на месте",
-            waiting_at_A: "Водитель ожидает",
-            picked_up: "Курьер забрал посылку",
-            in_progress: expressType === "taxi" ? "Поездка началась" : "Доставка началась",
-            completed: "Экспресс-заказ завершён",
-            cancelled: "Экспресс-заказ отменён",
-        };
-
-        toast.info(data.message || textByStatus[data.status] || "Статус экспресс-заказа обновлён");
     };
 
     const openReviewFromCompletion = (
@@ -578,10 +547,6 @@ export const ModalProvider = ({ children }) => {
             }
         };
 
-        const handleExpressArrived = (data) => {
-            toast.info(data.message || "Исполнитель прибыл");
-        };
-
         const handleNewNotification = (notifications) => {
 
             const list = Array.isArray(notifications) ? notifications : [notifications];
@@ -697,7 +662,6 @@ export const ModalProvider = ({ children }) => {
         socket.on("orderApproved", handleOrderApproved);
         socket.on("orderCompleted", handleOrderCompleted);
         socket.on("expressOrderCompleted", handleExpressOrderCompleted);
-        socket.on("expressArrived", handleExpressArrived);
         socket.on("reviewNeeded", handleReviewNeeded);
         socket.on("expressOrderAccepted", handleExpressOrderAccepted);
         socket.on("expressOrderStatusChanged", handleExpressOrderStatusChanged);
@@ -709,7 +673,6 @@ export const ModalProvider = ({ children }) => {
             socket.off("orderCompleted", handleOrderCompleted);
             socket.off("expressOrderCompleted", handleExpressOrderCompleted);
             socket.off("reviewNeeded", handleReviewNeeded);
-            socket.off("expressArrived", handleExpressArrived);
             socket.off("expressOrderAccepted", handleExpressOrderAccepted);
             socket.off("expressOrderStatusChanged", handleExpressOrderStatusChanged);
             socket.off("new_notification", handleNewNotification);

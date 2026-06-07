@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect } from 'react';
+import React, { Suspense, lazy, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import Modal from "react-modal";
@@ -50,6 +50,7 @@ function SocketBootstrap() {
 
 function App() {
     const navigate = useNavigate();
+    const shownToastKeysRef = useRef(new Map());
 
     const getOrderTargetPath = (payload = {}) => {
         const type = payload.type || payload?.data?.type;
@@ -177,12 +178,34 @@ function App() {
 
             lastShownNotificationId = latest.id;
 
+            const latestData = latest.data || {};
+
+            const dedupeKey = [
+                latest.type || latestData.type || "unknown",
+                latest.orderType || latestData.orderType || "regular",
+                latest.orderId || latestData.orderId || latestData.expressOrderId || "",
+                latestData.status || latest.status || "",
+            ].join(":");
+
+            const now = Date.now();
+            const lastShownAt = shownToastKeysRef.current.get(dedupeKey);
+
+            if (lastShownAt && now - lastShownAt < 7000) {
+                return;
+            }
+
+            shownToastKeysRef.current.set(dedupeKey, now);
+
             const title = latest.title || "Новое уведомление";
             const body = latest.body || "";
 
             const type = latest.type;
             const orderId = latest.orderId;
             const orderType = latest.orderType || "regular";
+
+            if (type === "express_available_nearby") {
+                return;
+            }
 
             toast.info(`${title}${body ? `: ${body}` : ""}`, {
                 autoClose: 6000,

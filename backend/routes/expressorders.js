@@ -756,12 +756,6 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
                     type: order.type,
                     status: order.status,
                 },
-                socketEvent: "expressOrderAccepted",
-                socketPayload: buildExpressPayload(order, {
-                    message: `Исполнитель принял ваш ${
-                        order.type === "taxi" ? "заказ такси" : "курьерский заказ"
-                    } №${order.id}`,
-                }),
             });
         } catch (notifyError) {
             console.error("express accept notify error:", notifyError);
@@ -833,19 +827,6 @@ router.post("/express-orders/:id/on-the-way", authenticateToken, async (req, res
                 expressType: order.type,
                 type: order.type,
                 status: order.status,
-            },
-            socketEvent: "expressOrderStatusChanged",
-            socketPayload: {
-                orderId: order.id,
-                orderType: "express",
-                type: order.type,
-                expressType: order.type,
-                status: order.status,
-                creatorId: order.creatorId,
-                executorId: order.executorId,
-                message: order.type === "taxi"
-                    ? "Водитель выехал к вам"
-                    : "Курьер выехал к точке A",
             },
         });
 
@@ -936,16 +917,6 @@ router.post("/express-orders/:id/arrived", authenticateToken, async (req, res) =
                 status: order.status,
                 arrivedAt: order.arrivedAt,
             },
-            socketEvent: "expressOrderStatusChanged",
-            socketPayload: {
-                orderId: order.id,
-                orderType: "express",
-                type: order.type,
-                status: order.status,
-                creatorId: order.creatorId,
-                executorId: order.executorId,
-                message: arrivedBody,
-            },
         });
 
         res.json({ success: true, order });
@@ -1014,13 +985,6 @@ router.post("/express-orders/:id/start-waiting", authenticateToken, async (req, 
                 expressType: order.type,
                 status: order.status,
                 waitingStartedAt: order.waitingStartedAt,
-            },
-            socketEvent: "expressOrderStatusChanged",
-            socketPayload: {
-                orderId: order.id,
-                orderType: "express",
-                status: order.status,
-                message: "Водитель ожидает клиента",
             },
         });
 
@@ -1091,13 +1055,6 @@ router.post("/express-orders/:id/pick-up", authenticateToken, async (req, res) =
                 status: order.status,
                 pickedUpAt: order.pickedUpAt,
             },
-            socketEvent: "expressOrderStatusChanged",
-            socketPayload: {
-                orderId: order.id,
-                orderType: "express",
-                status: order.status,
-                message: "Курьер забрал посылку",
-            },
         });
 
         return res.json({ success: true, order });
@@ -1162,20 +1119,6 @@ router.post("/express-orders/:id/start", authenticateToken, async (req, res) => 
                 type: order.type,
                 status: order.status,
                 startedAt: order.startedAt,
-            },
-            socketEvent: "expressOrderStatusChanged",
-            socketPayload: {
-                orderId: order.id,
-                orderType: "express",
-                type: order.type,
-                expressType: order.type,
-                status: order.status,
-                creatorId: order.creatorId,
-                executorId: order.executorId,
-                startedAt: order.startedAt,
-                message: order.type === "taxi"
-                    ? "Поездка началась"
-                    : "Доставка началась",
             },
         });
 
