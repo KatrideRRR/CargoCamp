@@ -48,6 +48,25 @@ function SocketBootstrap() {
     return null;
 }
 
+function PushBootstrap() {
+    const { user } = useAuth();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const token = localStorage.getItem("authToken");
+
+        if (!user?.id || !token) {
+            return;
+        }
+
+        initPushNotifications({ navigate }).catch((e) => {
+            console.error("initPushNotifications error:", e);
+        });
+    }, [user?.id, navigate]);
+
+    return null;
+}
+
 function App() {
     const navigate = useNavigate();
     const shownToastKeysRef = useRef(new Map());
@@ -76,12 +95,6 @@ function App() {
 
         return isExpress ? `/express-order/${orderId}` : `/order/${orderId}`;
     };
-
-    useEffect(() => {
-        initPushNotifications({ navigate }).catch((e) => {
-            console.error("initPushNotifications error:", e);
-        });
-    }, [navigate]);
 
     useEffect(() => {
         const handlePush = (payload) => {
@@ -281,9 +294,10 @@ function App() {
     }, [navigate]);
 
     return (
-        <ModalProvider>
-            <AuthProvider>
+        <AuthProvider>
+            <ModalProvider>
                 <SocketBootstrap />
+                <PushBootstrap />
                 <PullToRefresh />
                 <UserProvider>
                     <Suspense
@@ -326,8 +340,9 @@ function App() {
 
                     </Suspense>
                 </UserProvider>
-            </AuthProvider>
-        </ModalProvider>
+            </ModalProvider>
+        </AuthProvider>
+
     );
 }
 

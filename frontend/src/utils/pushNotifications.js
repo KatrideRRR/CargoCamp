@@ -136,6 +136,9 @@ export async function initPushNotifications({ navigate } = {}) {
 
     PushNotifications.addListener("registration", async (tokenResult) => {
         try {
+
+            console.log("Push registration success:", tokenResult);
+
             const pushToken = tokenResult.value;
 
             if (!pushToken) return;
@@ -146,6 +149,7 @@ export async function initPushNotifications({ navigate } = {}) {
                 deviceId: `${getPushPlatform()}-${pushToken.slice(0, 16)}`,
                 appVersion: process.env.REACT_APP_VERSION || null,
             });
+            console.log("Push token saved:", res.data);
 
         } catch (e) {
             console.error("Push token register API error:", e);
@@ -248,6 +252,16 @@ export async function initPushNotifications({ navigate } = {}) {
             sound: "default",
         });
     }
+
+    console.log("Push init start", {
+        platform: Capacitor.getPlatform(),
+        isNative: Capacitor.isNativePlatform(),
+        hasToken: !!localStorage.getItem("authToken"),
+    });
+
+    console.log("Push permissions:", permStatus);
+    console.log("Local permissions:", localPerm);
+    console.log("Push register call...");
 
     await PushNotifications.register();
 }
