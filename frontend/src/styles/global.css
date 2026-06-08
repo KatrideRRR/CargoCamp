@@ -115,3 +115,22 @@ textarea,
 select {
     touch-action: manipulation;
 }
+
+:root {
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+}
+
+@supports (padding-top: env(safe-area-inset-top)) {
+    .orders-page--ios,
+    .active-orders--ios,
+    .profile-page,
+    .chat-page,
+    .create-order-page,
+    .my-orders-page,
+    .order-history-page {
+        padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    }
+}
