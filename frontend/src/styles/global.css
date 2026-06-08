@@ -86,3 +86,32 @@ body.hide-bottom-menu .mobile-bottom-menu {
 body.hide-bottom-menu .page {
     padding-bottom: 0 !important;
 }
+
+/* iOS WebView/Safari: запрет авто-зума при фокусе на полях */
+@supports (-webkit-touch-callout: none) {
+    input,
+    textarea,
+    select {
+        font-size: 16px !important;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+        font-size: 16px !important;
+    }
+}
+
+html,
+body,
+#root {
+    touch-action: manipulation;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+    touch-action: manipulation;
+}

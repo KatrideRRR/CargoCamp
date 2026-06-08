@@ -136,23 +136,28 @@ export async function initPushNotifications({ navigate } = {}) {
 
     PushNotifications.addListener("registration", async (tokenResult) => {
         try {
-
             console.log("Push registration success:", tokenResult);
 
             const pushToken = tokenResult.value;
 
-            if (!pushToken) return;
+            if (!pushToken) {
+                console.warn("Push token empty");
+                return;
+            }
 
-            await axiosInstance.post("/push/register", {
+            const res = await axiosInstance.post("/push/register", {
                 token: pushToken,
                 platform: getPushPlatform(),
                 deviceId: `${getPushPlatform()}-${pushToken.slice(0, 16)}`,
                 appVersion: process.env.REACT_APP_VERSION || null,
             });
-            console.log("Push token saved:", res.data);
 
+            console.log("Push token saved:", res.data);
         } catch (e) {
-            console.error("Push token register API error:", e);
+            console.error(
+                "Push token register API error:",
+                e?.response?.data || e.message || e
+            );
         }
     });
 
