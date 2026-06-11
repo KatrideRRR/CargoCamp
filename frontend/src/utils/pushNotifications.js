@@ -3,6 +3,9 @@ import { PushNotifications } from "@capacitor/push-notifications";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import axiosInstance from "./axiosInstance";
 
+let pushInitialized = false;
+let pushInitializing = false;
+
 function getPushPlatform() {
     const p = Capacitor.getPlatform();
 
@@ -104,6 +107,11 @@ function navigateFromPush(data, navigate) {
 }
 
 export async function initPushNotifications({ navigate } = {}) {
+    if (pushInitialized || pushInitializing) {
+        console.log("Push already initialized or initializing, skip");
+        return;
+    }
+
     if (!Capacitor.isNativePlatform()) {
         console.info("Push: web platform, skip native push init");
         return;
@@ -114,6 +122,15 @@ export async function initPushNotifications({ navigate } = {}) {
         console.info("Push: no auth token, skip");
         return;
     }
+
+    pushInitializing = true;
+
+    try {
+        console.log("Push init start", {
+            platform: Capacitor.getPlatform(),
+            isNative: Capacitor.isNativePlatform(),
+            hasToken: !!localStorage.getItem("authToken"),
+        });
 
     let permStatus = await PushNotifications.checkPermissions();
 
@@ -266,7 +283,15 @@ export async function initPushNotifications({ navigate } = {}) {
 
     console.log("Push permissions:", permStatus);
     console.log("Local permissions:", localPerm);
-    console.log("Push register call...");
+        console.log("Push register call...");
 
-    await PushNotifications.register();
+        await PushNotifications.register();
+
+        pushInitialized = true;
+    } catch (error) {
+        console.error("Push init error:", error);
+        pushInitialized = false;
+    } finally {
+        pushInitializing = false;
+    }
 }

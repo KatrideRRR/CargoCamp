@@ -173,7 +173,7 @@ async function bumpSavedAddressUsage({ userId, id, transaction }) {
 
 /* ================= orders ================= */
 
-router.get("/express-orders/available", authenticateToken, async (req, res) => {
+router.get("/express-orders/available", async (req, res) => {
     try {
         const type = req.query.type ? String(req.query.type) : null;
 
