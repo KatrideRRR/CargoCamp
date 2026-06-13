@@ -83,6 +83,16 @@ const corsOptions = {
     credentials: true,
 };
 
+app.set("etag", false);
+
+app.use("/api", (req, res, next) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.setHeader("Surrogate-Control", "no-store");
+    next();
+});
+
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
