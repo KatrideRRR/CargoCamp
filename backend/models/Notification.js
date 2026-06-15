@@ -8,25 +8,7 @@ module.exports = (sequelize, DataTypes) => {
             },
 
             type: {
-                type: DataTypes.ENUM(
-                    "new_message",
-                    "order_request",
-                    "order_request_approved",
-                    "order_started",
-                    "order_completion_requested",
-                    "order_completed_by_other",
-                    "order_completed",
-                    "review_needed",
-                    "dispute_opened",
-                    "express_status_changed",
-                    "express_arrived",
-                    "express_completed",
-                    "express_cancelled",
-                    "debt_created",
-                    "order_push",
-                    "support_reply",
-                    "express_available_nearby"
-                ),
+                type: DataTypes.STRING,
                 allowNull: false,
             },
 
