@@ -1,10 +1,11 @@
 import { Capacitor } from "@capacitor/core";
-import { PushNotifications } from "@capacitor/push-notifications";
+import { FirebaseMessaging } from "@capacitor-firebase/messaging";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import axiosInstance from "./axiosInstance";
 
 let pushInitialized = false;
 let pushInitializing = false;
+let pushInitializedUserId = null;
 
 function getPushPlatform() {
     const p = Capacitor.getPlatform();
@@ -71,6 +72,7 @@ function navigateFromPush(data, navigate) {
             "order_request_approved",
             "order_started",
             "order_completion_requested",
+            "order_completion_reminder",
             "order_completed",
             "express_status_changed",
             "express_arrived",
@@ -84,8 +86,10 @@ function navigateFromPush(data, navigate) {
 
     if (type === "order_request") {
         const userRaw = localStorage.getItem("user");
+
         try {
             const user = userRaw ? JSON.parse(userRaw) : null;
+
             if (user?.id) {
                 navigate(`/my-orders/${user.id}`);
                 return;
@@ -106,9 +110,36 @@ function navigateFromPush(data, navigate) {
     }
 }
 
-export async function initPushNotifications({ navigate } = {}) {
-    if (pushInitialized || pushInitializing) {
-        console.log("Push already initialized or initializing, skip");
+async function savePushTokenToBackend(pushToken) {
+    if (!pushToken) {
+        console.warn("Push token empty");
+        return;
+    }
+
+    const platform = getPushPlatform();
+
+    const res = await axiosInstance.post("/push/register", {
+        token: pushToken,
+        platform,
+        deviceId: `${platform}-${pushToken.slice(0, 16)}`,
+        appVersion: process.env.REACT_APP_VERSION || null,
+    });
+
+    console.log("Push token saved:", res.data);
+}
+
+export async function initPushNotifications({ navigate, userId } = {}) {
+    const normalizedUserId = userId ? String(userId) : null;
+
+    if (pushInitialized && pushInitializedUserId === normalizedUserId) {
+        console.log("Push already initialized for this user, skip", {
+            userId: normalizedUserId,
+        });
+        return;
+    }
+
+    if (pushInitializing) {
+        console.log("Push already initializing, skip");
         return;
     }
 
@@ -117,8 +148,9 @@ export async function initPushNotifications({ navigate } = {}) {
         return;
     }
 
-    const token = localStorage.getItem("authToken");
-    if (!token) {
+    const authToken = localStorage.getItem("authToken");
+
+    if (!authToken) {
         console.info("Push: no auth token, skip");
         return;
     }
@@ -126,171 +158,164 @@ export async function initPushNotifications({ navigate } = {}) {
     pushInitializing = true;
 
     try {
-        console.log("Push init start", {
-            platform: Capacitor.getPlatform(),
+        const platform = getPushPlatform();
+
+        console.log("FirebaseMessaging init start", {
+            platform,
             isNative: Capacitor.isNativePlatform(),
-            hasToken: !!localStorage.getItem("authToken"),
+            hasToken: !!authToken,
+            userId: normalizedUserId,
         });
 
-    let permStatus = await PushNotifications.checkPermissions();
+        const supported = await FirebaseMessaging.isSupported();
 
-    if (permStatus.receive !== "granted") {
-        permStatus = await PushNotifications.requestPermissions();
-    }
+        if (supported && supported.isSupported === false) {
+            console.warn("FirebaseMessaging is not supported");
+            return;
+        }
 
-    if (permStatus.receive !== "granted") {
-        console.warn("Push: permission not granted");
-        return;
-    }
+        let permStatus = await FirebaseMessaging.checkPermissions();
 
-    let localPerm = await LocalNotifications.checkPermissions();
+        if (permStatus.receive !== "granted") {
+            permStatus = await FirebaseMessaging.requestPermissions();
+        }
 
-    if (localPerm.display !== "granted") {
-        localPerm = await LocalNotifications.requestPermissions();
-    }
+        if (permStatus.receive !== "granted") {
+            console.warn("FirebaseMessaging permission not granted", permStatus);
+            return;
+        }
 
-    await PushNotifications.removeAllListeners();
+        let localPerm = await LocalNotifications.checkPermissions();
 
-    PushNotifications.addListener("registration", async (tokenResult) => {
-        try {
-            console.log("Push registration success:", tokenResult);
+        if (localPerm.display !== "granted") {
+            localPerm = await LocalNotifications.requestPermissions();
+        }
 
-            const pushToken = tokenResult.value;
+        await FirebaseMessaging.removeAllListeners();
 
-            if (!pushToken) {
-                console.warn("Push token empty");
-                return;
+        await FirebaseMessaging.addListener("tokenReceived", async (event) => {
+            try {
+                console.log("FirebaseMessaging tokenReceived:", {
+                    tokenLen: event?.token?.length,
+                    tokenStart: event?.token?.slice(0, 25),
+                });
+
+                await savePushTokenToBackend(event.token);
+            } catch (e) {
+                console.error(
+                    "FirebaseMessaging tokenReceived save error:",
+                    e?.response?.data || e.message || e
+                );
+            }
+        });
+
+        await FirebaseMessaging.addListener("notificationReceived", async (event) => {
+            console.log("FirebaseMessaging notificationReceived foreground:", event);
+
+            const notification = event?.notification || {};
+            const data = notification?.data || {};
+
+            const title =
+                notification?.title ||
+                data.title ||
+                "CargoCamp";
+
+            const body =
+                notification?.body ||
+                data.body ||
+                data.message ||
+                "Новое уведомление";
+
+            try {
+                await LocalNotifications.schedule({
+                    notifications: [
+                        {
+                            id: Date.now() % 2147483647,
+                            title,
+                            body,
+                            extra: data,
+                            channelId: "cargocamp_default",
+                            sound: "default",
+                            schedule: {
+                                at: new Date(Date.now() + 100),
+                            },
+                        },
+                    ],
+                });
+            } catch (e) {
+                console.error("Local notification foreground error:", e);
             }
 
-            const res = await axiosInstance.post("/push/register", {
-                token: pushToken,
-                platform: getPushPlatform(),
-                deviceId: `${getPushPlatform()}-${pushToken.slice(0, 16)}`,
-                appVersion: process.env.REACT_APP_VERSION || null,
+            if (data.type === "review_needed" && data.orderId) {
+                localStorage.setItem(
+                    "pendingReviewFromPush",
+                    JSON.stringify({
+                        orderId: data.orderId,
+                        orderType: data.orderType || "regular",
+                        creatorId: data.creatorId || "",
+                        executorId: data.executorId || "",
+                        type: data.type,
+                        openedAt: Date.now(),
+                    })
+                );
+
+                window.dispatchEvent(new CustomEvent("openReviewFromPush"));
+            }
+        });
+
+        await FirebaseMessaging.addListener("notificationActionPerformed", (event) => {
+            console.log("FirebaseMessaging notificationActionPerformed:", event);
+
+            const notification = event?.notification || {};
+            const data = notification?.data || {};
+
+            navigateFromPush(data, navigate);
+        });
+
+        await LocalNotifications.removeAllListeners();
+
+        await LocalNotifications.addListener("localNotificationActionPerformed", (action) => {
+            console.log("Local notification action:", action);
+
+            const data = action?.notification?.extra || {};
+            navigateFromPush(data, navigate);
+        });
+
+        if (platform === "android") {
+            await FirebaseMessaging.createChannel({
+                id: "cargocamp_default",
+                name: "CargoCamp уведомления",
+                description: "Основные уведомления CargoCamp",
+                importance: 5,
+                visibility: 1,
+                sound: "default",
             });
 
-            console.log("Push token saved:", res.data);
-        } catch (e) {
-            console.error(
-                "Push token register API error:",
-                e?.response?.data || e.message || e
-            );
-        }
-    });
-
-    PushNotifications.addListener("registrationError", (error) => {
-        console.error("Push registration error:", error);
-    });
-
-    PushNotifications.addListener("pushNotificationReceived", async (notification) => {
-        console.log("Push received foreground:", notification);
-
-        const data = notification?.data || {};
-        const type = data.type;
-
-        const title =
-            notification?.title ||
-            data.title ||
-            "CargoCamp";
-
-        const body =
-            notification?.body ||
-            data.body ||
-            data.message ||
-            "Новое уведомление";
-
-        // ✅ Показываем локальное системное уведомление,
-        // когда приложение открыто
-        try {
-            await LocalNotifications.schedule({
-                notifications: [
-                    {
-                        id: Date.now() % 2147483647,
-                        title,
-                        body,
-                        extra: data,
-                        channelId: "cargocamp_default",
-                        sound: "default",
-                        schedule: {
-                            at: new Date(Date.now() + 100),
-                        },
-                    },
-                ],
+            await LocalNotifications.createChannel({
+                id: "cargocamp_default",
+                name: "CargoCamp уведомления",
+                description: "Основные уведомления CargoCamp",
+                importance: 5,
+                visibility: 1,
+                sound: "default",
             });
-        } catch (e) {
-            console.error("Local notification foreground error:", e);
         }
 
-        // ✅ Старая логика для отзывов остаётся
-        if (type === "review_needed" && data.orderId) {
-            localStorage.setItem(
-                "pendingReviewFromPush",
-                JSON.stringify({
-                    orderId: data.orderId,
-                    orderType: data.orderType || "regular",
-                    creatorId: data.creatorId || "",
-                    executorId: data.executorId || "",
-                    type: data.type,
-                    openedAt: Date.now(),
-                })
-            );
+        const tokenResult = await FirebaseMessaging.getToken();
 
-            window.dispatchEvent(new CustomEvent("openReviewFromPush"));
-        }
-    });
-
-    LocalNotifications.addListener("localNotificationActionPerformed", (action) => {
-        console.log("Local notification action:", action);
-
-        const data = action?.notification?.extra || {};
-        navigateFromPush(data, navigate);
-    });
-
-    PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
-        console.log("Push action:", action);
-
-        const data = action?.notification?.data || {};
-        navigateFromPush(data, navigate);
-    });
-
-    if (Capacitor.getPlatform() === "android") {
-        await PushNotifications.createChannel({
-            id: "cargocamp_default",
-            name: "CargoCamp уведомления",
-            description: "Основные уведомления CargoCamp",
-            importance: 5,
-            visibility: 1,
-            sound: "default",
+        console.log("FirebaseMessaging getToken result:", {
+            tokenLen: tokenResult?.token?.length,
+            tokenStart: tokenResult?.token?.slice(0, 25),
         });
-    }
 
-    if (Capacitor.getPlatform() === "android") {
-        await LocalNotifications.createChannel({
-            id: "cargocamp_default",
-            name: "CargoCamp уведомления",
-            description: "Основные уведомления CargoCamp",
-            importance: 5,
-            visibility: 1,
-            sound: "default",
-        });
-    }
-
-    console.log("Push init start", {
-        platform: Capacitor.getPlatform(),
-        isNative: Capacitor.isNativePlatform(),
-        hasToken: !!localStorage.getItem("authToken"),
-    });
-
-    console.log("Push permissions:", permStatus);
-    console.log("Local permissions:", localPerm);
-        console.log("Push register call...");
-
-        await PushNotifications.register();
+        await savePushTokenToBackend(tokenResult.token);
 
         pushInitialized = true;
+        pushInitializedUserId = normalizedUserId;
     } catch (error) {
-        console.error("Push init error:", error);
+        console.error("FirebaseMessaging init error:", error);
         pushInitialized = false;
+        pushInitializedUserId = null;
     } finally {
         pushInitializing = false;
     }

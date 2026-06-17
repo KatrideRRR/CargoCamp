@@ -59,7 +59,7 @@ function PushBootstrap() {
             return;
         }
 
-        initPushNotifications({ navigate }).catch((e) => {
+        initPushNotifications({ navigate, userId: user.id }).catch((e) => {
             console.error("initPushNotifications error:", e);
         });
     }, [user?.id, navigate]);
@@ -178,18 +178,82 @@ function App() {
         };
     }, [navigate]);
 
+    const getNotificationId = (n) => {
+        return n?.id || n?.data?.notificationId || null;
+    };
+
+    const getNotificationCreatedAtMs = (n) => {
+        const raw =
+            n?.createdAt ||
+            n?.created_at ||
+            n?.data?.createdAt ||
+            n?.data?.created_at;
+
+        if (!raw) return null;
+
+        const ts = new Date(raw).getTime();
+
+        return Number.isFinite(ts) ? ts : null;
+    };
+
+    const isFreshNotification = (n, maxAgeMs = 2 * 60 * 1000) => {
+        const createdAtMs = getNotificationCreatedAtMs(n);
+
+        // Если даты нет, лучше не показывать toast как "новый",
+        // иначе старые события без createdAt будут всплывать бесконечно.
+        if (!createdAtMs) return false;
+
+        return Date.now() - createdAtMs <= maxAgeMs;
+    };
+
+    const wasToastShown = (notificationId) => {
+        if (!notificationId) return false;
+
+        return localStorage.getItem(`toast_shown_notification_${notificationId}`) === "1";
+    };
+
+    const markToastShown = (notificationId) => {
+        if (!notificationId) return;
+
+        localStorage.setItem(`toast_shown_notification_${notificationId}`, "1");
+    };
+
     useEffect(() => {
-        let lastShownNotificationId = null;
-
         const handleNewNotification = (notifications = []) => {
-            if (!Array.isArray(notifications) || notifications.length === 0) return;
+            const list = Array.isArray(notifications) ? notifications : [notifications];
 
-            const latest = notifications[0];
+            if (!list.length) return;
 
-            if (!latest?.id) return;
-            if (latest.id === lastShownNotificationId) return;
+            const freshList = list.filter((n) => {
+                if (!n?.id && !n?.data?.notificationId) return false;
 
-            lastShownNotificationId = latest.id;
+                const type = n.type || n?.data?.type;
+
+                // express_available_nearby обрабатывается отдельно
+                if (type === "express_available_nearby") return false;
+
+                // express_cancelled у тебя уже обрабатывается в ModalProvider.
+                // Здесь обычный верхний toast для него не показываем,
+                // иначе и появляется старый баннер "Экспресс-заказ отменён".
+                if (type === "express_cancelled") return false;
+
+                // Не показываем уже прочитанные уведомления как новые
+                if (n.isRead === true) return false;
+
+                // Не показываем старые уведомления
+                if (!isFreshNotification(n)) return false;
+
+                const notificationId = getNotificationId(n);
+
+                if (wasToastShown(notificationId)) return false;
+
+                return true;
+            });
+
+            if (!freshList.length) return;
+
+            const latest = freshList[0];
+            const notificationId = getNotificationId(latest);
 
             const latestData = latest.data || {};
 
@@ -208,33 +272,20 @@ function App() {
             }
 
             shownToastKeysRef.current.set(dedupeKey, now);
+            markToastShown(notificationId);
 
             const title = latest.title || "Новое уведомление";
             const body = latest.body || "";
 
-            const type = latest.type;
-            const orderId = latest.orderId;
-            const orderType = latest.orderType || "regular";
-
-            if (type === "express_available_nearby") {
-                return;
-            }
+            const type = latest.type || latestData.type;
+            const orderId = latest.orderId || latestData.orderId;
+            const orderType = latest.orderType || latestData.orderType || "regular";
 
             toast.info(`${title}${body ? `: ${body}` : ""}`, {
                 autoClose: 6000,
                 onClick: () => {
                     if (type === "new_message" && orderId) {
                         navigate(`/messages/${orderType}/${orderId}`);
-                        return;
-                    }
-
-                    if (type === "express_available_nearby") {
-                        const targetPath = getOrderTargetPath({
-                            ...latest,
-                            orderType: "express",
-                        });
-
-                        navigate(targetPath || "/orders");
                         return;
                     }
 
@@ -249,10 +300,10 @@ function App() {
                             "express_status_changed",
                             "express_arrived",
                             "express_completed",
-                            "express_cancelled",
                             "order_request_approved",
                             "order_started",
                             "order_completion_requested",
+                            "order_completion_reminder",
                             "review_needed",
                         ].includes(type)
                     ) {
@@ -262,8 +313,10 @@ function App() {
 
                     if (type === "order_request") {
                         const userRaw = localStorage.getItem("user");
+
                         try {
                             const user = userRaw ? JSON.parse(userRaw) : null;
+
                             if (user?.id) {
                                 navigate(`/my-orders/${user.id}`);
                                 return;

@@ -29,6 +29,48 @@ function looksLikeCoordsString(v) {
     );
 }
 
+async function geocodeAddressYandex({ address, apiKey }) {
+    if (!apiKey) throw new Error("No Yandex API key");
+
+    const q = String(address || "").trim();
+
+    if (q.length < 3) {
+        return null;
+    }
+
+    const url =
+        `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}` +
+        `&geocode=${encodeURIComponent(q)}` +
+        `&format=json&results=1&kind=house`;
+
+    const r = await fetch(url);
+    const data = await r.json();
+
+    const first =
+        data?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
+
+    const text =
+        first?.metaDataProperty?.GeocoderMetaData?.text ||
+        first?.name ||
+        null;
+
+    const pos = first?.Point?.pos; // "lon lat"
+
+    if (!text || !pos) return null;
+
+    const [lng, lat] = pos.split(" ").map(Number);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return null;
+    }
+
+    return {
+        address: text,
+        lat,
+        lng,
+    };
+}
+
 async function reverseGeocodeYandex({ lat, lng, apiKey }) {
     if (!apiKey) throw new Error("No Yandex API key");
 
@@ -516,13 +558,54 @@ const ProfilePage = () => {
             return;
         }
 
+        const cleanAddress = String(address || "").trim();
+
+        if (!cleanAddress) {
+            setLocError("Введите адрес");
+            toast.error("Введите адрес");
+            return;
+        }
+
         setLocLoading(true);
         setLocError(null);
 
         try {
+            let finalAddress = cleanAddress;
+            let finalLat = Number(lat);
+            let finalLng = Number(lng);
+            let finalSource = source || "manual";
+
+            const hasCoords =
+                Number.isFinite(finalLat) &&
+                Number.isFinite(finalLng) &&
+                !(Math.abs(finalLat) < 0.000001 && Math.abs(finalLng) < 0.000001);
+
+            if (!hasCoords) {
+                const resolved = await geocodeAddressYandex({
+                    address: cleanAddress,
+                    apiKey: YM_KEY,
+                });
+
+                if (!resolved) {
+                    setLocError("Не удалось определить координаты адреса. Выберите адрес из подсказки, GPS или на карте.");
+                    toast.error("Не удалось определить координаты адреса");
+                    return;
+                }
+
+                finalAddress = resolved.address;
+                finalLat = resolved.lat;
+                finalLng = resolved.lng;
+                finalSource = "manual";
+            }
+
             const res = await axios.post(
                 `${apiUrl}/api/auth/location/me`,
-                { address, lat, lng, source },
+                {
+                    address: finalAddress,
+                    lat: finalLat,
+                    lng: finalLng,
+                    source: finalSource,
+                },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
@@ -530,6 +613,11 @@ const ProfilePage = () => {
 
             setAddressSuggestions([]);
             setAddressQuery("");
+            setPickedCoords({
+                lat: finalLat,
+                lng: finalLng,
+            });
+            setLocationDraft(finalAddress);
 
             setProfile((prev) => ({
                 ...prev,

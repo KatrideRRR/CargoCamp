@@ -1,5 +1,6 @@
 const { PushToken } = require("../models");
 const { initFirebaseAdmin } = require("../config/firebaseAdmin");
+const crypto = require("crypto");
 
 function stringifyData(data = {}) {
     const out = {};
@@ -16,18 +17,31 @@ function stringifyData(data = {}) {
 
     return out;
 }
+function makeTokenHash(token) {
+    return crypto
+        .createHash("sha256")
+        .update(String(token))
+        .digest("hex");
+}
 
 async function deactivateBadTokens(badTokens = []) {
     if (!badTokens.length) return;
+
+    const hashes = badTokens.map(makeTokenHash);
 
     await PushToken.update(
         { isActive: false },
         {
             where: {
-                token: badTokens,
+                tokenHash: hashes,
             },
         }
     );
+
+    console.warn("PUSH BAD TOKENS DEACTIVATED:", {
+        count: badTokens.length,
+        tokenStarts: badTokens.map((t) => String(t).slice(0, 20)),
+    });
 }
 
 async function sendPushToUser({
@@ -46,7 +60,20 @@ async function sendPushToUser({
             userId,
             isActive: true,
         },
-        attributes: ["id", "token", "platform"],
+        attributes: ["id", "token", "tokenHash", "platform", "deviceId", "lastSeenAt"],
+    });
+
+    console.log("PUSH TOKENS FOUND:", {
+        userId,
+        count: rows.length,
+        tokens: rows.map((r) => ({
+            id: r.id,
+            platform: r.platform,
+            deviceId: r.deviceId,
+            tokenLen: r.token ? String(r.token).length : 0,
+            tokenStart: r.token ? String(r.token).slice(0, 20) : null,
+            lastSeenAt: r.lastSeenAt,
+        })),
     });
 
     const tokens = [...new Set(rows.map((r) => r.token).filter(Boolean))];
@@ -91,6 +118,12 @@ async function sendPushToUser({
     try {
         const response = await admin.messaging().sendEach(messages);
 
+        console.log("PUSH SEND RESULT:", {
+            userId,
+            successCount: response.successCount,
+            failureCount: response.failureCount,
+        });
+
         response.responses.forEach((r, idx) => {
             if (!r.success) {
                 const code = r.error?.code || "";
@@ -103,8 +136,15 @@ async function sendPushToUser({
                     badTokens.push(tokens[idx]);
                 }
 
-                console.error("push send error:", code, r.error?.message);
-            }
+                console.error("push send error:", {
+                    userId,
+                    tokenId: rows[idx]?.id,
+                    platform: rows[idx]?.platform,
+                    deviceId: rows[idx]?.deviceId,
+                    tokenStart: tokens[idx]?.slice(0, 20),
+                    code,
+                    message: r.error?.message,
+                });            }
         });
 
         await deactivateBadTokens(badTokens);

@@ -108,23 +108,23 @@ const ActiveOrdersPage = () => {
     };
 
     const normalizePhoneForTel = (rawPhone) => {
-        const digits = String(rawPhone || "").replace(/\D/g, "");
+        let digits = String(rawPhone || "").replace(/\D/g, "");
 
         if (!digits) return null;
 
-        // 89123456789 -> +79123456789
+        // 8 978 003-29-78 -> 79780032978
         if (digits.length === 11 && digits.startsWith("8")) {
-            return `+7${digits.slice(1)}`;
+            digits = `7${digits.slice(1)}`;
         }
 
-        // 79123456789 -> +79123456789
+        // 9780032978 -> 79780032978
+        if (digits.length === 10) {
+            digits = `7${digits}`;
+        }
+
+        // Российский номер должен быть 11 цифр и начинаться с 7
         if (digits.length === 11 && digits.startsWith("7")) {
             return `+${digits}`;
-        }
-
-        // 9123456789 -> +79123456789
-        if (digits.length === 10) {
-            return `+7${digits}`;
         }
 
         return null;
@@ -138,7 +138,10 @@ const ActiveOrdersPage = () => {
             return;
         }
 
-        window.location.href = `tel:${phoneForTel}`;
+        console.log("CALL RAW PHONE:", rawPhone);
+        console.log("CALL NORMALIZED PHONE:", phoneForTel);
+
+        window.location.href = `tel:${encodeURIComponent(phoneForTel)}`;
     };
 
     const buildCompletionPayload = ({ order, orderType }) => {

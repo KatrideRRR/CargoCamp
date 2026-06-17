@@ -589,7 +589,23 @@ export const ModalProvider = ({ children }) => {
 
             });
 
-            if (cancelledNotification) {
+            const isNotificationFresh = (n, maxAgeMs = 2 * 60 * 1000) => {
+                const raw =
+                    n?.createdAt ||
+                    n?.created_at ||
+                    n?.data?.createdAt ||
+                    n?.data?.created_at;
+
+                if (!raw) return false;
+
+                const ts = new Date(raw).getTime();
+
+                if (!Number.isFinite(ts)) return false;
+
+                return Date.now() - ts <= maxAgeMs;
+            };
+
+            if (cancelledNotification && isNotificationFresh(cancelledNotification)) {
                 openExpressCancelledModal({
                     orderId: cancelledNotification.orderId || cancelledNotification?.data?.orderId,
                     title: cancelledNotification.title || "Экспресс-заказ отменён",

@@ -1378,8 +1378,6 @@ router.post("/express-orders/:id/cancel", authenticateToken, async (req, res) =>
                     status: order.status,
                     cancelledAt: order.cancelledAt,
                 },
-                socketEvent: "expressOrderCancelled",
-                socketPayload,
             });
         }
 

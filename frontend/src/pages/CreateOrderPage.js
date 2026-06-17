@@ -64,6 +64,48 @@ function parseYandexGeocoderSuggestions(data) {
         .filter(Boolean);
 }
 
+async function geocodeAddressYandex({ address, apiKey }) {
+    if (!apiKey) throw new Error("No Yandex API key");
+
+    const q = String(address || "").trim();
+
+    if (q.length < 3) {
+        return null;
+    }
+
+    const url =
+        `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}` +
+        `&geocode=${encodeURIComponent(q)}` +
+        `&format=json&results=1&kind=house`;
+
+    const r = await fetch(url);
+    const data = await r.json();
+
+    const first =
+        data?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
+
+    const text =
+        first?.metaDataProperty?.GeocoderMetaData?.text ||
+        first?.name ||
+        null;
+
+    const pos = first?.Point?.pos; // "lon lat"
+
+    if (!text || !pos) return null;
+
+    const [lng, lat] = pos.split(" ").map(Number);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return null;
+    }
+
+    return {
+        address: text,
+        lat,
+        lng,
+    };
+}
+
 // reverse geocode через Yandex Geocoder: geocode=lng,lat
 async function reverseGeocodeYandex({ lat, lng, apiKey }) {
     if (!apiKey) throw new Error("No Yandex API key");
@@ -175,7 +217,29 @@ function CreateOrderPage() {
 
                 if (loc.locationAddress && !looksLikeCoordsString(loc.locationAddress)) {
                     setFormData((p) => ({ ...p, address: loc.locationAddress }));
-                    if (hasCoords) setMarkerPosition([lat, lng]);
+
+                    if (hasCoords) {
+                        setMarkerPosition([lat, lng]);
+                        return;
+                    }
+
+                    setAddrResolving(true);
+                    setAddrResolveError(null);
+
+                    const resolved = await geocodeAddressYandex({
+                        address: loc.locationAddress,
+                        apiKey: YM_KEY,
+                    });
+
+                    if (resolved) {
+                        setFormData((p) => ({ ...p, address: resolved.address }));
+                        setMarkerPosition([resolved.lat, resolved.lng]);
+                        setAddrResolving(false);
+                        return;
+                    }
+
+                    setAddrResolving(false);
+                    setAddrResolveError("Адрес из профиля найден, но координаты не определены. Выберите адрес из подсказки, GPS или на карте.");
                     return;
                 }
 
@@ -651,7 +715,28 @@ function CreateOrderPage() {
 
                                                         if (addr && !looksLikeCoordsString(addr)) {
                                                             setFormData((p) => ({ ...p, address: addr }));
-                                                            if (hasCoords) setMarkerPosition([lat, lng]);
+
+                                                            if (hasCoords) {
+                                                                setMarkerPosition([lat, lng]);
+                                                                return;
+                                                            }
+
+                                                            setAddrResolving(true);
+
+                                                            const resolved = await geocodeAddressYandex({
+                                                                address: addr,
+                                                                apiKey: YM_KEY,
+                                                            });
+
+                                                            setAddrResolving(false);
+
+                                                            if (resolved) {
+                                                                setFormData((p) => ({ ...p, address: resolved.address }));
+                                                                setMarkerPosition([resolved.lat, resolved.lng]);
+                                                                return;
+                                                            }
+
+                                                            setAddrResolveError("Адрес из профиля есть, но координаты не найдены. Выберите адрес из подсказки, GPS или на карте.");
                                                             return;
                                                         }
 
