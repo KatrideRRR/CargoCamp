@@ -1024,7 +1024,7 @@ const ProfilePage = () => {
     }
 
     return (
-        <div className={`profile-page profile-page--${platform}`}>
+        <div className={`profile-page profile-page--${platform} ${platform === "ios" ? "ios-safe-top ios-safe-bottom" : ""}`}>
             <div className="profile-shell">
                 <div className="profile-header glass">
                     <div className="profile-header-top">

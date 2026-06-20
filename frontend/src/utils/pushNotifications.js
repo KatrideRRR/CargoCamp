@@ -6,6 +6,7 @@ import axiosInstance from "./axiosInstance";
 let pushInitialized = false;
 let pushInitializing = false;
 let pushInitializedUserId = null;
+let lastSavedPushToken = null;
 
 function getPushPlatform() {
     const p = Capacitor.getPlatform();
@@ -116,6 +117,11 @@ async function savePushTokenToBackend(pushToken) {
         return;
     }
 
+    if (lastSavedPushToken === pushToken) {
+        console.log("Push token already saved in this session, skip");
+        return;
+    }
+
     const platform = getPushPlatform();
 
     const res = await axiosInstance.post("/push/register", {
@@ -124,6 +130,8 @@ async function savePushTokenToBackend(pushToken) {
         deviceId: `${platform}-${pushToken.slice(0, 16)}`,
         appVersion: process.env.REACT_APP_VERSION || null,
     });
+
+    lastSavedPushToken = pushToken;
 
     console.log("Push token saved:", res.data);
 }

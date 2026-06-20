@@ -40,12 +40,25 @@ body,
 
 /* platform */
 
+.chat-page--ios {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
 .chat-page--ios .chat-container {
-    padding-top: env(safe-area-inset-top);
+    height: 100dvh;
+    min-height: 100dvh;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.chat-page--ios .chat-header {
+    padding-top: calc(8px + env(safe-area-inset-top, 0px));
+    min-height: calc(62px + env(safe-area-inset-top, 0px));
 }
 
 .chat-page--ios .chat-input-container {
-    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
 }
 
 .chat-page--android .chat-header {
@@ -609,7 +622,7 @@ body,
     }
 
     .chat-input-container {
-        padding: 7px 10px calc(7px + env(safe-area-inset-bottom));
+        padding: 7px 10px 7px;
         gap: 7px;
     }
 
@@ -624,6 +637,17 @@ body,
         min-width: 46px;
         height: 46px;
         font-size: 21px;
+    }
+}
+
+@media (max-width: 768px) {
+    .chat-page--ios .chat-input-container {
+        padding: 7px 10px calc(7px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .chat-page--android .chat-input-container,
+    .chat-page--web .chat-input-container {
+        padding: 7px 10px 7px;
     }
 }
 
@@ -839,4 +863,26 @@ body,
 
 .chat-page--android .chat-dispute-submit {
     box-shadow: none;
+}
+
+.chat-input-container {
+    position: relative;
+    z-index: 10;
+}
+
+.chat-input {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.chat-input:focus {
+    scroll-margin-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+}
+
+.chat-page--ios .chat-messages {
+    padding-bottom: 12px;
+}
+
+.chat-page--ios .chat-send-button {
+    margin-bottom: 0;
 }
