@@ -6,6 +6,7 @@ import styles from "../styles/MyOrdersPage.module.css";
 import { AuthContext } from "../utils/authContext";
 import Modal from "react-modal";
 import { FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity } from "react-icons/fa";
+import { Capacitor } from "@capacitor/core";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -24,6 +25,22 @@ const MyOrdersPage = () => {
     const location = useLocation();
     const { hasNewRequests, setHasNewRequests } = useContext(AuthContext);
     const navigate = useNavigate();
+
+    const platform = useMemo(() => {
+        const params = new URLSearchParams(window.location.search);
+        const forcedPlatform = params.get("platform");
+
+        if (forcedPlatform === "ios") return "ios";
+        if (forcedPlatform === "android") return "android";
+        if (forcedPlatform === "web") return "web";
+
+        const currentPlatform = Capacitor.getPlatform();
+
+        if (currentPlatform === "ios") return "ios";
+        if (currentPlatform === "android") return "android";
+
+        return "web";
+    }, []);
 
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -389,7 +406,7 @@ const MyOrdersPage = () => {
     };
 
     return (
-        <div className={styles.container}>
+        <div className={`${styles.container} ${platform === "ios" ? styles.iosContainer : ""}`}>
             <div className={styles.ordersWrapper}>
                 {/* Top bar */}
                 <div className={styles.topBar}>

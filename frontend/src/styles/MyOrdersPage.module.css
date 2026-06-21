@@ -981,3 +981,21 @@
         width: 100%;
     }
 }
+
+/* ===== iOS safe-area for MyOrdersPage ===== */
+
+.iosContainer {
+    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(var(--bottom-nav-h) + 18px + env(safe-area-inset-bottom, 0px));
+}
+
+.iosContainer .topBar {
+    margin-top: 0;
+}
+
+@media (max-width: 640px) {
+    .iosContainer {
+        padding-top: calc(12px + env(safe-area-inset-top, 0px));
+        padding-bottom: calc(var(--bottom-nav-h) + 18px + env(safe-area-inset-bottom, 0px));
+    }
+}

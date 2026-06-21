@@ -55,6 +55,26 @@ function formatDatePill(value) {
     });
 }
 
+function normalizePhoneForTel(rawPhone) {
+    let digits = String(rawPhone || "").replace(/\D/g, "");
+
+    if (!digits) return null;
+
+    if (digits.length === 11 && digits.startsWith("8")) {
+        digits = `7${digits.slice(1)}`;
+    }
+
+    if (digits.length === 10) {
+        digits = `7${digits}`;
+    }
+
+    if (digits.length === 11 && digits.startsWith("7")) {
+        return `+${digits}`;
+    }
+
+    return null;
+}
+
 const ChatPage = () => {
     const params = useParams();
     const orderId = params.orderId;
@@ -280,14 +300,14 @@ const ChatPage = () => {
     };
 
     const handleCallUser = () => {
-        const phone = selectedUser?.phone;
+        const phoneForTel = normalizePhoneForTel(selectedUser?.phone);
 
-        if (!phone) {
-            alert("Телефон пользователя не найден");
+        if (!phoneForTel) {
+            alert("Некорректный номер телефона");
             return;
         }
 
-        window.open(`tel:${phone}`);
+        window.location.href = `tel:${encodeURIComponent(phoneForTel)}`;
     };
 
     const handleRouteClick = () => {

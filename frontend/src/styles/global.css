@@ -121,26 +121,18 @@ select {
     --safe-right: env(safe-area-inset-right, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
     --safe-left: env(safe-area-inset-left, 0px);
+
+    --app-header-safe-top: calc(12px + var(--safe-top));
+    --app-bottom-safe: calc(12px + var(--safe-bottom));
 }
 
 @supports (padding-top: env(safe-area-inset-top)) {
     .orders-page--ios,
     .active-orders--ios,
     .create-order-page,
-    .my-orders-page,
     .order-history-page {
         padding-top: calc(14px + env(safe-area-inset-top, 0px));
     }
-}
-
-:root {
-    --safe-top: env(safe-area-inset-top, 0px);
-    --safe-right: env(safe-area-inset-right, 0px);
-    --safe-bottom: env(safe-area-inset-bottom, 0px);
-    --safe-left: env(safe-area-inset-left, 0px);
-
-    --app-header-safe-top: calc(12px + var(--safe-top));
-    --app-bottom-safe: calc(12px + var(--safe-bottom));
 }
 
 .ios-safe-top {
