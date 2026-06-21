@@ -1007,3 +1007,33 @@
     .create-page .timeChipValue{ font-size: 11.5px; }
 }
 
+/* ===== iOS / mobile bottom nav fix ===== */
+.create-page {
+    padding-top: calc(14px + env(safe-area-inset-top, 0px)) !important;
+}
+
+.create-page {
+    padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.create-shell {
+    padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.bottomActions {
+    margin-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+@media (max-width: 768px) {
+    .create-page {
+        padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+    .create-shell {
+        padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+    .bottomActions {
+        margin-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+}

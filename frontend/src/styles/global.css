@@ -147,3 +147,26 @@ select {
     padding-left: max(12px, var(--safe-left));
     padding-right: max(12px, var(--safe-right));
 }
+
+/* ===== Global page bottom reserve for fixed bottom menu ===== */
+
+:root {
+    --bottom-menu-height: 92px;
+    --bottom-menu-safe-gap: env(safe-area-inset-bottom, 0px);
+}
+
+body:not(.hide-bottom-menu) .page,
+body:not(.hide-bottom-menu) .create-page,
+body:not(.hide-bottom-menu) .orders-page,
+body:not(.hide-bottom-menu) .orders-page--ios,
+body:not(.hide-bottom-menu) .active-orders,
+body:not(.hide-bottom-menu) .active-orders--ios,
+body:not(.hide-bottom-menu) .profile-page,
+body:not(.hide-bottom-menu) .order-history-page,
+body:not(.hide-bottom-menu) .order-history-page--ios {
+    padding-bottom: calc(var(--bottom-menu-height) + 40px + var(--bottom-menu-safe-gap)) !important;
+}
+
+body.hide-bottom-menu .bottom-menu {
+    display: none !important;
+}

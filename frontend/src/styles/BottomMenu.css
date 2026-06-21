@@ -33,25 +33,43 @@
 ========================= */
 
 .bottom-menu {
-    position: fixed;
+    position: fixed !important;
+
     left: 10px;
     right: 10px;
-    bottom: var(--bm-bottom);
+    bottom: 0 !important;
+    top: auto !important;
 
-    height: 70px;
+    height: calc(74px + env(safe-area-inset-bottom, 0px));
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
 
-    z-index: 1000;
+    z-index: 9990;
     color: var(--bm-text);
 
     -webkit-tap-highlight-color: transparent;
     user-select: none;
+
+    pointer-events: none;
+
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+
+    contain: layout paint style;
+    isolation: isolate;
 }
 
 .bottom-menu__shell {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: calc(var(--bm-bottom) + env(safe-area-inset-bottom, 0px));
+
+    pointer-events: auto;
 
     height: var(--bm-shell-h);
 
@@ -200,7 +218,9 @@
 .bottom-menu__center {
     position: absolute;
     left: 50%;
-    bottom: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+
+    pointer-events: auto;
 
     width: var(--bm-center-size);
     height: var(--bm-center-size);
@@ -392,7 +412,7 @@
 }
 
 .bottom-menu--ios .bottom-menu__center {
-    bottom: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
 
     background:
             linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.82));
@@ -523,16 +543,6 @@
 
 .bottom-menu--web .bottom-menu__center:active {
     transform: translateX(-50%) scale(0.97);
-}
-
-/* =========================
-   Safe Area
-========================= */
-
-@supports (padding: env(safe-area-inset-bottom)) {
-    .bottom-menu {
-        bottom: calc(var(--bm-bottom) + env(safe-area-inset-bottom));
-    }
 }
 
 /* =========================
