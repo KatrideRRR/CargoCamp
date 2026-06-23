@@ -8,6 +8,7 @@ import PullToRefresh from "./components/PullToRefresh";
 import { socket, connectSocket } from "./socketClient";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { runAppVersionMigration } from "./utils/appVersionMigration";
 
 import { AuthProvider } from "./utils/authContext";
 import { UserProvider } from './utils/userContext';
@@ -400,6 +401,8 @@ function App() {
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
+
+runAppVersionMigration();
 
 root.render(
     <Router>
