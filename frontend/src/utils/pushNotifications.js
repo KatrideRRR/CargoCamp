@@ -17,12 +17,60 @@ function getPushPlatform() {
     return "web";
 }
 
-function navigateFromPush(data, navigate) {
-    if (!data || !navigate) return;
+function buildActiveOrdersUrl({
+                                  view = "created",
+                                  orderId = "",
+                                  orderType = "regular",
+                                  reason = "",
+                              } = {}) {
+    const params = new URLSearchParams();
+
+    params.set("view", view);
+
+    if (orderId) {
+        params.set("orderId", String(orderId));
+    }
+
+    if (orderType) {
+        params.set("orderType", String(orderType));
+    }
+
+    if (reason) {
+        params.set("reason", String(reason));
+    }
+
+    return `/active-orders?${params.toString()}`;
+}
+
+function normalizePushData(raw = {}) {
+    const data = { ...(raw || {}) };
+
+    // На всякий случай, если где-то прилетит вложенная строка JSON
+    if (typeof data.data === "string") {
+        try {
+            Object.assign(data, JSON.parse(data.data));
+        } catch {}
+    }
+
+    return data;
+}
+
+function navigateFromPush(rawData, navigate) {
+    if (!rawData || !navigate) return;
+
+    const data = normalizePushData(rawData);
 
     const type = data.type;
-    const orderId = data.orderId;
+    const orderId = data.orderId || data.expressOrderId || data.expressId;
     const orderType = data.orderType || "regular";
+
+    console.log("NAVIGATE FROM PUSH:", {
+        rawData,
+        data,
+        type,
+        orderId,
+        orderType,
+    });
 
     if (type === "new_message" && orderId) {
         navigate(`/messages/${orderType}/${orderId}`);
@@ -64,13 +112,43 @@ function navigateFromPush(data, navigate) {
             })
         );
 
-        navigate("/active-orders?reviewFromPush=1");
+        const currentUserRaw = localStorage.getItem("user");
+        let currentUserId = null;
+
+        try {
+            const currentUser = currentUserRaw ? JSON.parse(currentUserRaw) : null;
+            currentUserId = currentUser?.id ? Number(currentUser.id) : null;
+        } catch {}
+
+        const isExecutor =
+            currentUserId &&
+            data.executorId &&
+            Number(data.executorId) === Number(currentUserId);
+
+        navigate(
+            buildActiveOrdersUrl({
+                view: isExecutor ? "performing" : "created",
+                orderId,
+                orderType,
+                reason: "review_needed",
+            }) + "&reviewFromPush=1"
+        );
+
+        setTimeout(() => {
+
+            window.dispatchEvent(new CustomEvent("openReviewFromPush"));
+
+        }, 700);
+
         return;
     }
 
+    /**
+     * Заказчик получает такие пуши, когда его заказ уже выполняют.
+     * Нужно открыть вкладку "Мои заказы выполняют".
+     */
     if (
         [
-            "order_request_approved",
             "order_started",
             "order_completion_requested",
             "order_completion_reminder",
@@ -81,10 +159,39 @@ function navigateFromPush(data, navigate) {
             "express_cancelled",
         ].includes(type)
     ) {
-        navigate("/active-orders");
+        navigate(
+            buildActiveOrdersUrl({
+                view: "created",
+                orderId,
+                orderType,
+                reason: type,
+            })
+        );
+
         return;
     }
 
+    /**
+     * Исполнитель получает это, когда его выбрали.
+     * Нужно открыть вкладку "Я выполняю".
+     */
+    if (type === "order_request_approved") {
+        navigate(
+            buildActiveOrdersUrl({
+                view: "performing",
+                orderId,
+                orderType,
+                reason: type,
+            })
+        );
+
+        return;
+    }
+
+    /**
+     * Заказчик получил новый отклик.
+     * Его отправляем в "Мои заказы".
+     */
     if (type === "order_request") {
         const userRaw = localStorage.getItem("user");
 
@@ -106,9 +213,25 @@ function navigateFromPush(data, navigate) {
         return;
     }
 
-    if (orderType === "regular" && orderId) {
-        navigate(`/order/${orderId}`);
+    /**
+     * Fallback.
+     * Если тип неизвестный, но это активный express/regular заказ,
+     * лучше открыть active-orders, а не профиль.
+     */
+    if (orderId) {
+        navigate(
+            buildActiveOrdersUrl({
+                view: "created",
+                orderId,
+                orderType,
+                reason: type || "unknown_push",
+            })
+        );
+
+        return;
     }
+
+    navigate("/profile");
 }
 
 async function savePushTokenToBackend(pushToken) {
@@ -252,22 +375,6 @@ export async function initPushNotifications({ navigate, userId } = {}) {
                 });
             } catch (e) {
                 console.error("Local notification foreground error:", e);
-            }
-
-            if (data.type === "review_needed" && data.orderId) {
-                localStorage.setItem(
-                    "pendingReviewFromPush",
-                    JSON.stringify({
-                        orderId: data.orderId,
-                        orderType: data.orderType || "regular",
-                        creatorId: data.creatorId || "",
-                        executorId: data.executorId || "",
-                        type: data.type,
-                        openedAt: Date.now(),
-                    })
-                );
-
-                window.dispatchEvent(new CustomEvent("openReviewFromPush"));
             }
         });
 

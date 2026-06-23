@@ -199,13 +199,19 @@ export const ModalProvider = ({ children }) => {
     };
 
     const openReviewFromPushPayload = (payload) => {
-        if (!payload?.orderId) return;
+        if (!payload?.orderId) return false;
 
         const orderId = payload.orderId;
         const orderType = payload.orderType || "regular";
 
-        if (!shouldRemindReview(orderId, orderType)) {
-            return;
+        // ВАЖНО:
+        // При клике по пушу НЕ используем shouldRemindReview.
+        // shouldRemindReview может заблокировать открытие на 24 часа,
+        // если напоминание уже показывалось.
+        // Но если пользователь сам нажал пуш — модалку надо открыть.
+        if (hasSubmittedReview(orderId, orderType)) {
+            toast.info("Вы уже оставили отзыв по этому заказу");
+            return false;
         }
 
         const creatorId = payload.creatorId;
@@ -213,7 +219,7 @@ export const ModalProvider = ({ children }) => {
 
         if (!creatorId || !executorId) {
             console.warn("review push payload without creatorId/executorId:", payload);
-            return;
+            return false;
         }
 
         openReviewFromCompletion(
@@ -224,6 +230,8 @@ export const ModalProvider = ({ children }) => {
         );
 
         markReminded(orderId, orderType);
+
+        return true;
     };
 
     useEffect(() => {
@@ -235,8 +243,15 @@ export const ModalProvider = ({ children }) => {
 
             try {
                 const payload = JSON.parse(raw);
-                localStorage.removeItem("pendingReviewFromPush");
-                openReviewFromPushPayload(payload);
+
+                const opened = openReviewFromPushPayload(payload);
+
+                // Удаляем только если реально открыли модалку
+                // или если отзыв уже был отправлен.
+                // Иначе не теряем payload раньше времени.
+                if (opened || hasSubmittedReview(payload?.orderId, payload?.orderType || "regular")) {
+                    localStorage.removeItem("pendingReviewFromPush");
+                }
             } catch (e) {
                 console.error("openReviewFromPush error:", e);
                 localStorage.removeItem("pendingReviewFromPush");
@@ -245,8 +260,8 @@ export const ModalProvider = ({ children }) => {
 
         window.addEventListener("openReviewFromPush", openPendingReview);
 
-        // на случай перехода с пуша
-        openPendingReview();
+        // на случай холодного запуска приложения по пушу
+        setTimeout(openPendingReview, 500);
 
         return () => {
             window.removeEventListener("openReviewFromPush", openPendingReview);
