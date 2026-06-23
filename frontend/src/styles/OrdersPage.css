@@ -2623,3 +2623,17 @@
 .orders-page--ios {
     padding-top: calc(14px + env(safe-area-inset-top, 0px));
 }
+
+.orders-page,
+.orders-list,
+.orders-container {
+    padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+@media (max-width: 768px) {
+    .orders-page,
+    .orders-list,
+    .orders-container {
+        padding-bottom: calc(165px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+}

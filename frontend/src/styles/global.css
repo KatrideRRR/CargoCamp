@@ -76,17 +76,6 @@ a {
     }
 }
 
-body.hide-bottom-menu .bottom-menu,
-body.hide-bottom-menu .bottom-navigation,
-body.hide-bottom-menu .bottom-nav,
-body.hide-bottom-menu .mobile-bottom-menu {
-    display: none !important;
-}
-
-body.hide-bottom-menu .page {
-    padding-bottom: 0 !important;
-}
-
 /* iOS WebView/Safari: запрет авто-зума при фокусе на полях */
 @supports (-webkit-touch-callout: none) {
     input,
@@ -148,11 +137,11 @@ select {
     padding-right: max(12px, var(--safe-right));
 }
 
-/* ===== Global page bottom reserve for fixed bottom menu ===== */
+/* ===== App fixed bottom menu reserve ===== */
 
 :root {
-    --bottom-menu-height: 92px;
-    --bottom-menu-safe-gap: env(safe-area-inset-bottom, 0px);
+    --app-bottom-menu-height: 98px;
+    --app-bottom-menu-safe: env(safe-area-inset-bottom, 0px);
 }
 
 body:not(.hide-bottom-menu) .page,
@@ -164,7 +153,7 @@ body:not(.hide-bottom-menu) .active-orders--ios,
 body:not(.hide-bottom-menu) .profile-page,
 body:not(.hide-bottom-menu) .order-history-page,
 body:not(.hide-bottom-menu) .order-history-page--ios {
-    padding-bottom: calc(var(--bottom-menu-height) + 40px + var(--bottom-menu-safe-gap)) !important;
+    padding-bottom: calc(var(--app-bottom-menu-height) + var(--app-bottom-menu-safe)) !important;
 }
 
 body.hide-bottom-menu .bottom-menu {

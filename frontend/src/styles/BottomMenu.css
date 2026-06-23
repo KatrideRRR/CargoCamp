@@ -1,46 +1,34 @@
 :root {
+    --bm-left: 14px;
+    --bm-right: 14px;
     --bm-bottom: 8px;
 
-    --bm-shell-h: 62px;
-    --bm-shell-radius: 22px;
-
-    --bm-center-size: 58px;
-    --bm-center-radius: 21px;
-
-    --bm-notch-w: 78px;
-    --bm-notch-h: 36px;
+    --bm-shell-h: 66px;
+    --bm-center-size: 62px;
 
     --bm-text: rgba(15, 23, 42, 0.72);
     --bm-muted: rgba(100, 116, 139, 0.88);
 
     --bm-active: #2563eb;
-    --bm-active-dark: #1d4ed8;
-    --bm-active-soft: rgba(37, 99, 235, 0.1);
+    --bm-active-soft: rgba(37, 99, 235, 0.11);
 
     --bm-danger: #ef4444;
-    --bm-danger-border: #ffffff;
-
-    --bm-bg: rgba(255, 255, 255, 0.96);
+    --bm-bg: rgba(255, 255, 255, 0.94);
     --bm-border: rgba(15, 23, 42, 0.08);
-
-    --bm-page-bg: #f4f6f8;
 
     --bm-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* =========================
-   Общая конструкция
-========================= */
+/* ===== root fixed layer ===== */
 
 .bottom-menu {
     position: fixed !important;
-
-    left: 10px;
-    right: 10px;
-    bottom: 0 !important;
+    left: var(--bm-left);
+    right: var(--bm-right);
+    bottom: var(--bm-bottom) !important;
     top: auto !important;
 
-    height: calc(74px + env(safe-area-inset-bottom, 0px));
+    height: 82px;
     max-width: 720px;
     margin-left: auto;
     margin-right: auto;
@@ -53,88 +41,59 @@
 
     pointer-events: none;
 
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
 
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
-
-    contain: layout paint style;
-    isolation: isolate;
 }
+
+/* iOS: чуть выше home indicator, но не на пол-экрана */
+.bottom-menu--ios {
+    bottom: calc(6px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* Android: без safe-area, чтобы центральная кнопка не уезжала */
+.bottom-menu--android {
+    bottom: 8px !important;
+}
+
+/* ===== shell ===== */
 
 .bottom-menu__shell {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: calc(var(--bm-bottom) + env(safe-area-inset-bottom, 0px));
-
-    pointer-events: auto;
+    bottom: 0;
 
     height: var(--bm-shell-h);
 
     display: grid;
-    grid-template-columns: 1fr 1fr var(--bm-notch-w) 1fr 1fr;
+    grid-template-columns: 1fr 1fr 78px 1fr 1fr;
     align-items: center;
     gap: 3px;
 
     padding: 5px;
 
-    border-radius: var(--bm-shell-radius);
+    border-radius: 24px;
     border: 1px solid var(--bm-border);
     background: var(--bm-bg);
 
     box-shadow:
-            0 -5px 16px rgba(15, 23, 42, 0.08),
-            0 4px 14px rgba(15, 23, 42, 0.05);
+            0 -8px 26px rgba(15, 23, 42, 0.10),
+            0 8px 24px rgba(15, 23, 42, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 0.78);
 
-    overflow: hidden;
+    backdrop-filter: blur(20px) saturate(1.35);
+    -webkit-backdrop-filter: blur(20px) saturate(1.35);
+
+    overflow: visible;
+    pointer-events: auto;
 }
 
-/* =========================
-   Ямка под центральную кнопку
-========================= */
-
+/* Убираем старую ямку, она давала странные углы */
 .bottom-menu__notch {
-    position: absolute;
-    left: 50%;
-    top: -1px;
-
-    width: var(--bm-notch-w);
-    height: var(--bm-notch-h);
-
-    transform: translateX(-50%);
-
-    border-bottom-left-radius: 999px;
-    border-bottom-right-radius: 999px;
-
-    background:
-            radial-gradient(circle at 50% 0%, rgba(15, 23, 42, 0.08), transparent 62%),
-            linear-gradient(180deg, rgba(15, 23, 42, 0.055), rgba(15, 23, 42, 0));
-
-    pointer-events: none;
-    z-index: 0;
-}
-
-.bottom-menu__notch::before {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: -20px;
-
-    width: calc(var(--bm-notch-w) + 18px);
-    height: calc(var(--bm-notch-w) + 18px);
-
-    transform: translateX(-50%);
-
-    border-radius: 999px;
-    background: var(--bm-page-bg);
-
-    box-shadow:
-            inset 0 -1px 0 rgba(255, 255, 255, 0.75),
-            0 8px 18px rgba(15, 23, 42, 0.05);
-
-    z-index: -1;
+    display: none !important;
 }
 
 .bottom-menu__spacer {
@@ -143,9 +102,7 @@
     pointer-events: none;
 }
 
-/* =========================
-   Обычные кнопки
-========================= */
+/* ===== buttons ===== */
 
 .bottom-menu__item,
 .bottom-menu__center {
@@ -165,19 +122,25 @@
     justify-content: center;
 
     -webkit-tap-highlight-color: transparent;
+    pointer-events: auto;
 }
 
 .bottom-menu__item {
     min-width: 0;
-    height: 50px;
+    height: 52px;
 
-    border-radius: 16px;
+    border-radius: 17px;
 
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
 
     z-index: 2;
     overflow: hidden;
+
+    transition:
+            transform 140ms var(--bm-ease),
+            background 140ms var(--bm-ease),
+            color 140ms var(--bm-ease);
 }
 
 .bottom-menu__icon-wrap {
@@ -195,9 +158,9 @@
 }
 
 .bottom-menu__label {
-    font-size: 9.5px;
+    font-size: 10px;
     line-height: 1;
-    font-weight: 750;
+    font-weight: 800;
     letter-spacing: -0.015em;
     color: var(--bm-muted);
 }
@@ -211,23 +174,19 @@
     color: var(--bm-active);
 }
 
-/* =========================
-   Центральная светлая кнопка
-========================= */
+/* ===== center button ===== */
 
 .bottom-menu__center {
     position: absolute;
     left: 50%;
-    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
-
-    pointer-events: auto;
+    bottom: 12px;
 
     width: var(--bm-center-size);
     height: var(--bm-center-size);
 
     transform: translateX(-50%);
 
-    border-radius: var(--bm-center-radius);
+    border-radius: 24px;
 
     color: #2563eb;
 
@@ -235,16 +194,21 @@
             radial-gradient(circle at 35% 18%, rgba(255, 255, 255, 1), transparent 34%),
             linear-gradient(180deg, #ffffff 0%, #f8fbff 48%, #eef6ff 100%);
 
-    border: 1px solid rgba(147, 197, 253, 0.58);
+    border: 1px solid rgba(147, 197, 253, 0.62);
 
     box-shadow:
-            0 10px 22px rgba(37, 99, 235, 0.16),
-            0 4px 12px rgba(15, 23, 42, 0.08),
+            0 12px 26px rgba(37, 99, 235, 0.18),
+            0 5px 14px rgba(15, 23, 42, 0.10),
             inset 0 1px 0 rgba(255, 255, 255, 1),
             inset 0 -1px 0 rgba(191, 219, 254, 0.36);
 
-    z-index: 4;
+    z-index: 5;
     overflow: visible;
+
+    transition:
+            transform 140ms var(--bm-ease),
+            box-shadow 140ms var(--bm-ease),
+            background 140ms var(--bm-ease);
 }
 
 .bottom-menu__center::after {
@@ -252,7 +216,7 @@
     position: absolute;
     inset: 5px;
 
-    border-radius: calc(var(--bm-center-radius) - 5px);
+    border-radius: 19px;
 
     background:
             linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.86));
@@ -289,9 +253,7 @@
 .bottom-menu__center-icon {
     position: relative;
     z-index: 2;
-
     stroke-width: 2.05;
-
     color: #2563eb;
 
     filter:
@@ -309,34 +271,17 @@
     border-color: rgba(96, 165, 250, 0.72);
 
     box-shadow:
-            0 12px 24px rgba(37, 99, 235, 0.2),
-            0 5px 13px rgba(15, 23, 42, 0.08),
+            0 14px 28px rgba(37, 99, 235, 0.22),
+            0 6px 15px rgba(15, 23, 42, 0.10),
             inset 0 1px 0 rgba(255, 255, 255, 1),
             inset 0 -1px 0 rgba(147, 197, 253, 0.42);
 }
 
-.bottom-menu__center.is-active::after {
-    background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(219, 234, 254, 0.9));
-
-    border-color: rgba(191, 219, 254, 1);
-
-    box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 1),
-            inset 0 -6px 12px rgba(37, 99, 235, 0.06);
+.bottom-menu__center:active {
+    transform: translateX(-50%) scale(0.97);
 }
 
-.bottom-menu__center.is-active .bottom-menu__center-icon {
-    color: #1d4ed8;
-
-    filter:
-            drop-shadow(0 1px 0 rgba(255, 255, 255, 0.95))
-            drop-shadow(0 4px 7px rgba(37, 99, 235, 0.16));
-}
-
-/* =========================
-   Badge
-========================= */
+/* ===== badge ===== */
 
 .bottom-menu__badge {
     position: absolute;
@@ -352,7 +297,7 @@
     justify-content: center;
 
     border-radius: 999px;
-    border: 2px solid var(--bm-danger-border);
+    border: 2px solid #ffffff;
     background: var(--bm-danger);
     color: #ffffff;
 
@@ -361,7 +306,7 @@
     font-weight: 900;
 
     box-shadow: 0 5px 12px rgba(239, 68, 68, 0.35);
-    z-index: 5;
+    z-index: 6;
 }
 
 .bottom-menu__center .bottom-menu__badge {
@@ -369,196 +314,47 @@
     right: -8px;
 }
 
-/* =========================
-   iOS
-========================= */
-
-.bottom-menu--ios {
-    --bm-bottom: 10px;
-    --bm-shell-h: 64px;
-    --bm-center-size: 60px;
-    --bm-center-radius: 22px;
-}
+/* ===== platform fine tune ===== */
 
 .bottom-menu--ios .bottom-menu__shell {
     background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.72)),
-            rgba(255, 255, 255, 0.76);
+            linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.78)),
+            rgba(255, 255, 255, 0.78);
 
-    border-color: rgba(255, 255, 255, 0.62);
-
-    box-shadow:
-            0 -14px 34px rgba(15, 23, 42, 0.1),
-            0 8px 22px rgba(15, 23, 42, 0.07),
-            inset 0 1px 0 rgba(255, 255, 255, 0.76);
-
-    backdrop-filter: blur(20px) saturate(1.32);
-    -webkit-backdrop-filter: blur(20px) saturate(1.32);
-}
-
-.bottom-menu--ios .bottom-menu__notch::before {
-    background: rgba(244, 246, 248, 0.82);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-}
-
-.bottom-menu--ios .bottom-menu__item,
-.bottom-menu--ios .bottom-menu__center {
-    transition:
-            transform 180ms var(--bm-ease),
-            background 180ms var(--bm-ease),
-            color 180ms var(--bm-ease),
-            box-shadow 180ms var(--bm-ease);
+    border-color: rgba(255, 255, 255, 0.66);
 }
 
 .bottom-menu--ios .bottom-menu__center {
-    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
-
-    background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.82));
-
-    border-color: rgba(255, 255, 255, 0.76);
-
-    backdrop-filter: blur(18px) saturate(1.3);
-    -webkit-backdrop-filter: blur(18px) saturate(1.3);
-
-    box-shadow:
-            0 14px 30px rgba(37, 99, 235, 0.16),
-            0 7px 16px rgba(15, 23, 42, 0.1),
-            inset 0 1px 0 rgba(255, 255, 255, 0.96),
-            inset 0 -1px 0 rgba(191, 219, 254, 0.22);
-}
-
-.bottom-menu--ios .bottom-menu__center.is-active {
-    color: #1d4ed8;
-
-    background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.88));
-
-    box-shadow:
-            0 16px 32px rgba(37, 99, 235, 0.19),
-            0 7px 16px rgba(15, 23, 42, 0.1),
-            inset 0 1px 0 rgba(255, 255, 255, 0.98),
-            inset 0 -1px 0 rgba(147, 197, 253, 0.26);
-}
-/* =========================
-   Android
-========================= */
-
-.bottom-menu--android {
-    --bm-bottom: 7px;
-    --bm-shell-h: 60px;
-    --bm-center-size: 56px;
-    --bm-center-radius: 20px;
-    --bm-notch-h: 32px;
+    bottom: 12px;
 }
 
 .bottom-menu--android .bottom-menu__shell {
     background: #ffffff;
-    border-color: rgba(15, 23, 42, 0.1);
-
-    box-shadow:
-            0 -4px 13px rgba(15, 23, 42, 0.08),
-            0 3px 10px rgba(15, 23, 42, 0.045);
+    border-color: rgba(15, 23, 42, 0.10);
 
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
 }
 
-.bottom-menu--android .bottom-menu__item {
-    height: 48px;
-    border-radius: 15px;
-
-    transition:
-            background 110ms ease,
-            color 110ms ease,
-            transform 70ms ease;
-}
-
 .bottom-menu--android .bottom-menu__center {
-    bottom: 7px;
-    border-radius: 20px;
-
-    background:
-            linear-gradient(180deg, #ffffff 0%, #f8fbff 52%, #eef6ff 100%);
-
-    border-color: rgba(147, 197, 253, 0.52);
-
-    box-shadow:
-            0 8px 16px rgba(37, 99, 235, 0.14),
-            0 3px 8px rgba(15, 23, 42, 0.07),
-            inset 0 1px 0 rgba(255, 255, 255, 1);
+    bottom: 10px;
 }
 
-.bottom-menu--android .bottom-menu__center::after {
-    inset: 5px;
-
-    background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.88));
-
-    box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 1),
-            inset 0 -4px 9px rgba(37, 99, 235, 0.04);
-}
-
-.bottom-menu--android .bottom-menu__center-shine {
-    opacity: 0.48;
-}
-
-.bottom-menu--android .bottom-menu__center.is-active {
-    color: #2563eb;
-
-    background:
-            linear-gradient(180deg, #ffffff 0%, #eff6ff 52%, #dbeafe 100%);
-
-    box-shadow:
-            0 9px 18px rgba(37, 99, 235, 0.16),
-            0 3px 8px rgba(15, 23, 42, 0.07),
-            inset 0 1px 0 rgba(255, 255, 255, 1);
-}
-
-.bottom-menu--android .bottom-menu__center.is-active::after {
-    background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(219, 234, 254, 0.88));
-}
-/* =========================
-   Web
-========================= */
-
-.bottom-menu--web .bottom-menu__item,
-.bottom-menu--web .bottom-menu__center {
-    transition:
-            background 130ms ease,
-            color 130ms ease,
-            transform 90ms ease;
-}
-
-.bottom-menu--web .bottom-menu__item:hover {
-    background: rgba(15, 23, 42, 0.04);
-}
-
-.bottom-menu--web .bottom-menu__item:active {
-    transform: scale(0.97);
-}
-
-.bottom-menu--web .bottom-menu__center:active {
-    transform: translateX(-50%) scale(0.97);
-}
-
-/* =========================
-   Маленькие экраны
-========================= */
+/* ===== small screens ===== */
 
 @media (max-width: 380px) {
     .bottom-menu {
         left: 8px;
         right: 8px;
+        height: 78px;
     }
 
     .bottom-menu__shell {
+        height: 62px;
         grid-template-columns: 1fr 1fr 70px 1fr 1fr;
         gap: 2px;
         padding: 4px;
+        border-radius: 22px;
     }
 
     .bottom-menu__label {
@@ -566,9 +362,14 @@
     }
 
     .bottom-menu__center {
-        width: 54px;
-        height: 54px;
-        border-radius: 19px;
+        width: 56px;
+        height: 56px;
+        border-radius: 21px;
+        bottom: 10px;
+    }
+
+    .bottom-menu__center::after {
+        border-radius: 16px;
     }
 }
 
@@ -576,11 +377,11 @@
     .bottom-menu {
         left: 6px;
         right: 6px;
-        height: 64px;
+        height: 72px;
     }
 
     .bottom-menu__shell {
-        height: 56px;
+        height: 58px;
         grid-template-columns: 1fr 1fr 62px 1fr 1fr;
     }
 
@@ -589,19 +390,15 @@
     }
 
     .bottom-menu__item {
-        height: 46px;
+        height: 48px;
     }
 
     .bottom-menu__center {
-        width: 52px;
-        height: 52px;
-        bottom: 6px;
+        width: 54px;
+        height: 54px;
+        bottom: 9px;
     }
 }
-
-/* =========================
-   Reduced motion
-========================= */
 
 @media (prefers-reduced-motion: reduce) {
     .bottom-menu__item,
