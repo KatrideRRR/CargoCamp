@@ -3682,6 +3682,37 @@ body {
     font-weight: 800;
 }
 
+/* =========================================================
+   ACTIVE ORDERS — final spacing fix
+   Убираем двойной нижний отступ и лишнюю пустоту
+========================================================= */
+
+.active-orders,
 .active-orders--ios {
-    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    margin: 0 !important;
+}
+
+.active-orders .pageContainer {
+    min-height: 100dvh;
+    padding: 14px !important;
+    padding-bottom: calc(86px + 8px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.active-orders--ios .pageContainer {
+    padding-top: calc(14px + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: calc(86px + 8px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+@media (max-width: 768px) {
+    .active-orders .pageContainer {
+        padding: 10px !important;
+        padding-bottom: calc(86px + 8px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+    .active-orders--ios .pageContainer {
+        padding-top: calc(10px + env(safe-area-inset-top, 0px)) !important;
+        padding-bottom: calc(86px + 8px + env(safe-area-inset-bottom, 0px)) !important;
+    }
 }

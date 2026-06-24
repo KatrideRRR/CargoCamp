@@ -182,8 +182,6 @@ body:not(.hide-bottom-menu) .create-page,
 body:not(.hide-bottom-menu) .exo-page,
 body:not(.hide-bottom-menu) .orders-page,
 body:not(.hide-bottom-menu) .orders-page--ios,
-body:not(.hide-bottom-menu) .active-orders,
-body:not(.hide-bottom-menu) .active-orders--ios,
 body:not(.hide-bottom-menu) .profile-page,
 body:not(.hide-bottom-menu) .reviewsPage,
 body:not(.hide-bottom-menu) .reviewsPage--ios,
@@ -202,30 +200,18 @@ body.hide-bottom-menu .bottom-menu {
     display: none !important;
 }
 
-/* ===== App visual scroll boundaries ===== */
+/* ===== iOS top safe-area only: НЕ ломает скролл ===== */
 
-body:not(.hide-bottom-menu) .page,
-body:not(.hide-bottom-menu) .create-page,
-body:not(.hide-bottom-menu) .exo-page,
-body:not(.hide-bottom-menu) .orders-page,
-body:not(.hide-bottom-menu) .active-orders,
-body:not(.hide-bottom-menu) .profile-page,
-body:not(.hide-bottom-menu) .reviewsPage,
-body:not(.hide-bottom-menu) .oh-page,
-body:not(.hide-bottom-menu) .info-page,
-body:not(.hide-bottom-menu) .login-page,
-body:not(.hide-bottom-menu) .register-page {
-    min-height: 100dvh;
-    overscroll-behavior: contain;
-}
-
-.orders-page--ios,
-.active-orders--ios,
-.exo-page--ios,
-.reviewsPage--ios,
-.oh-page--ios,
-.info-page--ios,
-.login-page.auth-page--ios,
-.register-page.auth-page--ios {
-    padding-top: calc(14px + env(safe-area-inset-top, 0px)) !important;
+@supports (padding-top: env(safe-area-inset-top)) {
+    .orders-page--ios,
+    .active-orders--ios,
+    .exo-page--ios,
+    .reviewsPage--ios,
+    .oh-page--ios,
+    .info-page--ios,
+    .login-page.auth-page--ios,
+    .register-page.auth-page--ios,
+    .order-history-page--ios {
+        padding-top: calc(14px + env(safe-area-inset-top, 0px)) !important;
+    }
 }

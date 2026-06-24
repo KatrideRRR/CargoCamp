@@ -54,7 +54,7 @@
     overflow-x: hidden;
 
     padding: 14px;
-    padding-bottom: calc(18px + var(--bottom-menu-height) + env(safe-area-inset-bottom));
+    padding-bottom: calc(8px + var(--bottom-menu-height) + env(safe-area-inset-bottom));
 
     background:
             radial-gradient(circle at 18% 4%, rgba(96, 165, 250, 0.18), transparent 30%),
@@ -2099,7 +2099,7 @@
 @media (max-width: 860px) {
     .orders-page {
         padding: 10px;
-        padding-bottom: calc(14px + var(--bottom-menu-height) + env(safe-area-inset-bottom));
+        padding-bottom: calc(8px + var(--bottom-menu-height) + env(safe-area-inset-bottom));
     }
 
     .orders-shell {
@@ -2622,20 +2622,6 @@
 
 .orders-page--ios {
     padding-top: calc(14px + env(safe-area-inset-top, 0px));
-}
-
-.orders-page,
-.orders-list,
-.orders-container {
-    padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)) !important;
-}
-
-@media (max-width: 768px) {
-    .orders-page,
-    .orders-list,
-    .orders-container {
-        padding-bottom: calc(165px + env(safe-area-inset-bottom, 0px)) !important;
-    }
 }
 
 /* =========================================================
