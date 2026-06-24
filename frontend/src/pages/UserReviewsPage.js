@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import axiosInstance from "../utils/axiosInstance";
 import "../styles/UserReviewsPage.css";
@@ -18,6 +19,22 @@ const Stars = ({ value = 0 }) => {
 const UserReviewsPage = () => {
     const { userId } = useParams();
     const navigate = useNavigate();
+
+    const platform = useMemo(() => {
+        const params = new URLSearchParams(window.location.search);
+        const forcedPlatform = params.get("platform");
+
+        if (forcedPlatform === "ios") return "ios";
+        if (forcedPlatform === "android") return "android";
+        if (forcedPlatform === "web") return "web";
+
+        const currentPlatform = Capacitor.getPlatform();
+
+        if (currentPlatform === "ios") return "ios";
+        if (currentPlatform === "android") return "android";
+
+        return "web";
+    }, []);
 
     const [user, setUser] = useState(null);        // профиль
     const [reviews, setReviews] = useState([]);    // отзывы на пользователя
@@ -83,7 +100,7 @@ const UserReviewsPage = () => {
     if (error) return <div className="reviewsPageState error">Ошибка: {error}</div>;
 
     return (
-        <div className="reviewsPage">
+        <div className={`reviewsPage reviewsPage--${platform}`}>
             <div className="reviewsWrap">
                 <div className="reviewsTop">
                     <button className="backBtn" onClick={() => navigate(-1)}>← Назад</button>

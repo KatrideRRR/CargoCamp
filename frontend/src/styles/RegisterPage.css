@@ -638,3 +638,34 @@
         grid-template-columns: 1fr 1fr;
     }
 }
+
+/* ===== iOS safe-area for RegisterPage ===== */
+
+.register-page.auth-page--ios {
+    padding-top: calc(18px + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: calc(var(--auth-bottom-nav-h) + 18px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.register-page.auth-page--ios .register-shell {
+    min-height: calc(
+            100vh - var(--auth-bottom-nav-h) - 36px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+    );
+    align-items: flex-start;
+    padding-top: 18px;
+}
+
+.register-page.auth-page--ios .modal-overlay-agreement {
+    padding-top: calc(16px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 520px) {
+    .register-page.auth-page--ios {
+        padding-top: calc(18px + env(safe-area-inset-top, 0px)) !important;
+        padding-bottom: calc(var(--auth-bottom-nav-h) + 18px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+    .register-page.auth-page--ios .register-shell {
+        padding-top: 10px;
+    }
+}

@@ -381,3 +381,21 @@ body { margin: 0; font-family: "Inter", sans-serif; -webkit-font-smoothing: anti
         gap: 10px;
     }
 }
+
+/* ===== iOS safe-area for UserReviewsPage ===== */
+
+.reviewsPage--ios {
+    padding-top: calc(18px + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.reviewsPage--ios .reviewsTop {
+    margin-top: 0;
+}
+
+@media (max-width: 640px) {
+    .reviewsPage--ios {
+        padding-top: calc(18px + env(safe-area-inset-top, 0px)) !important;
+        padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+}

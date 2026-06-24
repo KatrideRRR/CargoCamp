@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { Capacitor } from "@capacitor/core";
 import "../styles/CreateExpressOrder.css";
 import axiosInstance from "../utils/axiosInstance";
 import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrentLocation";
@@ -102,6 +103,22 @@ const CreateExpressOrder = () => {
     const apiKey = process.env.REACT_APP_YANDEX_API_KEY;
 
     const navigate = useNavigate();
+
+    const platform = useMemo(() => {
+        const params = new URLSearchParams(window.location.search);
+        const forcedPlatform = params.get("platform");
+
+        if (forcedPlatform === "ios") return "ios";
+        if (forcedPlatform === "android") return "android";
+        if (forcedPlatform === "web") return "web";
+
+        const currentPlatform = Capacitor.getPlatform();
+
+        if (currentPlatform === "ios") return "ios";
+        if (currentPlatform === "android") return "android";
+
+        return "web";
+    }, []);
 
     const [type, setType] = useState("taxi");
     const [error, setError] = useState("");
@@ -429,7 +446,7 @@ const CreateExpressOrder = () => {
     }, [coordsOk, routeCalc.loading, routeCalc.err, recommended]);
 
     return (
-        <div className="exo-page">
+        <div className={`exo-page exo-page--${platform}`}>
             <div className="exo-shell">
 
                 {/* Header */}

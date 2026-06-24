@@ -497,3 +497,20 @@
 .suggestions li:hover{
     background: rgba(255,255,255,.08);
 }
+
+/* =========================================================
+   iOS safe-area fix for CreateExpressOrder
+========================================================= */
+
+.exo-page--ios {
+    padding-top: calc(16px + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.exo-page--ios .exo-shell {
+    padding-top: 0;
+}
+
+.exo-page--ios .exo-header {
+    margin-top: 0;
+}

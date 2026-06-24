@@ -119,7 +119,9 @@ select {
     .orders-page--ios,
     .active-orders--ios,
     .create-order-page,
-    .order-history-page {
+    .exo-page--ios,
+    .order-history-page,
+    .order-history-page--ios {
         padding-top: calc(14px + env(safe-area-inset-top, 0px));
     }
 }
@@ -146,13 +148,22 @@ select {
 
 body:not(.hide-bottom-menu) .page,
 body:not(.hide-bottom-menu) .create-page,
+body:not(.hide-bottom-menu) .exo-page,
 body:not(.hide-bottom-menu) .orders-page,
 body:not(.hide-bottom-menu) .orders-page--ios,
 body:not(.hide-bottom-menu) .active-orders,
 body:not(.hide-bottom-menu) .active-orders--ios,
 body:not(.hide-bottom-menu) .profile-page,
+body:not(.hide-bottom-menu) .reviewsPage,
+body:not(.hide-bottom-menu) .reviewsPage--ios,
+body:not(.hide-bottom-menu) .oh-page,
+body:not(.hide-bottom-menu) .oh-page--ios,
 body:not(.hide-bottom-menu) .order-history-page,
-body:not(.hide-bottom-menu) .order-history-page--ios {
+body:not(.hide-bottom-menu) .order-history-page--ios,
+body:not(.hide-bottom-menu) .info-page,
+body:not(.hide-bottom-menu) .info-page--ios,
+body:not(.hide-bottom-menu) .login-page,
+body:not(.hide-bottom-menu) .register-page {
     padding-bottom: calc(var(--app-bottom-menu-height) + var(--app-bottom-menu-safe)) !important;
 }
 

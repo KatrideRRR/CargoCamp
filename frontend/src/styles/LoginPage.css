@@ -535,3 +535,29 @@
         transition: none !important;
     }
 }
+
+/* ===== iOS safe-area for LoginPage ===== */
+
+.login-page.auth-page--ios {
+    padding-top: calc(18px + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: calc(var(--auth-bottom-nav-h) + 18px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.login-page.auth-page--ios .login-shell {
+    min-height: calc(
+            100vh - var(--auth-bottom-nav-h) - 36px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+    );
+    align-items: flex-start;
+    padding-top: 18px;
+}
+
+@media (max-width: 520px) {
+    .login-page.auth-page--ios {
+        padding-top: calc(18px + env(safe-area-inset-top, 0px)) !important;
+        padding-bottom: calc(var(--auth-bottom-nav-h) + 18px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+    .login-page.auth-page--ios .login-shell {
+        padding-top: 10px;
+    }
+}

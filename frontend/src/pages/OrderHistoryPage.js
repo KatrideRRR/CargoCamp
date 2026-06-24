@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { useParams } from "react-router-dom";
 import axiosInstance from "../utils/axiosInstance";
 import "../styles/OrderHistotyPage.css";
@@ -10,6 +11,22 @@ const apiUrl = process.env.REACT_APP_API_URL;
 
 const OrderHistoryPage = () => {
     const { userId } = useParams();
+
+    const platform = useMemo(() => {
+        const params = new URLSearchParams(window.location.search);
+        const forcedPlatform = params.get("platform");
+
+        if (forcedPlatform === "ios") return "ios";
+        if (forcedPlatform === "android") return "android";
+        if (forcedPlatform === "web") return "web";
+
+        const currentPlatform = Capacitor.getPlatform();
+
+        if (currentPlatform === "ios") return "ios";
+        if (currentPlatform === "android") return "android";
+
+        return "web";
+    }, []);
 
     const [orders, setOrders] = useState([]);
     const [myReviewedOrderIds, setMyReviewedOrderIds] = useState(() => new Set());
@@ -136,7 +153,7 @@ const OrderHistoryPage = () => {
     if (error) return <div className="oh-state oh-state--error">Ошибка: {error}</div>;
 
     return (
-        <div className="oh-page">
+        <div className={`oh-page oh-page--${platform} order-history-page order-history-page--${platform}`}>
             <div className="oh-shell">
                 <div className="oh-header glass">
                     <div className="oh-title-row">

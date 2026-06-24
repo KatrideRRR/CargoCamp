@@ -284,3 +284,21 @@
     .info-footer-row { flex-direction: column; align-items: flex-start; }
     .info-footer-row .v { text-align: left; }
 }
+
+/* ===== iOS safe-area for InfoPage ===== */
+
+.info-page--ios {
+    padding-top: calc(18px + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.info-page--ios .info-top {
+    margin-top: 0;
+}
+
+@media (max-width: 480px) {
+    .info-page--ios {
+        padding-top: calc(18px + env(safe-area-inset-top, 0px)) !important;
+        padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+}

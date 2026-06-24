@@ -393,3 +393,21 @@
         width: 100%;
     }
 }
+
+/* ===== iOS safe-area for OrderHistoryPage ===== */
+
+.oh-page--ios {
+    padding-top: calc(18px + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.oh-page--ios .oh-header {
+    margin-top: 0;
+}
+
+@media (max-width: 860px) {
+    .oh-page--ios {
+        padding-top: calc(18px + env(safe-area-inset-top, 0px)) !important;
+        padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+}

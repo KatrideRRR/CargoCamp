@@ -1,11 +1,29 @@
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import "../styles/InfoPage.css";
 
 export default function InfoPage() {
     const navigate = useNavigate();
 
+    const platform = useMemo(() => {
+        const params = new URLSearchParams(window.location.search);
+        const forcedPlatform = params.get("platform");
+
+        if (forcedPlatform === "ios") return "ios";
+        if (forcedPlatform === "android") return "android";
+        if (forcedPlatform === "web") return "web";
+
+        const currentPlatform = Capacitor.getPlatform();
+
+        if (currentPlatform === "ios") return "ios";
+        if (currentPlatform === "android") return "android";
+
+        return "web";
+    }, []);
+
     return (
-        <div className="info-page">
+        <div className={`info-page info-page--${platform}`}>
             <div className="info-wrap">
                 <div className="info-top">
                     <button className="info-back" onClick={() => navigate(-1)}>
