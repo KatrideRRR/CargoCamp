@@ -5,8 +5,32 @@
 html,
 body,
 #root {
+    width: 100%;
+    height: 100%;
     min-height: 100%;
     margin: 0;
+}
+
+html {
+    overflow: hidden;
+    background: #f4f5f7;
+}
+
+body {
+    overflow: hidden;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+#root {
+    position: relative;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    overscroll-behavior-x: none;
 }
 
 body {
@@ -16,6 +40,7 @@ body {
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeSpeed;
     overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
 }
 
 button,
@@ -111,8 +136,14 @@ select {
     --safe-bottom: env(safe-area-inset-bottom, 0px);
     --safe-left: env(safe-area-inset-left, 0px);
 
-    --app-header-safe-top: calc(12px + var(--safe-top));
-    --app-bottom-safe: calc(12px + var(--safe-bottom));
+    --app-top-gap: 14px;
+    --app-bottom-gap: 10px;
+
+    --app-header-safe-top: calc(var(--app-top-gap) + var(--safe-top));
+    --app-bottom-safe: calc(var(--app-bottom-gap) + var(--safe-bottom));
+
+    --app-bottom-menu-height: 92px;
+    --app-bottom-menu-safe: env(safe-area-inset-bottom, 0px);
 }
 
 @supports (padding-top: env(safe-area-inset-top)) {
@@ -164,9 +195,37 @@ body:not(.hide-bottom-menu) .info-page,
 body:not(.hide-bottom-menu) .info-page--ios,
 body:not(.hide-bottom-menu) .login-page,
 body:not(.hide-bottom-menu) .register-page {
-    padding-bottom: calc(var(--app-bottom-menu-height) + var(--app-bottom-menu-safe)) !important;
+    padding-bottom: calc(var(--app-bottom-menu-height) + var(--app-bottom-menu-safe) + 8px) !important;
 }
 
 body.hide-bottom-menu .bottom-menu {
     display: none !important;
+}
+
+/* ===== App visual scroll boundaries ===== */
+
+body:not(.hide-bottom-menu) .page,
+body:not(.hide-bottom-menu) .create-page,
+body:not(.hide-bottom-menu) .exo-page,
+body:not(.hide-bottom-menu) .orders-page,
+body:not(.hide-bottom-menu) .active-orders,
+body:not(.hide-bottom-menu) .profile-page,
+body:not(.hide-bottom-menu) .reviewsPage,
+body:not(.hide-bottom-menu) .oh-page,
+body:not(.hide-bottom-menu) .info-page,
+body:not(.hide-bottom-menu) .login-page,
+body:not(.hide-bottom-menu) .register-page {
+    min-height: 100dvh;
+    overscroll-behavior: contain;
+}
+
+.orders-page--ios,
+.active-orders--ios,
+.exo-page--ios,
+.reviewsPage--ios,
+.oh-page--ios,
+.info-page--ios,
+.login-page.auth-page--ios,
+.register-page.auth-page--ios {
+    padding-top: calc(14px + env(safe-area-inset-top, 0px)) !important;
 }
