@@ -54,6 +54,19 @@ const ActiveOrdersPage = () => {
         return "performing";
     });
 
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const view = params.get("view");
+
+        if (view === "created") {
+            setActiveView("created");
+        }
+
+        if (view === "performing") {
+            setActiveView("performing");
+        }
+    }, []);
+
     const [error, setError] = useState(null);
 
     // модалка картинок обычных заказов
@@ -822,10 +835,22 @@ const ActiveOrdersPage = () => {
         (order) => Number(order.creatorId) === Number(user.id)
     );
 
+    const targetOrderId = new URLSearchParams(window.location.search).get("orderId");
+
+    const sortTargetOrderFirst = (list) => {
+        if (!targetOrderId) return list;
+
+        return [...list].sort((a, b) => {
+            if (String(a.id) === String(targetOrderId)) return -1;
+            if (String(b.id) === String(targetOrderId)) return 1;
+            return 0;
+        });
+    };
+
     const visibleRegularOrders =
         activeView === "performing"
-            ? performingOrders.slice(0, 1)
-            : createdOrders;
+            ? sortTargetOrderFirst(performingOrders).slice(0, 1)
+            : sortTargetOrderFirst(createdOrders);
 
     const visibleExpressOrders =
         activeView === "performing"

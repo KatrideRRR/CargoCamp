@@ -196,21 +196,21 @@ const MyOrdersPage = () => {
         try {
             const res = await axiosInstance.post(`/orders/${orderId}/approve`, { executorId });
 
+            /**
+             * Если это безопасная сделка / рассрочка и backend вернул ссылку на оплату —
+             * сначала отправляем на оплату. Активным заказ станет после оплаты/подтверждения.
+             */
             if (res.data?.confirmationUrl) {
                 window.location.href = res.data.confirmationUrl;
                 return;
             }
 
-            alert("Исполнитель одобрен!");
-            setOrders((prev) =>
-                prev.map((o) =>
-                    o.id === orderId
-                        ? {
-                            ...o,
-                            requestedExecutors: o.requestedExecutors.filter((e) => e.id !== executorId),
-                        }
-                        : o
-                )
+            /**
+             * Если заказ сразу стал active, например при наличной оплате,
+             * переносим заказчика в "Активные заказы" → "Мои заказы выполняют".
+             */
+            navigate(
+                `/active-orders?view=created&orderId=${orderId}&orderType=regular&reason=approved`
             );
         } catch (error) {
             console.error(error);
