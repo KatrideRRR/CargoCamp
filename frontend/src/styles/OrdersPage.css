@@ -2769,3 +2769,27 @@
         font-size: 14px;
     }
 }
+
+/* =========================================================
+   Fix top card angular artifact
+   Убираем квадратный декоративный блик в верхнем блоке
+========================================================= */
+
+.orders-page .orders-top::before {
+    display: none !important;
+}
+
+.orders-page .orders-top {
+    overflow: visible;
+    border-radius: 28px;
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.84)),
+            rgba(255, 255, 255, 0.92);
+}
+
+.orders-page--ios .orders-top {
+    border-radius: 30px;
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.68)),
+            rgba(255, 255, 255, 0.64);
+}
