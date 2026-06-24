@@ -42,14 +42,40 @@ function buildActiveOrdersUrl({
     return `/active-orders?${params.toString()}`;
 }
 
+function buildMyOrdersUrl({
+                              userId = "",
+                              orderId = "",
+                              reason = "",
+                              expand = true,
+                          } = {}) {
+    const params = new URLSearchParams();
+
+    if (orderId) {
+        params.set("orderId", String(orderId));
+    }
+
+    if (reason) {
+        params.set("reason", String(reason));
+    }
+
+    if (expand) {
+        params.set("expand", "1");
+    }
+
+    return `/my-orders/${userId}?${params.toString()}`;
+}
+
 function normalizePushData(raw = {}) {
     const data = { ...(raw || {}) };
 
-    // На всякий случай, если где-то прилетит вложенная строка JSON
     if (typeof data.data === "string") {
         try {
             Object.assign(data, JSON.parse(data.data));
         } catch {}
+    }
+
+    if (data.data && typeof data.data === "object") {
+        Object.assign(data, data.data);
     }
 
     return data;
@@ -195,16 +221,32 @@ function navigateFromPush(rawData, navigate) {
     if (type === "order_request") {
         const userRaw = localStorage.getItem("user");
 
+        let currentUserId = null;
+
         try {
             const user = userRaw ? JSON.parse(userRaw) : null;
-
-            if (user?.id) {
-                navigate(`/my-orders/${user.id}`);
-                return;
-            }
+            currentUserId = user?.id || null;
         } catch {}
 
-        navigate("/profile");
+        const targetUserId =
+            data.creatorId ||
+            data.userId ||
+            data.targetUserId ||
+            currentUserId;
+
+        if (targetUserId) {
+            navigate(
+                buildMyOrdersUrl({
+                    userId: targetUserId,
+                    orderId,
+                    reason: "order_request",
+                    expand: true,
+                })
+            );
+            return;
+        }
+
+        navigate("/login");
         return;
     }
 

@@ -42,6 +42,16 @@ const MyOrdersPage = () => {
         return "web";
     }, []);
 
+    const targetOrderId = useMemo(() => {
+        const params = new URLSearchParams(location.search);
+        return params.get("orderId");
+    }, [location.search]);
+
+    const shouldExpandTarget = useMemo(() => {
+        const params = new URLSearchParams(location.search);
+        return params.get("expand") === "1";
+    }, [location.search]);
+
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -164,11 +174,28 @@ const MyOrdersPage = () => {
                     }));
             }
 
-            const merged = [...regularOrders, ...expressOrders].sort(
-                (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            );
+            const merged = [...regularOrders, ...expressOrders].sort((a, b) => {
+                if (targetOrderId) {
+                    if (String(a.id) === String(targetOrderId)) return -1;
+                    if (String(b.id) === String(targetOrderId)) return 1;
+                }
+
+                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+            });
 
             setOrders(merged);
+
+            if (targetOrderId && shouldExpandTarget) {
+                setExpandedExec((prev) => ({
+                    ...prev,
+                    [targetOrderId]: true,
+                }));
+
+                setExpandedDesc((prev) => ({
+                    ...prev,
+                    [targetOrderId]: true,
+                }));
+            }
         } catch (err) {
             console.error("Ошибка при загрузке заказов:", err);
             setError("Ошибка загрузки данных");
@@ -344,7 +371,7 @@ const MyOrdersPage = () => {
             socket.off("expressOrderStatusChanged", removeAcceptedExpressFromMyOrders);
             socket.off("expressStatusChanged", removeAcceptedExpressFromMyOrders);
         };
-    }, [userId, navigate, setHasNewRequests]);
+    }, [userId, navigate, setHasNewRequests, targetOrderId, shouldExpandTarget]);
 
     const getPaymentIcon = (type) => {
         switch (type) {

@@ -78,6 +78,7 @@ export const ModalProvider = ({ children }) => {
     const [selectedDebtProvider, setSelectedDebtProvider] = useState("yookassa");
     const [selectedNotificationDebtProvider, setSelectedNotificationDebtProvider] = useState("yookassa");
 
+    const [orderRequestData, setOrderRequestData] = useState(null);
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -480,6 +481,27 @@ export const ModalProvider = ({ children }) => {
         setNotificationData(null);
     };
 
+    const handleOrderRequestClose = () => {
+        setOrderRequestData(null);
+    };
+
+    const openOrderRequestPage = () => {
+        if (!orderRequestData?.creatorId || !orderRequestData?.orderId) {
+            setOrderRequestData(null);
+            return;
+        }
+
+        const params = new URLSearchParams();
+
+        params.set("orderId", String(orderRequestData.orderId));
+        params.set("reason", "order_request");
+        params.set("expand", "1");
+
+        setOrderRequestData(null);
+
+        window.location.href = `/my-orders/${orderRequestData.creatorId}?${params.toString()}`;
+    };
+
     const handleCompletionNotificationClose = () => {
         setCompletionNotificationData(null);
     };
@@ -580,6 +602,44 @@ export const ModalProvider = ({ children }) => {
 
                 return;
 
+            }
+
+            const orderRequestNotification = list.find((n) => {
+                const type = n.type || n?.data?.type;
+                const orderType = n.orderType || n?.data?.orderType || "regular";
+
+                return (
+                    type === "order_request" &&
+                    orderType !== "express" &&
+                    (n.orderId || n?.data?.orderId)
+                );
+            });
+
+            if (orderRequestNotification) {
+                const orderId =
+                    orderRequestNotification.orderId ||
+                    orderRequestNotification?.data?.orderId;
+
+                const creatorId =
+                    orderRequestNotification.creatorId ||
+                    orderRequestNotification?.data?.creatorId ||
+                    userId;
+
+                setOrderRequestData({
+                    title: orderRequestNotification.title || "Новый отклик на заказ",
+                    description:
+                        orderRequestNotification.body ||
+                        orderRequestNotification.message ||
+                        `По заказу №${orderId} появился новый исполнитель`,
+                    orderId,
+                    creatorId,
+                    executorId:
+                        orderRequestNotification.executorId ||
+                        orderRequestNotification?.data?.executorId ||
+                        "",
+                });
+
+                return;
             }
 
             const cancelledNotification = list.find((n) => {
@@ -925,6 +985,52 @@ export const ModalProvider = ({ children }) => {
                                 onClick={handleExpressAcceptedClose}
                             >
                                 Понятно
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {orderRequestData && (
+                <div className="modal-overlay">
+                    <div className="modal modal-compact">
+                        <button
+                            className="modal-close"
+                            onClick={handleOrderRequestClose}
+                            aria-label="Закрыть"
+                            type="button"
+                        >
+                            ×
+                        </button>
+
+                        <div className="modal-icon">👷</div>
+
+                        <h2 className="modal-title">
+                            {orderRequestData.title || "Новый отклик"}
+                        </h2>
+
+                        <p className="modal-text">
+                            {orderRequestData.description ||
+                                `По заказу №${orderRequestData.orderId} появился новый исполнитель`}
+                        </p>
+
+                        <div className="modal-note modal-note-success">
+                            Откройте заказ, чтобы посмотреть исполнителя и одобрить его.
+                        </div>
+
+                        <div className="modal-actions">
+                            <button
+                                className="modal-btn modal-btn-primary"
+                                onClick={openOrderRequestPage}
+                            >
+                                Открыть заказ
+                            </button>
+
+                            <button
+                                className="modal-btn modal-btn-ghost"
+                                onClick={handleOrderRequestClose}
+                            >
+                                Позже
                             </button>
                         </div>
                     </div>
