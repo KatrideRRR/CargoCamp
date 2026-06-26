@@ -174,10 +174,15 @@ function CreateOrderPage() {
     const [isAsap, setIsAsap] = useState(true);
 
     const promotionTotal = useMemo(() => {
-        return Object.entries(promotion).reduce(
-            (sum, [key, enabled]) => (enabled ? sum + PROMOTION_PRICES[key] : sum),
-            0
-        );
+        const safePromotion = {
+            highlight: !!promotion?.highlight,
+            recommended: !!promotion?.recommended,
+            push: !!promotion?.push,
+        };
+
+        return Object.entries(safePromotion).reduce((sum, [key, enabled]) => {
+            return enabled ? sum + (PROMOTION_PRICES[key] || 0) : sum;
+        }, 0);
     }, [promotion]);
 
     useEffect(() => {
@@ -495,7 +500,19 @@ function CreateOrderPage() {
             data.append("subcategoryId", Number(selectedSubcategory));
         }
 
-        data.append("promotion", JSON.stringify(promotion));
+        const cleanPromotion = {
+            highlight: !!promotion.highlight,
+            recommended: !!promotion.recommended,
+            push: !!promotion.push,
+        };
+
+        const cleanPromotionTotal = Object.entries(cleanPromotion).reduce(
+            (sum, [key, enabled]) => enabled ? sum + (PROMOTION_PRICES[key] || 0) : sum,
+            0
+        );
+
+        data.append("promotion", JSON.stringify(cleanPromotion));
+
         images.forEach((img) => data.append("images", img));
 
         data.append("coordinates", `${Number(markerPosition[0])},${Number(markerPosition[1])}`);
@@ -514,7 +531,7 @@ function CreateOrderPage() {
 
             const orderId = response.data.id;
 
-            if (promotionTotal > 0) {
+            if (cleanPromotionTotal > 0) {
                 const endpoint =
                     selectedProvider === "tbank"
                         ? "/api/tbank-payments/order/promotion/create"
