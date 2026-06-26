@@ -2,6 +2,8 @@
     box-sizing: border-box;
 }
 
+/* ===== Base document scroll ===== */
+
 html,
 body,
 #root {
@@ -25,6 +27,13 @@ body {
     color: #1f2933;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeSpeed;
+
+    /*
+      Важно:
+      Не ставим body position: fixed.
+      Не ставим body overflow: hidden.
+      Иначе на iOS WebView ломается нормальный свайп/инерция.
+    */
 }
 
 #root {
@@ -33,15 +42,35 @@ body {
     overflow: visible;
 }
 
-body {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background: #f4f5f7;
-    color: #1f2933;
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeSpeed;
-    overscroll-behavior: none;
-    -webkit-overflow-scrolling: touch;
+/* ===== CSS variables / safe area ===== */
+
+:root {
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+
+    --app-top-gap: 14px;
+    --app-bottom-gap: 12px;
+
+    /*
+      Высота нижнего меню.
+      Если реальная высота bottom menu другая — меняй только это значение.
+    */
+    --app-bottom-menu-height: 98px;
+
+    --app-page-top: calc(var(--app-top-gap) + var(--safe-top));
+
+    --app-page-bottom: calc(
+            var(--app-bottom-menu-height) +
+            var(--safe-bottom) +
+            var(--app-bottom-gap)
+    );
+
+    --app-page-bottom-no-menu: calc(24px + var(--safe-bottom));
 }
+
+/* ===== Base elements ===== */
 
 button,
 input,
@@ -54,6 +83,14 @@ button {
     -webkit-tap-highlight-color: transparent;
 }
 
+button,
+a,
+input,
+textarea,
+select {
+    touch-action: manipulation;
+}
+
 img {
     max-width: 100%;
     display: block;
@@ -63,6 +100,8 @@ a {
     color: inherit;
     text-decoration: none;
 }
+
+/* ===== App loading ===== */
 
 .app-loading {
     min-height: 100vh;
@@ -74,12 +113,13 @@ a {
     color: #4b5563;
 }
 
+/* ===== Common page/card ===== */
+
 .page {
     width: 100%;
     max-width: 720px;
     margin: 0 auto;
     padding: 14px;
-    padding-bottom: 86px;
 }
 
 .card {
@@ -92,7 +132,6 @@ a {
 @media (max-width: 480px) {
     .page {
         padding: 10px;
-        padding-bottom: 82px;
     }
 
     .card {
@@ -101,7 +140,8 @@ a {
     }
 }
 
-/* iOS WebView/Safari: запрет авто-зума при фокусе на полях */
+/* ===== iOS WebView/Safari: запрет авто-зума при фокусе на полях ===== */
+
 @supports (-webkit-touch-callout: none) {
     input,
     textarea,
@@ -116,47 +156,21 @@ a {
     }
 }
 
-button,
-a,
-input,
-textarea,
-select {
-    touch-action: manipulation;
-}
+/* ===== Universal safe helpers ===== */
 
-:root {
-    --safe-top: env(safe-area-inset-top, 0px);
-    --safe-right: env(safe-area-inset-right, 0px);
-    --safe-bottom: env(safe-area-inset-bottom, 0px);
-    --safe-left: env(safe-area-inset-left, 0px);
-
-    --app-top-gap: 14px;
-    --app-bottom-gap: 10px;
-
-    --app-header-safe-top: calc(var(--app-top-gap) + var(--safe-top));
-    --app-bottom-safe: calc(var(--app-bottom-gap) + var(--safe-bottom));
-
-    --app-bottom-menu-height: 92px;
-    --app-bottom-menu-safe: env(safe-area-inset-bottom, 0px);
-}
-
-@supports (padding-top: env(safe-area-inset-top)) {
-    .orders-page--ios,
-    .active-orders--ios,
-    .create-order-page,
-    .exo-page--ios,
-    .order-history-page,
-    .order-history-page--ios {
-        padding-top: calc(14px + env(safe-area-inset-top, 0px));
-    }
+.app-page-safe {
+    padding-top: var(--app-page-top) !important;
+    padding-bottom: var(--app-page-bottom) !important;
+    padding-left: max(12px, var(--safe-left));
+    padding-right: max(12px, var(--safe-right));
 }
 
 .ios-safe-top {
-    padding-top: var(--app-header-safe-top) !important;
+    padding-top: var(--app-page-top) !important;
 }
 
 .ios-safe-bottom {
-    padding-bottom: var(--app-bottom-safe) !important;
+    padding-bottom: var(--app-page-bottom-no-menu) !important;
 }
 
 .ios-safe-x {
@@ -164,18 +178,21 @@ select {
     padding-right: max(12px, var(--safe-right));
 }
 
-/* ===== App fixed bottom menu reserve ===== */
+/* ===== Pages with fixed bottom menu ===== */
 
-:root {
-    --app-bottom-menu-height: 98px;
-    --app-bottom-menu-safe: env(safe-area-inset-bottom, 0px);
-}
+/*
+  Эти страницы получают нижний отступ,
+  чтобы контент не уходил под bottom menu.
+*/
 
 body:not(.hide-bottom-menu) .page,
 body:not(.hide-bottom-menu) .create-page,
+body:not(.hide-bottom-menu) .create-order-page,
 body:not(.hide-bottom-menu) .exo-page,
 body:not(.hide-bottom-menu) .orders-page,
 body:not(.hide-bottom-menu) .orders-page--ios,
+body:not(.hide-bottom-menu) .active-orders,
+body:not(.hide-bottom-menu) .active-orders--ios,
 body:not(.hide-bottom-menu) .profile-page,
 body:not(.hide-bottom-menu) .reviewsPage,
 body:not(.hide-bottom-menu) .reviewsPage--ios,
@@ -184,28 +201,67 @@ body:not(.hide-bottom-menu) .oh-page--ios,
 body:not(.hide-bottom-menu) .order-history-page,
 body:not(.hide-bottom-menu) .order-history-page--ios,
 body:not(.hide-bottom-menu) .info-page,
-body:not(.hide-bottom-menu) .info-page--ios,
-body:not(.hide-bottom-menu) .login-page,
-body:not(.hide-bottom-menu) .register-page {
-    padding-bottom: calc(var(--app-bottom-menu-height) + var(--app-bottom-menu-safe) + 8px) !important;
+body:not(.hide-bottom-menu) .info-page--ios {
+    padding-bottom: var(--app-page-bottom) !important;
 }
+
+/* ===== iOS top safe-area ===== */
+
+/*
+  Верхний отступ только для iOS-страниц.
+  Это не ломает скролл, потому что работает через padding.
+*/
+
+@supports (padding-top: env(safe-area-inset-top)) {
+    .orders-page--ios,
+    .active-orders--ios,
+    .create-order-page,
+    .exo-page--ios,
+    .reviewsPage--ios,
+    .oh-page--ios,
+    .info-page--ios,
+    .order-history-page--ios {
+        padding-top: var(--app-page-top) !important;
+    }
+
+    /*
+      Логин/регистрация обычно без нижнего меню.
+      Им нужен safe top, но не нужен огромный отступ под bottom menu.
+    */
+    .login-page.auth-page--ios,
+    .register-page.auth-page--ios {
+        padding-top: var(--app-page-top) !important;
+        padding-bottom: var(--app-page-bottom-no-menu) !important;
+    }
+}
+
+/* ===== Bottom menu hidden mode ===== */
 
 body.hide-bottom-menu .bottom-menu {
     display: none !important;
 }
 
-/* ===== iOS top safe-area only: НЕ ломает скролл ===== */
+body.hide-bottom-menu .page,
+body.hide-bottom-menu .login-page,
+body.hide-bottom-menu .register-page {
+    padding-bottom: var(--app-page-bottom-no-menu) !important;
+}
 
-@supports (padding-top: env(safe-area-inset-top)) {
-    .orders-page--ios,
-    .active-orders--ios,
-    .exo-page--ios,
-    .reviewsPage--ios,
-    .oh-page--ios,
-    .info-page--ios,
-    .login-page.auth-page--ios,
-    .register-page.auth-page--ios,
-    .order-history-page--ios {
-        padding-top: calc(14px + env(safe-area-inset-top, 0px)) !important;
-    }
+/* ===== Page-specific inner containers ===== */
+
+/*
+  Важно:
+  Некоторые страницы могут иметь не саму страницу как основной контейнер,
+  а вложенный .pageContainer.
+  Например active-orders .pageContainer.
+  Тогда safe-area надо дать именно этому контейнеру.
+*/
+
+.active-orders .pageContainer {
+    padding-top: var(--app-page-top) !important;
+    padding-bottom: var(--app-page-bottom) !important;
+}
+
+body.hide-bottom-menu .active-orders .pageContainer {
+    padding-bottom: var(--app-page-bottom-no-menu) !important;
 }
