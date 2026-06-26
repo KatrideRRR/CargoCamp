@@ -3,7 +3,10 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import Modal from "react-modal";
 import { useAuth } from "./utils/authContext";
-import { initPushNotifications } from "./utils/pushNotifications";
+import {
+    initPushNotifications,
+    consumePendingPushNavigation,
+} from "./utils/pushNotifications";
 import PullToRefresh from "./components/PullToRefresh";
 import { socket, connectSocket } from "./socketClient";
 import { ToastContainer, toast } from "react-toastify";
@@ -56,13 +59,23 @@ function PushBootstrap() {
     useEffect(() => {
         const token = localStorage.getItem("authToken");
 
-        if (!user?.id || !token) {
+        if (!token) {
             return;
         }
 
-        initPushNotifications({ navigate, userId: user.id }).catch((e) => {
-            console.error("initPushNotifications error:", e);
-        });
+        /*
+          Если пользователь уже есть — инициализируем пуши нормально.
+          Если user ещё не успел загрузиться, pending push всё равно можно попробовать обработать,
+          потому что userId можно достать из JWT внутри pushNotifications.js.
+        */
+
+        if (user?.id) {
+            initPushNotifications({ navigate, userId: user.id }).catch((e) => {
+                console.error("initPushNotifications error:", e);
+            });
+        }
+
+        consumePendingPushNavigation(navigate);
     }, [user?.id, navigate]);
 
     return null;
@@ -315,16 +328,42 @@ function App() {
                     if (type === "order_request") {
                         const userRaw = localStorage.getItem("user");
 
+                        let currentUserId = null;
+
                         try {
                             const user = userRaw ? JSON.parse(userRaw) : null;
-
-                            if (user?.id) {
-                                navigate(`/my-orders/${user.id}`);
-                                return;
-                            }
+                            currentUserId = user?.id || null;
                         } catch {}
 
-                        navigate("/profile");
+                        const targetUserId =
+                            latestData.creatorId ||
+                            latestData.customerId ||
+                            latestData.ownerId ||
+                            latestData.userId ||
+                            latestData.targetUserId ||
+                            currentUserId;
+
+                        if (targetUserId) {
+                            const params = new URLSearchParams();
+
+                            if (orderId) {
+                                params.set("orderId", String(orderId));
+                            }
+
+                            params.set("reason", "order_request");
+                            params.set("expand", "1");
+
+                            navigate(`/my-orders/${targetUserId}?${params.toString()}`, {
+                                replace: true,
+                            });
+
+                            return;
+                        }
+
+                        navigate("/active-orders?view=created&reason=order_request", {
+                            replace: true,
+                        });
+
                         return;
                     }
 

@@ -65,6 +65,96 @@ function buildMyOrdersUrl({
     return `/my-orders/${userId}?${params.toString()}`;
 }
 
+function getAuthToken() {
+    return localStorage.getItem("authToken");
+}
+
+function parseJwtPayload(token) {
+    if (!token || typeof token !== "string") return null;
+
+    try {
+        const payload = token.split(".")[1];
+        if (!payload) return null;
+
+        const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+        const json = decodeURIComponent(
+            atob(normalized)
+                .split("")
+                .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
+                .join("")
+        );
+
+        return JSON.parse(json);
+    } catch (e) {
+        console.warn("JWT parse error:", e);
+        return null;
+    }
+}
+
+function getCurrentUserId() {
+    const userRaw = localStorage.getItem("user");
+
+    try {
+        const user = userRaw ? JSON.parse(userRaw) : null;
+        if (user?.id) return String(user.id);
+    } catch {}
+
+    const token = getAuthToken();
+    const payload = parseJwtPayload(token);
+
+    if (payload?.id) return String(payload.id);
+    if (payload?.userId) return String(payload.userId);
+
+    return null;
+}
+
+function savePendingPushNavigation(rawData) {
+    if (!rawData) return;
+
+    try {
+        localStorage.setItem(
+            "pendingPushNavigation",
+            JSON.stringify({
+                data: rawData,
+                savedAt: Date.now(),
+            })
+        );
+    } catch (e) {
+        console.warn("savePendingPushNavigation error:", e);
+    }
+}
+
+export function consumePendingPushNavigation(navigate) {
+    if (!navigate) return false;
+
+    const raw = localStorage.getItem("pendingPushNavigation");
+    if (!raw) return false;
+
+    try {
+        const parsed = JSON.parse(raw);
+
+        localStorage.removeItem("pendingPushNavigation");
+
+        if (!parsed?.data) return false;
+
+        // защита от очень старых пушей, например старше 10 минут
+        const age = Date.now() - Number(parsed.savedAt || 0);
+        if (age > 10 * 60 * 1000) {
+            return false;
+        }
+
+        navigateFromPush(parsed.data, navigate, {
+            fromPending: true,
+        });
+
+        return true;
+    } catch (e) {
+        console.warn("consumePendingPushNavigation error:", e);
+        localStorage.removeItem("pendingPushNavigation");
+        return false;
+    }
+}
+
 function normalizePushData(raw = {}) {
     const data = { ...(raw || {}) };
 
@@ -81,7 +171,7 @@ function normalizePushData(raw = {}) {
     return data;
 }
 
-function navigateFromPush(rawData, navigate) {
+function navigateFromPush(rawData, navigate, options = {}) {
     if (!rawData || !navigate) return;
 
     const data = normalizePushData(rawData);
@@ -90,16 +180,33 @@ function navigateFromPush(rawData, navigate) {
     const orderId = data.orderId || data.expressOrderId || data.expressId;
     const orderType = data.orderType || "regular";
 
+    const authToken = getAuthToken();
+    const currentUserId = getCurrentUserId();
+
     console.log("NAVIGATE FROM PUSH:", {
         rawData,
         data,
         type,
         orderId,
         orderType,
+        hasAuthToken: !!authToken,
+        currentUserId,
+        options,
     });
 
+    if (!authToken) {
+        savePendingPushNavigation(data);
+        navigate("/login", {
+            replace: true,
+            state: {
+                fromPush: true,
+                reason: type || "push",
+            },
+        });
+        return;
+    }
     if (type === "new_message" && orderId) {
-        navigate(`/messages/${orderType}/${orderId}`);
+        navigate(`/messages/${orderType}/${orderId}`, { replace: true });
         return;
     }
 
@@ -107,21 +214,21 @@ function navigateFromPush(rawData, navigate) {
         const expressId = data.orderId || data.expressOrderId || data.expressId;
 
         if (expressId) {
-            navigate(`/express-order/${expressId}`);
+            navigate(`/express-order/${expressId}`, { replace: true });
             return;
         }
 
-        navigate("/orders");
+        navigate("/orders", { replace: true });
         return;
     }
 
     if (type === "order_push" && orderId) {
         if (orderType === "express") {
-            navigate(`/express-order/${orderId}`);
+            navigate(`/express-order/${orderId}`, { replace: true });
             return;
         }
 
-        navigate(`/order/${orderId}`);
+        navigate(`/order/${orderId}`, { replace: true });
         return;
     }
 
@@ -158,7 +265,7 @@ function navigateFromPush(rawData, navigate) {
                 orderType,
                 reason: "review_needed",
             }) + "&reviewFromPush=1"
-        );
+            , { replace: true });
 
         setTimeout(() => {
 
@@ -192,7 +299,7 @@ function navigateFromPush(rawData, navigate) {
                 orderType,
                 reason: type,
             })
-        );
+            , { replace: true });
 
         return;
     }
@@ -219,17 +326,10 @@ function navigateFromPush(rawData, navigate) {
      * Его отправляем в "Мои заказы".
      */
     if (type === "order_request") {
-        const userRaw = localStorage.getItem("user");
-
-        let currentUserId = null;
-
-        try {
-            const user = userRaw ? JSON.parse(userRaw) : null;
-            currentUserId = user?.id || null;
-        } catch {}
-
         const targetUserId =
             data.creatorId ||
+            data.customerId ||
+            data.ownerId ||
             data.userId ||
             data.targetUserId ||
             currentUserId;
@@ -241,17 +341,47 @@ function navigateFromPush(rawData, navigate) {
                     orderId,
                     reason: "order_request",
                     expand: true,
-                })
+                }),
+                { replace: true }
             );
+
             return;
         }
 
-        navigate("/login");
+        /*
+          Важный момент:
+          Если authToken есть, но userId не нашли, НЕ отправляем на login.
+          Открываем активные/мои созданные заказы.
+          Так пользователь хотя бы попадёт в нужный раздел.
+        */
+        if (authToken) {
+            navigate(
+                buildActiveOrdersUrl({
+                    view: "created",
+                    orderId,
+                    orderType,
+                    reason: "order_request",
+                }),
+                { replace: true }
+            );
+
+            return;
+        }
+
+        savePendingPushNavigation(data);
+        navigate("/login", {
+            replace: true,
+            state: {
+                fromPush: true,
+                reason: "order_request",
+            },
+        }, { replace: true });
+
         return;
     }
 
     if (type === "debt_created") {
-        navigate("/profile");
+        navigate("/profile", { replace: true });
         return;
     }
 
@@ -268,12 +398,12 @@ function navigateFromPush(rawData, navigate) {
                 orderType,
                 reason: type || "unknown_push",
             })
-        );
+            , { replace: true });
 
         return;
     }
 
-    navigate("/profile");
+    navigate("/profile", { replace: true });
 }
 
 async function savePushTokenToBackend(pushToken) {
