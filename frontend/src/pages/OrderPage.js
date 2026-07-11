@@ -507,6 +507,7 @@ const OrderPage = () => {
 
     const getStatusLabel = (status) => {
         const map = {
+            created: "Ожидает исполнителя",
             pending: "Ожидает исполнителя",
             accepted: "Принят",
             on_the_way_to_A: "В пути к точке А",

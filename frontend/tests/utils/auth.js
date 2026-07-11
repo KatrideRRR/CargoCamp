@@ -9,25 +9,27 @@
  * @param {string} options.password - пароль
  */
 
-async function auth(page, {
-    phone = "9780032978",
+// tests/utils/auth.js
+
+async function login(page, {
+    phone = "+7 (978) 003-29-78",
     password = "11jan1999",
 } = {}) {
+    await page.goto("http://localhost:3000/login?platform=web");
 
-    // Переход на страницу логина
-    await page.goto("http://localhost:3000/login");
+    await page.locator("#phone").fill(phone);
 
-    // Ввод телефона
-    await page.getByLabel("Телефон:").fill(phone);
+    await page.getByRole("button", { name: "Войти по паролю" }).click();
 
-    // Ввод пароля
-    await page.getByLabel("Пароль:").fill(password);
+    await page.locator("#password").fill(password);
 
-    // Нажатие кнопки "Войти"
-    await page.getByRole("button", { name: "Войти" }).click();
+    await page.getByRole("button", { name: /^Войти$/ }).click();
 
-    // Ожидаем, что логин успешный (появится /profile)
-    await page.waitForURL(/\/profile/, { timeout: 5000 });
+    await page.waitForURL(/\/profile/, {
+        timeout: 10000,
+    });
 }
+
+module.exports = { login };
 
 module.exports = { login: auth };
