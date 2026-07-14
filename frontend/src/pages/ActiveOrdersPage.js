@@ -412,7 +412,7 @@ const ActiveOrdersPage = () => {
 
             const formData = new FormData();
             Array.from(files).forEach((file) => {
-                formData.append("images", file);
+                formData.append("images", file, file.name);
             });
 
             const endpointMap = {
@@ -431,7 +431,6 @@ const ActiveOrdersPage = () => {
             await axiosInstance.post(endpoint, formData, {
                 headers: {
                     Authorization: `Bearer ${t}`,
-                    "Content-Type": "multipart/form-data",
                 },
             });
 
