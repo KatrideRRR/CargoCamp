@@ -1,5 +1,5 @@
 import { toast } from "react-toastify";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { useNavigate } from "react-router-dom";
 import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrentLocation";
@@ -41,9 +41,14 @@ async function geocodeAddressYandex({ address, apiKey }) {
     const url =
         `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}` +
         `&geocode=${encodeURIComponent(q)}` +
-        `&format=json&results=1&kind=house`;
+        `&format=json&results=1&lang=ru_RU`;
 
     const r = await fetch(url);
+
+    if (!r.ok) {
+        throw new Error(`Yandex geocoder HTTP ${r.status}`);
+    }
+
     const data = await r.json();
 
     const first =
@@ -74,9 +79,17 @@ async function geocodeAddressYandex({ address, apiKey }) {
 async function reverseGeocodeYandex({ lat, lng, apiKey }) {
     if (!apiKey) throw new Error("No Yandex API key");
 
-    const url = `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}&geocode=${lng},${lat}&format=json&results=1&kind=house`;
+    const url =
+        `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}` +
+        `&geocode=${lng},${lat}` +
+        `&format=json&results=1&lang=ru_RU`;
 
     const r = await fetch(url);
+
+    if (!r.ok) {
+        throw new Error(`Yandex geocoder HTTP ${r.status}`);
+    }
+
     const data = await r.json();
 
     const first =
@@ -133,6 +146,9 @@ const ProfilePage = () => {
 
     const [addressSuggestions, setAddressSuggestions] = useState([]);
     const [addressQuery, setAddressQuery] = useState("");
+
+    const addressRequestIdRef = useRef(0);
+    const addressAbortRef = useRef(null);
 
     const [avatarUploading, setAvatarUploading] = useState(false);
 
@@ -253,41 +269,101 @@ const ProfilePage = () => {
     };
 
     const fetchAddressSuggestions = async (query) => {
-        if (!query || query.length < 3) {
+        const cleanQuery = String(query || "").trim();
+
+        if (cleanQuery.length < 3 || !YM_KEY) {
+            addressAbortRef.current?.abort();
             setAddressSuggestions([]);
             return;
         }
 
-        if (!YM_KEY) {
-            setAddressSuggestions([]);
-            return;
-        }
+        const requestId = ++addressRequestIdRef.current;
+
+        addressAbortRef.current?.abort();
+
+        const controller = new AbortController();
+        addressAbortRef.current = controller;
 
         try {
-            const r = await fetch(
-                `https://geocode-maps.yandex.ru/1.x/?apikey=${YM_KEY}&geocode=${encodeURIComponent(query)}&format=json&results=6`
-            );
+            const url =
+                `https://geocode-maps.yandex.ru/1.x/?apikey=${YM_KEY}` +
+                `&geocode=${encodeURIComponent(cleanQuery)}` +
+                `&format=json&results=6&lang=ru_RU`;
 
-            const data = await r.json();
+            const response = await fetch(url, {
+                signal: controller.signal,
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    `Yandex suggestions HTTP ${response.status}`
+                );
+            }
+
+            const data = await response.json();
+
+            /*
+             * Пока запрос выполнялся, пользователь мог уже изменить текст.
+             * Старому запросу не разрешаем менять список.
+             */
+            if (requestId !== addressRequestIdRef.current) {
+                return;
+            }
 
             const items =
-                data?.response?.GeoObjectCollection?.featureMember?.map((f) => {
-                    const geo = f.GeoObject;
-                    const pos = geo.Point.pos.split(" ").map(Number);
+                data?.response?.GeoObjectCollection?.featureMember
+                    ?.map((feature) => {
+                        const geoObject = feature?.GeoObject;
+                        const position = String(
+                            geoObject?.Point?.pos || ""
+                        )
+                            .split(" ")
+                            .map(Number);
 
-                    return {
-                        label: geo.metaDataProperty.GeocoderMetaData.text,
-                        lat: pos[1],
-                        lng: pos[0],
-                    };
-                }) || [];
+                        const lng = position[0];
+                        const lat = position[1];
+
+                        const label =
+                            geoObject?.metaDataProperty
+                                ?.GeocoderMetaData?.text ||
+                            geoObject?.name ||
+                            "";
+
+                        if (
+                            !label ||
+                            !Number.isFinite(lat) ||
+                            !Number.isFinite(lng)
+                        ) {
+                            return null;
+                        }
+
+                        return {
+                            label,
+                            lat,
+                            lng,
+                        };
+                    })
+                    .filter(Boolean) || [];
 
             setAddressSuggestions(items);
-        } catch (e) {
-            console.error("address suggest error", e);
-            setAddressSuggestions([]);
+        } catch (error) {
+            if (error?.name === "AbortError") {
+                return;
+            }
+
+            console.error("address suggest error:", error);
+
+            if (requestId === addressRequestIdRef.current) {
+                setAddressSuggestions([]);
+            }
         }
     };
+
+    useEffect(() => {
+        return () => {
+            addressAbortRef.current?.abort();
+        };
+    }, []);
 
     useEffect(() => {
         axios
@@ -653,14 +729,20 @@ const ProfilePage = () => {
                 });
 
                 if (!addr) {
-                    setLocationDraft(`Координаты: ${lat}, ${lng}`);
-                    setGpsCandidate({
+                    setPickedCoords({
                         lat,
                         lng,
-                        address: `Координаты: ${lat}, ${lng}`,
                     });
 
-                    toast.info("Координаты получены, адрес не распознан");
+                    setGpsCandidate(null);
+                    setAddressSuggestions([]);
+                    setAddressQuery("");
+                    setShowMapModal(true);
+
+                    toast.info(
+                        "Координаты получены. Уточните точку на карте, чтобы определить адрес."
+                    );
+
                     return;
                 }
 
@@ -672,16 +754,19 @@ const ProfilePage = () => {
             } catch (e) {
                 console.error("reverse geocode error:", e);
 
-                setLocationDraft(`Координаты: ${lat}, ${lng}`);
-                setAddressSuggestions([]);
-                setAddressQuery("");
-                setGpsCandidate({
+                setPickedCoords({
                     lat,
                     lng,
-                    address: `Координаты: ${lat}, ${lng}`,
                 });
 
-                toast.info("Координаты получены, адрес не распознан");
+                setGpsCandidate(null);
+                setAddressSuggestions([]);
+                setAddressQuery("");
+                setShowMapModal(true);
+
+                toast.info(
+                    "Координаты получены. Уточните точку на карте, чтобы определить адрес."
+                );
             }
         } catch (e) {
             console.error("Profile GPS error:", e);
@@ -1379,7 +1464,7 @@ const ProfilePage = () => {
                     </div>
                 </div>
 
-                <div className="profile-card glass">
+                <div className="profile-card profile-location-card glass">
                     <div className="card-head">
                         <div>
                             <h2 className="card-title">Местоположение</h2>
@@ -1504,7 +1589,6 @@ const ProfilePage = () => {
                         initialLat={profile?.locationLat}
                         initialLng={profile?.locationLng}
                         showOrders={false}
-                        orders={[]}
                         onPick={(picked) => {
                             setLocationDraft(picked.address);
                             setAddressSuggestions([]);

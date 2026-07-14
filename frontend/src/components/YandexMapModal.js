@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import "../styles/YandexMapModal.css";
+
+const EMPTY_ORDERS = Object.freeze([]);
 
 let ymapsLoaderPromise = null;
 
@@ -60,7 +63,7 @@ export default function YandexMapModal({
                                            initialLng,
                                            onPick,
                                            showOrders = false,
-                                           orders = [],
+                                           orders = EMPTY_ORDERS,
                                            currentUserId = null,
                                        }) {
     const apiKey = process.env.REACT_APP_YANDEX_API_KEY;
@@ -74,6 +77,12 @@ export default function YandexMapModal({
 
     const clickHandlerRef = useRef(null);
     const dragHandlerRef = useRef(null);
+
+    const reverseRequestIdRef = useRef(0);
+    const resizeObserverRef = useRef(null);
+    const viewportTimersRef = useRef([]);
+
+    const [mapReady, setMapReady] = useState(false);
 
     const [loading, setLoading] = useState(false);
     const [picked, setPicked] = useState(null);
@@ -138,11 +147,23 @@ export default function YandexMapModal({
     }, []);
 
     const setPickedPoint = useCallback(
-        async (lat, lng, shouldCenter = false) => {
+        async (latValue, lngValue, shouldCenter = false) => {
             const ymaps = ymapsRef.current;
             const map = mapRef.current;
 
-            if (!ymaps || !map) return;
+            const lat = Number(latValue);
+            const lng = Number(lngValue);
+
+            if (
+                !ymaps ||
+                !map ||
+                !Number.isFinite(lat) ||
+                !Number.isFinite(lng)
+            ) {
+                return;
+            }
+
+            const requestId = ++reverseRequestIdRef.current;
 
             if (!userPlacemarkRef.current) {
                 const placemark = new ymaps.Placemark(
@@ -158,24 +179,64 @@ export default function YandexMapModal({
                 map.geoObjects.add(placemark);
 
                 const dragHandler = async () => {
-                    const coords = placemark.geometry.getCoordinates();
+                    const coords =
+                        placemark.geometry.getCoordinates();
 
-                    if (!coords || coords.length < 2) return;
+                    if (!coords || coords.length < 2) {
+                        return;
+                    }
 
-                    await setPickedPoint(coords[0], coords[1], false);
+                    await setPickedPoint(
+                        coords[0],
+                        coords[1],
+                        false
+                    );
                 };
 
                 dragHandlerRef.current = dragHandler;
-                placemark.events.add("dragend", dragHandler);
+
+                placemark.events.add(
+                    "dragend",
+                    dragHandler
+                );
             } else {
-                userPlacemarkRef.current.geometry.setCoordinates([lat, lng]);
+                userPlacemarkRef.current.geometry.setCoordinates([
+                    lat,
+                    lng,
+                ]);
             }
 
+            /*
+             * Координаты показываем сразу.
+             * Адрес догружаем отдельно.
+             */
+            setPicked({
+                lat,
+                lng,
+                address: "Определяем адрес…",
+            });
+
             if (shouldCenter) {
-                map.setCenter([lat, lng], Math.max(map.getZoom(), 12));
+                map.setCenter(
+                    [lat, lng],
+                    Math.max(map.getZoom(), 12),
+                    {
+                        duration: 0,
+                    }
+                );
             }
 
             const address = await reverseGeocode(lat, lng);
+
+            /*
+             * Если пользователь успел выбрать другую точку,
+             * старый reverse-geocode не должен её перезаписать.
+             */
+            if (
+                requestId !== reverseRequestIdRef.current
+            ) {
+                return;
+            }
 
             setPicked({
                 lat,
@@ -307,16 +368,45 @@ export default function YandexMapModal({
 
         let cancelled = false;
 
+        const clearViewportTimers = () => {
+            viewportTimersRef.current.forEach((timer) => {
+                clearTimeout(timer);
+            });
+
+            viewportTimersRef.current = [];
+        };
+
+        const fitMap = () => {
+            if (cancelled || !mapRef.current) {
+                return;
+            }
+
+            try {
+                mapRef.current.container.fitToViewport();
+            } catch (error) {
+                console.warn(
+                    "Yandex map fitToViewport error:",
+                    error
+                );
+            }
+        };
+
         const initMap = async () => {
             try {
                 setLoading(true);
                 setError(null);
                 setPicked(null);
+                setMapReady(false);
 
                 const ymaps = await loadYMaps(apiKey);
                 await ymaps.ready();
 
-                if (cancelled || !mapNodeRef.current) return;
+                if (
+                    cancelled ||
+                    !mapNodeRef.current
+                ) {
+                    return;
+                }
 
                 ymapsRef.current = ymaps;
 
@@ -330,42 +420,89 @@ export default function YandexMapModal({
                 clickHandlerRef.current = null;
                 dragHandlerRef.current = null;
 
-                const map = new ymaps.Map(mapNodeRef.current, {
-                    center: initialCenter,
-                    zoom: hasInitialCoords ? 12 : 10,
-                    controls: ["zoomControl"],
-                });
+                const map = new ymaps.Map(
+                    mapNodeRef.current,
+                    {
+                        center: initialCenter,
+                        zoom: hasInitialCoords ? 14 : 10,
+                        controls: ["zoomControl"],
+                    },
+                    {
+                        suppressMapOpenBlock: true,
+                    }
+                );
 
                 mapRef.current = map;
 
-                const clickHandler = async (e) => {
-                    const coords = e.get("coords");
+                const clickHandler = async (event) => {
+                    const coords = event.get("coords");
 
-                    if (!coords || coords.length < 2) return;
+                    if (!coords || coords.length < 2) {
+                        return;
+                    }
 
-                    await setPickedPoint(coords[0], coords[1], true);
+                    await setPickedPoint(
+                        coords[0],
+                        coords[1],
+                        false
+                    );
                 };
 
                 clickHandlerRef.current = clickHandler;
-                map.events.add("click", clickHandler);
 
-                // Дать контейнеру модалки отрисоваться, затем подогнать карту.
-                requestAnimationFrame(async () => {
-                    if (cancelled || !mapRef.current) return;
+                map.events.add(
+                    "click",
+                    clickHandler
+                );
 
-                    try {
-                        map.container.fitToViewport();
-                    } catch {}
+                /*
+                 * iOS-модалка может менять размер после первого кадра.
+                 * Поэтому подгоняем карту несколько раз.
+                 */
+                requestAnimationFrame(fitMap);
 
-                    if (hasInitialCoords) {
-                        await setPickedPoint(initialCenter[0], initialCenter[1], false);
-                    }
+                viewportTimersRef.current = [
+                    setTimeout(fitMap, 80),
+                    setTimeout(fitMap, 250),
+                    setTimeout(fitMap, 600),
+                ];
 
-                    renderOrders();
-                });
-            } catch (e) {
-                console.error(e);
-                setError("Не удалось загрузить Яндекс.Карту");
+                if (
+                    typeof ResizeObserver !== "undefined" &&
+                    mapNodeRef.current
+                ) {
+                    resizeObserverRef.current =
+                        new ResizeObserver(() => {
+                            fitMap();
+                        });
+
+                    resizeObserverRef.current.observe(
+                        mapNodeRef.current
+                    );
+                }
+
+                if (hasInitialCoords) {
+                    await setPickedPoint(
+                        initialCenter[0],
+                        initialCenter[1],
+                        false
+                    );
+                }
+
+                if (!cancelled) {
+                    setMapReady(true);
+                }
+            } catch (error) {
+                console.error(
+                    "Yandex map initialization error:",
+                    error
+                );
+
+                if (!cancelled) {
+                    setError(
+                        "Не удалось загрузить Яндекс.Карту"
+                    );
+                }
             } finally {
                 if (!cancelled) {
                     setLoading(false);
@@ -378,8 +515,21 @@ export default function YandexMapModal({
         return () => {
             cancelled = true;
 
+            reverseRequestIdRef.current += 1;
+
+            clearViewportTimers();
+
             try {
-                if (userPlacemarkRef.current && dragHandlerRef.current) {
+                resizeObserverRef.current?.disconnect?.();
+            } catch {}
+
+            resizeObserverRef.current = null;
+
+            try {
+                if (
+                    userPlacemarkRef.current &&
+                    dragHandlerRef.current
+                ) {
                     userPlacemarkRef.current.events.remove(
                         "dragend",
                         dragHandlerRef.current
@@ -388,8 +538,14 @@ export default function YandexMapModal({
             } catch {}
 
             try {
-                if (mapRef.current && clickHandlerRef.current) {
-                    mapRef.current.events.remove("click", clickHandlerRef.current);
+                if (
+                    mapRef.current &&
+                    clickHandlerRef.current
+                ) {
+                    mapRef.current.events.remove(
+                        "click",
+                        clickHandlerRef.current
+                    );
                 }
             } catch {}
 
@@ -404,6 +560,7 @@ export default function YandexMapModal({
             clickHandlerRef.current = null;
             dragHandlerRef.current = null;
 
+            setMapReady(false);
             setLoading(false);
             setError(null);
             setPicked(null);
@@ -414,19 +571,31 @@ export default function YandexMapModal({
         initialCenter,
         hasInitialCoords,
         setPickedPoint,
-        renderOrders,
     ]);
 
     useEffect(() => {
-        if (!isOpen || !mapRef.current) return;
+        if (
+            !isOpen ||
+            !mapReady ||
+            !mapRef.current
+        ) {
+            return;
+        }
 
         renderOrders();
-    }, [isOpen, renderOrders]);
+    }, [
+        isOpen,
+        mapReady,
+        renderOrders,
+    ]);
 
     if (!isOpen) return null;
 
     return createPortal(
-        <div className="glass-modal-overlay" onClick={onClose}>
+        <div
+            className="glass-modal-overlay yandex-map-modal-overlay"
+            onClick={onClose}
+        >
             <div className="glass-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="glass-modal-head">
                     <div>

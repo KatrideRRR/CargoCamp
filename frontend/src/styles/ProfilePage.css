@@ -2061,3 +2061,46 @@
         transition: none !important;
     }
 }
+
+/* Карточка местоположения должна выпускать подсказки наружу */
+.profile-location-card {
+    overflow: visible;
+    z-index: 30;
+}
+
+.profile-location-card .card-head,
+.profile-location-card .loc-row,
+.profile-location-card .grid-2,
+.profile-location-card .gps-confirm,
+.profile-location-card .loc-meta,
+.profile-location-card .loc-error {
+    position: relative;
+}
+
+.profile-location-card .card-head {
+    z-index: 1;
+}
+
+.profile-location-card .loc-row {
+    z-index: 50;
+    align-items: start;
+}
+
+.profile-location-card .loc-input-wrap {
+    position: relative;
+    z-index: 100;
+}
+
+.profile-location-card .loc-suggestions {
+    z-index: 5000;
+}
+
+.profile-location-card .grid-2 {
+    z-index: 1;
+}
+
+@media (max-width: 520px) {
+    .profile-location-card .loc-suggestions {
+        max-height: min(280px, 42vh);
+    }
+}
