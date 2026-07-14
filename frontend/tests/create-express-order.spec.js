@@ -330,16 +330,6 @@ test.describe("CreateExpressOrder", () => {
         await expect(page.locator(".exo-typeBtn.isActive")).toContainText("Такси");
     });
 
-    test("загружает сохранённые адреса", async ({ page }) => {
-        await expect(page.locator(".exo-pill").filter({ hasText: "Адреса: 2" })).toBeVisible({
-            timeout: 10000,
-        });
-
-        await expect(page.locator(".exo-saTag").filter({ hasText: "Дом" })).toBeVisible();
-        await expect(page.locator(".exo-saTag").filter({ hasText: "Работа" })).toBeVisible();
-
-    });
-
     test("показывает адресные подсказки для точки A и выбирает адрес", async ({ page }) => {
         const fromInput = page.getByPlaceholder("Адрес точки A");
 

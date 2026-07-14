@@ -52,7 +52,10 @@
     "build": "react-app-rewired build",
     "test": "react-scripts test",
     "build:android": "npm run build && npx cap sync android",
-    "open:android": "npx cap open android"
+    "open:android": "npx cap open android",
+    "test:e2e": "playwright test --project=chromium --workers=1",
+    "test:e2e:headed": "playwright test --project=chromium --workers=1 --headed",
+    "predeploy": "npm run build && npm run test:e2e"
   },
   "eslintConfig": {
     "extends": [

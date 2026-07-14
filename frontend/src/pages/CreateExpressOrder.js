@@ -5,7 +5,6 @@ import axiosInstance from "../utils/axiosInstance";
 import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrentLocation";
 import YandexMapModal from "../components/YandexMapModal";
 import ExpressRouteMapModal from "../components/ExpressRouteMapModal";
-import ExpressSavedAddressesBar from "../components/ExpressSavedAddressesBar";
 import { FaTaxi, FaBox, FaLocationArrow, FaMapMarkedAlt } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
@@ -489,21 +488,6 @@ const CreateExpressOrder = () => {
                         <div className="exo-alertText">{error}</div>
                     </div>
                 )}
-
-                {/* Saved addresses */}
-                <ExpressSavedAddressesBar
-                    items={saved}
-                    onPickFrom={(item) => {
-                        setField("fromAddress", item.address);
-                        setField("fromLat", String(item.lat));
-                        setField("fromLng", String(item.lng));
-                    }}
-                    onPickTo={(item) => {
-                        setField("toAddress", item.address);
-                        setField("toLat", String(item.lat));
-                        setField("toLng", String(item.lng));
-                    }}
-                />
 
                 {/* Main: route + price + create */}
                 <div className="exo-glass exo-card">

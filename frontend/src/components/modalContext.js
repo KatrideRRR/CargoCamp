@@ -56,6 +56,123 @@ const canReviewOrder = ({ orderType, userId, creatorId, executorId }) => {
     );
 };
 
+const ORDER_REQUEST_SHOWN_STORAGE_KEY =
+    "shown_order_request_notifications";
+
+const getShownOrderRequestKeys = () => {
+    try {
+        const raw = localStorage.getItem(
+            ORDER_REQUEST_SHOWN_STORAGE_KEY
+        );
+
+        const parsed = raw ? JSON.parse(raw) : [];
+
+        return Array.isArray(parsed)
+            ? parsed.map(String)
+            : [];
+    } catch (error) {
+        console.warn(
+            "Ошибка чтения показанных уведомлений order_request:",
+            error
+        );
+
+        return [];
+    }
+};
+
+const getOrderRequestNotificationKey = (notification) => {
+    if (!notification) return null;
+
+    const notificationId =
+        notification.id ||
+        notification.notificationId ||
+        notification?.data?.notificationId ||
+        notification?.data?.id;
+
+    if (notificationId) {
+        return `notification_${notificationId}`;
+    }
+
+    const orderId =
+        notification.orderId ||
+        notification?.data?.orderId;
+
+    const executorId =
+        notification.executorId ||
+        notification.requesterId ||
+        notification?.data?.executorId ||
+        notification?.data?.requesterId ||
+        "unknown";
+
+    const createdAt =
+        notification.createdAt ||
+        notification.created_at ||
+        notification?.data?.createdAt ||
+        notification?.data?.created_at ||
+        "unknown";
+
+    if (!orderId) return null;
+
+    return `order_${orderId}_executor_${executorId}_created_${createdAt}`;
+};
+
+const wasOrderRequestNotificationShown = (notification) => {
+    const key = getOrderRequestNotificationKey(notification);
+
+    if (!key) return false;
+
+    return getShownOrderRequestKeys().includes(key);
+};
+
+const markOrderRequestNotificationShown = (notification) => {
+    const key = getOrderRequestNotificationKey(notification);
+
+    if (!key) return;
+
+    const shownKeys = getShownOrderRequestKeys();
+
+    if (!shownKeys.includes(key)) {
+        shownKeys.push(key);
+    }
+
+    try {
+        localStorage.setItem(
+            ORDER_REQUEST_SHOWN_STORAGE_KEY,
+            JSON.stringify(shownKeys.slice(-100))
+        );
+    } catch (error) {
+        console.warn(
+            "Ошибка сохранения показанного order_request:",
+            error
+        );
+    }
+};
+
+const isNotificationFresh = (
+    notification,
+    maxAgeMs = 2 * 60 * 1000
+) => {
+    const rawDate =
+        notification?.createdAt ||
+        notification?.created_at ||
+        notification?.data?.createdAt ||
+        notification?.data?.created_at;
+
+    /*
+     * Не показываем модалку, если сервер не передал дату.
+     * Это защищает от старых уведомлений из общего списка.
+     */
+    if (!rawDate) return false;
+
+    const timestamp = new Date(rawDate).getTime();
+
+    if (!Number.isFinite(timestamp)) return false;
+
+    const age = Date.now() - timestamp;
+
+    return age >= 0 && age <= maxAgeMs;
+};
+
 export const ModalProvider = ({ children }) => {
     const [modalData, setModalData] = useState(null);
     const [userId, setUserId] = useState(null);
@@ -585,131 +702,226 @@ export const ModalProvider = ({ children }) => {
         };
 
         const handleNewNotification = (notifications) => {
+            /*
+             * Сервер может прислать как одно уведомление,
+             * так и весь список уведомлений пользователя.
+             */
+            const sourceList = Array.isArray(notifications)
+                ? notifications
+                : [notifications];
 
-            const list = Array.isArray(notifications) ? notifications : [notifications];
+            /*
+             * order_push здесь не обрабатываем.
+             * Но не прекращаем обработку всего массива,
+             * а удаляем только элементы order_push.
+             */
+            const list = sourceList.filter((notification) => {
+                const type =
+                    notification?.type ||
+                    notification?.data?.type;
 
-            // ✅ Не обрабатываем order_push здесь,
-
-            // потому что он уже обрабатывается в App через new_notification / push_notification
-
-            const hasOrderPush = list.some((n) => {
-
-                return n.type === "order_push" || n?.data?.type === "order_push";
-
+                return type !== "order_push";
             });
 
-            if (hasOrderPush) {
-
+            if (list.length === 0) {
                 return;
-
             }
 
-            const orderRequestNotification = list.find((n) => {
-                const type = n.type || n?.data?.type;
-                const orderType = n.orderType || n?.data?.orderType || "regular";
+            /*
+             * Новый отклик на обычный заказ.
+             *
+             * Защита:
+             * 1. уведомление должно быть свежим;
+             * 2. оно не должно быть показано ранее;
+             * 3. должен присутствовать orderId.
+             */
+            const orderRequestNotification = list.find((notification) => {
+                const type =
+                    notification?.type ||
+                    notification?.data?.type;
+
+                const orderType =
+                    notification?.orderType ||
+                    notification?.data?.orderType ||
+                    "regular";
+
+                const orderId =
+                    notification?.orderId ||
+                    notification?.data?.orderId;
 
                 return (
                     type === "order_request" &&
                     orderType !== "express" &&
-                    (n.orderId || n?.data?.orderId)
+                    Boolean(orderId) &&
+                    isNotificationFresh(notification) &&
+                    !wasOrderRequestNotificationShown(notification)
                 );
             });
 
             if (orderRequestNotification) {
                 const orderId =
-                    orderRequestNotification.orderId ||
+                    orderRequestNotification?.orderId ||
                     orderRequestNotification?.data?.orderId;
 
                 const creatorId =
-                    orderRequestNotification.creatorId ||
+                    orderRequestNotification?.creatorId ||
                     orderRequestNotification?.data?.creatorId ||
                     userId;
 
+                const executorId =
+                    orderRequestNotification?.executorId ||
+                    orderRequestNotification?.requesterId ||
+                    orderRequestNotification?.data?.executorId ||
+                    orderRequestNotification?.data?.requesterId ||
+                    "";
+
+                /*
+                 * Помечаем уведомление показанным до открытия модалки.
+                 * Поэтому повторное socket-событие не откроет её снова.
+                 */
+                markOrderRequestNotificationShown(
+                    orderRequestNotification
+                );
+
                 setOrderRequestData({
-                    title: orderRequestNotification.title || "Новый отклик на заказ",
+                    title:
+                        orderRequestNotification?.title ||
+                        "Новый отклик на заказ",
+
                     description:
-                        orderRequestNotification.body ||
-                        orderRequestNotification.message ||
+                        orderRequestNotification?.body ||
+                        orderRequestNotification?.message ||
                         `По заказу №${orderId} появился новый исполнитель`,
+
                     orderId,
                     creatorId,
-                    executorId:
-                        orderRequestNotification.executorId ||
-                        orderRequestNotification?.data?.executorId ||
-                        "",
+                    executorId,
+
+                    notificationId:
+                        orderRequestNotification?.id ||
+                        orderRequestNotification?.notificationId ||
+                        orderRequestNotification?.data?.notificationId ||
+                        null,
                 });
 
                 return;
             }
 
-            const cancelledNotification = list.find((n) => {
+            /*
+             * Отмена экспресс-заказа.
+             */
+            const cancelledNotification = list.find((notification) => {
+                const type =
+                    notification?.type ||
+                    notification?.data?.type;
 
-                const orderType = n.orderType || n?.data?.orderType;
+                const orderType =
+                    notification?.orderType ||
+                    notification?.data?.orderType;
 
-                const status = n?.data?.status;
+                const status =
+                    notification?.status ||
+                    notification?.data?.status;
+
+                const orderId =
+                    notification?.orderId ||
+                    notification?.data?.orderId;
+
+                const cancelledBy =
+                    notification?.cancelledBy ||
+                    notification?.data?.cancelledBy;
 
                 return (
-
                     orderType === "express" &&
-
-                    n.type === "express_cancelled" &&
-
+                    type === "express_cancelled" &&
                     status === "cancelled" &&
-
-                    (n.orderId || n?.data?.orderId) &&
-
-                    n?.data?.cancelledBy
-
+                    Boolean(orderId) &&
+                    Boolean(cancelledBy)
                 );
-
             });
 
-            const isNotificationFresh = (n, maxAgeMs = 2 * 60 * 1000) => {
-                const raw =
-                    n?.createdAt ||
-                    n?.created_at ||
-                    n?.data?.createdAt ||
-                    n?.data?.created_at;
-
-                if (!raw) return false;
-
-                const ts = new Date(raw).getTime();
-
-                if (!Number.isFinite(ts)) return false;
-
-                return Date.now() - ts <= maxAgeMs;
-            };
-
-            if (cancelledNotification && isNotificationFresh(cancelledNotification)) {
+            if (
+                cancelledNotification &&
+                isNotificationFresh(cancelledNotification)
+            ) {
                 openExpressCancelledModal({
-                    orderId: cancelledNotification.orderId || cancelledNotification?.data?.orderId,
-                    title: cancelledNotification.title || "Экспресс-заказ отменён",
-                    body: cancelledNotification.body,
-                    message: cancelledNotification.body,
-                    creatorId: cancelledNotification?.data?.creatorId,
-                    executorId: cancelledNotification?.data?.executorId,
-                    cancelledBy: cancelledNotification?.data?.cancelledBy,
-                    cancelledByRole: cancelledNotification?.data?.cancelledByRole,
-                    status: cancelledNotification?.data?.status || "cancelled",
+                    orderId:
+                        cancelledNotification?.orderId ||
+                        cancelledNotification?.data?.orderId,
+
+                    title:
+                        cancelledNotification?.title ||
+                        "Экспресс-заказ отменён",
+
+                    body:
+                        cancelledNotification?.body ||
+                        cancelledNotification?.data?.body,
+
+                    message:
+                        cancelledNotification?.message ||
+                        cancelledNotification?.body ||
+                        cancelledNotification?.data?.message,
+
+                    creatorId:
+                        cancelledNotification?.creatorId ||
+                        cancelledNotification?.data?.creatorId,
+
+                    executorId:
+                        cancelledNotification?.executorId ||
+                        cancelledNotification?.data?.executorId,
+
+                    cancelledBy:
+                        cancelledNotification?.cancelledBy ||
+                        cancelledNotification?.data?.cancelledBy,
+
+                    cancelledByRole:
+                        cancelledNotification?.cancelledByRole ||
+                        cancelledNotification?.data?.cancelledByRole,
+
+                    status:
+                        cancelledNotification?.status ||
+                        cancelledNotification?.data?.status ||
+                        "cancelled",
+
                     orderType: "express",
-                    data: cancelledNotification.data,
+                    data: cancelledNotification?.data,
                 });
 
                 return;
             }
 
-            const reviewNotification = list.find((n) => {
-                const orderType = n.orderType || n?.data?.orderType;
+            /*
+             * Просьба оставить отзыв по экспресс-заказу.
+             */
+            const reviewNotification = list.find((notification) => {
+                const type =
+                    notification?.type ||
+                    notification?.data?.type;
+
+                const orderType =
+                    notification?.orderType ||
+                    notification?.data?.orderType;
+
+                const orderId =
+                    notification?.orderId ||
+                    notification?.data?.orderId;
+
                 return (
                     orderType === "express" &&
-                    n.type === "review_needed" &&
-                    n.orderId
+                    type === "review_needed" &&
+                    Boolean(orderId) &&
+                    isNotificationFresh(notification)
                 );
             });
 
-            if (!reviewNotification) return;
+            if (!reviewNotification) {
+                return;
+            }
 
-            const orderId = reviewNotification.orderId || reviewNotification?.data?.orderId;
+            const orderId =
+                reviewNotification?.orderId ||
+                reviewNotification?.data?.orderId;
+
             const orderType = "express";
 
             if (hasSubmittedReview(orderId, orderType)) {
@@ -723,14 +935,26 @@ export const ModalProvider = ({ children }) => {
             markReminded(orderId, orderType);
 
             setCompletionNotificationData({
-                title: reviewNotification.title || "Экспресс-заказ завершён",
+                title:
+                    reviewNotification?.title ||
+                    "Экспресс-заказ завершён",
+
                 description:
-                    reviewNotification.body ||
-                    `Заказ номер ${reviewNotification.orderId}: Оставьте отзыв`,
-                orderId: reviewNotification.orderId || reviewNotification?.data?.orderId,
-                creatorId: reviewNotification?.data?.creatorId,
-                executorId: reviewNotification?.data?.executorId,
-                orderType: "express",
+                    reviewNotification?.body ||
+                    reviewNotification?.message ||
+                    `Заказ номер ${orderId}: Оставьте отзыв`,
+
+                orderId,
+
+                creatorId:
+                    reviewNotification?.creatorId ||
+                    reviewNotification?.data?.creatorId,
+
+                executorId:
+                    reviewNotification?.executorId ||
+                    reviewNotification?.data?.executorId,
+
+                orderType,
             });
         };
 

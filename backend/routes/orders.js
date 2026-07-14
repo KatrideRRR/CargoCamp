@@ -975,13 +975,20 @@ module.exports = (io) => {
                 orderId: order.id,
                 orderType: "regular",
                 data: {
+                    creatorId: order.creatorId || order.userId,
+                    executorId,
                     requesterId: executorId,
                     proposedSum: safeProposedSum,
                 },
                 socketEvent: `orderRequest:${String(order.creatorId || order.userId)}`,
                 socketPayload: {
                     orderId: order.id,
+                    orderType: "regular",
+
+                    creatorId: order.creatorId || order.userId,
+                    executorId,
                     requesterId: executorId,
+
                     proposedSum: safeProposedSum,
                 },
             });

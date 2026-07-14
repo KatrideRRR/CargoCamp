@@ -477,7 +477,38 @@ test.describe("ActiveOrdersPage", () => {
     });
 
     test("завершает заказ после подтверждения", async ({ page }) => {
+        let completionConfirmed = false;
+        let completeRequestCalled = false;
+        let confirmWasShown = false;
+        let successAlertWasShown = false;
+
+        /*
+         * После подтверждения завершения следующий GET должен вернуть
+         * уже обновлённый заказ с completedBy: [1].
+         */
+        await page.route("**/api/orders/active-orders", async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({
+                    orders: [
+                        {
+                            ...regularOrder,
+                            completedBy: completionConfirmed ? [1] : [],
+                            status: "active",
+                        },
+                    ],
+                    notifications: [],
+                }),
+            });
+        });
+
         await page.route("**/api/orders/complete/101", async (route) => {
+            expect(route.request().method()).toBe("POST");
+
+            completeRequestCalled = true;
+            completionConfirmed = true;
+
             await route.fulfill({
                 status: 200,
                 contentType: "application/json",
@@ -489,23 +520,51 @@ test.describe("ActiveOrdersPage", () => {
             });
         });
 
-        let confirmWasShown = false;
-
         page.on("dialog", async (dialog) => {
             if (dialog.type() === "confirm") {
                 confirmWasShown = true;
-                expect(dialog.message()).toContain("Подтвердить завершение заказа?");
+
+                expect(dialog.message()).toContain(
+                    "Подтвердить завершение заказа?"
+                );
+            }
+
+            if (
+                dialog.type() === "alert" &&
+                dialog.message().includes("Вы подтвердили завершение")
+            ) {
+                successAlertWasShown = true;
             }
 
             await dialog.accept();
         });
 
-        await page.getByRole("button", { name: /Завершить/i }).click();
+        await page.getByRole("button", {
+            name: /^Завершить$/,
+        }).click();
 
         await expect.poll(() => confirmWasShown).toBe(true);
+        await expect.poll(() => completeRequestCalled).toBe(true);
+        await expect.poll(() => successAlertWasShown).toBe(true);
 
         await expect(
-            page.getByText("Вы подтвердили завершение.")
+            page.getByText("Вы подтвердили завершение.", {
+                exact: true,
+            })
+        ).toBeVisible({
+            timeout: 10000,
+        });
+
+        await expect(
+            page.getByRole("button", {
+                name: /Ждём подтверждения/i,
+            })
+        ).toBeDisabled();
+
+        await expect(
+            page.getByRole("button", {
+                name: /Напомнить/i,
+            })
         ).toBeVisible();
     });
 

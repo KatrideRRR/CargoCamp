@@ -1,12 +1,11 @@
 const { Notification } = require("../models");
 const { sendPushToUser } = require("./pushService");
-const {
-    sendNotifications,
-    sendToUser,
-} = require("../socket");
+const { sendToUser } = require("../socket");
 
 function normalizeOrderType(orderType) {
-    return ["regular", "express"].includes(orderType) ? orderType : "regular";
+    return ["regular", "express"].includes(orderType)
+        ? orderType
+        : "regular";
 }
 
 function stringifyPushData(data = {}) {
@@ -29,9 +28,9 @@ function stringifyPushData(data = {}) {
  * Универсальное уведомление пользователю.
  *
  * 1. Создаёт запись Notification в БД
- * 2. Обновляет список уведомлений через socket
- * 3. Шлёт отдельное socket-событие, если передан socketEvent
- * 4. Шлёт push через Firebase
+ * 2. Отправляет через socket только новое уведомление
+ * 3. Отправляет отдельное socket-событие, если передан socketEvent
+ * 4. Отправляет push через Firebase
  */
 async function notifyUser({
                               userId,
@@ -45,7 +44,9 @@ async function notifyUser({
                               socketEvent = null,
                               socketPayload = null,
                           }) {
-    if (!userId || !type) return null;
+    if (!userId || !type) {
+        return null;
+    }
 
     const normalizedOrderType = normalizeOrderType(orderType);
 
@@ -68,37 +69,103 @@ async function notifyUser({
         data: payloadData,
     });
 
-    await sendNotifications(userId);
+    /*
+     * Отправляем через new_notification только что созданное
+     * уведомление, а не весь список уведомлений пользователя.
+     */
+    const notificationPayload = {
+        id: notification.id,
+        notificationId: notification.id,
 
+        userId: notification.userId,
+        type: notification.type,
+
+        title: notification.title,
+        body: notification.body,
+
+        orderId: notification.orderId,
+        orderType:
+            notification.orderType ||
+            normalizedOrderType,
+
+        messageId: notification.messageId || null,
+        isRead: Boolean(notification.isRead),
+
+        createdAt: notification.createdAt,
+
+        data: {
+            ...payloadData,
+            notificationId: notification.id,
+            createdAt: notification.createdAt,
+        },
+    };
+
+    sendToUser(
+        userId,
+        "new_notification",
+        notificationPayload
+    );
+
+    /*
+     * Дополнительное socket-событие для конкретного действия.
+     * Например orderRequest:12, reviewNeeded и так далее.
+     */
     if (socketEvent) {
         sendToUser(userId, socketEvent, {
             ...(socketPayload || {}),
-            type,
-            title,
-            body,
-            orderId,
-            orderType: normalizedOrderType,
+
             notificationId: notification.id,
+
+            type,
+            title: title || null,
+            body: body || null,
+
+            orderId:
+                socketPayload?.orderId ??
+                notification.orderId ??
+                orderId,
+
+            orderType:
+                socketPayload?.orderType ||
+                notification.orderType ||
+                normalizedOrderType,
+
+            createdAt: notification.createdAt,
         });
     }
 
+    /*
+     * Push отправляем отдельно.
+     * Ошибка push не должна ломать создание уведомления.
+     */
     sendPushToUser({
         userId,
         title: title || "CargoCamp",
         body: body || "Новое уведомление",
+
         data: stringifyPushData({
             notificationId: notification.id,
+            createdAt: notification.createdAt,
             ...payloadData,
         }),
-    }).catch((e) => {
-        console.error("push send failed:", e);
+    }).catch((error) => {
+        console.error(
+            "push send failed:",
+            error
+        );
     });
 
     return notification;
 }
 
 async function notifyMany(users = [], payload = {}) {
-    const uniqueUsers = [...new Set(users.filter(Boolean).map(Number))];
+    const uniqueUsers = [
+        ...new Set(
+            users
+                .filter(Boolean)
+                .map(Number)
+        ),
+    ];
 
     const results = [];
 

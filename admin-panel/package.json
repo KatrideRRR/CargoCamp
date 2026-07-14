@@ -23,7 +23,10 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "test:e2e": "playwright test --project=chromium --workers=1",
+    "test:e2e:headed": "playwright test --project=chromium --workers=1 --headed",
+    "predeploy": "npm run build && npm run test:e2e"
   },
   "eslintConfig": {
     "extends": [
