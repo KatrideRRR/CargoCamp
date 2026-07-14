@@ -204,7 +204,9 @@ async function setupChatMocks(page, options = {}) {
         await route.fulfill({
             status: 200,
             contentType: "application/json",
-            body: JSON.stringify(dispute),
+            body: JSON.stringify({
+                dispute: options.dispute || null,
+            }),
         });
     });
 }

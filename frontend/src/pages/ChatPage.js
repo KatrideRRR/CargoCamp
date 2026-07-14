@@ -181,14 +181,21 @@ const ChatPage = () => {
                 setOrder(orderData);
 
                 try {
-                    const { data: disputeData } = await axiosInstance.get(
+                    const { data: disputeResponse } = await axiosInstance.get(
                         `/disputes/order/${orderData.id}`
                     );
 
-                    setOrderDispute(disputeData || null);
+                    const dispute =
+                        disputeResponse?.dispute ||
+                        null;
+
+                    setOrderDispute(dispute);
                 } catch (e) {
                     if (e?.response?.status !== 404) {
-                        console.error(`Ошибка загрузки спора для заказа ${orderData.id}:`, e);
+                        console.error(
+                            `Ошибка загрузки спора для заказа ${orderData.id}:`,
+                            e
+                        );
                     }
 
                     setOrderDispute(null);
@@ -376,20 +383,27 @@ const ChatPage = () => {
 
     const fetchOrderDispute = async (targetOrderId) => {
         try {
-            const res = await axiosInstance.get(`/disputes/order/${targetOrderId}`);
+            const res = await axiosInstance.get(
+                `/disputes/order/${targetOrderId}`
+            );
 
-            if (res.data) {
-                setOrderDispute(res.data);
-                return res.data;
-            }
+            const dispute =
+                res.data?.dispute ||
+                null;
 
-            return null;
+            setOrderDispute(dispute);
+
+            return dispute;
         } catch (e) {
             if (e?.response?.status !== 404) {
-                console.error(`Ошибка получения спора по заказу ${targetOrderId}:`, e);
+                console.error(
+                    `Ошибка получения спора по заказу ${targetOrderId}:`,
+                    e
+                );
             }
 
             setOrderDispute(null);
+
             return null;
         }
     };
