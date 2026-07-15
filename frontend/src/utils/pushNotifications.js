@@ -210,6 +210,72 @@ function navigateFromPush(rawData, navigate, options = {}) {
         return;
     }
 
+    /*
+ * Пользователь получил новый отзыв.
+ *
+ * Заказ уже завершён, поэтому не отправляем его
+ * на active-orders. Открываем страницу его отзывов.
+ */
+    if (type === "review_received") {
+        const reviewedUserId =
+            data.reviewedUserId ||
+            data.toUserId ||
+            data.userId ||
+            currentUserId;
+
+        const reviewId =
+            data.reviewId ||
+            "";
+
+        if (reviewedUserId) {
+            const params =
+                new URLSearchParams();
+
+            if (reviewId) {
+                params.set(
+                    "reviewId",
+                    String(reviewId)
+                );
+            }
+
+            if (orderId) {
+                params.set(
+                    "orderId",
+                    String(orderId)
+                );
+            }
+
+            params.set(
+                "reason",
+                "review_received"
+            );
+
+            const query =
+                params.toString();
+
+            navigate(
+                `/complaints/${reviewedUserId}${
+                    query ? `?${query}` : ""
+                }`,
+                {
+                    replace: true,
+                }
+            );
+
+            return;
+        }
+
+        /*
+         * Защита на случай, если userId почему-то
+         * не удалось извлечь.
+         */
+        navigate("/profile", {
+            replace: true,
+        });
+
+        return;
+    }
+
     if (type === "express_available_nearby") {
         const expressId = data.orderId || data.expressOrderId || data.expressId;
 

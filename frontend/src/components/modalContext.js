@@ -531,15 +531,29 @@ export const ModalProvider = ({ children }) => {
                 selectedOrder.orderType ||
                 (selectedOrder.isExpress ? "express" : "regular");
 
-            await axiosInstance.post("/auth/review", {
-                orderId: selectedOrder.id,
-                rating,
-                text,
-                isExpress: !!selectedOrder.isExpress,
-                orderType,
-                toUserId: selectedOrder.toUserId || null,
-                isCancellationReview: !!selectedOrder.isCancellationReview,
-            });
+            const response =
+                await axiosInstance.post(
+                    "/auth/review",
+                    {
+                        orderId: selectedOrder.id,
+                        rating,
+                        text,
+                        isExpress:
+                            !!selectedOrder.isExpress,
+                        orderType,
+                        toUserId:
+                            selectedOrder.toUserId ||
+                            null,
+                        isCancellationReview:
+                            !!selectedOrder
+                                .isCancellationReview,
+                    }
+                );
+
+            console.log(
+                "REVIEW CREATED:",
+                response.data
+            );
 
             // ✅ больше не показываем напоминание по этому заказу
             markReviewSubmitted(selectedOrder.id, orderType);

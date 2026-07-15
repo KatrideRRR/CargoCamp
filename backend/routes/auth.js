@@ -10,6 +10,7 @@ const path = require('path');
 const axios = require("axios");
 const fs = require('fs');
 const SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
+const { notifyUser } = require("../services/notificationService");
 
 const avatarsDir = path.join(__dirname, "..", "uploads", "avatars");
 const uploadsRoot = path.join(__dirname, '..', 'uploads');
@@ -696,7 +697,8 @@ router.get("/reviews/user/:userId", async (req, res) => {
 
 router.post("/review", authenticateToken, async (req, res) => {
     try {
-        const fromUserId = req.user.id;
+        const fromUserId = Number(req.user.id);
+
         const {
             orderId,
             rating,
@@ -707,28 +709,65 @@ router.post("/review", authenticateToken, async (req, res) => {
         } = req.body;
 
         if (!orderId) {
-            return res.status(400).json({ message: "orderId обязателен" });
+            return res.status(400).json({
+                message: "orderId обязателен",
+            });
         }
 
-        const r = Number(rating);
-        if (!Number.isFinite(r) || r < 1 || r > 5) {
-            return res.status(400).json({ message: "rating должен быть от 1 до 5" });
+        const normalizedOrderId = Number(orderId);
+
+        if (!Number.isInteger(normalizedOrderId) || normalizedOrderId <= 0) {
+            return res.status(400).json({
+                message: "Некорректный orderId",
+            });
         }
+
+        const normalizedRating = Number(rating);
+
+        if (
+            !Number.isFinite(normalizedRating) ||
+            normalizedRating < 1 ||
+            normalizedRating > 5
+        ) {
+            return res.status(400).json({
+                message: "rating должен быть от 1 до 5",
+            });
+        }
+
+        const cleanText =
+            String(text || "").trim().slice(0, 800) ||
+            null;
 
         let targetOrder = null;
         let orderType = "regular";
 
-        // 1) если фронт явно передал, что заказ экспресс
+        /*
+         * Если фронт явно указал express, сначала ищем
+         * только экспресс-заказ.
+         */
         if (isExpress === true) {
-            targetOrder = await ExpressOrder.findByPk(orderId);
+            targetOrder = await ExpressOrder.findByPk(
+                normalizedOrderId
+            );
+
             orderType = "express";
         } else {
-            // 2) сначала пробуем обычный заказ
-            targetOrder = await Order.findByPk(orderId);
+            /*
+             * Сначала обычный заказ.
+             */
+            targetOrder = await Order.findByPk(
+                normalizedOrderId
+            );
 
-            // 3) если обычный не найден — пробуем экспресс
+            /*
+             * Если обычный заказ не найден,
+             * пробуем экспресс-заказ.
+             */
             if (!targetOrder) {
-                targetOrder = await ExpressOrder.findByPk(orderId);
+                targetOrder = await ExpressOrder.findByPk(
+                    normalizedOrderId
+                );
+
                 if (targetOrder) {
                     orderType = "express";
                 }
@@ -736,7 +775,9 @@ router.post("/review", authenticateToken, async (req, res) => {
         }
 
         if (!targetOrder) {
-            return res.status(404).json({ message: "Заказ не найден" });
+            return res.status(404).json({
+                message: "Заказ не найден",
+            });
         }
 
         const isCancelledExpressReview =
@@ -744,96 +785,262 @@ router.post("/review", authenticateToken, async (req, res) => {
             targetOrder.status === "cancelled" &&
             isCancellationReview === true;
 
-        if (targetOrder.status !== "completed" && !isCancelledExpressReview) {
+        /*
+         * Для обычных заказов отзыв разрешён только после completed.
+         * Для express дополнительно допускаем отзыв после отмены,
+         * когда пользователь оценивает отменившую сторону.
+         */
+        if (
+            targetOrder.status !== "completed" &&
+            !isCancelledExpressReview
+        ) {
             return res.status(400).json({
-                message: "Отзыв можно оставить только после завершения или отмены экспресс-заказа",
+                message:
+                    "Отзыв можно оставить только после завершения или отмены экспресс-заказа",
             });
         }
 
-        const isCreator = Number(targetOrder.creatorId) === Number(fromUserId);
-        const isExecutor = Number(targetOrder.executorId) === Number(fromUserId);
+        const creatorId = Number(targetOrder.creatorId);
+        const executorId = Number(targetOrder.executorId);
+
+        const isCreator =
+            creatorId === fromUserId;
+
+        const isExecutor =
+            executorId === fromUserId;
 
         if (!isCreator && !isExecutor) {
-            return res.status(403).json({ message: "Вы не участник этого заказа" });
+            return res.status(403).json({
+                message: "Вы не участник этого заказа",
+            });
         }
 
-        let toUserId = isCreator ? targetOrder.executorId : targetOrder.creatorId;
+        /*
+         * По умолчанию отзыв получает второй участник заказа.
+         */
+        let toUserId = isCreator
+            ? executorId
+            : creatorId;
 
-        if (isCancelledExpressReview && requestedToUserId) {
-            const requestedId = Number(requestedToUserId);
+        /*
+         * При отменённом express-заказе фронт может явно передать,
+         * кого пользователь оценивает.
+         */
+        if (
+            isCancelledExpressReview &&
+            requestedToUserId
+        ) {
+            const requestedId =
+                Number(requestedToUserId);
 
             const isValidTarget =
-                requestedId === Number(targetOrder.creatorId) ||
-                requestedId === Number(targetOrder.executorId);
+                requestedId === creatorId ||
+                requestedId === executorId;
 
             if (!isValidTarget) {
                 return res.status(400).json({
-                    message: "Нельзя оценить пользователя, который не участвовал в заказе",
+                    message:
+                        "Нельзя оценить пользователя, который не участвовал в заказе",
                 });
             }
 
-            if (requestedId === Number(fromUserId)) {
+            if (requestedId === fromUserId) {
                 return res.status(400).json({
-                    message: "Нельзя оставить отзыв самому себе",
+                    message:
+                        "Нельзя оставить отзыв самому себе",
                 });
             }
 
             toUserId = requestedId;
         }
 
-        if (!toUserId) {
-            return res.status(400).json({ message: "Невозможно определить второго участника" });
+        if (
+            !Number.isInteger(toUserId) ||
+            toUserId <= 0
+        ) {
+            return res.status(400).json({
+                message:
+                    "Невозможно определить второго участника",
+            });
         }
 
-        const existing = await OrderReview.findOne({
-            where: { orderId, orderType, fromUserId }
-        });
+        /*
+         * Сначала проверяем получателя.
+         * Иначе отзыв мог бы сохраниться, а затем запрос вернул бы 404.
+         */
+        const reviewedUser = await User.findByPk(
+            toUserId
+        );
 
-        if (existing) {
-            return res.status(400).json({ message: "Вы уже оставляли отзыв по этому заказу" });
+        if (!reviewedUser) {
+            return res.status(404).json({
+                message:
+                    "Пользователь для оценки не найден",
+            });
         }
 
-        await OrderReview.create({
-            orderId,
+        /*
+         * Проверяем повторный отзыв.
+         */
+        const existingReview =
+            await OrderReview.findOne({
+                where: {
+                    orderId: normalizedOrderId,
+                    orderType,
+                    fromUserId,
+                },
+            });
+
+        if (existingReview) {
+            return res.status(400).json({
+                message:
+                    "Вы уже оставляли отзыв по этому заказу",
+            });
+        }
+
+        /*
+         * Создаём отзыв.
+         */
+        const review = await OrderReview.create({
+            orderId: normalizedOrderId,
             fromUserId,
             toUserId,
-            rating: r,
-            text: (text || "").trim() || null,
+            rating: normalizedRating,
+            text: cleanText,
             orderType,
         });
 
-        const user = await User.findByPk(toUserId);
-        if (!user) {
-            return res.status(404).json({ message: "Пользователь для оценки не найден" });
+        /*
+         * Пересчитываем рейтинг получателя.
+         */
+        const currentRating =
+            Number(reviewedUser.rating || 0);
+
+        const currentCount =
+            Number(reviewedUser.ratingCount || 0);
+
+        const newRating =
+            (
+                currentRating * currentCount +
+                normalizedRating
+            ) /
+            (currentCount + 1);
+
+        reviewedUser.rating = newRating;
+        reviewedUser.ratingCount =
+            currentCount + 1;
+
+        await reviewedUser.save();
+
+        /*
+         * Формируем понятное описание автора.
+         */
+        let reviewerRole = "Участник заказа";
+
+        if (isCreator) {
+            reviewerRole = "Заказчик";
+        } else if (isExecutor) {
+            reviewerRole = "Исполнитель";
         }
 
-        const currentRating = Number(user.rating || 0);
-        const currentCount = Number(user.ratingCount || 0);
-        const newRating = (currentRating * currentCount + r) / (currentCount + 1);
+        const notificationTitle =
+            "Вам оставили отзыв";
 
-        user.rating = newRating;
-        user.ratingCount = currentCount + 1;
-        await user.save();
+        const notificationBody =
+            `${reviewerRole} оставил вам отзыв ` +
+            `по заказу №${normalizedOrderId}: ` +
+            `${normalizedRating} ★`;
+
+        /*
+         * Уведомление создаём после успешного сохранения отзыва
+         * и пересчёта рейтинга.
+         *
+         * Ошибка уведомления не должна превращать успешное
+         * сохранение отзыва в ошибку для пользователя.
+         */
+        try {
+            await notifyUser({
+                userId: toUserId,
+
+                type: "review_received",
+
+                title: notificationTitle,
+                body: notificationBody,
+
+                orderId: normalizedOrderId,
+                orderType,
+
+                data: {
+                    reviewId: review.id,
+
+                    reviewerId: fromUserId,
+                    reviewedUserId: toUserId,
+
+                    creatorId,
+                    executorId,
+
+                    rating: normalizedRating,
+                    hasText: Boolean(cleanText),
+
+                    isCancellationReview:
+                        Boolean(
+                            isCancelledExpressReview
+                        ),
+                },
+            });
+        } catch (notificationError) {
+            console.error(
+                "Ошибка отправки уведомления о новом отзыве:",
+                {
+                    message:
+                    notificationError?.message,
+                    reviewId: review.id,
+                    orderId: normalizedOrderId,
+                    orderType,
+                    reviewerId: fromUserId,
+                    reviewedUserId: toUserId,
+                }
+            );
+        }
 
         return res.json({
             message: "Отзыв сохранён",
+
+            review: {
+                id: review.id,
+                orderId: review.orderId,
+                orderType: review.orderType,
+                fromUserId: review.fromUserId,
+                toUserId: review.toUserId,
+                rating: review.rating,
+                text: review.text,
+                createdAt: review.createdAt,
+            },
+
             orderType,
             toUserId,
-            rating: user.rating,
-            ratingCount: user.ratingCount,
+
+            rating: reviewedUser.rating,
+            ratingCount:
+            reviewedUser.ratingCount,
         });
     } catch (e) {
         if (
-            e?.name === "SequelizeUniqueConstraintError" ||
+            e?.name ===
+            "SequelizeUniqueConstraintError" ||
             e?.original?.code === "ER_DUP_ENTRY"
         ) {
             return res.status(400).json({
-                message: "Вы уже оставляли отзыв по этому заказу",
+                message:
+                    "Вы уже оставляли отзыв по этому заказу",
             });
         }
 
         console.error("review error:", e);
-        return res.status(500).json({ message: "Ошибка сервера" });
+
+        return res.status(500).json({
+            message: "Ошибка сервера",
+        });
     }
 });
 
