@@ -5,7 +5,13 @@ import { useNavigate } from "react-router-dom";
 import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrentLocation";
 import { useAuth } from "../utils/authContext";
 import axios from "axios";
-import { FaHeadset } from "react-icons/fa";
+import axiosInstance from "../utils/axiosInstance";
+import {
+    FaHeadset,
+    FaLightbulb,
+    FaTrophy,
+    FaPaperPlane,
+} from "react-icons/fa";
 
 import "../styles/ProfilePage.css";
 
@@ -131,6 +137,10 @@ const ProfilePage = () => {
     const [showVerificationModal, setShowVerificationModal] = useState(false);
     const [showAgreement, setShowAgreement] = useState(false);
     const [showUnbindConfirm, setShowUnbindConfirm] = useState(false);
+
+    const [showSuggestionModal, setShowSuggestionModal] = useState(false);
+    const [suggestionText, setSuggestionText] = useState("");
+    const [suggestionSending, setSuggestionSending] = useState(false);
 
     const [paymentMethodId, setPaymentMethodId] = useState(null);
 
@@ -1061,6 +1071,71 @@ const ProfilePage = () => {
         }
     };
 
+    const openSuggestionModal = () => {
+        setSuggestionText("");
+        setShowSuggestionModal(true);
+    };
+
+    const closeSuggestionModal = () => {
+        if (suggestionSending) return;
+
+        setShowSuggestionModal(false);
+        setSuggestionText("");
+    };
+
+    const submitPlatformSuggestion = async () => {
+        const cleanText = String(suggestionText || "").trim();
+
+        if (cleanText.length < 10) {
+            toast.info("Опишите предложение немного подробнее");
+            return;
+        }
+
+        if (cleanText.length > 2000) {
+            toast.error("Предложение не должно превышать 2000 символов");
+            return;
+        }
+
+        try {
+            setSuggestionSending(true);
+
+            const platformLabel =
+                platform === "ios"
+                    ? "iOS"
+                    : platform === "android"
+                        ? "Android"
+                        : "Web";
+
+            const message = [
+                "💡 ПРЕДЛОЖЕНИЕ ПО РАЗВИТИЮ CARGOCAMP",
+                "",
+                cleanText,
+                "",
+                `Платформа: ${platformLabel}`,
+                `Пользователь: ${profile?.username || "Неизвестно"}`,
+                `ID пользователя: ${profile?.id || "Неизвестно"}`,
+            ].join("\n");
+
+            await axiosInstance.post("/support/messages", {
+                text: message,
+            });
+
+            toast.success("Спасибо! Предложение отправлено");
+
+            setShowSuggestionModal(false);
+            setSuggestionText("");
+        } catch (error) {
+            console.error("Ошибка отправки предложения:", error);
+
+            toast.error(
+                error?.response?.data?.message ||
+                "Не удалось отправить предложение"
+            );
+        } finally {
+            setSuggestionSending(false);
+        }
+    };
+
     const handleOrderHistory = () => {
         if (profile) {
             navigate(`/orders-history/${profile.id}`);
@@ -1183,13 +1258,58 @@ const ProfilePage = () => {
                                     </div>
                                 </div>
 
-                                <button
-                                    className="profile-action-button"
-                                    onClick={() => navigate("/support")}
-                                >
-                                    <FaHeadset />
-                                    <span>Поддержка</span>
-                                </button>
+                                <div className="profile-quick-actions">
+                                    <button
+                                        type="button"
+                                        className="profile-quick-action profile-quick-action-support"
+                                        onClick={() => navigate("/support")}
+                                    >
+        <span className="profile-quick-action-icon">
+            <FaHeadset />
+        </span>
+
+                                        <span className="profile-quick-action-content">
+            <strong>Поддержка</strong>
+            <small>Помощь и вопросы</small>
+        </span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        className="profile-quick-action profile-quick-action-idea"
+                                        onClick={openSuggestionModal}
+                                    >
+        <span className="profile-quick-action-icon">
+            <FaLightbulb />
+        </span>
+
+                                        <span className="profile-quick-action-content">
+            <strong>Предложить идею</strong>
+            <small>Помогите улучшить CargoCamp</small>
+        </span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        className="profile-quick-action profile-quick-action-disabled"
+                                        disabled
+                                        aria-disabled="true"
+                                        title="Раздел достижений находится в разработке"
+                                    >
+        <span className="profile-quick-action-icon">
+            <FaTrophy />
+        </span>
+
+                                        <span className="profile-quick-action-content">
+            <strong>Достижения</strong>
+            <small>Бонусы и активные навыки</small>
+        </span>
+
+                                        <span className="profile-coming-soon">
+            Скоро
+        </span>
+                                    </button>
+                                </div>
 
                             </div>
                         </div>
@@ -1646,6 +1766,113 @@ const ProfilePage = () => {
                     </button>
                 </div>
             </div>
+
+            {showSuggestionModal && (
+                <div
+                    className="modal-overlay profile-suggestion-overlay"
+                    onClick={closeSuggestionModal}
+                >
+                    <div
+                        className="modal-window profile-suggestion-modal"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            type="button"
+                            className="profile-suggestion-close"
+                            onClick={closeSuggestionModal}
+                            disabled={suggestionSending}
+                            aria-label="Закрыть"
+                        >
+                            ×
+                        </button>
+
+                        <div className="profile-suggestion-head">
+                            <div className="profile-suggestion-icon">
+                                <FaLightbulb />
+                            </div>
+
+                            <div>
+                                <h3>Предложить улучшение</h3>
+
+                                <p>
+                                    Расскажите, что стоит добавить, исправить
+                                    или сделать удобнее.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="profile-suggestion-reward">
+                            <strong>Бонус за полезную идею</strong>
+
+                            <span>
+                    Если предложение поможет развитию платформы,
+                    после рассмотрения мы можем подарить вам
+                    1 день Premium.
+                </span>
+                        </div>
+
+                        <label className="profile-suggestion-label">
+                            Ваше предложение
+
+                            <textarea
+                                className="profile-suggestion-textarea"
+                                value={suggestionText}
+                                onChange={(e) =>
+                                    setSuggestionText(
+                                        e.target.value.slice(0, 2000)
+                                    )
+                                }
+                                placeholder={
+                                    "Например: добавьте фильтр заказов по времени, " +
+                                    "измените работу карты или сделайте новый способ оплаты..."
+                                }
+                                rows={7}
+                                maxLength={2000}
+                                disabled={suggestionSending}
+                                autoFocus
+                            />
+                        </label>
+
+                        <div className="profile-suggestion-counter">
+                            {suggestionText.length} / 2000
+                        </div>
+
+                        <div className="profile-suggestion-note">
+                            Предложение поступит в поддержку CargoCamp.
+                            Ответ при необходимости появится в чате поддержки.
+                        </div>
+
+                        <div className="profile-suggestion-actions">
+                            <button
+                                type="button"
+                                className="btn btn-ghost"
+                                onClick={closeSuggestionModal}
+                                disabled={suggestionSending}
+                            >
+                                Отмена
+                            </button>
+
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={submitPlatformSuggestion}
+                                disabled={
+                                    suggestionSending ||
+                                    suggestionText.trim().length < 10
+                                }
+                            >
+                                <FaPaperPlane />
+
+                                <span>
+                        {suggestionSending
+                            ? "Отправляем..."
+                            : "Отправить идею"}
+                    </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {showAgreement && (
                 <AgreementModal
