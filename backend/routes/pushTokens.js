@@ -34,16 +34,6 @@ router.post("/register", authenticateToken, async (req, res) => {
             ? platform
             : "android";
 
-        console.log("PUSH REGISTER REQUEST:", {
-            userId,
-            platform,
-            safePlatform,
-            deviceId,
-            appVersion,
-            tokenLen: token.length,
-            tokenStart: token.slice(0, 25),
-        });
-
         const tokenHash = makeTokenHash(token);
 
         const [row, created] = await PushToken.findOrCreate({
@@ -74,14 +64,6 @@ router.post("/register", authenticateToken, async (req, res) => {
                 lastSeenAt: new Date(),
             });
         }
-
-        console.log("PUSH REGISTER SAVED:", {
-            userId,
-            pushTokenId: row.id,
-            created,
-            platform: safePlatform,
-            isActive: true,
-        });
 
         return res.json({
             success: true,

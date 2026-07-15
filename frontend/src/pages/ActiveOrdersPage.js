@@ -314,9 +314,37 @@ const ActiveOrdersPage = () => {
         }
     };
 
-    const openModal = (images) => {
-        setCurrentImages(Array.isArray(images) ? images : []);
-        setCurrentImageIndex(0);
+    const normalizePhotoArray = (value) => {
+        if (Array.isArray(value)) {
+            return value.filter(Boolean);
+        }
+
+        if (typeof value === "string") {
+            try {
+                const parsed = JSON.parse(value);
+                return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+            } catch {
+                return [];
+            }
+        }
+
+        return [];
+    };
+
+    const openModal = (images, startIndex = 0) => {
+        const normalizedImages = normalizePhotoArray(images);
+
+        if (normalizedImages.length === 0) {
+            return;
+        }
+
+        const safeIndex =
+            startIndex >= 0 && startIndex < normalizedImages.length
+                ? startIndex
+                : 0;
+
+        setCurrentImages(normalizedImages);
+        setCurrentImageIndex(safeIndex);
         setIsModalOpen(true);
     };
 
@@ -394,53 +422,105 @@ const ActiveOrdersPage = () => {
         }
     };
 
-    const uploadOrderPhotos = async (orderId, type, files) => {
+    const uploadOrderPhotos = async (orderId, type, filesLike) => {
+        const uploadKey = `${orderId}_${type}`;
+
         try {
             const t = localStorage.getItem("authToken");
+
             if (!t) {
                 alert("Вы не авторизованы");
                 navigate("/login");
                 return;
             }
 
-            if (!files || files.length === 0) {
+            const files = Array.from(filesLike || []);
+
+            if (files.length === 0) {
                 alert("Выберите хотя бы одно фото");
                 return;
             }
 
-            setPhotoUploading((prev) => ({ ...prev, [`${orderId}_${type}`]: true }));
+            setPhotoUploading((prev) => ({
+                ...prev,
+                [uploadKey]: true,
+            }));
 
             const formData = new FormData();
-            Array.from(files).forEach((file) => {
-                formData.append("images", file, file.name);
+
+            files.forEach((file, index) => {
+                console.log("SELECTED IOS FILE:", {
+                    name: file?.name,
+                    type: file?.type,
+                    size: file?.size,
+                });
+
+                const fileName =
+                    file?.name ||
+                    `photo_${Date.now()}_${index}.jpg`;
+
+                formData.append("images", file, fileName);
             });
 
             const endpointMap = {
-                executorBefore: `/orders/${orderId}/executor-before-photos`,
-                executorAfter: `/orders/${orderId}/executor-after-photos`,
-                customerBefore: `/orders/${orderId}/customer-before-photos`,
-                customerAfter: `/orders/${orderId}/customer-after-photos`,
+                executorBefore:
+                    `/orders/${orderId}/executor-before-photos`,
+                executorAfter:
+                    `/orders/${orderId}/executor-after-photos`,
+                customerBefore:
+                    `/orders/${orderId}/customer-before-photos`,
+                customerAfter:
+                    `/orders/${orderId}/customer-after-photos`,
             };
 
             const endpoint = endpointMap[type];
+
             if (!endpoint) {
                 alert("Неизвестный тип загрузки");
                 return;
             }
 
-            await axiosInstance.post(endpoint, formData, {
-                headers: {
-                    Authorization: `Bearer ${t}`,
-                },
-            });
+            const response = await axios.post(
+                `${apiUrl}/api${endpoint}`,
+                formData,
+                {
+                    headers: {
+                        Authorization: `Bearer ${t}`,
+                    },
+                    timeout: 120000,
+                }
+            );
+
+            console.log("PHOTO UPLOAD RESPONSE:", response.data);
+
+            if (!response.data?.success) {
+                throw new Error("Сервер не сохранил фотографии");
+            }
 
             await fetchActiveOrders();
-            alert("Фото успешно загружены ✅");
+
+            alert(
+                files.length === 1
+                    ? "Фотография успешно загружена ✅"
+                    : `Фотографии успешно загружены: ${files.length} ✅`
+            );
         } catch (e) {
-            console.error("Ошибка загрузки фото:", e);
-            alert(e.response?.data?.message || "Ошибка при загрузке фото");
+            console.error("Ошибка загрузки фото:", {
+                message: e?.message,
+                status: e?.response?.status,
+                data: e?.response?.data,
+            });
+
+            alert(
+                e?.response?.data?.message ||
+                e?.message ||
+                "Ошибка при загрузке фото"
+            );
         } finally {
-            setPhotoUploading((prev) => ({ ...prev, [`${orderId}_${type}`]: false }));
+            setPhotoUploading((prev) => ({
+                ...prev,
+                [uploadKey]: false,
+            }));
         }
     };
 
@@ -469,24 +549,33 @@ const ActiveOrdersPage = () => {
         }
     };
 
-    const renderPhotoList = (photos = []) => {
-        if (!Array.isArray(photos) || photos.length === 0) {
+    const renderPhotoList = (photosValue = []) => {
+        const photos = normalizePhotoArray(photosValue);
+
+        if (photos.length === 0) {
             return <p className="photo-empty">Фото пока нет</p>;
         }
 
         return (
             <div className="protocol-photo-grid">
                 {photos.map((photo, index) => (
-                    <img
-                        key={index}
-                        src={`${apiUrl}${photo}`}
-                        alt={`protocol-${index + 1}`}
-                        className="protocol-photo"
+                    <button
+                        type="button"
+                        key={`${photo}-${index}`}
+                        className="protocol-photo-button"
                         onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
-                            openModal(photos);
+                            openModal(photos, index);
                         }}
-                    />
+                        aria-label={`Открыть фотографию ${index + 1}`}
+                    >
+                        <img
+                            src={`${apiUrl}${photo}`}
+                            alt={`Фото протокола ${index + 1}`}
+                            className="protocol-photo"
+                        />
+                    </button>
                 ))}
             </div>
         );
@@ -1178,115 +1267,224 @@ const ActiveOrdersPage = () => {
                                                         )}
 
                                                         <div className="photo-protocol-section">
-                                                            <h4 className="photo-protocol-title">Фото-протокол заказа</h4>
+                                                            <h4 className="photo-protocol-title">
+                                                                Фото-протокол заказа
+                                                            </h4>
 
                                                             <div className="photo-protocol-alert">
-                                                                Фото ДО и ПОСЛЕ необязательны, но помогают зафиксировать состояние объекта и результат работы.
+                                                                Фото ДО и ПОСЛЕ необязательны, но помогают зафиксировать
+                                                                состояние объекта и результат работы. Фотографии доступны
+                                                                обеим сторонам заказа.
                                                             </div>
 
-                                                            {isExecutor ? (
-                                                                <>
-                                                                    <div className="photo-protocol-card">
-                                                                        <div className="photo-protocol-head">
-                                                                            <strong>Фото ДО начала работы</strong>
-                                                                            <span className="photo-protocol-warning">Рекомендуется</span>
-                                                                        </div>
+                                                            {/* ================= Фото ДО ================= */}
 
-                                                                        <p className="photo-protocol-hint">
-                                                                            Зафиксируйте состояние объекта до начала работы.
-                                                                        </p>
+                                                            <div className="photo-protocol-stage">
+                                                                <h5 className="photo-protocol-stage-title">
+                                                                    Фото ДО начала работы
+                                                                </h5>
 
-                                                                        {renderPhotoList(order.executorBeforePhotos)}
+                                                                <div className="photo-protocol-card">
+                                                                    <div className="photo-protocol-head">
+                                                                        <strong>Фото заказчика</strong>
 
-                                                                        <label className="photo-upload-button" onClick={(e) => e.stopPropagation()}>
-                                                                            {photoUploading[`${order.id}_executorBefore`] ? "Загрузка..." : "Загрузить фото ДО"}
+                                                                        <span className="photo-protocol-optional">
+                    До начала работ
+                </span>
+                                                                    </div>
+
+                                                                    <p className="photo-protocol-hint">
+                                                                        Состояние объекта, зафиксированное заказчиком.
+                                                                    </p>
+
+                                                                    {renderPhotoList(order.customerBeforePhotos)}
+
+                                                                    {isCreator && (
+                                                                        <label
+                                                                            className="photo-upload-button"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                        >
+                                                                            {photoUploading[`${order.id}_customerBefore`]
+                                                                                ? "Загрузка..."
+                                                                                : "Добавить фото заказчика ДО"}
+
                                                                             <input
                                                                                 type="file"
                                                                                 accept="image/*"
                                                                                 multiple
                                                                                 hidden
-                                                                                onChange={(e) => uploadOrderPhotos(order.id, "executorBefore", e.target.files)}
+                                                                                disabled={
+                                                                                    photoUploading[`${order.id}_customerBefore`]
+                                                                                }
+                                                                                onChange={async (e) => {
+                                                                                    const selectedFiles = e.target.files;
+
+                                                                                    await uploadOrderPhotos(
+                                                                                        order.id,
+                                                                                        "customerBefore",
+                                                                                        selectedFiles
+                                                                                    );
+
+                                                                                    e.target.value = "";
+                                                                                }}
                                                                             />
                                                                         </label>
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="photo-protocol-card">
+                                                                    <div className="photo-protocol-head">
+                                                                        <strong>Фото исполнителя</strong>
+
+                                                                        <span className="photo-protocol-warning">
+                    Рекомендуется
+                </span>
                                                                     </div>
 
-                                                                    <div className="photo-protocol-card">
-                                                                        <div className="photo-protocol-head">
-                                                                            <strong>Фото ПОСЛЕ выполнения работы</strong>
-                                                                            <span className="photo-protocol-warning">Рекомендуется</span>
-                                                                        </div>
+                                                                    <p className="photo-protocol-hint">
+                                                                        Состояние объекта, зафиксированное исполнителем до
+                                                                        начала работы.
+                                                                    </p>
 
-                                                                        <p className="photo-protocol-hint">
-                                                                            Зафиксируйте итоговый результат после выполнения.
-                                                                        </p>
+                                                                    {renderPhotoList(order.executorBeforePhotos)}
 
-                                                                        {renderPhotoList(order.executorAfterPhotos)}
+                                                                    {isExecutor && (
+                                                                        <label
+                                                                            className="photo-upload-button"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                        >
+                                                                            {photoUploading[`${order.id}_executorBefore`]
+                                                                                ? "Загрузка..."
+                                                                                : "Добавить фото исполнителя ДО"}
 
-                                                                        <label className="photo-upload-button" onClick={(e) => e.stopPropagation()}>
-                                                                            {photoUploading[`${order.id}_executorAfter`] ? "Загрузка..." : "Загрузить фото ПОСЛЕ"}
                                                                             <input
                                                                                 type="file"
                                                                                 accept="image/*"
                                                                                 multiple
                                                                                 hidden
-                                                                                onChange={(e) => uploadOrderPhotos(order.id, "executorAfter", e.target.files)}
+                                                                                disabled={
+                                                                                    photoUploading[`${order.id}_executorBefore`]
+                                                                                }
+                                                                                onChange={async (e) => {
+                                                                                    const selectedFiles = e.target.files;
+
+                                                                                    await uploadOrderPhotos(
+                                                                                        order.id,
+                                                                                        "executorBefore",
+                                                                                        selectedFiles
+                                                                                    );
+
+                                                                                    e.target.value = "";
+                                                                                }}
                                                                             />
                                                                         </label>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* ================= Фото ПОСЛЕ ================= */}
+
+                                                            <div className="photo-protocol-stage">
+                                                                <h5 className="photo-protocol-stage-title">
+                                                                    Фото ПОСЛЕ выполнения работы
+                                                                </h5>
+
+                                                                <div className="photo-protocol-card optional">
+                                                                    <div className="photo-protocol-head">
+                                                                        <strong>Фото заказчика</strong>
+
+                                                                        <span className="photo-protocol-optional">
+                    После выполнения
+                </span>
                                                                     </div>
-                                                                </>
-                                                            ) : null}
 
-                                                            {isCreator ? (
-                                                                <>
-                                                                    <div className="photo-protocol-card optional">
-                                                                        <div className="photo-protocol-head">
-                                                                            <strong>Ваши фото ДО</strong>
-                                                                            <span className="photo-protocol-optional">Необязательно</span>
-                                                                        </div>
+                                                                    <p className="photo-protocol-hint">
+                                                                        Результат работы, зафиксированный заказчиком.
+                                                                    </p>
 
-                                                                        <p className="photo-protocol-hint">
-                                                                            Можно добавить для фиксации состояния до начала работ.
-                                                                        </p>
+                                                                    {renderPhotoList(order.customerAfterPhotos)}
 
-                                                                        {renderPhotoList(order.customerBeforePhotos)}
+                                                                    {isCreator && (
+                                                                        <label
+                                                                            className="photo-upload-button"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                        >
+                                                                            {photoUploading[`${order.id}_customerAfter`]
+                                                                                ? "Загрузка..."
+                                                                                : "Добавить фото заказчика ПОСЛЕ"}
 
-                                                                        <label className="photo-upload-button" onClick={(e) => e.stopPropagation()}>
-                                                                            {photoUploading[`${order.id}_customerBefore`] ? "Загрузка..." : "Добавить фото ДО"}
                                                                             <input
                                                                                 type="file"
                                                                                 accept="image/*"
                                                                                 multiple
                                                                                 hidden
-                                                                                onChange={(e) => uploadOrderPhotos(order.id, "customerBefore", e.target.files)}
+                                                                                disabled={
+                                                                                    photoUploading[`${order.id}_customerAfter`]
+                                                                                }
+                                                                                onChange={async (e) => {
+                                                                                    const selectedFiles = e.target.files;
+
+                                                                                    await uploadOrderPhotos(
+                                                                                        order.id,
+                                                                                        "customerAfter",
+                                                                                        selectedFiles
+                                                                                    );
+
+                                                                                    e.target.value = "";
+                                                                                }}
                                                                             />
                                                                         </label>
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="photo-protocol-card">
+                                                                    <div className="photo-protocol-head">
+                                                                        <strong>Фото исполнителя</strong>
+
+                                                                        <span className="photo-protocol-warning">
+                    Рекомендуется
+                </span>
                                                                     </div>
 
-                                                                    <div className="photo-protocol-card optional">
-                                                                        <div className="photo-protocol-head">
-                                                                            <strong>Ваши фото ПОСЛЕ</strong>
-                                                                            <span className="photo-protocol-optional">Необязательно</span>
-                                                                        </div>
+                                                                    <p className="photo-protocol-hint">
+                                                                        Итоговый результат, зафиксированный исполнителем.
+                                                                    </p>
 
-                                                                        <p className="photo-protocol-hint">
-                                                                            Можно добавить, если хотите зафиксировать итоговый результат.
-                                                                        </p>
+                                                                    {renderPhotoList(order.executorAfterPhotos)}
 
-                                                                        {renderPhotoList(order.customerAfterPhotos)}
+                                                                    {isExecutor && (
+                                                                        <label
+                                                                            className="photo-upload-button"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                        >
+                                                                            {photoUploading[`${order.id}_executorAfter`]
+                                                                                ? "Загрузка..."
+                                                                                : "Добавить фото исполнителя ПОСЛЕ"}
 
-                                                                        <label className="photo-upload-button" onClick={(e) => e.stopPropagation()}>
-                                                                            {photoUploading[`${order.id}_customerAfter`] ? "Загрузка..." : "Добавить фото ПОСЛЕ"}
                                                                             <input
                                                                                 type="file"
                                                                                 accept="image/*"
                                                                                 multiple
                                                                                 hidden
-                                                                                onChange={(e) => uploadOrderPhotos(order.id, "customerAfter", e.target.files)}
+                                                                                disabled={
+                                                                                    photoUploading[`${order.id}_executorAfter`]
+                                                                                }
+                                                                                onChange={async (e) => {
+                                                                                    const selectedFiles = e.target.files;
+
+                                                                                    await uploadOrderPhotos(
+                                                                                        order.id,
+                                                                                        "executorAfter",
+                                                                                        selectedFiles
+                                                                                    );
+
+                                                                                    e.target.value = "";
+                                                                                }}
                                                                             />
                                                                         </label>
-                                                                    </div>
-                                                                </>
-                                                            ) : null}
+                                                                    )}
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
                                             </li>

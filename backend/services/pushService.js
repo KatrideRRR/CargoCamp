@@ -118,12 +118,6 @@ async function sendPushToUser({
     try {
         const response = await admin.messaging().sendEach(messages);
 
-        console.log("PUSH SEND RESULT:", {
-            userId,
-            successCount: response.successCount,
-            failureCount: response.failureCount,
-        });
-
         response.responses.forEach((r, idx) => {
             if (!r.success) {
                 const code = r.error?.code || "";
