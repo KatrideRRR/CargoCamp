@@ -6,6 +6,7 @@
   "dependencies": {
     "@capacitor-firebase/messaging": "^8.3.0",
     "@capacitor/android": "^8.3.1",
+    "@capacitor/app-launcher": "^8.0.1",
     "@capacitor/cli": "^8.3.1",
     "@capacitor/core": "^8.3.1",
     "@capacitor/geolocation": "^8.2.0",
