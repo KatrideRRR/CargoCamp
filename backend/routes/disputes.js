@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
+const { notifyUser } = require("../services/notificationService");
 
 const authMiddleware = require('../middlewares/userAuth');
 const { Dispute, Order, ActionLog } = require('../models');
@@ -66,6 +67,66 @@ router.post('/open', authMiddleware, async (req, res) => {
             description: description || null,
             status: 'open'
         });
+
+        /*
+ * Уведомление получает второй участник заказа.
+ *
+ * Если спор открыл заказчик — уведомляем исполнителя.
+ * Если спор открыл исполнитель — уведомляем заказчика.
+ */
+        const recipientUserId = isCreator
+            ? order.executorId
+            : order.creatorId;
+
+        const recipientRole = isCreator
+            ? "executor"
+            : "creator";
+
+        if (recipientUserId) {
+            try {
+                await notifyUser({
+                    userId: recipientUserId,
+
+                    type: "dispute_opened",
+
+                    title: `Открыт спор по заказу №${order.id}`,
+
+                    body:
+                        `Вторая сторона открыла спор по заказу №${order.id}. ` +
+                        `Причина: ${reason}`,
+
+                    orderId: order.id,
+                    orderType: "regular",
+
+                    data: {
+                        disputeId: dispute.id,
+
+                        creatorId: order.creatorId,
+                        executorId: order.executorId || "",
+
+                        openedById: userId,
+                        openedByRole: isCreator
+                            ? "creator"
+                            : "executor",
+
+                        recipientRole,
+
+                        reasonCode,
+                        reason,
+                        status: "open",
+                    },
+                });
+            } catch (notificationError) {
+                /*
+                 * Спор уже создан, поэтому ошибка уведомления
+                 * не должна возвращать пользователю ошибку открытия спора.
+                 */
+                console.error(
+                    "Ошибка уведомления об открытии спора:",
+                    notificationError
+                );
+            }
+        }
 
         await req.logAction({
             req,

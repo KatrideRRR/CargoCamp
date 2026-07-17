@@ -211,6 +211,38 @@ function navigateFromPush(rawData, navigate, options = {}) {
     }
 
     /*
+ * Открыт спор по обычному заказу.
+ *
+ * Заказчик открывает вкладку созданных заказов.
+ * Исполнитель открывает вкладку выполняемых заказов.
+ */
+    if (type === "dispute_opened" && orderId) {
+        const isCurrentUserExecutor =
+            currentUserId &&
+            data.executorId &&
+            Number(currentUserId) === Number(data.executorId);
+
+        const targetView =
+            isCurrentUserExecutor
+                ? "performing"
+                : "created";
+
+        navigate(
+            buildActiveOrdersUrl({
+                view: targetView,
+                orderId,
+                orderType: "regular",
+                reason: "dispute_opened",
+            }),
+            {
+                replace: true,
+            }
+        );
+
+        return;
+    }
+
+    /*
  * Пользователь получил новый отзыв.
  *
  * Заказ уже завершён, поэтому не отправляем его
