@@ -1,8 +1,79 @@
-* {
+/* =========================================================
+   GLOBAL RESET
+   ========================================================= */
+
+*,
+*::before,
+*::after {
     box-sizing: border-box;
 }
 
-/* ===== Base document scroll ===== */
+/* =========================================================
+   CSS VARIABLES / SAFE AREA
+   ========================================================= */
+
+:root {
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+
+    /*
+      Дополнительное расстояние ниже часов,
+      Dynamic Island и статус-бара.
+    */
+    --app-top-gap: 12px;
+    --app-bottom-gap: 12px;
+
+    /*
+      Высота нижнего меню CargoCamp.
+    */
+    --app-bottom-menu-height: 98px;
+
+    /*
+      Верхняя защищённая область страницы.
+    */
+    --app-top-guard-height: calc(
+            var(--safe-top) + var(--app-top-gap)
+    );
+
+    --app-page-top: var(--app-top-guard-height);
+
+    --app-page-bottom: calc(
+            var(--app-bottom-menu-height) +
+            var(--safe-bottom) +
+            var(--app-bottom-gap)
+    );
+
+    --app-page-bottom-no-menu: calc(
+            24px + var(--safe-bottom)
+    );
+
+    /*
+      Основной цвет, которым закрывается контент
+      возле системной панели телефона.
+    */
+    --app-system-bar-background: #f4f5f7;
+}
+
+/*
+  На некоторых Android WebView safe-area-inset-top равен 0.
+  Поэтому на мобильном устройстве оставляем минимум 34px.
+*/
+@media (max-width: 768px) and (hover: none) {
+    :root {
+        --app-top-guard-height: max(
+                calc(var(--safe-top) + var(--app-top-gap)),
+                34px
+        );
+
+        --app-page-top: var(--app-top-guard-height);
+    }
+}
+
+/* =========================================================
+   BASE DOCUMENT
+   ========================================================= */
 
 html,
 body,
@@ -13,64 +84,101 @@ body,
 }
 
 html {
-    background: #f4f5f7;
+    min-height: 100%;
     overflow-x: hidden;
+    background: var(--app-system-bar-background);
 }
 
 body {
     min-height: 100vh;
+    min-height: 100dvh;
+
+    margin: 0;
+
     overflow-x: hidden;
     overflow-y: auto;
 
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background: #f4f5f7;
+    font-family:
+            system-ui,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            sans-serif;
+
+    background: var(--app-system-bar-background);
     color: #1f2933;
+
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeSpeed;
 
     /*
-      Важно:
-      Не ставим body position: fixed.
-      Не ставим body overflow: hidden.
-      Иначе на iOS WebView ломается нормальный свайп/инерция.
+      Не ставить:
+      position: fixed;
+      overflow: hidden;
+
+      Иначе ломается прокрутка iOS WebView.
     */
 }
 
 #root {
     min-height: 100vh;
+    min-height: 100dvh;
+
     position: relative;
     overflow: visible;
+
+    isolation: isolate;
 }
 
-/* ===== CSS variables / safe area ===== */
+/* =========================================================
+   FIXED TOP SYSTEM GUARD
+   ========================================================= */
 
-:root {
-    --safe-top: env(safe-area-inset-top, 0px);
-    --safe-right: env(safe-area-inset-right, 0px);
-    --safe-bottom: env(safe-area-inset-bottom, 0px);
-    --safe-left: env(safe-area-inset-left, 0px);
+/*
+  Эта маска постоянно находится сверху.
 
-    --app-top-gap: 14px;
-    --app-bottom-gap: 12px;
+  Страница продолжает прокручиваться обычным способом,
+  но контент, который уходит под часы, Dynamic Island
+  или статус-бар Android, скрывается под маской.
+*/
+@media (max-width: 768px) and (hover: none) {
+    body::before {
+        content: "";
 
-    /*
-      Высота нижнего меню.
-      Если реальная высота bottom menu другая — меняй только это значение.
-    */
-    --app-bottom-menu-height: 98px;
+        position: fixed;
+        top: 0;
+        right: 0;
+        left: 0;
 
-    --app-page-top: calc(var(--app-top-gap) + var(--safe-top));
+        width: 100%;
+        height: var(--app-top-guard-height);
 
-    --app-page-bottom: calc(
-            var(--app-bottom-menu-height) +
-            var(--safe-bottom) +
-            var(--app-bottom-gap)
-    );
+        background: var(--app-system-bar-background);
 
-    --app-page-bottom-no-menu: calc(24px + var(--safe-bottom));
+        border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.025);
+
+        pointer-events: none;
+
+        /*
+          Выше содержимого страниц и нижнего меню,
+          но ниже модальных окон.
+        */
+        z-index: 15000;
+
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
+
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+
+        will-change: transform;
+    }
 }
 
-/* ===== Base elements ===== */
+/* =========================================================
+   BASE ELEMENTS
+   ========================================================= */
 
 button,
 input,
@@ -92,8 +200,8 @@ select {
 }
 
 img {
-    max-width: 100%;
     display: block;
+    max-width: 100%;
 }
 
 a {
@@ -101,37 +209,56 @@ a {
     text-decoration: none;
 }
 
-/* ===== App loading ===== */
+/* =========================================================
+   APP LOADING
+   ========================================================= */
 
 .app-loading {
     min-height: 100vh;
+    min-height: 100dvh;
+
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px;
+
+    padding:
+            var(--app-page-top)
+            24px
+            var(--app-page-bottom-no-menu);
+
     font-size: 16px;
     color: #4b5563;
 }
 
-/* ===== Common page/card ===== */
+/* =========================================================
+   COMMON PAGE / CARD
+   ========================================================= */
 
 .page {
     width: 100%;
     max-width: 720px;
+
     margin: 0 auto;
-    padding: 14px;
+
+    padding:
+            var(--app-page-top)
+            14px
+            var(--app-page-bottom);
 }
 
 .card {
     background: #ffffff;
-    border-radius: 18px;
-    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+
     border: 1px solid rgba(15, 23, 42, 0.05);
+    border-radius: 18px;
+
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
 }
 
 @media (max-width: 480px) {
     .page {
-        padding: 10px;
+        padding-right: max(10px, var(--safe-right));
+        padding-left: max(10px, var(--safe-left));
     }
 
     .card {
@@ -140,15 +267,14 @@ a {
     }
 }
 
-/* ===== iOS WebView/Safari: запрет авто-зума при фокусе на полях ===== */
+/* =========================================================
+   iOS WEBVIEW / SAFARI INPUT ZOOM
+   ========================================================= */
 
 @supports (-webkit-touch-callout: none) {
     input,
     textarea,
-    select {
-        font-size: 16px !important;
-    }
-
+    select,
     input:focus,
     textarea:focus,
     select:focus {
@@ -156,13 +282,15 @@ a {
     }
 }
 
-/* ===== Universal safe helpers ===== */
+/* =========================================================
+   UNIVERSAL SAFE HELPERS
+   ========================================================= */
 
 .app-page-safe {
     padding-top: var(--app-page-top) !important;
+    padding-right: max(12px, var(--safe-right)) !important;
     padding-bottom: var(--app-page-bottom) !important;
-    padding-left: max(12px, var(--safe-left));
-    padding-right: max(12px, var(--safe-right));
+    padding-left: max(12px, var(--safe-left)) !important;
 }
 
 .ios-safe-top {
@@ -174,16 +302,64 @@ a {
 }
 
 .ios-safe-x {
-    padding-left: max(12px, var(--safe-left));
-    padding-right: max(12px, var(--safe-right));
+    padding-right: max(12px, var(--safe-right)) !important;
+    padding-left: max(12px, var(--safe-left)) !important;
 }
 
-/* ===== Pages with fixed bottom menu ===== */
+/* =========================================================
+   GLOBAL TOP SAFE AREA FOR APPLICATION PAGES
+   ========================================================= */
 
 /*
-  Эти страницы получают нижний отступ,
-  чтобы контент не уходил под bottom menu.
+  Верхний padding нужен, чтобы при первом открытии страницы
+  заголовок не оказался под статус-баром.
+
+  Фиксированная маска body::before отвечает уже за прокрутку.
 */
+@supports (padding-top: env(safe-area-inset-top)) {
+    .page,
+    .create-page,
+    .create-order-page,
+    .exo-page,
+    .orders-page,
+    .active-orders,
+    .profile-page,
+    .reviewsPage,
+    .oh-page,
+    .order-history-page,
+    .info-page,
+    .login-page,
+    .register-page,
+    .auth-page {
+        padding-top: var(--app-page-top) !important;
+    }
+}
+
+/*
+  Android fallback, когда env(safe-area-inset-top) равен нулю.
+*/
+@media (max-width: 768px) and (hover: none) {
+    .page,
+    .create-page,
+    .create-order-page,
+    .exo-page,
+    .orders-page,
+    .active-orders,
+    .profile-page,
+    .reviewsPage,
+    .oh-page,
+    .order-history-page,
+    .info-page,
+    .login-page,
+    .register-page,
+    .auth-page {
+        padding-top: var(--app-page-top) !important;
+    }
+}
+
+/* =========================================================
+   PAGES WITH FIXED BOTTOM MENU
+   ========================================================= */
 
 body:not(.hide-bottom-menu) .page,
 body:not(.hide-bottom-menu) .create-page,
@@ -191,77 +367,151 @@ body:not(.hide-bottom-menu) .create-order-page,
 body:not(.hide-bottom-menu) .exo-page,
 body:not(.hide-bottom-menu) .orders-page,
 body:not(.hide-bottom-menu) .orders-page--ios,
+body:not(.hide-bottom-menu) .orders-page--android,
 body:not(.hide-bottom-menu) .active-orders,
 body:not(.hide-bottom-menu) .active-orders--ios,
+body:not(.hide-bottom-menu) .active-orders--android,
 body:not(.hide-bottom-menu) .profile-page,
 body:not(.hide-bottom-menu) .reviewsPage,
 body:not(.hide-bottom-menu) .reviewsPage--ios,
+body:not(.hide-bottom-menu) .reviewsPage--android,
 body:not(.hide-bottom-menu) .oh-page,
 body:not(.hide-bottom-menu) .oh-page--ios,
+body:not(.hide-bottom-menu) .oh-page--android,
 body:not(.hide-bottom-menu) .order-history-page,
 body:not(.hide-bottom-menu) .order-history-page--ios,
+body:not(.hide-bottom-menu) .order-history-page--android,
 body:not(.hide-bottom-menu) .info-page,
-body:not(.hide-bottom-menu) .info-page--ios {
+body:not(.hide-bottom-menu) .info-page--ios,
+body:not(.hide-bottom-menu) .info-page--android {
     padding-bottom: var(--app-page-bottom) !important;
 }
 
-/* ===== iOS top safe-area ===== */
+/* =========================================================
+   AUTH PAGES WITHOUT BOTTOM MENU
+   ========================================================= */
 
-/*
-  Верхний отступ только для iOS-страниц.
-  Это не ломает скролл, потому что работает через padding.
-*/
-
-@supports (padding-top: env(safe-area-inset-top)) {
-    .orders-page--ios,
-    .active-orders--ios,
-    .create-order-page,
-    .exo-page--ios,
-    .reviewsPage--ios,
-    .oh-page--ios,
-    .info-page--ios,
-    .order-history-page--ios {
-        padding-top: var(--app-page-top) !important;
-    }
-
-    /*
-      Логин/регистрация обычно без нижнего меню.
-      Им нужен safe top, но не нужен огромный отступ под bottom menu.
-    */
-    .login-page.auth-page--ios,
-    .register-page.auth-page--ios {
-        padding-top: var(--app-page-top) !important;
-        padding-bottom: var(--app-page-bottom-no-menu) !important;
-    }
+.login-page,
+.register-page,
+.auth-page {
+    padding-bottom: var(--app-page-bottom-no-menu) !important;
 }
 
-/* ===== Bottom menu hidden mode ===== */
+/* =========================================================
+   BOTTOM MENU HIDDEN MODE
+   ========================================================= */
 
 body.hide-bottom-menu .bottom-menu {
     display: none !important;
 }
 
 body.hide-bottom-menu .page,
+body.hide-bottom-menu .create-page,
+body.hide-bottom-menu .create-order-page,
+body.hide-bottom-menu .exo-page,
+body.hide-bottom-menu .orders-page,
+body.hide-bottom-menu .active-orders,
+body.hide-bottom-menu .profile-page,
+body.hide-bottom-menu .reviewsPage,
+body.hide-bottom-menu .oh-page,
+body.hide-bottom-menu .order-history-page,
+body.hide-bottom-menu .info-page,
 body.hide-bottom-menu .login-page,
-body.hide-bottom-menu .register-page {
+body.hide-bottom-menu .register-page,
+body.hide-bottom-menu .auth-page {
     padding-bottom: var(--app-page-bottom-no-menu) !important;
 }
 
-/* ===== Page-specific inner containers ===== */
+/* =========================================================
+   ACTIVE ORDERS INNER CONTAINER
+   ========================================================= */
 
 /*
-  Важно:
-  Некоторые страницы могут иметь не саму страницу как основной контейнер,
-  а вложенный .pageContainer.
-  Например active-orders .pageContainer.
-  Тогда safe-area надо дать именно этому контейнеру.
+  У ActiveOrdersPage основной внутренний контейнер —
+  .pageContainer. Поэтому даём ему safe-area отдельно.
 */
-
 .active-orders .pageContainer {
+    width: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+
     padding-top: var(--app-page-top) !important;
+    padding-right: max(12px, var(--safe-right)) !important;
     padding-bottom: var(--app-page-bottom) !important;
+    padding-left: max(12px, var(--safe-left)) !important;
 }
 
 body.hide-bottom-menu .active-orders .pageContainer {
     padding-bottom: var(--app-page-bottom-no-menu) !important;
+}
+
+/*
+  Не допускаем двойного верхнего padding:
+  родитель active-orders уже защищён глобально,
+  а реальный контент находится в pageContainer.
+*/
+.active-orders {
+    padding-top: 0 !important;
+}
+
+/* =========================================================
+   FIXED BOTTOM MENU SAFE AREA
+   ========================================================= */
+
+.bottom-menu {
+    padding-bottom: var(--safe-bottom);
+}
+
+/* =========================================================
+   MODALS ABOVE THE TOP GUARD
+   ========================================================= */
+
+/*
+  Все модальные окна должны находиться выше body::before.
+*/
+.modal-overlay,
+.custom-modal-overlay,
+.glass-modal-overlay,
+.request-order-overlay,
+.ReactModal__Overlay {
+    z-index: 30000 !important;
+}
+
+.custom-modal,
+.glass-modal,
+.request-order-modal,
+.ReactModal__Content {
+    z-index: 30001 !important;
+}
+
+/* =========================================================
+   TOASTS ABOVE THE TOP GUARD
+   ========================================================= */
+
+.Toastify__toast-container {
+    z-index: 40000 !important;
+}
+
+/*
+  На мобильном Toast не должен попадать под статус-бар.
+*/
+@media (max-width: 768px) and (hover: none) {
+    .Toastify__toast-container--top-center,
+    .Toastify__toast-container--top-left,
+    .Toastify__toast-container--top-right {
+        top: var(--app-top-guard-height) !important;
+    }
+}
+
+/* =========================================================
+   DESKTOP
+   ========================================================= */
+
+/*
+  На обычном компьютере системная верхняя маска не нужна.
+*/
+@media (min-width: 769px), (hover: hover) {
+    body::before {
+        display: none;
+    }
 }
