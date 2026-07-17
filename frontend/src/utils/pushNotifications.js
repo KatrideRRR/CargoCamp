@@ -504,6 +504,28 @@ function navigateFromPush(rawData, navigate, options = {}) {
     navigate("/profile", { replace: true });
 }
 
+function getOrCreatePushDeviceId() {
+    const storageKey = "cargocamp_push_device_id";
+
+    let deviceId = localStorage.getItem(storageKey);
+
+    if (deviceId) {
+        return deviceId;
+    }
+
+    const randomPart =
+        typeof crypto !== "undefined" &&
+        typeof crypto.randomUUID === "function"
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+
+    deviceId = `${getPushPlatform()}-${randomPart}`;
+
+    localStorage.setItem(storageKey, deviceId);
+
+    return deviceId;
+}
+
 async function savePushTokenToBackend(pushToken) {
     if (!pushToken) {
         console.warn("Push token empty");
@@ -520,7 +542,7 @@ async function savePushTokenToBackend(pushToken) {
     const res = await axiosInstance.post("/push/register", {
         token: pushToken,
         platform,
-        deviceId: `${platform}-${pushToken.slice(0, 16)}`,
+            deviceId: getOrCreatePushDeviceId(),
         appVersion: process.env.REACT_APP_VERSION || null,
     });
 

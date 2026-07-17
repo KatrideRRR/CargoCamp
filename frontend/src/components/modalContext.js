@@ -701,18 +701,23 @@ export const ModalProvider = ({ children }) => {
         };
 
         const handleOrderCompleted = (data) => {
-            console.log("🔔 Уведомление о завершении заказа:", data);
+            console.log("🔔 Заказ окончательно завершён:", data);
 
-            if (data.message) {
-                setCompletionNotificationData({
-                    title: "Ожидание завершения заказа",
-                    description: `Заказ номер ${data.orderId}: ${data.message}`,
-                    orderId: data.orderId,
-                    creatorId: data.creatorId,
-                    executorId: data.executorId,
-                    orderType: data.orderType || "regular",
-                });
-            }
+            /*
+             * Заказ уже завершён на сервере.
+             * Повторно открывать модалку с кнопкой
+             * подтверждения завершения нельзя.
+             */
+            setCompletionNotificationData((current) => {
+                if (
+                    current?.orderId &&
+                    Number(current.orderId) === Number(data?.orderId)
+                ) {
+                    return null;
+                }
+
+                return current;
+            });
         };
 
         const handleNewNotification = (notifications) => {
@@ -978,14 +983,25 @@ export const ModalProvider = ({ children }) => {
         };
 
         const handleReviewNeeded = (data) => {
-            setCompletionNotificationData({
-                title: "Заказ завершён",
-                description: `Заказ номер ${data.orderId}: ${data.message || "Оставьте отзыв"}`,
-                orderId: data.orderId,
-                creatorId: data.creatorId,
-                executorId: data.executorId,
-                orderType: data.orderType || "regular",
-            });
+            const orderId = data?.orderId;
+            const orderType = data?.orderType || "regular";
+
+            if (!orderId) return;
+
+            if (hasSubmittedReview(orderId, orderType)) {
+                return;
+            }
+
+            /*
+             * Это событие просит оставить отзыв,
+             * а не повторно завершить заказ.
+             */
+            openReviewFromCompletion(
+                orderId,
+                data.creatorId,
+                data.executorId,
+                orderType
+            );
         };
 
         socket.on("orderApproved", handleOrderApproved);

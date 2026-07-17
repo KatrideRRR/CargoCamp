@@ -1,5 +1,6 @@
 const express = require("express");
 const crypto = require("crypto");
+const { Op } = require("sequelize");
 const router = express.Router();
 const { sendPushToUser } = require("../services/pushService");
 
@@ -16,6 +17,7 @@ function makeTokenHash(token) {
 router.post("/register", authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
+
         const {
             token,
             platform = "android",
@@ -34,8 +36,20 @@ router.post("/register", authenticateToken, async (req, res) => {
             ? platform
             : "android";
 
-        const tokenHash = makeTokenHash(token);
+        const safeDeviceId =
+            typeof deviceId === "string" && deviceId.trim()
+                ? deviceId.trim().slice(0, 255)
+                : null;
 
+        const tokenHash = makeTokenHash(token);
+        const now = new Date();
+
+        /*
+         * Один и тот же Firebase-токен мог раньше принадлежать
+         * другому пользователю на этом устройстве.
+         *
+         * Сначала обновляем запись самого токена.
+         */
         const [row, created] = await PushToken.findOrCreate({
             where: {
                 tokenHash,
@@ -45,10 +59,10 @@ router.post("/register", authenticateToken, async (req, res) => {
                 token,
                 tokenHash,
                 platform: safePlatform,
-                deviceId,
+                deviceId: safeDeviceId,
                 appVersion,
                 isActive: true,
-                lastSeenAt: new Date(),
+                lastSeenAt: now,
             },
         });
 
@@ -58,18 +72,62 @@ router.post("/register", authenticateToken, async (req, res) => {
                 token,
                 tokenHash,
                 platform: safePlatform,
-                deviceId,
+                deviceId: safeDeviceId,
                 appVersion,
                 isActive: true,
-                lastSeenAt: new Date(),
+                lastSeenAt: now,
             });
         }
 
+        /*
+         * Если у устройства появился новый Firebase-токен,
+         * выключаем старые токены этого же устройства.
+         */
+        if (safeDeviceId) {
+            await PushToken.update(
+                {
+                    isActive: false,
+                },
+                {
+                    where: {
+                        userId,
+                        deviceId: safeDeviceId,
+                        tokenHash: {
+                            [Op.ne]: tokenHash,
+                        },
+                        isActive: true,
+                    },
+                }
+            );
+        }
+
+        /*
+         * Дополнительная защита:
+         * одинаковый токен не должен оставаться активным
+         * одновременно у разных пользователей.
+         */
+        await PushToken.update(
+            {
+                isActive: false,
+            },
+            {
+                where: {
+                    userId: {
+                        [Op.ne]: userId,
+                    },
+                    tokenHash,
+                    isActive: true,
+                },
+            }
+        );
+
         return res.json({
             success: true,
+            created,
         });
     } catch (e) {
         console.error("push register error:", e);
+
         return res.status(500).json({
             success: false,
             message: "Ошибка регистрации push-token",
