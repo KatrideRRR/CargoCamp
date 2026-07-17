@@ -4,6 +4,58 @@ import "../styles/YandexMapModal.css";
 
 const EMPTY_ORDERS = Object.freeze([]);
 
+const CRIMEA_FALLBACK_CENTER = Object.freeze([
+    45.15,
+    34.40,
+]);
+
+const CRIMEA_FALLBACK_ZOOM = 9;
+
+function parseCoordinate(value, type) {
+    if (
+        value === null ||
+        value === undefined ||
+        String(value).trim() === ""
+    ) {
+        return null;
+    }
+
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
+        return null;
+    }
+
+    if (type === "lat" && (number < -90 || number > 90)) {
+        return null;
+    }
+
+    if (type === "lng" && (number < -180 || number > 180)) {
+        return null;
+    }
+
+    return number;
+}
+
+function getValidCoordinates(latValue, lngValue) {
+    const lat = parseCoordinate(latValue, "lat");
+    const lng = parseCoordinate(lngValue, "lng");
+
+    if (lat === null || lng === null) {
+        return null;
+    }
+
+    // Запрещаем техническую нулевую точку 0,0.
+    if (
+        Math.abs(lat) < 0.000001 &&
+        Math.abs(lng) < 0.000001
+    ) {
+        return null;
+    }
+
+    return [lat, lng];
+}
+
 let ymapsLoaderPromise = null;
 
 function loadYMaps(apiKey) {
@@ -93,24 +145,19 @@ export default function YandexMapModal({
         return orders;
     }, [orders]);
 
-    const initialCenter = useMemo(() => {
-        const lat = Number(initialLat);
-        const lng = Number(initialLng);
+    const validInitialCoords = useMemo(() => {
+        return getValidCoordinates(initialLat, initialLng);
+    }, [initialLat, initialLng]);
 
-        if (Number.isFinite(lat) && Number.isFinite(lng)) {
-            return [lat, lng];
+    const hasInitialCoords = validInitialCoords !== null;
+
+    const initialCenter = useMemo(() => {
+        if (validInitialCoords) {
+            return validInitialCoords;
         }
 
-        // Москва как безопасный fallback
-        return [55.751244, 37.618423];
-    }, [initialLat, initialLng]);
-
-    const hasInitialCoords = useMemo(() => {
-        const lat = Number(initialLat);
-        const lng = Number(initialLng);
-
-        return Number.isFinite(lat) && Number.isFinite(lng);
-    }, [initialLat, initialLng]);
+        return [...CRIMEA_FALLBACK_CENTER];
+    }, [validInitialCoords]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -144,6 +191,51 @@ export default function YandexMapModal({
         } catch {
             return `Координаты: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
         }
+    }, []);
+
+    const tryCenterByBrowserLocation = useCallback((map) => {
+        if (!map || !navigator.geolocation) {
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = Number(position.coords?.latitude);
+                const lng = Number(position.coords?.longitude);
+
+                const coords = getValidCoordinates(lat, lng);
+
+                if (!coords || !mapRef.current) {
+                    return;
+                }
+
+                try {
+                    mapRef.current.setCenter(coords, 12, {
+                        duration: 300,
+                    });
+                } catch (error) {
+                    console.warn(
+                        "Не удалось переместить карту к местоположению:",
+                        error
+                    );
+                }
+            },
+            (error) => {
+                /*
+                 * Здесь специально ничего не показываем пользователю.
+                 * Крым уже установлен как безопасный центр.
+                 */
+                console.info(
+                    "Приблизительное местоположение недоступно:",
+                    error?.message
+                );
+            },
+            {
+                enableHighAccuracy: false,
+                timeout: 5000,
+                maximumAge: 10 * 60 * 1000,
+            }
+        );
     }, []);
 
     const setPickedPoint = useCallback(
@@ -424,7 +516,9 @@ export default function YandexMapModal({
                     mapNodeRef.current,
                     {
                         center: initialCenter,
-                        zoom: hasInitialCoords ? 14 : 10,
+                        zoom: hasInitialCoords
+                            ? 14
+                            : CRIMEA_FALLBACK_ZOOM,
                         controls: ["zoomControl"],
                     },
                     {
@@ -433,6 +527,10 @@ export default function YandexMapModal({
                 );
 
                 mapRef.current = map;
+
+                if (!hasInitialCoords) {
+                    tryCenterByBrowserLocation(map);
+                }
 
                 const clickHandler = async (event) => {
                     const coords = event.get("coords");
@@ -571,6 +669,7 @@ export default function YandexMapModal({
         initialCenter,
         hasInitialCoords,
         setPickedPoint,
+        tryCenterByBrowserLocation,
     ]);
 
     useEffect(() => {
