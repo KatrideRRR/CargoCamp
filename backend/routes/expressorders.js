@@ -1185,7 +1185,7 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
             userId: order.creatorId,
             type: "review_needed",
             title: "Экспресс-заказ завершён",
-            body: "Оцените исполнителя и оставьте отзыв",
+            body: "Оцените исполнителя",
             orderId: order.id,
             orderType: "express",
             data: {
