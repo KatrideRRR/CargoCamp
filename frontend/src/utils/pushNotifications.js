@@ -632,43 +632,27 @@ export async function initPushNotifications({ navigate, userId } = {}) {
             }
         });
 
-        await FirebaseMessaging.addListener("notificationReceived", async (event) => {
-            console.log("FirebaseMessaging notificationReceived foreground:", event);
+        await FirebaseMessaging.addListener(
+            "notificationReceived",
+            async (event) => {
+                console.log(
+                    "FirebaseMessaging notificationReceived foreground:",
+                    event
+                );
 
-            const notification = event?.notification || {};
-            const data = notification?.data || {};
-
-            const title =
-                notification?.title ||
-                data.title ||
-                "CargoCamp";
-
-            const body =
-                notification?.body ||
-                data.body ||
-                data.message ||
-                "Новое уведомление";
-
-            try {
-                await LocalNotifications.schedule({
-                    notifications: [
-                        {
-                            id: Date.now() % 2147483647,
-                            title,
-                            body,
-                            extra: data,
-                            channelId: "cargocamp_default",
-                            sound: "default",
-                            schedule: {
-                                at: new Date(Date.now() + 100),
-                            },
-                        },
-                    ],
-                });
-            } catch (e) {
-                console.error("Local notification foreground error:", e);
+                /*
+                 * ВАЖНО:
+                 * Не создаём LocalNotifications.schedule().
+                 *
+                 * Firebase/APNs уже доставляет push.
+                 * Ручное локальное уведомление может создавать
+                 * второй одинаковый push на устройстве.
+                 *
+                 * Обновление страниц и модалок приходит отдельно
+                 * через socket-события new_notification и другие события.
+                 */
             }
-        });
+        );
 
         await FirebaseMessaging.addListener("notificationActionPerformed", (event) => {
             console.log("FirebaseMessaging notificationActionPerformed:", event);
