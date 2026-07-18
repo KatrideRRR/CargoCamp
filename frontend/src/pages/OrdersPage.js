@@ -118,6 +118,21 @@ function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
+function getOrderTimestamp(order) {
+    const rawDate =
+        order?.createdAt ??
+        order?.created_at ??
+        null;
+
+    if (!rawDate) return 0;
+
+    const timestamp = new Date(rawDate).getTime();
+
+    return Number.isFinite(timestamp)
+        ? timestamp
+        : 0;
+}
+
 const OrdersPage = () => {
     const navigate = useNavigate();
     const YM_KEY = process.env.REACT_APP_YANDEX_API_KEY;
@@ -831,16 +846,21 @@ const OrdersPage = () => {
             .filter((o) => o && o._distance <= RADIUS_KM);
 
         return [...geoFiltered].sort((a, b) => {
-            const ad = Number.isFinite(a._distance) ? a._distance : 1e9;
-            const bd = Number.isFinite(b._distance) ? b._distance : 1e9;
-            if (ad !== bd) return ad - bd;
-            const getOrderTimestamp = (order) => {
-                const rawDate = order.createdAt || order.created_at;
-                const timestamp = rawDate ? new Date(rawDate).getTime() : 0;
+            const ad = Number.isFinite(a._distance)
+                ? a._distance
+                : 1e9;
 
-                return Number.isFinite(timestamp) ? timestamp : 0;
-            };
+            const bd = Number.isFinite(b._distance)
+                ? b._distance
+                : 1e9;
+
+            if (ad !== bd) {
+                return ad - bd;
+            }
+
+            return getOrderTimestamp(b) - getOrderTimestamp(a);
         });
+
     }, [
         allRaw,
         activeTab,
@@ -1276,6 +1296,30 @@ const OrdersPage = () => {
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {orderTiming && (
+                                            <div
+                                                className={`order-time-box ${
+                                                    orderTiming.type === "asap"
+                                                        ? "order-time-box--asap"
+                                                        : "order-time-box--scheduled"
+                                                }`}
+                                            >
+        <span className="order-time-icon">
+            {orderTiming.type === "asap" ? "⚡" : "🕒"}
+        </span>
+
+                                                <div className="order-time-content">
+            <span className="order-time-label">
+                {orderTiming.label}
+            </span>
+
+                                                    <span className="order-time-value">
+                {orderTiming.value}
+            </span>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {Array.isArray(order.images) && order.images.length > 0 && (
                                             <div className="thumbs" onClick={() => openModal(order.images)}>

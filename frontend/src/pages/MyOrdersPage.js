@@ -20,6 +20,21 @@ const getRouteOrAddress = (order) => {
     return order.address || "—";
 };
 
+const getOrderTimestamp = (order) => {
+    const rawDate =
+        order?.createdAt ??
+        order?.created_at ??
+        null;
+
+    if (!rawDate) return 0;
+
+    const timestamp = new Date(rawDate).getTime();
+
+    return Number.isFinite(timestamp)
+        ? timestamp
+        : 0;
+};
+
 const formatOrderDate = (value) => {
     if (!value) return "Дата не указана";
 
@@ -30,6 +45,65 @@ const formatOrderDate = (value) => {
     }
 
     return date.toLocaleString("ru-RU");
+};
+
+const normalizeBoolean = (value) => {
+    if (
+        value === true ||
+        value === 1 ||
+        value === "1" ||
+        value === "true"
+    ) {
+        return true;
+    }
+
+    if (
+        value === false ||
+        value === 0 ||
+        value === "0" ||
+        value === "false"
+    ) {
+        return false;
+    }
+
+    return null;
+};
+
+const getOrderTiming = (order) => {
+    const isAsap = normalizeBoolean(
+        order?.isAsap ?? order?.is_asap
+    );
+
+    if (isAsap === true) {
+        return {
+            type: "asap",
+            label: "Срок выполнения",
+            value: "Как можно скорее",
+        };
+    }
+
+    const rawWorkTime =
+        order?.workTime ??
+        order?.work_time ??
+        null;
+
+    if (!rawWorkTime) return null;
+
+    const date = new Date(rawWorkTime);
+
+    if (Number.isNaN(date.getTime())) return null;
+
+    return {
+        type: "scheduled",
+        label: "Выполнить к",
+        value: date.toLocaleString("ru-RU", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        }),
+    };
 };
 
 const MyOrdersPage = () => {
@@ -484,6 +558,10 @@ const MyOrdersPage = () => {
                     <ul className={styles.ordersList}>
                         {orders.map((order) => {
                             const isExpress = order.kind === "express";
+                            const orderTiming = isExpress
+                                ? null
+                                : getOrderTiming(order);
+
                             const st = isExpress ? getExpressStatusLabel(order.status) : getStatusLabel(order.status);
                             const paymentLabel =
                                 paymentMethods.find((m) => m.id === order.paymentType)?.label || "—";
@@ -587,6 +665,30 @@ const MyOrdersPage = () => {
         {getRouteOrAddress(order)}
     </span>
                                         </div>
+
+                                        {orderTiming && (
+                                            <div
+                                                className={`${styles.orderTimeBox} ${
+                                                    orderTiming.type === "asap"
+                                                        ? styles.orderTimeAsap
+                                                        : styles.orderTimeScheduled
+                                                }`}
+                                            >
+        <span className={styles.orderTimeIcon}>
+            {orderTiming.type === "asap" ? "⚡" : "🕒"}
+        </span>
+
+                                                <div className={styles.orderTimeContent}>
+            <span className={styles.orderTimeLabel}>
+                {orderTiming.label}
+            </span>
+
+                                                    <span className={styles.orderTimeValue}>
+                {orderTiming.value}
+            </span>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {(
                                             (!isExpress && ["pending", "pending_payment"].includes(order.status)) ||

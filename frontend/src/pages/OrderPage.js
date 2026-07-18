@@ -17,6 +17,69 @@ import ExpressRouteButtons from "../components/ExpressRouteButtons";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
+function normalizeBoolean(value) {
+    if (
+        value === true ||
+        value === 1 ||
+        value === "1" ||
+        value === "true"
+    ) {
+        return true;
+    }
+
+    if (
+        value === false ||
+        value === 0 ||
+        value === "0" ||
+        value === "false"
+    ) {
+        return false;
+    }
+
+    return null;
+}
+
+function getOrderTiming(order) {
+    const isAsap = normalizeBoolean(
+        order?.isAsap ?? order?.is_asap
+    );
+
+    if (isAsap === true) {
+        return {
+            type: "asap",
+            label: "Срок выполнения",
+            value: "Как можно скорее",
+        };
+    }
+
+    const rawWorkTime =
+        order?.workTime ??
+        order?.work_time ??
+        null;
+
+    if (!rawWorkTime) {
+        return null;
+    }
+
+    const date = new Date(rawWorkTime);
+
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    return {
+        type: "scheduled",
+        label: "Выполнить к",
+        value: date.toLocaleString("ru-RU", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        }),
+    };
+}
+
 const OrderPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -532,6 +595,10 @@ const OrderPage = () => {
 
     const isExpress = !!order.express;
     const displayId = isExpress ? order.expressId : order.id;
+
+    const orderTiming = isExpress
+        ? null
+        : getOrderTiming(order);
 
     const description =
         typeof order.description === "string"
