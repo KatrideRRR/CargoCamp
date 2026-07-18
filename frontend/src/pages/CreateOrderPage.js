@@ -197,7 +197,11 @@ function CreateOrderPage() {
     useEffect(() => {
         setIsAsap(true);
         setTimeOpen(false);
-        setFormData((p) => ({ ...p, workTime: plusHour(new Date()) }));
+
+        setFormData((prev) => ({
+            ...prev,
+            workTime: null,
+        }));
     }, []);
 
     // preload location
@@ -490,7 +494,13 @@ function CreateOrderPage() {
 
         data.append("description", formData.description || "");
         data.append("address", formData.address);
-        data.append("workTime", formData.workTime ? new Date(formData.workTime).toISOString() : "");
+        data.append("isAsap", String(isAsap));
+        data.append(
+            "workTime",
+            !isAsap && formData.workTime
+                ? new Date(formData.workTime).toISOString()
+                : ""
+        );
         data.append("proposedSum", String(Math.round(proposedSumRaw * 100) / 100));
         data.append("paymentType", paymentType);
 
@@ -584,19 +594,27 @@ function CreateOrderPage() {
     };
 
     const toggleAsap = () => {
-        const next = !isAsap;
-        setIsAsap(next);
+        const nextIsAsap = !isAsap;
 
-        if (next) {
-            // Срочно
+        setIsAsap(nextIsAsap);
+
+        if (nextIsAsap) {
             setTimeOpen(false);
-            setFormData((p) => ({ ...p, workTime: plusHour(new Date()) }));
-        } else {
-            // Ко времени
-            setTimeOpen(true);
-            // если вдруг workTime пустой — зададим на ближайшее +1 час как старт
-            setFormData((p) => ({ ...p, workTime: p.workTime ? p.workTime : plusHour(new Date()) }));
+
+            setFormData((prev) => ({
+                ...prev,
+                workTime: null,
+            }));
+
+            return;
         }
+
+        setTimeOpen(true);
+
+        setFormData((prev) => ({
+            ...prev,
+            workTime: prev.workTime || plusHour(new Date()),
+        }));
     };
 
     return (

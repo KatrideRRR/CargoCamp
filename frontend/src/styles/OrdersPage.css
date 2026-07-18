@@ -2779,3 +2779,112 @@
             linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.68)),
             rgba(255, 255, 255, 0.64);
 }
+
+/* =========================
+   Order execution time
+========================= */
+
+.order-time-box {
+    margin-top: 12px;
+
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    padding: 11px 12px;
+
+    border-radius: 18px;
+    border: 1px solid rgba(226, 232, 240, 0.78);
+
+    background:
+            linear-gradient(
+                    180deg,
+                    rgba(255, 255, 255, 0.94),
+                    rgba(248, 250, 252, 0.8)
+            );
+
+    box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.92),
+            0 5px 14px rgba(15, 23, 42, 0.035);
+}
+
+.order-time-icon {
+    flex: 0 0 auto;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 38px;
+    height: 38px;
+
+    border-radius: 14px;
+
+    font-size: 18px;
+
+    background: rgba(248, 250, 252, 0.92);
+    border: 1px solid rgba(226, 232, 240, 0.82);
+}
+
+.order-time-content {
+    min-width: 0;
+
+    display: grid;
+    gap: 3px;
+}
+
+.order-time-label {
+    color: var(--orders-muted);
+
+    font-size: 12px;
+    line-height: 1.2;
+    font-weight: 850;
+}
+
+.order-time-value {
+    color: var(--orders-text);
+
+    font-size: 14px;
+    line-height: 1.3;
+    font-weight: 950;
+}
+
+.order-time-box--asap {
+    background:
+            linear-gradient(
+                    180deg,
+                    rgba(255, 255, 255, 0.96),
+                    rgba(255, 251, 235, 0.84)
+            );
+
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
+.order-time-box--asap .order-time-icon {
+    background: rgba(254, 243, 199, 0.82);
+    border-color: rgba(245, 158, 11, 0.28);
+}
+
+.order-time-box--asap .order-time-value {
+    color: #b45309;
+}
+
+.order-time-box--scheduled {
+    background:
+            linear-gradient(
+                    180deg,
+                    rgba(255, 255, 255, 0.96),
+                    rgba(239, 246, 255, 0.84)
+            );
+
+    border-color: rgba(96, 165, 250, 0.32);
+}
+
+.order-time-box--scheduled .order-time-icon {
+    background: rgba(219, 234, 254, 0.76);
+    border-color: rgba(96, 165, 250, 0.3);
+}
+
+.order-time-box--scheduled .order-time-value {
+    color: #1d4ed8;
+}

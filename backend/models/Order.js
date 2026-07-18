@@ -235,6 +235,11 @@ module.exports = (sequelize) => {
                 allowNull: true,
 
             },
+            isAsap: {
+                type: DataTypes.BOOLEAN,
+                allowNull: true,
+                defaultValue: null,
+            },
         },
         {
             sequelize,

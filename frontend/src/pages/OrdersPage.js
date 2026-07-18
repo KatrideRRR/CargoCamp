@@ -22,6 +22,69 @@ const apiUrl = process.env.REACT_APP_API_URL;
 const RADIUS_KM = 50;
 const HIDE_FROM_DRAWER = new Set(["Такси", "Курьер"]);
 
+function normalizeBoolean(value) {
+    if (
+        value === true ||
+        value === 1 ||
+        value === "1" ||
+        value === "true"
+    ) {
+        return true;
+    }
+
+    if (
+        value === false ||
+        value === 0 ||
+        value === "0" ||
+        value === "false"
+    ) {
+        return false;
+    }
+
+    return null;
+}
+
+function getOrderTiming(order) {
+    const isAsap = normalizeBoolean(
+        order?.isAsap ?? order?.is_asap
+    );
+
+    if (isAsap === true) {
+        return {
+            type: "asap",
+            label: "Срок выполнения",
+            value: "Как можно скорее",
+        };
+    }
+
+    const rawWorkTime =
+        order?.workTime ??
+        order?.work_time ??
+        null;
+
+    if (!rawWorkTime) {
+        return null;
+    }
+
+    const date = new Date(rawWorkTime);
+
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    return {
+        type: "scheduled",
+        label: "Выполнить к",
+        value: date.toLocaleString("ru-RU", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        }),
+    };
+}
+
 function looksLikeCoordsString(v) {
     if (!v) return false;
     const s = String(v).trim();
@@ -1112,6 +1175,10 @@ const OrdersPage = () => {
                                 const creator = creatorsInfo[order.creatorId] || {};
                                 const isCreator = Number(order.creatorId) === Number(userId);
                                 const isExpress = !!order.express;
+
+                                const orderTiming = isExpress
+                                    ? null
+                                    : getOrderTiming(order);
 
                                 const description =
                                     typeof order.description === "string"

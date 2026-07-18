@@ -379,6 +379,7 @@ module.exports = (io) => {
                 address,
                 description,
                 workTime,
+                isAsap,
                 proposedSum,
                 categoryId,
                 subcategoryId,
@@ -550,15 +551,55 @@ module.exports = (io) => {
 
             const safeProposedSum = Math.round(proposedSumRaw * 100) / 100;
 
+            // --- normalize ASAP / work time ---
+
+            isAsap = Array.isArray(isAsap) ? isAsap[0] : isAsap;
+            workTime = Array.isArray(workTime) ? workTime[0] : workTime;
+
+            const normalizedIsAsap =
+                isAsap === true ||
+                isAsap === 1 ||
+                isAsap === "1" ||
+                String(isAsap).toLowerCase() === "true";
+
+            let normalizedWorkTime = null;
+
+            if (!normalizedIsAsap) {
+                if (!workTime || !String(workTime).trim()) {
+                    return res.status(400).json({
+                        message: "Выберите дату и время выполнения заказа",
+                    });
+                }
+
+                const parsedWorkTime = new Date(workTime);
+
+                if (Number.isNaN(parsedWorkTime.getTime())) {
+                    return res.status(400).json({
+                        message: "Указано некорректное время выполнения заказа",
+                    });
+                }
+
+                if (parsedWorkTime.getTime() < Date.now()) {
+                    return res.status(400).json({
+                        message: "Время выполнения заказа не может быть в прошлом",
+                    });
+                }
+
+                normalizedWorkTime = parsedWorkTime;
+            }
+
             // 3) Сначала создаём заказ БЕЗ финальных путей картинок
             const newOrder = await Order.create({
                 userId,
-                address,
-                description,
-                workTime,
+                address: String(address || "").trim(),
+                description: String(description || "").trim(),
+
+                isAsap: normalizedIsAsap,
+                workTime: normalizedWorkTime,
+
                 proposedSum: safeProposedSum,
                 coordinates: coordinatesStr,
-                createdAt: new Date().toISOString(),
+                createdAt: new Date(),
                 images: [],
                 creatorId: userId,
                 status,
@@ -607,6 +648,8 @@ module.exports = (io) => {
                 meta: {
                     status: newOrder.status,
                     paymentType: newOrder.paymentType,
+                    isAsap: newOrder.isAsap,
+                    workTime: newOrder.workTime,
                     categoryId: newOrder.categoryId,
                     subcategoryId: newOrder.subcategoryId,
                     serviceId: newOrder.serviceId,
@@ -741,7 +784,8 @@ module.exports = (io) => {
                     'executorId', 'status', 'paymentType',
                     'is_highlighted', 'is_recommended', 'is_push_notified', 'serviceId',
                     'categoryId',
-                    'subcategoryId',
+                    'subcategoryId',"isAsap",
+                    "workTime",
 
                 ],
                 where: whereClause,

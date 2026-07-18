@@ -687,6 +687,30 @@ const OrderPage = () => {
                             </div>
                         </div>
 
+                        {orderTiming && (
+                            <div
+                                className={`order-time-box ${
+                                    orderTiming.type === "asap"
+                                        ? "order-time-box--asap"
+                                        : "order-time-box--scheduled"
+                                }`}
+                            >
+        <span className="order-time-icon">
+            {orderTiming.type === "asap" ? "⚡" : "🕒"}
+        </span>
+
+                                <div className="order-time-content">
+            <span className="order-time-label">
+                {orderTiming.label}
+            </span>
+
+                                    <span className="order-time-value">
+                {orderTiming.value}
+            </span>
+                                </div>
+                            </div>
+                        )}
+
                         {isExpress && (
                             <div className="express-detail-route">
                                 <div className="kv">
