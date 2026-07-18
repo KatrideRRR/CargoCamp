@@ -13,8 +13,8 @@ services:
       DB_NAME: cargo_camp
     volumes:
       - ./uploads:/app/uploads
+      - ./contracts:/app/contracts
       - /root/cargocamp-secrets/firebase-service-account.json:/app/secrets/firebase-service-account.json:ro
-      - ./backend/contracts:/app/contracts
     command: ["npm", "start"]
 
   frontend:
