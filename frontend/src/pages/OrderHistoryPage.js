@@ -167,8 +167,13 @@ const OrderHistoryPage = () => {
                     <ul className="oh-list">
                         {sortedOrders.map((order) => {
                             const isDescExpanded = !!expandedDesc[order.id];
-                            const desc = order.description || "—";
-                            const shouldClamp = desc && desc.length > 140;
+                            const desc =
+                                typeof order.description === "string"
+                                    ? order.description.trim()
+                                    : "";
+
+                            const hasDescription = desc.length > 0;
+                            const shouldClamp = desc.length > 140;
 
                             return (
                                 <li key={order.id} className="oh-card glass">
@@ -204,29 +209,33 @@ const OrderHistoryPage = () => {
                                             <span className="oh-v">{order.address || "—"}</span>
                                         </div>
 
-                                        <div className="oh-kv oh-kv--wide">
-                                            <div className="oh-desc-head">
-                                                <span className="oh-k">Описание</span>
+                                        {hasDescription && (
+                                            <div className="oh-kv oh-kv--wide">
+                                                <div className="oh-desc-head">
+                                                    <span className="oh-k">Описание</span>
 
-                                                {shouldClamp && (
-                                                    <button
-                                                        type="button"
-                                                        className="oh-link-btn"
-                                                        onClick={() => toggleDesc(order.id)}
-                                                    >
-                                                        {isDescExpanded ? "Свернуть" : "Подробнее"}
-                                                    </button>
-                                                )}
+                                                    {shouldClamp && (
+                                                        <button
+                                                            type="button"
+                                                            className="oh-link-btn"
+                                                            onClick={() => toggleDesc(order.id)}
+                                                        >
+                                                            {isDescExpanded ? "Свернуть" : "Подробнее"}
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                <span
+                                                    className={`oh-v oh-desc ${
+                                                        shouldClamp ? "clampable" : ""
+                                                    } ${
+                                                        isDescExpanded ? "expanded" : "collapsed"
+                                                    }`}
+                                                >
+            {desc}
+        </span>
                                             </div>
-
-                                            <span
-                                                className={`oh-v oh-desc ${shouldClamp ? "clampable" : ""} ${
-                                                    isDescExpanded ? "expanded" : "collapsed"
-                                                }`}
-                                            >
-                        {desc}
-                      </span>
-                                        </div>
+                                        )}
 
                                         <div className="oh-kv">
                                             <span className="oh-k">ID создателя</span>

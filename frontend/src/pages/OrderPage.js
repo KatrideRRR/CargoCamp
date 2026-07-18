@@ -533,6 +533,13 @@ const OrderPage = () => {
     const isExpress = !!order.express;
     const displayId = isExpress ? order.expressId : order.id;
 
+    const description =
+        typeof order.description === "string"
+            ? order.description.trim()
+            : "";
+
+    const hasDescription = description.length > 0;
+
     const titleText = isExpress ? `Экспресс №${displayId}` : `Заказ №${displayId}`;
     const routeLabel = isExpress ? "Маршрут" : "Адрес";
 
@@ -711,10 +718,12 @@ const OrderPage = () => {
                             </div>
                         )}
 
-                        <div className="order-desc">
-                            <span className="k">Описание</span>
-                            <div className="v">{order.description || "—"}</div>
-                        </div>
+                        {hasDescription && (
+                            <div className="order-desc">
+                                <span className="k">Описание</span>
+                                <div className="v">{description}</div>
+                            </div>
+                        )}
 
                         <div className="order-actions">
                             <Link

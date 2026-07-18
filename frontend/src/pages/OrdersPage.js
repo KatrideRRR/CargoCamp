@@ -1108,6 +1108,13 @@ const OrdersPage = () => {
                                 const isCreator = Number(order.creatorId) === Number(userId);
                                 const isExpress = !!order.express;
 
+                                const description =
+                                    typeof order.description === "string"
+                                        ? order.description.trim()
+                                        : "";
+
+                                const hasDescription = description.length > 0;
+
                                 const canRequestRegular =
                                     !isExpress &&
                                     !isCreator &&
@@ -1209,10 +1216,12 @@ const OrdersPage = () => {
                                             </div>
                                         )}
 
-                                        <div className="order-desc">
-                                            <span className="k">Описание</span>
-                                            <div className="v">{order.description || "—"}</div>
-                                        </div>
+                                        {hasDescription && (
+                                            <div className="order-desc">
+                                                <span className="k">Описание</span>
+                                                <div className="v">{description}</div>
+                                            </div>
+                                        )}
 
                                         <div className="order-actions">
                                             <Link

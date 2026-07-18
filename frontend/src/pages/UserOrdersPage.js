@@ -145,6 +145,13 @@ const UserOrdersPage = () => {
                             {orders.map((order) => {
                                 const creator = creatorsInfo[order.creatorId] || {};
 
+                                const description =
+                                    typeof order.description === "string"
+                                        ? order.description.trim()
+                                        : "";
+
+                                const hasDescription = description.length > 0;
+
                                 return (
                                     <li
                                         key={order.id}
@@ -221,7 +228,11 @@ const UserOrdersPage = () => {
 
                                             <p><strong>Адрес:</strong> {order.address}</p>
                                             <p><strong>Цена:</strong> {order.proposedSum} ₽</p>
-                                            <p><strong>Описание:</strong> {order.description}</p>
+                                            {hasDescription && (
+                                                <p>
+                                                    <strong>Описание:</strong> {description}
+                                                </p>
+                                            )}
 
 
                                         </div>

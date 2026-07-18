@@ -479,6 +479,13 @@ const MyOrdersPage = () => {
                             const hasExecutors =
                                 Array.isArray(order.requestedExecutors) && order.requestedExecutors.length > 0;
 
+                            const description =
+                                typeof order.description === "string"
+                                    ? order.description.trim()
+                                    : "";
+
+                            const hasDescription = description.length > 0;
+
                             return (
                                 <li
                                     className={`${styles.orderCard} ${isExpress ? styles.orderCardExpress : ""}`}
@@ -605,25 +612,33 @@ const MyOrdersPage = () => {
                                         ) : null}
 
                                         {/* Description */}
-                                        <div className={styles.section}>
-                                            <div className={styles.sectionHead}>
-                                                <span className={styles.sectionTitle}>Описание</span>
+                                        {hasDescription && (
+                                            <div className={styles.section}>
+                                                <div className={styles.sectionHead}>
+                                                    <span className={styles.sectionTitle}>Описание</span>
 
-                                                {order.description && order.description.length > 120 && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => toggleDesc(order.id)}
-                                                        className={styles.linkButton}
-                                                    >
-                                                        {isDescExpanded ? "Свернуть" : "Подробнее"}
-                                                    </button>
-                                                )}
+                                                    {description.length > 120 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleDesc(order.id)}
+                                                            className={styles.linkButton}
+                                                        >
+                                                            {isDescExpanded ? "Свернуть" : "Подробнее"}
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                <p
+                                                    className={`${styles.descText} ${
+                                                        isDescExpanded
+                                                            ? styles.descExpanded
+                                                            : styles.descCollapsed
+                                                    }`}
+                                                >
+                                                    {description}
+                                                </p>
                                             </div>
-
-                                            <p className={`${styles.descText} ${isDescExpanded ? styles.descExpanded : styles.descCollapsed}`}>
-                                                {order.description || "—"}
-                                            </p>
-                                        </div>
+                                        )}
 
                                         {/* Pending payment actions */}
                                         {!isExpress ? (

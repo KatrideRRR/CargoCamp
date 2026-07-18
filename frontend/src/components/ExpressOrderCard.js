@@ -396,6 +396,13 @@ const ExpressOrderCard = ({
         (isExecutor &&
             ["accepted", "on_the_way_to_A", "arrived_at_A", "waiting_at_A"].includes(currentOrder.status));
 
+    const description =
+        typeof currentOrder.description === "string"
+            ? currentOrder.description.trim()
+            : "";
+
+    const hasDescription = description.length > 0;
+
     return (
         <li className={`order-card express-card ${currentOrder.type === "taxi" ? "express-taxi" : "express-courier"}`}>
             <div className="order-header">
@@ -495,11 +502,11 @@ const ExpressOrderCard = ({
                         </div>
                     </div>
 
-                    {currentOrder.description ? (
+                    {hasDescription && (
                         <p className="express-comment">
-                            <strong>Комментарий:</strong> {currentOrder.description}
+                            <strong>Комментарий:</strong> {description}
                         </p>
-                    ) : null}
+                    )}
 
                     {nextAction && !["completed", "cancelled"].includes(currentOrder.status) && isExecutor && (
                         <div className="express-primaryActionWrap">

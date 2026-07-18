@@ -6,7 +6,7 @@ import "../styles/ActiveOrdersPage.css";
 import { useAuth } from "../utils/authContext";
 import { socket, connectSocket } from "../socketClient";
 import { useMediaQuery } from "react-responsive";
-import { FaPhone, FaComments, FaRoute, FaCheck, FaTrash, FaExclamationTriangle, FaPlay } from "react-icons/fa";
+import { FaPhone, FaComments, FaRoute, FaCheck, FaExclamationTriangle, FaPlay } from "react-icons/fa";
 import Modal from "react-modal";
 import axiosInstance from "../utils/axiosInstance";
 import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
@@ -15,6 +15,9 @@ import { ModalContext } from "../components/modalContext";
 import { AppLauncher } from "@capacitor/app-launcher";
 
 const apiUrl = process.env.REACT_APP_API_URL;
+
+const hasDescription = (value) =>
+    typeof value === "string" && value.trim().length > 0;
 
 const ActiveOrdersPage = () => {
     const navigate = useNavigate();
@@ -1314,9 +1317,11 @@ const ActiveOrdersPage = () => {
                                                         <p>
                                                             <strong>Адрес:</strong> {order.address}
                                                         </p>
-                                                        <p>
-                                                            <strong>Описание:</strong> {order.description}
-                                                        </p>
+                                                        {hasDescription(order.description) && (
+                                                            <p>
+                                                                <strong>Описание:</strong> {order.description.trim()}
+                                                            </p>
+                                                        )}
 
                                                         {order.contractPath && (
                                                             <div className="contract-download-row">
