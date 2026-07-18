@@ -20,6 +20,18 @@ const getRouteOrAddress = (order) => {
     return order.address || "—";
 };
 
+const formatOrderDate = (value) => {
+    if (!value) return "Дата не указана";
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return "Дата не указана";
+    }
+
+    return date.toLocaleString("ru-RU");
+};
+
 const MyOrdersPage = () => {
     const { userId } = useParams();
     const location = useLocation();
@@ -139,6 +151,7 @@ const MyOrdersPage = () => {
                             );
                             return {
                                 ...order,
+                                createdAt: order.createdAt || order.created_at || null,
                                 requestedExecutors: Array.isArray(executorsResponse.data)
                                     ? executorsResponse.data
                                     : [],
@@ -148,6 +161,7 @@ const MyOrdersPage = () => {
                             console.error(`Ошибка загрузки исполнителей для заказа ${order.id}:`, error);
                             return {
                                 ...order,
+                                createdAt: order.createdAt || order.created_at || null,
                                 requestedExecutors: [],
                                 kind: "regular",
                             };
@@ -171,6 +185,7 @@ const MyOrdersPage = () => {
                     .map((o) => ({
                         ...o,
                         kind: "express",
+                        createdAt: o.createdAt || o.created_at || null,
                     }));
             }
 
@@ -180,7 +195,7 @@ const MyOrdersPage = () => {
                     if (String(b.id) === String(targetOrderId)) return 1;
                 }
 
-                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                return getOrderTimestamp(b) - getOrderTimestamp(a);
             });
 
             setOrders(merged);
@@ -500,8 +515,8 @@ const MyOrdersPage = () => {
     {isExpress ? `Экспресс №${order.id}` : `Заказ №${order.id}`}
 </span>
                                                     <span className={styles.orderDate}>
-                            {new Date(order.createdAt).toLocaleString()}
-                          </span>
+    {formatOrderDate(order.createdAt)}
+</span>
                                                 </div>
 
                                                 <div className={styles.titleRow}>

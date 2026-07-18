@@ -771,7 +771,12 @@ const OrdersPage = () => {
             const ad = Number.isFinite(a._distance) ? a._distance : 1e9;
             const bd = Number.isFinite(b._distance) ? b._distance : 1e9;
             if (ad !== bd) return ad - bd;
-            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+            const getOrderTimestamp = (order) => {
+                const rawDate = order.createdAt || order.created_at;
+                const timestamp = rawDate ? new Date(rawDate).getTime() : 0;
+
+                return Number.isFinite(timestamp) ? timestamp : 0;
+            };
         });
     }, [
         allRaw,
