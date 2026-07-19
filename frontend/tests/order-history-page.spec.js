@@ -149,9 +149,13 @@ async function openHistoryPage(page, options = {}) {
     const userId = options.userId || 1;
     const query = options.query || "platform=web";
 
-    await page.goto(`${FRONT_URL}/orders-history/${userId}?${query}`);
+    await page.goto(`${FRONT_URL}/orders-history/${userId}?${query}`, {
 
-    await page.waitForLoadState("domcontentloaded");
+        waitUntil: "domcontentloaded",
+
+        timeout: 30000,
+
+    });
 
     if (page.url().includes("/login")) {
         await page.screenshot({
@@ -565,8 +569,13 @@ test.describe("OrderHistoryPage", () => {
             });
         });
 
-        await page.goto(`${FRONT_URL}/orders-history/1?platform=web`);
-        await page.waitForLoadState("domcontentloaded");
+        await page.goto(`${FRONT_URL}/orders-history/1?platform=web`, {
+
+            waitUntil: "domcontentloaded",
+
+            timeout: 30000,
+
+        });
 
         await expect(page.locator(".oh-title")).toHaveText("История заказов", {
             timeout: 15000,

@@ -210,8 +210,10 @@ async function openPageWithBottomMenu(page, path = "/", options = {}) {
     await setFakeAuth(page, options.user || testUser);
     await setupBottomMenuMocks(page, options);
 
-    await page.goto(`${FRONT_URL}${path}`);
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto(`${FRONT_URL}${path}`, {
+        waitUntil: "domcontentloaded",
+        timeout: 30000,
+    });
 
     if (options.expectHidden) {
         return;

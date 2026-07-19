@@ -207,9 +207,13 @@ async function openCreateOrderPage(page, options = {}) {
     await setFakeAuth(page);
     await setupCreateOrderMocks(page, options);
 
-    await page.goto(`${FRONT_URL}/create-order`);
+    await page.goto(`${FRONT_URL}/create-order`, {
 
-    await page.waitForLoadState("domcontentloaded");
+        waitUntil: "domcontentloaded",
+
+        timeout: 30000,
+
+    });
 
     if (page.url().includes("/login")) {
         await page.screenshot({

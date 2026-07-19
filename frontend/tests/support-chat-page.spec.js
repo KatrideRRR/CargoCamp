@@ -154,8 +154,13 @@ async function openSupportChatPage(page, options = {}) {
 
     const query = options.query || "platform=web";
 
-    await page.goto(`${FRONT_URL}/support?${query}`);
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto(`${FRONT_URL}/support?${query}`, {
+
+        waitUntil: "domcontentloaded",
+
+        timeout: 30000,
+
+    });
 
     if (page.url().includes("/login")) {
         await page.screenshot({

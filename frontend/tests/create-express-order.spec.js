@@ -203,9 +203,13 @@ async function openExpressPage(page, options = {}) {
     await setFakeAuth(page);
     await setupExpressMocks(page, options);
 
-    await page.goto(EXPRESS_CREATE_URL);
+    await page.goto(EXPRESS_CREATE_URL, {
 
-    await page.waitForLoadState("domcontentloaded");
+        waitUntil: "domcontentloaded",
+
+        timeout: 30000,
+
+    });
 
     await expect(page.locator(".exo-page")).toBeVisible({
         timeout: 15000,

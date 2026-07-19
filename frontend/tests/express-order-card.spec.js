@@ -331,8 +331,13 @@ async function openActiveOrdersPage(page, options = {}) {
 
     const query = options.query || "platform=web&view=performing";
 
-    await page.goto(`${FRONT_URL}/active-orders?${query}`);
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto(`${FRONT_URL}/active-orders?${query}`, {
+
+        waitUntil: "domcontentloaded",
+
+        timeout: 30000,
+
+    });
 
     if (page.url().includes("/login")) {
         await page.screenshot({

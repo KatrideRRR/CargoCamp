@@ -73,9 +73,13 @@ async function openStartPage(page) {
     await setFakeAuth(page);
     await setupStartPageMocks(page);
 
-    await page.goto(`${FRONT_URL}/`);
+    await page.goto(`${FRONT_URL}/`, {
 
-    await page.waitForLoadState("domcontentloaded");
+        waitUntil: "domcontentloaded",
+
+        timeout: 30000,
+
+    });
 
     if (page.url().includes("/login")) {
         await page.screenshot({

@@ -306,17 +306,6 @@ const ChatPage = () => {
         navigate(-1);
     };
 
-    const handleCallUser = () => {
-        const phoneForTel = normalizePhoneForTel(selectedUser?.phone);
-
-        if (!phoneForTel) {
-            alert("Некорректный номер телефона");
-            return;
-        }
-
-        window.location.href = `tel:${encodeURIComponent(phoneForTel)}`;
-    };
-
     const handleRouteClick = () => {
         const coordinates = order?.coordinates || order?.toCoordinates || order?.destinationCoordinates;
 
@@ -487,6 +476,8 @@ const ChatPage = () => {
         });
     }, [messages]);
 
+    const phoneForTel = normalizePhoneForTel(selectedUser?.phone);
+
     useEffect(() => {
         const onPullToRefresh = async (e) => {
             try {
@@ -582,13 +573,24 @@ const ChatPage = () => {
                                 Маршрут
                             </button>
 
-                            <button
-                                type="button"
-                                className="chat-order-btn call"
-                                onClick={handleCallUser}
-                            >
-                                Позвонить
-                            </button>
+                            {phoneForTel ? (
+                                <a
+                                    className="chat-order-btn call"
+                                    href={`tel:${phoneForTel}`}
+                                    aria-label="Позвонить"
+                                >
+                                    Позвонить
+                                </a>
+                            ) : (
+                                <button
+                                    type="button"
+                                    className="chat-order-btn call"
+                                    onClick={() => alert("Некорректный номер телефона")}
+                                    aria-label="Позвонить"
+                                >
+                                    Позвонить
+                                </button>
+                            )}
 
                             {orderType === "regular" && (
                                 <button

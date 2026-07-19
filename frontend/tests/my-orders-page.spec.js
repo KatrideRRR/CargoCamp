@@ -271,9 +271,13 @@ async function openMyOrdersPage(page, options = {}) {
     const userId = options.userId || 1;
     const query = options.query || "platform=web";
 
-    await page.goto(`${FRONT_URL}/my-orders/${userId}?${query}`);
+    await page.goto(`${FRONT_URL}/my-orders/${userId}?${query}`, {
 
-    await page.waitForLoadState("domcontentloaded");
+        waitUntil: "domcontentloaded",
+
+        timeout: 30000,
+
+    });
 
     if (options.waitForPage === false) {
         return;

@@ -192,9 +192,10 @@ async function openActiveOrdersPage(page) {
     await setFakeAuthToken(page);
     await setupFrontendMocks(page);
 
-    await page.goto(`${FRONT_URL}/active-orders?platform=web`);
-
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto(`${FRONT_URL}/active-orders?platform=web`, {
+        waitUntil: "domcontentloaded",
+        timeout: 30000,
+    });
 
     if (page.url().includes("/login")) {
         await page.screenshot({
@@ -332,29 +333,50 @@ test.describe("ActiveOrdersPage", () => {
     });
 
     test("кнопка Маршрут открывает Яндекс.Навигатор", async ({ page }) => {
-        await page.evaluate(() => {
+        await page.addInitScript(() => {
             window.__openedUrl = null;
+
+            window.open = (url) => {
+                window.__openedUrl = String(url);
+                return null;
+            };
 
             window.confirm = () => true;
 
-            window.open = (url) => {
-                window.__openedUrl = url;
-            };
-
-            navigator.geolocation.getCurrentPosition = (success) => {
-                success({
-                    coords: {
-                        latitude: 55.75,
-                        longitude: 37.61,
+            Object.defineProperty(navigator, "geolocation", {
+                configurable: true,
+                value: {
+                    getCurrentPosition(success) {
+                        success({
+                            coords: {
+                                latitude: 55.75,
+                                longitude: 37.61,
+                                accuracy: 10,
+                            },
+                        });
                     },
-                });
-            };
+                },
+            });
         });
 
-        await page.getByRole("button", { name: /Маршрут/i }).click();
+        await openActiveOrdersPage(page);
+
+        const routeButton = page.getByRole("button", {
+            name: /Маршрут/i,
+        });
+
+        await expect(routeButton).toBeVisible();
+        await expect(routeButton).toBeEnabled();
+
+        await routeButton.click();
 
         await expect
-            .poll(async () => page.evaluate(() => window.__openedUrl))
+            .poll(
+                () => page.evaluate(() => window.__openedUrl),
+                {
+                    timeout: 10000,
+                }
+            )
             .toContain("https://yandex.ru/navi/");
     });
 

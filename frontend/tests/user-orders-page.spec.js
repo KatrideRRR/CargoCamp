@@ -170,8 +170,13 @@ async function openUserOrdersPage(page, options = {}) {
 
     const userId = options.userId || 1;
 
-    await page.goto(`${FRONT_URL}/user-orders/${userId}?platform=web`);
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto(`${FRONT_URL}/user-orders/${userId}?platform=web`, {
+
+        waitUntil: "domcontentloaded",
+
+        timeout: 30000,
+
+    });
 
     if (options.waitForPage === false) return;
 

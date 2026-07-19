@@ -221,9 +221,13 @@ async function openRegularOrderPage(page, options = {}) {
 
     const query = options.query || "platform=web";
 
-    await page.goto(`${FRONT_URL}/order/101?${query}`);
+    await page.goto(`${FRONT_URL}/order/101?${query}`, {
 
-    await page.waitForLoadState("domcontentloaded");
+        waitUntil: "domcontentloaded",
+
+        timeout: 30000,
+
+    });
 
     if (options.waitForPage === false) {
         return;
@@ -244,9 +248,13 @@ async function openExpressOrderPage(page, options = {}) {
 
     const query = options.query || "platform=web";
 
-    await page.goto(`${FRONT_URL}/express-order/201?${query}`);
+    await page.goto(`${FRONT_URL}/express-order/201?${query}`, {
 
-    await page.waitForLoadState("domcontentloaded");
+        waitUntil: "domcontentloaded",
+
+        timeout: 30000,
+
+    });
 
     if (options.waitForPage === false) {
         return;
@@ -555,8 +563,13 @@ test.describe("OrderPage — обычный заказ", () => {
             });
         });
 
-        await page.goto(`${FRONT_URL}/order/101?platform=web`);
-        await page.waitForLoadState("domcontentloaded");
+        await page.goto(`${FRONT_URL}/order/101?platform=web`, {
+
+            waitUntil: "domcontentloaded",
+
+            timeout: 30000,
+
+        });
 
         await expect(page.locator(".orders-title")).toHaveText("Заказ №101", {
             timeout: 15000,

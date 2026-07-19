@@ -383,9 +383,13 @@ async function openOrdersPage(page, options = {}) {
 
     const query = options.query || "platform=web";
 
-    await page.goto(`${FRONT_URL}/orders?${query}`);
+    await page.goto(`${FRONT_URL}/orders?${query}`, {
 
-    await page.waitForLoadState("domcontentloaded");
+        waitUntil: "domcontentloaded",
+
+        timeout: 30000,
+
+    });
 
     if (options.waitForPage === false) return;
 
@@ -1033,8 +1037,13 @@ test.describe("OrdersPage", () => {
             });
         });
 
-        await page.goto(`${FRONT_URL}/orders?platform=web`);
-        await page.waitForLoadState("domcontentloaded");
+        await page.goto(`${FRONT_URL}/orders?platform=web`, {
+
+            waitUntil: "domcontentloaded",
+
+            timeout: 30000,
+
+        });
 
         await expect(page.locator(".orders-title")).toHaveText("Все заказы", {
             timeout: 15000,

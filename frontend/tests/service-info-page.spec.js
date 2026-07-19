@@ -54,8 +54,13 @@ async function openServiceInfoPage(page) {
         });
     });
 
-    await page.goto(`${FRONT_URL}/services`);
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto(`${FRONT_URL}/services`, {
+
+        waitUntil: "domcontentloaded",
+
+        timeout: 30000,
+
+    });
 
     if (page.url().includes("/login")) {
         await page.screenshot({

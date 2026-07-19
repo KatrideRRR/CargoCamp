@@ -126,9 +126,13 @@ async function openRegisterPage(page, options = {}) {
 
     const query = options.query || "platform=web";
 
-    await page.goto(`${FRONT_URL}/register?${query}`);
+    await page.goto(`${FRONT_URL}/register?${query}`, {
 
-    await page.waitForLoadState("domcontentloaded");
+        waitUntil: "domcontentloaded",
+
+        timeout: 30000,
+
+    });
 
     await expect(page.locator(".register-title")).toHaveText("Регистрация", {
         timeout: 15000,

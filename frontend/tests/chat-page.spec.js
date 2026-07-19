@@ -219,9 +219,13 @@ async function openChatPage(page, options = {}) {
     await setFakeAuth(page);
     await setupChatMocks(page, options);
 
-    await page.goto(`${FRONT_URL}/messages/${orderType}/101?platform=web`);
+    await page.goto(`${FRONT_URL}/messages/${orderType}/101?platform=web`, {
 
-    await page.waitForLoadState("domcontentloaded");
+        waitUntil: "domcontentloaded",
+
+        timeout: 30000,
+
+    });
 
     if (page.url().includes("/login")) {
         await page.screenshot({
@@ -288,14 +292,6 @@ async function clickSendMessage(page) {
     });
 }
 
-async function clickCallButton(page) {
-    await clickBySelector(
-        page,
-        ".chat-order-btn.call",
-        "Кнопка Позвонить не найдена"
-    );
-}
-
 async function clickRouteButton(page) {
     await clickBySelector(
         page,
@@ -329,7 +325,9 @@ test.describe("ChatPage", () => {
         await expect(page.getByText("В процессе")).toBeVisible();
 
         await expect(page.getByRole("button", { name: /Маршрут/i })).toBeVisible();
-        await expect(page.getByRole("button", { name: /Позвонить/i })).toBeVisible();
+        await expect(
+            page.getByRole("link", { name: /Позвонить/i })
+        ).toBeVisible();
         await expect(page.getByRole("button", { name: /^Спор$/i })).toBeVisible();
 
         await expect(page.locator(".chat-input")).toBeVisible();
@@ -448,7 +446,20 @@ test.describe("ChatPage", () => {
         await page.locator(".chat-input").fill("Сообщение через Enter");
         await page.locator(".chat-input").press("Enter");
 
-        expect(messageRequestBody.content).toBe("Сообщение через Enter");
+        await expect
+            .poll(() => messageRequestBody, {
+                timeout: 5000,
+            })
+            .toEqual({
+                content: "Сообщение через Enter",
+                receiverId: customerUser.id,
+                orderId: "101",
+                orderType: "regular",
+            });
+
+        await expect(
+            page.locator(".chat-message-sent").last()
+        ).toContainText("Сообщение через Enter");
 
         await expect(page.locator(".chat-message-sent").last()).toContainText(
             "Сообщение через Enter"
@@ -502,16 +513,17 @@ test.describe("ChatPage", () => {
         await expect(page.getByText("Ошибка: Не удалось отправить сообщение.")).toBeVisible();
     });
 
-    test("кнопка Позвонить открывает tel-ссылку", async ({ page }) => {
-        const telPromise = page.waitForEvent("requestfailed", (request) =>
-            request.url().startsWith("tel:")
+    test("кнопка Позвонить содержит корректную tel-ссылку", async ({ page }) => {
+        const callLink = page.getByRole("link", {
+            name: /Позвонить/i,
+        });
+
+        await expect(callLink).toBeVisible();
+
+        await expect(callLink).toHaveAttribute(
+            "href",
+            "tel:+79780032978"
         );
-
-        await clickCallButton(page);
-
-        const telRequest = await telPromise;
-
-        expect(telRequest.url()).toContain("tel:%2B79780032978");
     });
 
     test("кнопка Маршрут открывает Яндекс.Навигатор", async ({ page }) => {

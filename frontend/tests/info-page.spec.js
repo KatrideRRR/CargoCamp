@@ -37,9 +37,13 @@ async function setFakeAuth(page) {
 async function openInfoPage(page, platform = "web") {
     await setFakeAuth(page);
 
-    await page.goto(`${FRONT_URL}/info?platform=${platform}`);
+    await page.goto(`${FRONT_URL}/info?platform=${platform}`, {
 
-    await page.waitForLoadState("domcontentloaded");
+        waitUntil: "domcontentloaded",
+
+        timeout: 30000,
+
+    });
 
     if (page.url().includes("/login")) {
         await page.screenshot({

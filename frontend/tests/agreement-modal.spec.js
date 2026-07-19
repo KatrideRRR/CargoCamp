@@ -153,8 +153,10 @@ async function openProfileWithAgreement(page, options = {}) {
     await setFakeAuth(page);
     await setupProfileMocks(page, options);
 
-    await page.goto(`${FRONT_URL}/profile?platform=web`);
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto(`${FRONT_URL}/profile?platform=web`, {
+        waitUntil: "domcontentloaded",
+        timeout: 30000,
+    });
 
     if (page.url().includes("/login")) {
         await page.screenshot({

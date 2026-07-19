@@ -122,8 +122,13 @@ async function openReviewsPage(page, options = {}) {
 
     const query = options.query || "platform=web";
 
-    await page.goto(`${FRONT_URL}/complaints/123?${query}`);
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto(`${FRONT_URL}/complaints/123?${query}`, {
+
+        waitUntil: "domcontentloaded",
+
+        timeout: 30000,
+
+    });
 
     if (options.waitForPage === false) return;
 
@@ -367,8 +372,13 @@ test.describe("UserReviewsPage", () => {
             });
         });
 
-        await page.goto(`${FRONT_URL}/complaints/123?platform=web`);
-        await page.waitForLoadState("domcontentloaded");
+        await page.goto(`${FRONT_URL}/complaints/123?platform=web`, {
+
+            waitUntil: "domcontentloaded",
+
+            timeout: 30000,
+
+        });
 
         await expect(page.locator(".title")).toHaveText("Отзывы", {
             timeout: 15000,

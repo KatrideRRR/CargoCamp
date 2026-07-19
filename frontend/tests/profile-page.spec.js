@@ -274,9 +274,13 @@ async function openProfilePage(page, options = {}) {
 
     const query = options.query || "platform=web";
 
-    await page.goto(`${FRONT_URL}/profile?${query}`);
+    await page.goto(`${FRONT_URL}/profile?${query}`, {
 
-    await page.waitForLoadState("domcontentloaded");
+        waitUntil: "domcontentloaded",
+
+        timeout: 30000,
+
+    });
 
     if (options.waitForPage === false) return;
 
@@ -837,8 +841,13 @@ test.describe("ProfilePage", () => {
 
         await setupProfileMocks(page);
 
-        await page.goto(`${FRONT_URL}/profile?platform=web`);
-        await page.waitForLoadState("domcontentloaded");
+        await page.goto(`${FRONT_URL}/profile?platform=web`, {
+
+            waitUntil: "domcontentloaded",
+
+            timeout: 30000,
+
+        });
 
         await expect(page).toHaveURL(/\/login/);
     });
@@ -896,8 +905,13 @@ test.describe("ProfilePage", () => {
             });
         });
 
-        await page.goto(`${FRONT_URL}/profile?platform=web`);
-        await page.waitForLoadState("domcontentloaded");
+        await page.goto(`${FRONT_URL}/profile?platform=web`, {
+
+            waitUntil: "domcontentloaded",
+
+            timeout: 30000,
+
+        });
 
         await expect(page.locator(".profile-title")).toHaveText("Профиль", {
             timeout: 15000,

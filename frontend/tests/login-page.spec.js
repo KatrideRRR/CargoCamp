@@ -133,9 +133,10 @@ async function setupLoginMocks(page, options = {}) {
 async function openLoginPage(page, options = {}) {
     await setupLoginMocks(page, options);
 
-    await page.goto(LOGIN_URL);
-
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto(LOGIN_URL, {
+        waitUntil: "domcontentloaded",
+        timeout: 30000,
+    });
 
     await expect(page.locator(".login-page")).toBeVisible({
         timeout: 15000,
