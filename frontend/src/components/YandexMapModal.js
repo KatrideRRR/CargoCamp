@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import "../styles/YandexMapModal.css";
+import {
+    getOrderCoordinatesForMap,
+} from "../utils/orderNavigation";
 
 const EMPTY_ORDERS = Object.freeze([]);
 
@@ -95,17 +98,6 @@ function loadYMaps(apiKey) {
     });
 
     return ymapsLoaderPromise;
-}
-
-function getCoordsFromOrder(order) {
-    const raw = String(order?.coordinates || "");
-    const [lat, lng] = raw.split(",").map((x) => Number(String(x).trim()));
-
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        return null;
-    }
-
-    return [lat, lng];
 }
 
 export default function YandexMapModal({
@@ -356,7 +348,8 @@ export default function YandexMapModal({
         if (!showOrders || safeOrders.length === 0) return;
 
         safeOrders.forEach((order) => {
-            const coords = getCoordsFromOrder(order);
+            const coords =
+                getOrderCoordinatesForMap(order);
 
             if (!coords) return;
 

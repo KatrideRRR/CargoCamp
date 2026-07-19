@@ -13,7 +13,11 @@ import {
     FaExclamationTriangle,
     FaClipboardCheck,
 } from "react-icons/fa";
-import ExpressRouteButtons from "./ExpressRouteButtons";
+
+import {
+    getExpressNavigationTarget,
+    openOrderRoute,
+} from "../utils/orderNavigation";
 
 function getExpressSteps(type) {
     if (type === "taxi") {
@@ -242,6 +246,29 @@ const ExpressOrderCard = ({
         } finally {
             setBusy(false);
             actionLockRef.current = false;
+        }
+    };
+
+    const handleExpressRoute = async () => {
+        const target =
+            getExpressNavigationTarget(currentOrder);
+
+        try {
+            await openOrderRoute(currentOrder, {
+                orderType: "express",
+                target,
+                confirmText:
+                    target === "A"
+                        ? "Открыть маршрут к точке A?"
+                        : "Открыть маршрут к точке B?",
+            });
+        } catch (error) {
+            console.error(
+                "Ошибка маршрута экспресс-заказа:",
+                error
+            );
+
+            alert("Не удалось открыть маршрут");
         }
     };
 
@@ -544,12 +571,19 @@ const ExpressOrderCard = ({
                         </button>
 
                         {isExecutor && navMode !== "none" && (
-                            <ExpressRouteButtons
-                                orderId={currentOrder.id}
-                                navMode={navMode}
-                                className="express-routeButtonsPremium"
-                                buttonClassName="express-secondaryBtn"
-                            />
+                            <button
+                                type="button"
+                                className="express-secondaryBtn"
+                                onClick={handleExpressRoute}
+                            >
+                                <FaCarSide />
+
+                                <span className="btn-text">
+            {navMode === "toA"
+                ? "Маршрут к A"
+                : "Маршрут к B"}
+        </span>
+                            </button>
                         )}
 
                         <button

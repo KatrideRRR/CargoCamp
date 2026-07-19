@@ -12,7 +12,7 @@ import axiosInstance from "../utils/axiosInstance";
 import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
 import ExpressOrderCard from "../components/ExpressOrderCard";
 import { ModalContext } from "../components/modalContext";
-import { AppLauncher } from "@capacitor/app-launcher";
+import { openOrderRoute } from "../utils/orderNavigation";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -386,97 +386,19 @@ const ActiveOrdersPage = () => {
         );
     };
 
-    const parseOrderCoordinates = (coordinates) => {
-        if (!coordinates) return null;
-
-        const normalized = String(coordinates)
-            .trim()
-            .replace(/\s+/g, "");
-
-        const parts = normalized.split(",");
-
-        if (parts.length !== 2) {
-            return null;
-        }
-
-        const latitude = Number(parts[0]);
-        const longitude = Number(parts[1]);
-
-        if (
-            !Number.isFinite(latitude) ||
-            !Number.isFinite(longitude) ||
-            latitude < -90 ||
-            latitude > 90 ||
-            longitude < -180 ||
-            longitude > 180
-        ) {
-            return null;
-        }
-
-        return {
-            latitude,
-            longitude,
-        };
-    };
-
     const handleRouteClick = async (order) => {
-        const destination = parseOrderCoordinates(order?.coordinates);
-
-        if (!destination) {
-            console.error("Некорректные координаты заказа:", {
-                orderId: order?.id,
-                coordinates: order?.coordinates,
-            });
-
-            alert("Координаты заказа не найдены или имеют неверный формат");
-            return;
-        }
-
-        const { latitude, longitude } = destination;
-
-        const confirmNavigation = window.confirm(
-            "Открыть маршрут в Яндекс.Навигаторе?"
-        );
-
-        if (!confirmNavigation) {
-            return;
-        }
-
         try {
-            if (Capacitor.isNativePlatform()) {
-                const navigatorUrl =
-                    `yandexnavi://build_route_on_map` +
-                    `?lat_to=${encodeURIComponent(latitude)}` +
-                    `&lon_to=${encodeURIComponent(longitude)}`;
-
-                const result = await AppLauncher.openUrl({
-                    url: navigatorUrl,
-                });
-
-                console.log("YANDEX NAVIGATOR OPEN RESULT:", result);
-
-                if (!result?.completed) {
-                    throw new Error("Яндекс.Навигатор не удалось открыть");
-                }
-
-                return;
-            }
-
-            const webUrl =
-                `https://yandex.ru/maps/?rtext=~` +
-                `${encodeURIComponent(latitude)},${encodeURIComponent(longitude)}` +
-                `&rtt=auto`;
-
-            window.location.assign(webUrl);
+            await openOrderRoute(order, {
+                orderType: "regular",
+                target: "auto",
+            });
         } catch (error) {
-            console.error("Ошибка открытия Яндекс.Навигатора:", error);
+            console.error(
+                "Ошибка открытия маршрута обычного заказа:",
+                error
+            );
 
-            const fallbackUrl =
-                `https://yandex.ru/maps/?rtext=~` +
-                `${encodeURIComponent(latitude)},${encodeURIComponent(longitude)}` +
-                `&rtt=auto`;
-
-            window.location.assign(fallbackUrl);
+            alert("Не удалось открыть маршрут");
         }
     };
 

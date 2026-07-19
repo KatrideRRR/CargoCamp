@@ -6,6 +6,7 @@ import "../styles/ChatPage.css";
 import { useUser } from "../utils/userContext";
 import { socket } from "../socketClient";
 import Modal from "react-modal";
+import { openOrderRoute } from "../utils/orderNavigation";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -306,42 +307,25 @@ const ChatPage = () => {
         navigate(-1);
     };
 
-    const handleRouteClick = () => {
-        const coordinates = order?.coordinates || order?.toCoordinates || order?.destinationCoordinates;
-
-        if (!coordinates || !String(coordinates).includes(",")) {
-            alert("Координаты заказа не найдены");
+    const handleRouteClick = async () => {
+        if (!order) {
+            alert("Заказ ещё не загружен");
             return;
         }
 
-        const [orderLat, orderLon] = String(coordinates)
-            .split(",")
-            .map((coord) => parseFloat(coord));
+        try {
+            await openOrderRoute(order, {
+                orderType,
+                target: "auto",
+            });
+        } catch (error) {
+            console.error(
+                "Ошибка открытия маршрута из чата:",
+                error
+            );
 
-        if (!Number.isFinite(orderLat) || !Number.isFinite(orderLon)) {
-            alert("Некорректные координаты заказа");
-            return;
+            alert("Не удалось открыть маршрут");
         }
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const userLat = position.coords.latitude;
-                const userLon = position.coords.longitude;
-
-                const url = `https://yandex.ru/navi/?rtext=${userLat},${userLon}~${orderLat},${orderLon}&rtt=auto`;
-
-                window.open(url, "_blank");
-            },
-            (err) => {
-                console.error(err);
-                alert("Не удалось определить местоположение");
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 12000,
-                maximumAge: 0,
-            }
-        );
     };
 
     const disputeReasonOptions = [
