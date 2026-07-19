@@ -575,6 +575,16 @@ const ExpressOrderCard = ({
                                 type="button"
                                 className="express-secondaryBtn"
                                 onClick={handleExpressRoute}
+                                aria-label={
+                                    navMode === "toA"
+                                        ? "Маршрут к A"
+                                        : "Маршрут к B"
+                                }
+                                title={
+                                    navMode === "toA"
+                                        ? "Маршрут к A"
+                                        : "Маршрут к B"
+                                }
                             >
                                 <FaCarSide />
 

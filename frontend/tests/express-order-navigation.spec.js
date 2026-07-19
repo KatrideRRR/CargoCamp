@@ -22,8 +22,15 @@ const baseTaxiOrder = {
     executorId: 2,
     totalPrice: 700,
     paymentType: "cash",
+
     fromAddress: "Симферополь, улица Пушкина, 1",
     toAddress: "Симферополь, проспект Кирова, 10",
+
+    fromLat: 44.9521,
+    fromLng: 34.1024,
+    toLat: 44.9482,
+    toLng: 34.1001,
+
     description: "Нужно такси",
     distanceKm: 3.4,
     estimatedTimeMin: 12,
@@ -39,8 +46,15 @@ const baseCourierOrder = {
     executorId: 2,
     totalPrice: 500,
     paymentType: "guarantee",
+
     fromAddress: "Симферополь, центр",
     toAddress: "Симферополь, вокзал",
+
+    fromLat: 44.9525,
+    fromLng: 34.1028,
+    toLat: 44.9642,
+    toLng: 34.0874,
+
     description: "Доставить документы",
     distanceKm: 5.1,
     estimatedTimeMin: 18,
@@ -83,73 +97,10 @@ async function setFakeAuth(page, user = executorUser) {
     });
 }
 
-async function mockGeolocation(page, options = {}) {
-    const {
-        latitude = 44.9521,
-        longitude = 34.1024,
-        shouldFail = false,
-        message = "GPS недоступен",
-    } = options;
-
-    await page.addInitScript(({ latitude, longitude, shouldFail, message }) => {
-        Object.defineProperty(navigator, "geolocation", {
-            configurable: true,
-            value: {
-                getCurrentPosition: (success, error) => {
-                    setTimeout(() => {
-                        if (shouldFail) {
-                            error?.({
-                                code: 1,
-                                message,
-                            });
-                            return;
-                        }
-
-                        success({
-                            coords: {
-                                latitude,
-                                longitude,
-                            },
-                        });
-                    }, 50);
-                },
-            },
-        });
-
-        window.__openedUrls = [];
-
-        window.open = (url) => {
-            window.__openedUrls.push(url);
-
-            return {
-                closed: false,
-                focus: () => {},
-            };
-        };
-    }, {
-        latitude,
-        longitude,
-        shouldFail,
-        message,
-    });
-}
-
 async function setupMocks(page, options = {}) {
     const {
         user = executorUser,
         expressOrders = [baseTaxiOrder],
-        toAStatus = 200,
-        toABody = {
-            success: true,
-            url: "https://yandex.ru/maps/?rtext=my~A",
-        },
-        atoBStatus = 200,
-        atoBBody = {
-            success: true,
-            url: "https://yandex.ru/maps/?rtext=A~B",
-        },
-        onToA,
-        onAtoB,
     } = options;
 
     page.on("pageerror", (error) => {
@@ -264,35 +215,9 @@ async function setupMocks(page, options = {}) {
             }),
         });
     });
-
-    await page.route("**/api/express/express-orders/*/route/to-A**", async (route) => {
-        const url = new URL(route.request().url());
-
-        onToA?.({
-            myLat: url.searchParams.get("myLat"),
-            myLng: url.searchParams.get("myLng"),
-        });
-
-        await route.fulfill({
-            status: toAStatus,
-            contentType: "application/json",
-            body: JSON.stringify(toABody),
-        });
-    });
-
-    await page.route("**/api/express/express-orders/*/route/A-to-B", async (route) => {
-        onAtoB?.();
-
-        await route.fulfill({
-            status: atoBStatus,
-            contentType: "application/json",
-            body: JSON.stringify(atoBBody),
-        });
-    });
 }
 
 async function openActiveOrdersPage(page, options = {}) {
-    await mockGeolocation(page, options.geo || {});
     await setFakeAuth(page, options.user || executorUser);
     await setupMocks(page, options);
 
@@ -326,12 +251,8 @@ function expressCard(page, text = "Экспресс №201") {
     });
 }
 
-async function getOpenedUrls(page) {
-    return await page.evaluate(() => window.__openedUrls || []);
-}
-
-test.describe("ExpressRouteButtons", () => {
-    test("при navMode toA показывает кнопку До точки A", async ({ page }) => {
+test.describe("Навигация экспресс-заказа", () => {
+    test("для accepted показывает маршрут к точке A", async ({ page }) => {
         await openActiveOrdersPage(page, {
             expressOrders: [
                 {
@@ -343,16 +264,39 @@ test.describe("ExpressRouteButtons", () => {
 
         const card = expressCard(page);
 
-        await expect(card.getByRole("button", {
-            name: /До точки A/i,
-        })).toBeVisible();
+        await expect(
+            card.getByRole("button", {
+                name: /Маршрут к A/i,
+            })
+        ).toBeVisible();
 
-        await expect(card.getByRole("button", {
-            name: /Маршрут A→B/i,
-        })).not.toBeVisible();
+        await expect(
+            card.getByRole("button", {
+                name: /Маршрут к B/i,
+            })
+        ).not.toBeVisible();
     });
 
-    test("при navMode AtoB показывает кнопку Маршрут A→B для taxi in_progress", async ({ page }) => {
+    test("для taxi on_the_way_to_A показывает маршрут к точке A", async ({ page }) => {
+        await openActiveOrdersPage(page, {
+            expressOrders: [
+                {
+                    ...baseTaxiOrder,
+                    status: "on_the_way_to_A",
+                },
+            ],
+        });
+
+        const card = expressCard(page);
+
+        await expect(
+            card.getByRole("button", {
+                name: /Маршрут к A/i,
+            })
+        ).toBeVisible();
+    });
+
+    test("для taxi in_progress показывает маршрут к точке B", async ({ page }) => {
         await openActiveOrdersPage(page, {
             expressOrders: [
                 {
@@ -364,16 +308,20 @@ test.describe("ExpressRouteButtons", () => {
 
         const card = expressCard(page);
 
-        await expect(card.getByRole("button", {
-            name: /Маршрут A→B/i,
-        })).toBeVisible();
+        await expect(
+            card.getByRole("button", {
+                name: /Маршрут к B/i,
+            })
+        ).toBeVisible();
 
-        await expect(card.getByRole("button", {
-            name: /До точки A/i,
-        })).not.toBeVisible();
+        await expect(
+            card.getByRole("button", {
+                name: /Маршрут к A/i,
+            })
+        ).not.toBeVisible();
     });
 
-    test("при navMode AtoB показывает кнопку Маршрут A→B для courier picked_up", async ({ page }) => {
+    test("для courier picked_up показывает маршрут к точке B", async ({ page }) => {
         await openActiveOrdersPage(page, {
             expressOrders: [
                 {
@@ -385,12 +333,14 @@ test.describe("ExpressRouteButtons", () => {
 
         const card = expressCard(page, "Экспресс №202");
 
-        await expect(card.getByRole("button", {
-            name: /Маршрут A→B/i,
-        })).toBeVisible();
+        await expect(
+            card.getByRole("button", {
+                name: /Маршрут к B/i,
+            })
+        ).toBeVisible();
     });
 
-    test("у заказчика кнопки маршрута не отображаются", async ({ page }) => {
+    test("у заказчика кнопка маршрута не отображается", async ({ page }) => {
         await openActiveOrdersPage(page, {
             user: creatorUser,
             query: "platform=web&view=created",
@@ -398,8 +348,6 @@ test.describe("ExpressRouteButtons", () => {
                 {
                     ...baseTaxiOrder,
                     status: "accepted",
-                    creatorId: 1,
-                    executorId: 2,
                 },
             ],
         });
@@ -408,18 +356,14 @@ test.describe("ExpressRouteButtons", () => {
 
         await expect(card).toBeVisible();
 
-        await expect(card.getByRole("button", {
-            name: /До точки A/i,
-        })).not.toBeVisible();
-
-        await expect(card.getByRole("button", {
-            name: /Маршрут A→B/i,
-        })).not.toBeVisible();
+        await expect(
+            card.getByRole("button", {
+                name: /Маршрут к [AB]/i,
+            })
+        ).not.toBeVisible();
     });
 
-    test("кнопка До точки A получает GPS, вызывает route/to-A и открывает ссылку", async ({ page }) => {
-        let routeParams = null;
-
+    test("маршрут к A открывает координаты точки отправления", async ({ page }) => {
         await openActiveOrdersPage(page, {
             expressOrders: [
                 {
@@ -427,40 +371,44 @@ test.describe("ExpressRouteButtons", () => {
                     status: "accepted",
                 },
             ],
-            geo: {
-                latitude: 44.9555,
-                longitude: 34.1111,
-            },
-            onToA: (params) => {
-                routeParams = params;
-            },
+        });
+
+        await page.evaluate(() => {
+            window.__openedUrl = null;
+
+            window.confirm = () => true;
+
+            window.open = (url) => {
+                window.__openedUrl = String(url);
+
+                return {
+                    closed: false,
+                    focus() {},
+                };
+            };
         });
 
         const card = expressCard(page);
 
         await card.getByRole("button", {
-            name: /До точки A/i,
+            name: /Маршрут к A/i,
         }).click();
 
         await expect
-            .poll(() => routeParams, {
-                timeout: 10000,
-            })
-            .toEqual({
-                myLat: "44.9555",
-                myLng: "34.1111",
-            });
+            .poll(() =>
+                page.evaluate(() => window.__openedUrl)
+            )
+            .toContain("https://yandex.ru/navi/");
 
-        await expect
-            .poll(async () => await getOpenedUrls(page), {
-                timeout: 10000,
-            })
-            .toContain("https://yandex.ru/maps/?rtext=my~A");
+        const openedUrl = await page.evaluate(
+            () => window.__openedUrl
+        );
+
+        expect(openedUrl).toContain("44.9521");
+        expect(openedUrl).toContain("34.1024");
     });
 
-    test("кнопка Маршрут A→B вызывает route/A-to-B и открывает ссылку", async ({ page }) => {
-        let called = false;
-
+    test("маршрут к B открывает координаты точки назначения", async ({ page }) => {
         await openActiveOrdersPage(page, {
             expressOrders: [
                 {
@@ -468,33 +416,44 @@ test.describe("ExpressRouteButtons", () => {
                     status: "in_progress",
                 },
             ],
-            onAtoB: () => {
-                called = true;
-            },
+        });
+
+        await page.evaluate(() => {
+            window.__openedUrl = null;
+
+            window.confirm = () => true;
+
+            window.open = (url) => {
+                window.__openedUrl = String(url);
+
+                return {
+                    closed: false,
+                    focus() {},
+                };
+            };
         });
 
         const card = expressCard(page);
 
         await card.getByRole("button", {
-            name: /Маршрут A→B/i,
+            name: /Маршрут к B/i,
         }).click();
 
         await expect
-            .poll(() => called, {
-                timeout: 10000,
-            })
-            .toBe(true);
+            .poll(() =>
+                page.evaluate(() => window.__openedUrl)
+            )
+            .toContain("https://yandex.ru/navi/");
 
-        await expect
-            .poll(async () => await getOpenedUrls(page), {
-                timeout: 10000,
-            })
-            .toContain("https://yandex.ru/maps/?rtext=A~B");
+        const openedUrl = await page.evaluate(
+            () => window.__openedUrl
+        );
+
+        expect(openedUrl).toContain("44.9482");
+        expect(openedUrl).toContain("34.1001");
     });
 
-    test("при ошибке GPS не вызывает route/to-A", async ({ page }) => {
-        let routeCalled = false;
-
+    test("отмена подтверждения не открывает маршрут", async ({ page }) => {
         await openActiveOrdersPage(page, {
             expressOrders: [
                 {
@@ -502,81 +461,83 @@ test.describe("ExpressRouteButtons", () => {
                     status: "accepted",
                 },
             ],
-            geo: {
-                shouldFail: true,
-                message: "User denied Geolocation",
-            },
-            onToA: () => {
-                routeCalled = true;
-            },
+        });
+
+        await page.evaluate(() => {
+            window.__openedUrl = null;
+
+            window.confirm = () => false;
+
+            window.open = (url) => {
+                window.__openedUrl = String(url);
+
+                return {
+                    closed: false,
+                    focus() {},
+                };
+            };
         });
 
         const card = expressCard(page);
 
         await card.getByRole("button", {
-            name: /До точки A/i,
+            name: /Маршрут к A/i,
         }).click();
 
-        await page.waitForTimeout(500);
+        await page.waitForTimeout(200);
 
-        expect(routeCalled).toBe(false);
+        const openedUrl = await page.evaluate(
+            () => window.__openedUrl
+        );
+
+        expect(openedUrl).toBeNull();
     });
 
-    test("при ответе без url не открывает новую вкладку", async ({ page }) => {
+    test("при отсутствии координат показывает предупреждение", async ({ page }) => {
         await openActiveOrdersPage(page, {
             expressOrders: [
                 {
                     ...baseTaxiOrder,
-                    status: "in_progress",
+                    status: "accepted",
+
+                    fromLat: null,
+                    fromLng: null,
+                    from_lat: null,
+                    from_lng: null,
+
+                    fromCoordinates: null,
+                    from_coordinates: null,
+                    pickupCoordinates: null,
                 },
             ],
-            atoBBody: {
-                success: true,
-                url: "",
-            },
         });
 
         const card = expressCard(page);
 
-        await card.getByRole("button", {
-            name: /Маршрут A→B/i,
-        }).click();
-
-        await page.waitForTimeout(500);
-
-        const urls = await getOpenedUrls(page);
-
-        expect(urls).toEqual([]);
-    });
-
-    test("при ошибке API не открывает новую вкладку", async ({ page }) => {
-        await openActiveOrdersPage(page, {
-            expressOrders: [
-                {
-                    ...baseTaxiOrder,
-                    status: "in_progress",
-                },
-            ],
-            atoBStatus: 500,
-            atoBBody: {
-                message: "Маршрут временно недоступен",
-            },
+        const routeButton = card.getByRole("button", {
+            name: /Маршрут к A/i,
         });
 
-        const card = expressCard(page);
+        await expect(routeButton).toBeVisible();
+        await expect(routeButton).toBeEnabled();
 
-        await card.getByRole("button", {
-            name: /Маршрут A→B/i,
-        }).click();
+        let alertMessage = null;
 
-        await page.waitForTimeout(500);
+        page.once("dialog", async (dialog) => {
+            alertMessage = dialog.message();
+            await dialog.accept();
+        });
 
-        const urls = await getOpenedUrls(page);
+        await routeButton.click();
 
-        expect(urls).toEqual([]);
+        await expect
+            .poll(() => alertMessage, {
+                timeout: 5000,
+            })
+            .toBe("Координаты заказа не найдены");
     });
 
-    test("кнопка имеет type button и общий CSS-класс", async ({ page }) => {
+    test("кнопка маршрута имеет type button и общий CSS-класс", async ({ page }) => {
         await openActiveOrdersPage(page, {
             expressOrders: [
                 {
@@ -589,7 +550,7 @@ test.describe("ExpressRouteButtons", () => {
         const card = expressCard(page);
 
         const button = card.getByRole("button", {
-            name: /До точки A/i,
+            name: /Маршрут к A/i,
         });
 
         await expect(button).toHaveAttribute("type", "button");

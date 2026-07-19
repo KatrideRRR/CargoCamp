@@ -333,36 +333,23 @@ test.describe("ActiveOrdersPage", () => {
     });
 
     test("кнопка Маршрут открывает Яндекс.Навигатор", async ({ page }) => {
-        await page.addInitScript(() => {
+        await page.evaluate(() => {
             window.__openedUrl = null;
-
-            window.open = (url) => {
-                window.__openedUrl = String(url);
-                return null;
-            };
 
             window.confirm = () => true;
 
-            Object.defineProperty(navigator, "geolocation", {
-                configurable: true,
-                value: {
-                    getCurrentPosition(success) {
-                        success({
-                            coords: {
-                                latitude: 55.75,
-                                longitude: 37.61,
-                                accuracy: 10,
-                            },
-                        });
-                    },
-                },
-            });
+            window.open = (url) => {
+                window.__openedUrl = String(url);
+
+                return {
+                    closed: false,
+                    focus() {},
+                };
+            };
         });
 
-        await openActiveOrdersPage(page);
-
         const routeButton = page.getByRole("button", {
-            name: /Маршрут/i,
+            name: /^Маршрут$/,
         });
 
         await expect(routeButton).toBeVisible();
@@ -378,6 +365,13 @@ test.describe("ActiveOrdersPage", () => {
                 }
             )
             .toContain("https://yandex.ru/navi/");
+
+        const openedUrl = await page.evaluate(
+            () => window.__openedUrl
+        );
+
+        expect(openedUrl).toContain("55.7558");
+        expect(openedUrl).toContain("37.6176");
     });
 
     test("открывает модалку спора", async ({ page }) => {

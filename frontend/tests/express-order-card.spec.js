@@ -22,8 +22,15 @@ const baseTaxiOrder = {
     executorId: 2,
     totalPrice: 700,
     paymentType: "cash",
+
     fromAddress: "Симферополь, улица Пушкина, 1",
     toAddress: "Симферополь, проспект Кирова, 10",
+
+    fromLat: 44.9521,
+    fromLng: 34.1024,
+    toLat: 44.9482,
+    toLng: 34.1001,
+
     description: "Нужно такси",
     distanceKm: 3.4,
     estimatedTimeMin: 12,
@@ -34,13 +41,20 @@ const baseTaxiOrder = {
 const baseCourierOrder = {
     id: 202,
     type: "courier",
-    status: "accepted",
+    status: "picked_up",
     creatorId: 1,
     executorId: 2,
     totalPrice: 500,
     paymentType: "guarantee",
+
     fromAddress: "Симферополь, центр",
     toAddress: "Симферополь, вокзал",
+
+    fromLat: 44.9525,
+    fromLng: 34.1028,
+    toLat: 44.9642,
+    toLng: 34.0874,
+
     description: "Доставить документы",
     distanceKm: 5.1,
     estimatedTimeMin: 18,
@@ -595,6 +609,65 @@ test.describe("ExpressOrderCard", () => {
         await expect(card.getByRole("button", { name: /Чат/i })).toBeVisible();
         await expect(card.getByRole("button", { name: /Проблема/i })).toBeVisible();
         await expect(card.getByRole("button", { name: /Отменить/i })).toBeVisible();
+    });
+
+    test("для accepted показывает маршрут к точке A", async ({ page }) => {
+        await openActiveOrdersPage(page, {
+            expressOrders: [
+                {
+                    ...baseTaxiOrder,
+                    status: "accepted",
+                },
+            ],
+        });
+
+        const card = expressCard(page);
+
+        await expect(
+            card.getByRole("button", {
+                name: /Маршрут к A/i,
+            })
+        ).toBeVisible();
+    });
+
+    test("для in_progress показывает маршрут к точке B", async ({ page }) => {
+        await openActiveOrdersPage(page, {
+            expressOrders: [
+                {
+                    ...baseTaxiOrder,
+                    status: "in_progress",
+                },
+            ],
+        });
+
+        const card = expressCard(page);
+
+        await expect(
+            card.getByRole("button", {
+                name: /Маршрут к B/i,
+            })
+        ).toBeVisible();
+    });
+
+    test("у заказчика маршрут не отображается", async ({ page }) => {
+        await openActiveOrdersPage(page, {
+            user: creatorUser,
+            query: "platform=web&view=created",
+            expressOrders: [
+                {
+                    ...baseTaxiOrder,
+                    status: "accepted",
+                },
+            ],
+        });
+
+        const card = expressCard(page);
+
+        await expect(
+            card.getByRole("button", {
+                name: /Маршрут к [AB]/i,
+            })
+        ).not.toBeVisible();
     });
 
     test("для executor accepted показывает действие Еду к точке A", async ({ page }) => {

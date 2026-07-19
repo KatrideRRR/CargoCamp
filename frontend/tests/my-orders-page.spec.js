@@ -121,6 +121,24 @@ const expressOrders = [
     },
 ];
 
+async function mockPaymentNavigation(page) {
+    let openedPaymentUrl = null;
+
+    await page.route("https://payment.example.test/**", async (route) => {
+        openedPaymentUrl = route.request().url();
+
+        await route.fulfill({
+            status: 200,
+            contentType: "text/html",
+            body: "<html><body>Payment mock</body></html>",
+        });
+    });
+
+    return {
+        getOpenedUrl: () => openedPaymentUrl,
+    };
+}
+
 function createFakeJwt(payload) {
     const header = {
         alg: "none",
@@ -384,26 +402,30 @@ test.describe("MyOrdersPage", () => {
     test("создаёт оплату продвижения и переходит по ссылке", async ({ page }) => {
         let paymentRequestBody = null;
 
-        await page.route("**/api/payments/order/promotion/create", async (route) => {
-            paymentRequestBody = route.request().postDataJSON();
+        const paymentNavigation = await mockPaymentNavigation(page);
 
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    success: true,
-                    confirmationUrl: "https://payment.example.test/confirm",
-                }),
-            });
-        });
+        await page.route(
+            "**/api/payments/order/promotion/create",
+            async (route) => {
+                paymentRequestBody = route.request().postDataJSON();
 
-        const paymentFailedPromise = page.waitForEvent("requestfailed", (request) =>
-            request.url().includes("payment.example.test/confirm")
+                await route.fulfill({
+                    status: 200,
+                    contentType: "application/json",
+                    body: JSON.stringify({
+                        success: true,
+                        confirmationUrl:
+                            "https://payment.example.test/confirm",
+                    }),
+                });
+            }
         );
 
         const card = orderCard(page, "Заказ №102");
 
-        await card.getByRole("button", { name: "Оплатить" }).click();
+        await card
+            .getByRole("button", { name: "Оплатить" })
+            .click();
 
         await expect
             .poll(() => paymentRequestBody, {
@@ -413,9 +435,18 @@ test.describe("MyOrdersPage", () => {
                 orderId: 102,
             });
 
-        const paymentRequest = await paymentFailedPromise;
+        await expect
+            .poll(() => paymentNavigation.getOpenedUrl(), {
+                timeout: 10000,
+            })
+            .toBe("https://payment.example.test/confirm");
 
-        expect(paymentRequest.url()).toContain("https://payment.example.test/confirm");
+        await expect(page).toHaveURL(
+            "https://payment.example.test/confirm",
+            {
+                timeout: 10000,
+            }
+        );
     });
 
     test("показывает данные экспресс-заказа", async ({ page }) => {
@@ -498,28 +529,35 @@ test.describe("MyOrdersPage", () => {
     test("если одобрение вернуло confirmationUrl, переходит на оплату", async ({ page }) => {
         let approveRequestBody = null;
 
-        await page.route("**/api/orders/101/approve", async (route) => {
-            approveRequestBody = route.request().postDataJSON();
+        const paymentNavigation = await mockPaymentNavigation(page);
 
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    success: true,
-                    confirmationUrl: "https://payment.example.test/guarantee",
-                }),
-            });
-        });
+        await page.route(
+            "**/api/orders/101/approve",
+            async (route) => {
+                approveRequestBody = route.request().postDataJSON();
 
-        const paymentFailedPromise = page.waitForEvent("requestfailed", (request) =>
-            request.url().includes("payment.example.test/guarantee")
+                await route.fulfill({
+                    status: 200,
+                    contentType: "application/json",
+                    body: JSON.stringify({
+                        success: true,
+                        confirmationUrl:
+                            "https://payment.example.test/guarantee",
+                    }),
+                });
+            }
         );
 
         const card = orderCard(page, "Заказ №101");
 
-        await card.getByRole("button", { name: "Показать" }).click();
+        await card
+            .getByRole("button", { name: "Показать" })
+            .click();
 
-        await card.getByRole("button", { name: "Одобрить" }).first().click();
+        await card
+            .getByRole("button", { name: "Одобрить" })
+            .first()
+            .click();
 
         await expect
             .poll(() => approveRequestBody, {
@@ -529,9 +567,18 @@ test.describe("MyOrdersPage", () => {
                 executorId: 2,
             });
 
-        const paymentRequest = await paymentFailedPromise;
+        await expect
+            .poll(() => paymentNavigation.getOpenedUrl(), {
+                timeout: 10000,
+            })
+            .toBe("https://payment.example.test/guarantee");
 
-        expect(paymentRequest.url()).toContain("https://payment.example.test/guarantee");
+        await expect(page).toHaveURL(
+            "https://payment.example.test/guarantee",
+            {
+                timeout: 10000,
+            }
+        );
     });
 
     test("удаляет обычный заказ после подтверждения", async ({ page }) => {

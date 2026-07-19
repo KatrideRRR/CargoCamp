@@ -1463,8 +1463,7 @@ const OrdersPage = () => {
                                                 {isExpress && (
                                                     <ExpressRouteButtons
                                                         orderId={order.expressId}
-                                                        canToA={true}
-                                                        canAToB={true}
+                                                        navMode="toA"
                                                         className="express-nav"
                                                         buttonClassName="btn btn-ghost express-nav-btn"
                                                     />

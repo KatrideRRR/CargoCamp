@@ -30,6 +30,22 @@ const regularOrder = {
     status: "active",
 };
 
+const expressOrder = {
+    id: 101,
+    type: "taxi",
+    status: "accepted",
+    creatorId: 2,
+    executorId: 1,
+
+    fromAddress: "Симферополь, улица Пушкина, 1",
+    toAddress: "Симферополь, проспект Кирова, 10",
+
+    fromLat: 44.9525,
+    fromLng: 34.1028,
+    toLat: 44.9489,
+    toLng: 34.0987,
+};
+
 const initialMessages = [
     {
         id: 1,
@@ -530,25 +546,80 @@ test.describe("ChatPage", () => {
         await page.evaluate(() => {
             window.__openedUrl = null;
 
-            window.open = (url) => {
-                window.__openedUrl = url;
-            };
+            window.confirm = () => true;
 
-            navigator.geolocation.getCurrentPosition = (success) => {
-                success({
-                    coords: {
-                        latitude: 55.75,
-                        longitude: 37.61,
-                    },
-                });
+            window.open = (url) => {
+                window.__openedUrl = String(url);
+
+                return {
+                    closed: false,
+                    focus() {},
+                };
             };
         });
 
         await clickRouteButton(page);
 
         await expect
-            .poll(async () => page.evaluate(() => window.__openedUrl))
+            .poll(
+                () => page.evaluate(() => window.__openedUrl),
+                {
+                    timeout: 10000,
+                }
+            )
             .toContain("https://yandex.ru/navi/");
+    });
+
+    test("в чате express-заказа открывает маршрут к точке A", async ({ page }) => {
+        await openChatPage(page, {
+            orderType: "express",
+            order: {
+                id: 101,
+                type: "taxi",
+                status: "accepted",
+                creatorId: 2,
+                executorId: 1,
+                fromAddress: "Симферополь, улица Пушкина, 1",
+                toAddress: "Симферополь, проспект Кирова, 10",
+                fromLat: 44.9525,
+                fromLng: 34.1028,
+                toLat: 44.9489,
+                toLng: 34.0987,
+            },
+        });
+
+        await page.evaluate(() => {
+            window.__openedUrl = null;
+            window.confirm = () => true;
+
+            window.open = (url) => {
+                window.__openedUrl = String(url);
+
+                return {
+                    closed: false,
+                    focus() {},
+                };
+            };
+        });
+
+        await clickRouteButton(page);
+
+        await expect
+            .poll(
+                () => page.evaluate(() => window.__openedUrl),
+                {
+                    timeout: 10000,
+                }
+            )
+            .not.toBeNull();
+
+        const openedUrl = await page.evaluate(
+            () => window.__openedUrl
+        );
+
+        expect(openedUrl).toContain("https://yandex.ru/navi/");
+        expect(openedUrl).toContain("44.9525");
+        expect(openedUrl).toContain("34.1028");
     });
 
     test("показывает alert, если координаты заказа некорректные", async ({ page }) => {
@@ -559,14 +630,19 @@ test.describe("ChatPage", () => {
             },
         });
 
-        let alertText = "";
+        const routeButton = page.locator(".chat-order-btn.route");
+
+        await expect(routeButton).toBeVisible();
+        await expect(routeButton).toBeEnabled();
+
+        let alertText = null;
 
         page.once("dialog", async (dialog) => {
             alertText = dialog.message();
             await dialog.accept();
         });
 
-        await clickRouteButton(page);
+        await routeButton.click();
 
         await expect
             .poll(() => alertText, {

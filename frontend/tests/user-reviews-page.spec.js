@@ -272,7 +272,15 @@ test.describe("UserReviewsPage", () => {
         await setFakeAuth(page);
         await setupReviewsMocks(page);
 
-        await page.goto(`${FRONT_URL}/profile?platform=web`);
+        await page.route("**/test-previous-page", async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "text/html",
+                body: "<html><body>Previous page</body></html>",
+            });
+        });
+
+        await page.goto(`${FRONT_URL}/test-previous-page`);
         await page.goto(`${FRONT_URL}/complaints/123?platform=web`);
 
         await expect(page.locator(".title")).toHaveText("Отзывы", {
@@ -281,7 +289,7 @@ test.describe("UserReviewsPage", () => {
 
         await page.getByRole("button", { name: /Назад/i }).click();
 
-        await expect(page).toHaveURL(/\/profile/);
+        await expect(page).toHaveURL(/\/test-previous-page/);
     });
 
     test("показывает пустое состояние, если отзывов нет", async ({ page }) => {

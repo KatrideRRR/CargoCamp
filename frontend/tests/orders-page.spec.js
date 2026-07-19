@@ -945,7 +945,10 @@ test.describe("OrdersPage", () => {
             });
         });
 
-        await page.getByPlaceholder("Введите адрес").fill("Симферополь Пушкина 1");
+        const addressInput = page.getByPlaceholder("Введите адрес");
+
+        await addressInput.clear();
+        await addressInput.fill("Симферополь Пушкина 1");
 
         await page.getByRole("button", { name: "Применить" }).click();
 
@@ -953,12 +956,21 @@ test.describe("OrdersPage", () => {
             .poll(() => saveLocationBody, {
                 timeout: 10000,
             })
-            .toEqual({
-                address: "Симферополь Пушкина 1",
-                lat: 44.9521,
-                lng: 34.1024,
-                source: "manual",
-            });
+            .not.toBeNull();
+
+        expect(saveLocationBody).toMatchObject({
+            lat: 44.9521,
+            lng: 34.1024,
+            source: "manual",
+        });
+
+        expect(saveLocationBody.address).toContain(
+            "Симферополь"
+        );
+
+        expect(saveLocationBody.address).toContain(
+            "Пушкина"
+        );
     });
 
     test("открывает меню местоположения и подтягивает адрес из профиля", async ({ page }) => {

@@ -42,6 +42,24 @@ function createFakeJwt(payload) {
     return `${base64url(header)}.${base64url(payload)}.`;
 }
 
+async function mockPaymentNavigation(page) {
+    let openedPaymentUrl = null;
+
+    await page.route("https://payment.example.test/**", async (route) => {
+        openedPaymentUrl = route.request().url();
+
+        await route.fulfill({
+            status: 200,
+            contentType: "text/html",
+            body: "<html><body>Payment mock</body></html>",
+        });
+    });
+
+    return {
+        getOpenedUrl: () => openedPaymentUrl,
+    };
+}
+
 async function setFakeAuth(page) {
     const fakeToken = createFakeJwt({
         id: testUser.id,
@@ -234,42 +252,30 @@ async function openCreateOrderPage(page, options = {}) {
 }
 
 async function clickCreateOrderButton(page) {
-    await page.evaluate(() => {
-        const buttons = Array.from(document.querySelectorAll("button"));
-        const button = buttons.find((item) =>
-            item.textContent?.includes("Создать заказ")
-        );
+    const button = page.getByRole("button", {
+        name: /^Создать заказ$/,
+    });
 
-        if (!button) {
-            throw new Error("Кнопка Создать заказ не найдена");
-        }
+    await expect(button).toBeVisible();
+    await expect(button).toBeEnabled();
 
-        button.click();
+    await button.click({
+        noWaitAfter: true,
     });
 }
 
 async function clickAddressCard(page) {
-    await page.evaluate(() => {
-        const button = document.querySelector(".miniCardBtn");
+    const button = page.locator(".miniCardBtn");
 
-        if (!button) {
-            throw new Error("Кнопка адреса не найдена");
-        }
-
-        button.click();
-    });
+    await expect(button).toBeVisible();
+    await button.click();
 }
 
 async function clickAsapToggle(page) {
-    await page.evaluate(() => {
-        const button = document.querySelector(".timeChip .toggle");
+    const button = page.locator(".timeChip .toggle");
 
-        if (!button) {
-            throw new Error("Тумблер времени не найден");
-        }
-
-        button.click();
-    });
+    await expect(button).toBeVisible();
+    await button.click();
 }
 
 async function fillRequiredOrderFields(page) {
@@ -539,31 +545,36 @@ test.describe("CreateOrderPage", () => {
         const count = await promoLabels.count();
 
         if (count === 0) {
-            test.skip(true, "PromotionOptions не содержит label-элементов в текущей верстке");
+            test.skip(
+                true,
+                "PromotionOptions не содержит label-элементов в текущей верстке"
+            );
         }
 
         let promotionPaymentRequest = null;
 
-        await page.route("**/api/payments/order/promotion/create", async (route) => {
-            promotionPaymentRequest = route.request();
+        const paymentNavigation = await mockPaymentNavigation(page);
 
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    success: true,
-                    confirmationUrl: "https://payment.example.test/confirm",
-                }),
-            });
-        });
+        await page.route(
+            "**/api/payments/order/promotion/create",
+            async (route) => {
+                promotionPaymentRequest = route.request();
+
+                await route.fulfill({
+                    status: 200,
+                    contentType: "application/json",
+                    body: JSON.stringify({
+                        success: true,
+                        confirmationUrl:
+                            "https://payment.example.test/confirm",
+                    }),
+                });
+            }
+        );
 
         await promoLabels.first().click();
 
         await fillRequiredOrderFields(page);
-
-        const paymentNavigationPromise = page.waitForEvent("requestfailed", (request) =>
-            request.url().includes("payment.example.test/confirm")
-        );
 
         await clickCreateOrderButton(page);
 
@@ -575,9 +586,18 @@ test.describe("CreateOrderPage", () => {
 
         expect(promotionPaymentRequest.method()).toBe("POST");
 
-        const paymentRequest = await paymentNavigationPromise;
+        await expect
+            .poll(() => paymentNavigation.getOpenedUrl(), {
+                timeout: 10000,
+            })
+            .toBe("https://payment.example.test/confirm");
 
-        expect(paymentRequest.url()).toContain("https://payment.example.test/confirm");
+        await expect(page).toHaveURL(
+            "https://payment.example.test/confirm",
+            {
+                timeout: 10000,
+            }
+        );
     });
 
     test("загружает фото и показывает превью", async ({ page }) => {

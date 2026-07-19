@@ -44,6 +44,24 @@ const categories = [
     { id: 13, name: "Курьер" },
 ];
 
+async function mockPaymentNavigation(page) {
+    let openedPaymentUrl = null;
+
+    await page.route("https://payment.example.test/**", async (route) => {
+        openedPaymentUrl = route.request().url();
+
+        await route.fulfill({
+            status: 200,
+            contentType: "text/html",
+            body: "<html><body>Payment mock</body></html>",
+        });
+    });
+
+    return {
+        getOpenedUrl: () => openedPaymentUrl,
+    };
+}
+
 function createFakeJwt(payload) {
     const header = {
         alg: "none",
@@ -475,19 +493,28 @@ test.describe("ProfilePage", () => {
             debt: 25000,
         });
 
-        const paymentNavigationPromise = page.waitForEvent("requestfailed", (request) =>
-            request.url().includes("payment.example.test/debt")
-        );
+        const paymentNavigation = await mockPaymentNavigation(page);
 
         const paymentsCard = page.locator(".profile-card").filter({
             hasText: "Платежи",
         });
 
-        await paymentsCard.getByRole("button", { name: "Оплатить" }).click();
+        await paymentsCard
+            .getByRole("button", { name: "Оплатить" })
+            .click();
 
-        const paymentRequest = await paymentNavigationPromise;
+        await expect
+            .poll(() => paymentNavigation.getOpenedUrl(), {
+                timeout: 10000,
+            })
+            .toBe("https://payment.example.test/debt");
 
-        expect(paymentRequest.url()).toContain("https://payment.example.test/debt");
+        await expect(page).toHaveURL(
+            "https://payment.example.test/debt",
+            {
+                timeout: 10000,
+            }
+        );
     });
 
     test("показывает Premium блок", async ({ page }) => {
@@ -519,15 +546,24 @@ test.describe("ProfilePage", () => {
     });
 
     test("создаёт оплату Premium на 7 дней и переходит на оплату", async ({ page }) => {
-        const paymentNavigationPromise = page.waitForEvent("requestfailed", (request) =>
-            request.url().includes("payment.example.test/premium")
+        const paymentNavigation = await mockPaymentNavigation(page);
+
+        await page
+            .getByRole("button", { name: "Купить на 7 дней" })
+            .click();
+
+        await expect
+            .poll(() => paymentNavigation.getOpenedUrl(), {
+                timeout: 10000,
+            })
+            .toBe("https://payment.example.test/premium");
+
+        await expect(page).toHaveURL(
+            "https://payment.example.test/premium",
+            {
+                timeout: 10000,
+            }
         );
-
-        await page.getByRole("button", { name: "Купить на 7 дней" }).click();
-
-        const paymentRequest = await paymentNavigationPromise;
-
-        expect(paymentRequest.url()).toContain("https://payment.example.test/premium");
     });
 
     test("показывает блок верификации", async ({ page }) => {
