@@ -828,9 +828,9 @@ const OrderPage = () => {
 
                             {isExpress && (
                                 <ExpressRouteButtons
-                                    orderId={order.expressId}
+                                    order={order}
                                     navMode="toA"
-                                    className="express-nav"
+                                    className="express-nav--detail"
                                     buttonClassName="btn btn-ghost express-nav-btn"
                                 />
                             )}

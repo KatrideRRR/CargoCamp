@@ -527,23 +527,100 @@ const OrdersPage = () => {
     const expressAsOrders = useMemo(() => {
         return (expressRaw || []).map((e) => ({
             id: `e-${e.id}`,
+
             express: true,
             expressId: e.id,
             taxi_courier: true,
             expressType: e.type,
-            createdAt: e.createdAt || e.created_at,
-            coordinates: `${Number(e.fromLat)},${Number(e.fromLng)}`,
-            address: `${e.fromAddress} → ${e.toAddress}`,
-            description: e.description || "",
-            proposedSum: Number(e.totalPrice ?? 0),
-            paymentType: e.paymentType,
-            images: [],
-            category: { name: e.type === "taxi" ? "Такси" : "Курьер" },
-            subcategory: e.subcategory ? { name: e.subcategory } : null,
-            service: null,
+
+            createdAt:
+                e.createdAt ||
+                e.created_at,
+
             creatorId: e.creatorId,
             executorId: e.executorId,
-            status: "pending",
+
+            status:
+                e.status ||
+                "pending",
+
+            fromAddress:
+                e.fromAddress ||
+                e.from_address ||
+                "",
+
+            toAddress:
+                e.toAddress ||
+                e.to_address ||
+                "",
+
+            fromLat:
+                e.fromLat ??
+                e.from_lat ??
+                null,
+
+            fromLng:
+                e.fromLng ??
+                e.from_lng ??
+                null,
+
+            toLat:
+                e.toLat ??
+                e.to_lat ??
+                null,
+
+            toLng:
+                e.toLng ??
+                e.to_lng ??
+                null,
+
+            /*
+             * Поле coordinates оставляем для фильтрации
+             * и отображения заказа на общей карте.
+             */
+            coordinates:
+                e.fromLat != null &&
+                e.fromLng != null
+                    ? `${e.fromLat},${e.fromLng}`
+                    : "",
+
+            address:
+                `${e.fromAddress || e.from_address || "Точка А"} → ` +
+                `${e.toAddress || e.to_address || "Точка Б"}`,
+
+            description:
+                e.description ||
+                "",
+
+            proposedSum: Number(
+                e.totalPrice ??
+                e.total_price ??
+                e.price ??
+                0
+            ),
+
+            paymentType:
+                e.paymentType ||
+                e.payment_type ||
+                "cash",
+
+            images: Array.isArray(e.images)
+                ? e.images
+                : [],
+
+            category: {
+                name:
+                    e.type === "taxi"
+                        ? "Такси"
+                        : "Курьер",
+            },
+
+            subcategory: e.subcategory
+                ? { name: e.subcategory }
+                : null,
+
+            service: null,
+
             is_recommended: false,
             is_highlighted: false,
         }));
@@ -1312,6 +1389,7 @@ const OrdersPage = () => {
                                     order.is_highlighted ? "highlighted" : "",
                                     order.is_recommended ? "recommended" : "",
                                     order.taxi_courier ? "courier" : "",
+                                    isExpress ? "express-order-card" : "",
                                 ]
                                     .filter(Boolean)
                                     .join(" ");
@@ -1462,9 +1540,9 @@ const OrdersPage = () => {
 
                                                 {isExpress && (
                                                     <ExpressRouteButtons
-                                                        orderId={order.expressId}
+                                                        order={order}
                                                         navMode="toA"
-                                                        className="express-nav"
+                                                        className="express-nav--list"
                                                         buttonClassName="btn btn-ghost express-nav-btn"
                                                     />
                                                 )}

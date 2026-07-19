@@ -1,96 +1,75 @@
-import React, { useState, useCallback } from "react";
-import axiosInstance from "../utils/axiosInstance";
+import React, { useCallback, useState } from "react";
 import { FaMapMarkedAlt } from "react-icons/fa";
 import { toast } from "react-toastify";
-
-const getMyGeo = () =>
-    new Promise((resolve, reject) => {
-        if (!navigator.geolocation) return reject(new Error("GPS недоступен"));
-        navigator.geolocation.getCurrentPosition(
-            (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-            (err) => reject(err),
-            { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
-        );
-    });
-
-function openExternal(url) {
-    if (!url) return;
-
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-    if (isMobile) {
-        const a = document.createElement("a");
-        a.href = url;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        return;
-    }
-
-    const win = window.open(url, "_blank", "noopener,noreferrer");
-    if (!win) {
-        alert("Браузер заблокировал новую вкладку. Разрешите всплывающие окна.");
-    }
-}
+import { openOrderRoute } from "../utils/orderNavigation";
 
 const ExpressRouteButtons = ({
-                                 orderId,
+                                 order,
                                  navMode = "none",
                                  className = "",
                                  buttonClassName = "express-secondaryBtn",
                              }) => {
     const [busyMode, setBusyMode] = useState(null);
 
-    const go = useCallback(
-        async (mode, e) => {
-            e?.preventDefault?.();
-            e?.stopPropagation?.();
+    const handleNavigation = useCallback(
+        async (mode, event) => {
+            event?.preventDefault?.();
+            event?.stopPropagation?.();
 
-            if (!orderId || busyMode) return;
+            if (!order || busyMode) {
+                return;
+            }
 
             setBusyMode(mode);
+
             try {
-                let r;
+                const target = mode === "AtoB" ? "B" : "A";
 
-                if (mode === "toA") {
-                    const my = await getMyGeo();
-                    r = await axiosInstance.get(
-                        `/express/express-orders/${orderId}/route/to-A`,
-                        { params: { myLat: my.lat, myLng: my.lng } }
-                    );
-                } else {
-                    r = await axiosInstance.get(`/express/express-orders/${orderId}/route/A-to-B`);
-                }
+                await openOrderRoute(order, {
+                    orderType: "express",
+                    target,
+                    confirmText:
+                        target === "A"
+                            ? "Открыть маршрут до точки А в Яндекс.Навигаторе?"
+                            : "Открыть маршрут до точки Б в Яндекс.Навигаторе?",
+                });
+            } catch (error) {
+                console.error("Express navigation error:", error);
 
-                const url = r.data?.url;
-                if (!url) throw new Error("Маршрут не получен");
-
-                openExternal(url);
-            } catch (err) {
-                console.error(err);
-                toast.error(err.response?.data?.message || err.message || "Ошибка навигации");
+                toast.error(
+                    error?.message ||
+                    "Не удалось открыть маршрут"
+                );
             } finally {
                 setBusyMode(null);
             }
         },
-        [orderId, busyMode]
+        [order, busyMode]
     );
 
-    if (navMode === "none") return null;
+    if (navMode === "none") {
+        return null;
+    }
 
     return (
-        <div className={className}>
+        <div className={`express-nav ${className}`.trim()}>
             {navMode === "toA" && (
                 <button
                     type="button"
                     className={buttonClassName}
-                    onClick={(e) => go("toA", e)}
+                    onClick={(event) =>
+                        handleNavigation("toA", event)
+                    }
                     disabled={busyMode !== null}
+                    aria-label="Открыть маршрут до точки А"
                 >
                     <FaMapMarkedAlt />
-                    <span className="btn-text">До точки A</span>
+
+                    <span className="btn-text">
+                        {busyMode === "toA"
+                            ? "Открываем..."
+                            : "До точки А"}
+                    </span>
                 </button>
             )}
 
@@ -98,11 +77,19 @@ const ExpressRouteButtons = ({
                 <button
                     type="button"
                     className={buttonClassName}
-                    onClick={(e) => go("AtoB", e)}
+                    onClick={(event) =>
+                        handleNavigation("AtoB", event)
+                    }
                     disabled={busyMode !== null}
+                    aria-label="Открыть маршрут до точки Б"
                 >
                     <FaMapMarkedAlt />
-                    <span className="btn-text">Маршрут A→B</span>
+
+                    <span className="btn-text">
+                        {busyMode === "AtoB"
+                            ? "Открываем..."
+                            : "До точки Б"}
+                    </span>
                 </button>
             )}
         </div>

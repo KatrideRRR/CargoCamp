@@ -2649,11 +2649,47 @@
 .orders-page:not(.order-detail-page) .order-main-actions {
     min-width: 0;
     display: grid;
-    grid-template-columns: minmax(92px, 0.42fr) minmax(150px, 1fr);
+    grid-template-columns:
+        minmax(90px, 0.7fr)
+        minmax(130px, 1fr)
+        minmax(110px, 0.85fr);
+
     gap: 8px;
-    align-items: center;
+    align-items: stretch;
 }
 
+.orders-page:not(.order-detail-page)
+.order-card:not(.express-order-card)
+.order-main-actions {
+    grid-template-columns:
+        minmax(92px, 0.42fr)
+        minmax(150px, 1fr);
+}
+
+.orders-page:not(.order-detail-page)
+.express-order-card
+.order-main-actions {
+    grid-template-columns:
+        minmax(90px, 0.7fr)
+        minmax(140px, 1fr)
+        minmax(110px, 0.85fr);
+}
+
+.orders-page:not(.order-detail-page)
+.order-main-actions
+> :only-child {
+    grid-column: 1 / -1;
+}
+
+.orders-page:not(.order-detail-page)
+.order-main-actions
+> :nth-last-child(2):first-child,
+.orders-page:not(.order-detail-page)
+.order-main-actions
+> :nth-last-child(2):first-child
+~ * {
+    min-width: 0;
+}
 .orders-page:not(.order-detail-page) .order-main-actions > .btn {
     width: 100%;
     min-width: 0;
@@ -2680,18 +2716,9 @@
         align-items: stretch;
     }
 
-    /*
-       Делаем так, чтобы кнопки внутри .order-main-actions
-       вели себя как прямые элементы сетки .order-actions:
-       1) Жалобы — слева
-       2) Открыть — справа
-       3) Запросить выполнение — вся ширина второй строкой
-    */
-    .orders-page:not(.order-detail-page) .order-main-actions {
-        display: contents;
-    }
-
-    .orders-page:not(.order-detail-page) .order-actions > .btn-inline {
+    .orders-page:not(.order-detail-page)
+    .order-actions
+    > .btn-inline {
         grid-column: 1;
         grid-row: 1;
 
@@ -2706,33 +2733,50 @@
         border-radius: 15px;
     }
 
-    .orders-page:not(.order-detail-page) .order-main-actions > .btn.btn-ghost {
+    .orders-page:not(.order-detail-page)
+    .order-main-actions {
         grid-column: 2;
         grid-row: 1;
 
-        width: 100% !important;
-        min-height: 42px;
-        padding: 8px 10px;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
 
-        font-size: 13px;
-        border-radius: 15px;
+        width: 100%;
+        min-width: 0;
     }
 
-    .orders-page:not(.order-detail-page) .order-main-actions > .btn.btn-primary {
-        grid-column: 1 / -1;
-        grid-row: 2;
-
-        width: 100% !important;
-        min-height: 48px;
-        padding: 12px 14px;
-
-        font-size: 15px;
-        border-radius: 17px;
+    .orders-page:not(.order-detail-page)
+    .order-main-actions
+    > .btn,
+    .orders-page:not(.order-detail-page)
+    .order-main-actions
+    > .express-nav {
+        width: 100%;
+        min-width: 0;
     }
 
-    .orders-page:not(.order-detail-page) .blocked-order-hint {
+    .orders-page:not(.order-detail-page)
+    .order-main-actions
+    .btn {
+        width: 100% !important;
+        min-height: 44px;
+    }
+
+    .orders-page:not(.order-detail-page)
+    .blocked-order-hint {
         grid-column: 1 / -1;
+        width: 100%;
         max-width: none;
+    }
+
+    .order-detail-page .order-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .order-detail-page .order-actions > *,
+    .order-detail-page .express-nav,
+    .order-detail-page .express-nav-btn {
         width: 100%;
     }
 }
@@ -2887,4 +2931,103 @@
 
 .order-time-box--scheduled .order-time-value {
     color: #1d4ed8;
+}
+
+/* =========================================================
+   Express navigation button
+========================================================= */
+
+.express-nav {
+    min-width: 0;
+    display: flex;
+    align-items: stretch;
+}
+
+.express-nav .express-nav-btn {
+    width: 100%;
+    min-width: 0;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    white-space: nowrap;
+}
+
+.express-nav-btn svg {
+    flex: 0 0 auto;
+}
+
+.express-nav-btn .btn-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Страница одного заказа */
+
+.order-detail-page .order-actions {
+    display: grid;
+    grid-template-columns:
+        minmax(54px, auto)
+        minmax(160px, 1fr)
+        minmax(130px, auto);
+
+    gap: 8px;
+    align-items: stretch;
+}
+
+.order-detail-page .order-actions > .btn-inline {
+    width: 100%;
+    min-width: 54px;
+}
+
+.order-detail-page .express-nav--detail {
+    width: 100%;
+}
+
+.order-detail-page .express-nav--detail .express-nav-btn {
+    width: 100%;
+    min-height: 44px;
+}
+
+/* Страница всех заказов */
+
+.orders-page:not(.order-detail-page)
+.order-main-actions
+.express-nav--list {
+    width: 100%;
+    min-width: 0;
+}
+
+.orders-page:not(.order-detail-page)
+.order-main-actions
+.express-nav--list
+.express-nav-btn {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 10px 12px;
+
+    color: #166534;
+
+    border-color: rgba(74, 222, 128, 0.34);
+
+    background:
+            radial-gradient(
+                    circle at 28% 14%,
+                    rgba(255, 255, 255, 1),
+                    transparent 32%
+            ),
+            linear-gradient(
+                    180deg,
+                    #ffffff 0%,
+                    #f7fff9 46%,
+                    #ecfdf3 100%
+            );
+
+    box-shadow:
+            0 8px 18px rgba(22, 163, 74, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 1);
 }
