@@ -18,6 +18,11 @@ import { FiAlertTriangle } from "react-icons/fi";
 import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
 
 const apiUrl = process.env.REACT_APP_API_URL;
+const publicApi = axios.create({
+
+    baseURL: `${apiUrl}/api`,
+
+});
 
 const RADIUS_KM = 50;
 const HIDE_FROM_DRAWER = new Set(["Такси", "Курьер"]);
@@ -271,19 +276,41 @@ const OrdersPage = () => {
     }, []);
 
     useEffect(() => {
-        axiosInstance
+        publicApi
             .get("/category")
             .then((res) => setCategories(res.data || []))
-            .catch(() => setCategories([]));
+            .catch((error) => {
+                console.error("Categories loading error:", error);
+                setCategories([]);
+            });
     }, []);
 
     const fetchProfile = useCallback(async () => {
+        const token = localStorage.getItem("authToken");
+
+        if (!token) {
+            setProfile(null);
+            setUserId(null);
+            return;
+        }
+
         try {
-            const res = await axiosInstance.get("/auth/profile");
-            setProfile(res.data);
+            const res = await axiosInstance.get("/auth/profile", {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            setProfile(res.data || null);
             setUserId(res.data?.id || null);
-        } catch {
-            console.info("OrdersPage: profile not loaded (maybe not logged in).");
+        } catch (error) {
+            console.info(
+                "OrdersPage: profile not loaded.",
+                error.response?.status
+            );
+
+            setProfile(null);
+            setUserId(null);
         }
     }, []);
 
@@ -293,10 +320,18 @@ const OrdersPage = () => {
 
     const fetchOrders = useCallback(async () => {
         try {
-            const res = await axiosInstance.get("/orders/all");
-            setOrdersRaw(res.data || []);
-        } catch (e) {
-            console.error(e);
+            const res = await publicApi.get("/orders/all");
+
+            const orders = Array.isArray(res.data)
+                ? res.data
+                : Array.isArray(res.data?.orders)
+                    ? res.data.orders
+                    : [];
+
+            setOrdersRaw(orders);
+        } catch (error) {
+            console.error("fetchOrders error:", error);
+            setOrdersRaw([]);
             toast.error("Не удалось загрузить заказы");
         }
     }, []);
@@ -313,10 +348,18 @@ const OrdersPage = () => {
 
     const fetchExpress = useCallback(async () => {
         try {
-            const res = await axiosInstance.get("/express/express-orders/available");
-            setExpressRaw(res.data?.orders || []);
-        } catch (e) {
-            console.error("fetchExpress error:", e);
+            const res = await publicApi.get(
+                "/express/express-orders/available"
+            );
+
+            setExpressRaw(
+                Array.isArray(res.data?.orders)
+                    ? res.data.orders
+                    : []
+            );
+        } catch (error) {
+            console.error("fetchExpress error:", error);
+            setExpressRaw([]);
         }
     }, []);
 
@@ -526,7 +569,7 @@ const OrdersPage = () => {
         (async () => {
             try {
                 const results = await Promise.allSettled(
-                    missing.map((id) => axiosInstance.get(`/auth/${id}`))
+                    missing.map((id) => publicApi.get(`/auth/${id}`))
                 );
 
                 results.forEach((r, idx) => {
@@ -714,9 +757,12 @@ const OrdersPage = () => {
 
     const saveLocationToProfile = async ({ address, lat, lng, source }) => {
         const token = localStorage.getItem("authToken");
+
         if (!token) {
-            toast.error("Нужно войти, чтобы сохранить местоположение");
-            return;
+            return {
+                saved: false,
+                guest: true,
+            };
         }
 
         setLocLoading(true);
@@ -726,13 +772,34 @@ const OrdersPage = () => {
             const res = await axios.post(
                 `${apiUrl}/api/auth/location/me`,
                 { address, lat, lng, source },
-                { headers: { Authorization: `Bearer ${token}` } }
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
             );
 
             toast.success("Местоположение сохранено");
-            setProfile((p) => ({ ...p, ...res.data.location }));
-        } catch (e) {
-            setLocError(e.response?.data?.message || "Ошибка сохранения");
+            setProfile((previousProfile) => ({
+                ...previousProfile,
+                ...res.data.location,
+            }));
+
+            return {
+                saved: true,
+                guest: false,
+            };
+        } catch (error) {
+            const message =
+                error.response?.data?.message ||
+                "Ошибка сохранения местоположения";
+
+            setLocError(message);
+
+            return {
+                saved: false,
+                guest: false,
+            };
         } finally {
             setLocLoading(false);
         }
@@ -771,9 +838,17 @@ const OrdersPage = () => {
         }
 
         try {
-            const res = await axiosInstance.get(`/category/subcategory/${categoryId}`);
-            setSubcategories(res.data || []);
-        } catch {
+            const res = await publicApi.get(
+                `/category/subcategory/${categoryId}`
+            );
+
+            setSubcategories(
+                Array.isArray(res.data)
+                    ? res.data
+                    : []
+            );
+        } catch (error) {
+            console.error("Subcategories loading error:", error);
             setSubcategories([]);
         }
     };
@@ -1401,6 +1476,14 @@ const OrdersPage = () => {
                                                         disabled={busyState.loading || busyState.hasAnyBusy}
                                                         title={busyState.hasAnyBusy ? busyHintText : ""}
                                                         onClick={async () => {
+                                                            const token = localStorage.getItem("authToken");
+
+                                                            if (!token) {
+                                                                toast.info("Войдите, чтобы принять заказ");
+                                                                navigate("/login");
+                                                                return;
+                                                            }
+
                                                             if (busyState.hasAnyBusy) {
                                                                 toast.info(busyHintText);
                                                                 return;
@@ -1413,13 +1496,27 @@ const OrdersPage = () => {
                                                             if (!confirmed) return;
 
                                                             try {
-                                                                await axiosInstance.post(`/express/express-orders/${order.expressId}/accept`);
+                                                                await axiosInstance.post(
+                                                                    `/express/express-orders/${order.expressId}/accept`,
+                                                                    {},
+                                                                    {
+                                                                        headers: {
+                                                                            Authorization: `Bearer ${token}`,
+                                                                        },
+                                                                    }
+                                                                );
+
                                                                 toast.success("Заказ принят!");
+
                                                                 await fetchExpress();
                                                                 await fetchBusyState();
+
                                                                 navigate("/active-orders");
-                                                            } catch (e) {
-                                                                toast.error(e.response?.data?.message || "Ошибка");
+                                                            } catch (error) {
+                                                                toast.error(
+                                                                    error.response?.data?.message ||
+                                                                    "Не удалось принять заказ"
+                                                                );
                                                             }
                                                         }}
                                                     >
