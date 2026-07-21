@@ -132,49 +132,7 @@ body {
 
 /* =========================================================
    FIXED TOP SYSTEM GUARD
-   ========================================================= */
-
-/*
-  Эта маска постоянно находится сверху.
-
-  Страница продолжает прокручиваться обычным способом,
-  но контент, который уходит под часы, Dynamic Island
-  или статус-бар Android, скрывается под маской.
-*/
-@media (max-width: 768px) and (hover: none) {
-    body::before {
-        content: "";
-
-        position: fixed;
-        top: 0;
-        right: 0;
-        left: 0;
-
-        width: 100%;
-        height: var(--app-top-guard-height);
-
-        background: var(--app-system-bar-background);
-
-        border-bottom: 1px solid rgba(15, 23, 42, 0.04);
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.025);
-
-        pointer-events: none;
-
-        /*
-          Выше содержимого страниц и нижнего меню,
-          но ниже модальных окон.
-        */
-        z-index: 15000;
-
-        transform: translateZ(0);
-        -webkit-transform: translateZ(0);
-
-        backface-visibility: hidden;
-        -webkit-backface-visibility: hidden;
-
-        will-change: transform;
-    }
-}
+   ========================================================= *
 
 /* =========================================================
    BASE ELEMENTS
@@ -500,18 +458,5 @@ body.hide-bottom-menu .active-orders .pageContainer {
     .Toastify__toast-container--top-left,
     .Toastify__toast-container--top-right {
         top: var(--app-top-guard-height) !important;
-    }
-}
-
-/* =========================================================
-   DESKTOP
-   ========================================================= */
-
-/*
-  На обычном компьютере системная верхняя маска не нужна.
-*/
-@media (min-width: 769px), (hover: hover) {
-    body::before {
-        display: none;
     }
 }
