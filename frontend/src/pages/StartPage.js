@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 
@@ -17,6 +18,22 @@ export default function StartPage() {
     // false — сайт открыт в обычном браузере.
     const isNativeApp = Capacitor.isNativePlatform();
 
+    useEffect(() => {
+
+        document.body.classList.add("start-page-open");
+
+        document.documentElement.classList.add("start-page-open");
+
+        return () => {
+
+            document.body.classList.remove("start-page-open");
+
+            document.documentElement.classList.remove("start-page-open");
+
+        };
+
+    }, []);
+
     const handleIosDownload = () => {
         if (!IOS_TESTFLIGHT_URL) {
             return;
@@ -26,8 +43,13 @@ export default function StartPage() {
     };
 
     return (
-        <div className="start-page-container">
-            <div className="start-page-content">
+        <div
+            className={`start-page-container ${
+                isNativeApp
+                    ? "start-page-container--native"
+                    : "start-page-container--web"
+            }`}
+        >            <div className="start-page-content">
                 <div className="start-page-heading">
                     <h1 className="start-page-title">CargoCamp</h1>
                     <p className="start-page-subtitle">

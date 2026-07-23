@@ -12,6 +12,17 @@
     --start-bottom-nav-height: 92px;
 }
 
+html.start-page-open,
+body.start-page-open {
+    background: #eef4ff;
+    overscroll-behavior-y: none;
+}
+
+body.start-page-open {
+    min-height: 100vh;
+    min-height: 100dvh;
+}
+
 * {
     box-sizing: border-box;
 }
@@ -48,19 +59,25 @@ body {
 }
 
 .start-page-container {
+    width: 100%;
     min-height: 100vh;
     min-height: 100dvh;
-    padding: 24px;
+
+    padding-top: max(24px, env(safe-area-inset-top, 0px));
+    padding-right: max(24px, env(safe-area-inset-right, 0px));
     padding-bottom:
             calc(
                     var(--start-bottom-nav-height) +
                     24px +
                     env(safe-area-inset-bottom, 0px)
             );
+    padding-left: max(24px, env(safe-area-inset-left, 0px));
+
     display: flex;
     justify-content: center;
-    align-items: flex-start;
+
     overflow-x: hidden;
+
     background:
             linear-gradient(
                     to bottom right,
@@ -69,16 +86,42 @@ body {
             );
 }
 
+/*
+ * В веб-версии контента больше из-за кнопок скачивания.
+ * Размещаем его естественно сверху и разрешаем странице расти.
+ */
+.start-page-container--web {
+    align-items: flex-start;
+}
+
+/*
+ * В установленном приложении блока скачивания нет.
+ * Три основные кнопки центрируем по доступной высоте экрана.
+ */
+.start-page-container--native {
+    align-items: center;
+}
+
 .start-page-content {
     width: 100%;
     max-width: 420px;
-    margin: auto 0;
+
     text-align: center;
+
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 10px;
+
     animation: startPageFadeUp 0.22s ease-out;
+}
+
+.start-page-container--web .start-page-content {
+    margin: 0;
+}
+
+.start-page-container--native .start-page-content {
+    margin: 0;
 }
 
 .start-page-heading {
@@ -340,17 +383,23 @@ body {
 
 @media (max-width: 480px) {
     .start-page-container {
-        padding: 16px;
+        padding-top: max(16px, env(safe-area-inset-top, 0px));
+        padding-right: max(16px, env(safe-area-inset-right, 0px));
         padding-bottom:
                 calc(
                         var(--start-bottom-nav-height) +
                         18px +
                         env(safe-area-inset-bottom, 0px)
                 );
+        padding-left: max(16px, env(safe-area-inset-left, 0px));
     }
 
-    .start-page-content {
-        margin: 0;
+    .start-page-container--native {
+        padding-top:
+                calc(
+                        max(16px, env(safe-area-inset-top, 0px)) +
+                        12px
+                );
     }
 
     .start-page-title {
