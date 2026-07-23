@@ -11,6 +11,10 @@ function getUserFromToken(token) {
 
         if (!decoded?.exp || decoded.exp * 1000 <= Date.now()) {
             localStorage.removeItem("authToken");
+            localStorage.removeItem("refreshToken");
+            localStorage.removeItem("user");
+            localStorage.removeItem("currentUser");
+
             return null;
         }
 
@@ -21,6 +25,10 @@ function getUserFromToken(token) {
         };
     } catch {
         localStorage.removeItem("authToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("user");
+        localStorage.removeItem("currentUser");
+
         return null;
     }
 }
@@ -46,7 +54,10 @@ export const AuthProvider = ({ children }) => {
 
     const logout = () => {
         localStorage.removeItem("authToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("user");
         localStorage.removeItem("currentUser");
+
         setUser(null);
     };
 

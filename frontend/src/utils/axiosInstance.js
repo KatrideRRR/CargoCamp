@@ -221,13 +221,17 @@ const clearAuthAndRedirect = () => {
     localStorage.removeItem("authToken");
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
+    localStorage.removeItem("currentUser");
 
     window.dispatchEvent(new Event("auth:logout"));
 
     const currentPath = window.location.pathname;
 
-    if (currentPath !== "/login" && currentPath !== "/register") {
-        window.location.href = "/login";
+    // При просроченной или недействительной авторизации
+    // возвращаем пользователя на стартовую страницу,
+    // а не принудительно отправляем на логин.
+    if (currentPath !== "/") {
+        window.location.replace("/");
     }
 };
 
