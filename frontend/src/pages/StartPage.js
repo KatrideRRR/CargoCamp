@@ -8,7 +8,7 @@ const ANDROID_DOWNLOAD_URL =
 
 // Сюда позже подставим публичную ссылку TestFlight.
 // Пример: https://testflight.apple.com/join/AbCdEf12
-const IOS_TESTFLIGHT_URL = "";
+const IOS_TESTFLIGHT_URL = "https://testflight.apple.com/join/EHem7CUq";
 
 export default function StartPage() {
     const navigate = useNavigate();
