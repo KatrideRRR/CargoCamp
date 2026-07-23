@@ -47,7 +47,6 @@ const UserOrdersPage = () => {
         const fetchUserData = async () => {
             try {
                 const response = await axiosInstance.get('/auth/profile');
-                console.log("👤 Данные пользователя:", response.data);
                 setUser(response.data);
                 setUserId(response.data.id);
             } catch (err) {

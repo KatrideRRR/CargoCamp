@@ -63,19 +63,6 @@ async function sendPushToUser({
         attributes: ["id", "token", "tokenHash", "platform", "deviceId", "lastSeenAt"],
     });
 
-    console.log("PUSH TOKENS FOUND:", {
-        userId,
-        count: rows.length,
-        tokens: rows.map((r) => ({
-            id: r.id,
-            platform: r.platform,
-            deviceId: r.deviceId,
-            tokenLen: r.token ? String(r.token).length : 0,
-            tokenStart: r.token ? String(r.token).slice(0, 20) : null,
-            lastSeenAt: r.lastSeenAt,
-        })),
-    });
-
     const tokens = [...new Set(rows.map((r) => r.token).filter(Boolean))];
 
     if (!tokens.length) return;

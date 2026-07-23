@@ -183,17 +183,6 @@ function navigateFromPush(rawData, navigate, options = {}) {
     const authToken = getAuthToken();
     const currentUserId = getCurrentUserId();
 
-    console.log("NAVIGATE FROM PUSH:", {
-        rawData,
-        data,
-        type,
-        orderId,
-        orderType,
-        hasAuthToken: !!authToken,
-        currentUserId,
-        options,
-    });
-
     if (!authToken) {
         savePendingPushNavigation(data);
         navigate("/login", {

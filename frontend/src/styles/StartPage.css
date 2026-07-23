@@ -1,15 +1,15 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap");
 
 :root {
-    --bg1: #eef4ff;
-    --bg2: #ffffff;
-    --text: #0f172a;
-    --muted: #64748b;
-    --card: rgba(255, 255, 255, 0.92);
-    --card-border: rgba(15, 23, 42, 0.08);
-    --shadow-soft: 0 6px 18px rgba(15, 23, 42, 0.08);
-    --shadow-hover: 0 10px 24px rgba(15, 23, 42, 0.12);
-    --bottom-nav-h: 92px;
+    --start-bg-1: #eef4ff;
+    --start-bg-2: #ffffff;
+    --start-text: #0f172a;
+    --start-muted: #64748b;
+    --start-card: rgba(255, 255, 255, 0.92);
+    --start-card-border: rgba(15, 23, 42, 0.08);
+    --start-shadow-soft: 0 6px 18px rgba(15, 23, 42, 0.08);
+    --start-shadow-hover: 0 10px 24px rgba(15, 23, 42, 0.12);
+    --start-bottom-nav-height: 92px;
 }
 
 * {
@@ -18,16 +18,29 @@
 
 body {
     margin: 0;
-    font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    background: linear-gradient(to bottom right, var(--bg1), var(--bg2));
+    font-family:
+            "Inter",
+            system-ui,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            Roboto,
+            sans-serif;
+    background:
+            linear-gradient(
+                    to bottom right,
+                    var(--start-bg-1),
+                    var(--start-bg-2)
+            );
     -webkit-font-smoothing: antialiased;
 }
 
-@keyframes pageFadeUp {
+@keyframes startPageFadeUp {
     from {
         opacity: 0;
         transform: translateY(8px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -36,81 +49,109 @@ body {
 
 .start-page-container {
     min-height: 100vh;
+    min-height: 100dvh;
     padding: 24px;
-    padding-bottom: calc(var(--bottom-nav-h) + 24px);
+    padding-bottom:
+            calc(
+                    var(--start-bottom-nav-height) +
+                    24px +
+                    env(safe-area-inset-bottom, 0px)
+            );
     display: flex;
     justify-content: center;
-    align-items: center;
-    background: linear-gradient(to bottom right, var(--bg1), var(--bg2));
-}
-
-@supports (padding: env(safe-area-inset-bottom)) {
-    .start-page-container {
-        padding-bottom: calc(var(--bottom-nav-h) + 24px + env(safe-area-inset-bottom));
-    }
+    align-items: flex-start;
+    overflow-x: hidden;
+    background:
+            linear-gradient(
+                    to bottom right,
+                    var(--start-bg-1),
+                    var(--start-bg-2)
+            );
 }
 
 .start-page-content {
     width: 100%;
     max-width: 420px;
+    margin: auto 0;
     text-align: center;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    animation: pageFadeUp 0.22s ease-out;
+    animation: startPageFadeUp 0.22s ease-out;
 }
 
-.title {
+.start-page-heading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 11px;
+}
+
+.start-page-title {
+    margin: 0;
+    color: var(--start-text);
     font-size: 2.1rem;
     font-weight: 800;
     letter-spacing: -0.03em;
-    color: var(--text);
+}
+
+.start-page-subtitle {
     margin: 0;
-}
-
-.subtitle {
+    color: var(--start-muted);
     font-size: 1rem;
-    color: var(--muted);
-    margin: 0 0 18px;
 }
 
-.button-group {
+.start-page-button-group {
     width: 100%;
     display: flex;
     flex-direction: column;
     gap: 12px;
 }
 
-.role-button {
+.start-page-role-button {
     width: 100%;
+    min-height: 84px;
+    padding: 16px;
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 16px;
+    border: 1px solid var(--start-card-border);
     border-radius: 18px;
-    border: 1px solid var(--card-border);
-    background: var(--card);
-    box-shadow: var(--shadow-soft);
+    background: var(--start-card);
+    box-shadow: var(--start-shadow-soft);
+    color: inherit;
     cursor: pointer;
     text-align: left;
-    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+    font: inherit;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+            transform 0.12s ease,
+            box-shadow 0.12s ease,
+            background 0.12s ease;
 }
 
-.role-button-soft {
+.start-page-role-button-soft {
     background: #f8fbff;
 }
 
-.role-button:hover {
+.start-page-role-button:hover {
     transform: translateY(-1px);
-    box-shadow: var(--shadow-hover);
+    box-shadow: var(--start-shadow-hover);
 }
 
-.role-button:active {
+.start-page-role-button:active {
     transform: scale(0.99);
 }
 
-.emoji {
+.start-page-role-button:focus-visible,
+.start-page-store-button:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.28);
+    outline-offset: 3px;
+}
+
+.start-page-emoji {
     width: 52px;
     height: 52px;
     flex: 0 0 52px;
@@ -118,55 +159,261 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.45rem;
     background: #f1f5f9;
+    font-size: 1.45rem;
 }
 
-.text {
+.start-page-role-text {
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 4px;
-    min-width: 0;
 }
 
-.role-title {
+.start-page-role-title {
+    margin: 0;
+    color: var(--start-text);
     font-size: 1.02rem;
     font-weight: 800;
     letter-spacing: -0.01em;
-    color: var(--text);
-    margin: 0;
 }
 
-.role-subtitle {
-    font-size: 0.88rem;
-    color: var(--muted);
+.start-page-role-subtitle {
     margin: 0;
-    line-height: 1.25;
+    color: var(--start-muted);
+    font-size: 0.88rem;
+    line-height: 1.3;
+}
+
+/* ===== Блок скачивания приложений ===== */
+
+.start-page-download-section {
+    width: 100%;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.start-page-download-heading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.start-page-download-title {
+    margin: 0;
+    color: var(--start-text);
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+
+.start-page-download-description {
+    max-width: 340px;
+    margin: 0;
+    color: var(--start-muted);
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
+.start-page-store-buttons {
+    width: 100%;
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.start-page-store-button {
+    width: 100%;
+    min-width: 0;
+    min-height: 58px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    border: 0;
+    border-radius: 14px;
+    background: #111827;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.16);
+    color: #ffffff;
+    text-decoration: none;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+            transform 0.12s ease,
+            box-shadow 0.12s ease,
+            opacity 0.12s ease;
+}
+
+.start-page-store-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 9px 20px rgba(15, 23, 42, 0.21);
+}
+
+.start-page-store-button:active {
+    transform: scale(0.985);
+}
+
+.start-page-store-button-android {
+    background:
+            linear-gradient(
+                    135deg,
+                    #111827,
+                    #1f2937
+            );
+}
+
+.start-page-store-button-ios {
+    background:
+            linear-gradient(
+                    135deg,
+                    #0f172a,
+                    #334155
+            );
+}
+
+.start-page-store-button-disabled {
+    opacity: 0.55;
+    cursor: default;
+    box-shadow: none;
+}
+
+.start-page-store-button-disabled:hover,
+.start-page-store-button-disabled:active {
+    transform: none;
+    box-shadow: none;
+}
+
+.start-page-store-icon {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.start-page-store-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.start-page-store-text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.start-page-store-label {
+    overflow: hidden;
+    color: rgba(255, 255, 255, 0.74);
+    font-size: 0.64rem;
+    font-weight: 600;
+    line-height: 1.1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.start-page-store-name {
+    overflow: hidden;
+    color: #ffffff;
+    font-size: 0.94rem;
+    font-weight: 800;
+    line-height: 1.15;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.start-page-download-note {
+    margin: 10px 0 0;
+    color: #94a3b8;
+    font-size: 0.7rem;
+    line-height: 1.3;
 }
 
 @media (max-width: 480px) {
     .start-page-container {
         padding: 16px;
-        padding-bottom: calc(var(--bottom-nav-h) + 18px);
+        padding-bottom:
+                calc(
+                        var(--start-bottom-nav-height) +
+                        18px +
+                        env(safe-area-inset-bottom, 0px)
+                );
     }
 
-    .title {
+    .start-page-content {
+        margin: 0;
+    }
+
+    .start-page-title {
         font-size: 1.9rem;
     }
 
-    .role-button {
+    .start-page-role-button {
+        min-height: 76px;
         padding: 14px;
         border-radius: 16px;
     }
 
-    .emoji {
+    .start-page-emoji {
         width: 48px;
         height: 48px;
         flex-basis: 48px;
         font-size: 1.3rem;
     }
 
-    .role-subtitle {
+    .start-page-role-subtitle {
         font-size: 0.84rem;
+    }
+
+    .start-page-download-section {
+        margin-top: 16px;
+        padding-top: 17px;
+    }
+
+    .start-page-store-button {
+        min-height: 56px;
+        padding: 9px 10px;
+        gap: 8px;
+        border-radius: 13px;
+    }
+
+    .start-page-store-icon {
+        width: 25px;
+        height: 25px;
+        flex-basis: 25px;
+    }
+
+    .start-page-store-name {
+        font-size: 0.88rem;
+    }
+}
+
+@media (max-width: 350px) {
+    .start-page-store-buttons {
+        grid-template-columns: 1fr;
+    }
+
+    .start-page-store-button {
+        justify-content: center;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .start-page-content {
+        animation: none;
+    }
+
+    .start-page-role-button,
+    .start-page-store-button {
+        transition: none;
     }
 }

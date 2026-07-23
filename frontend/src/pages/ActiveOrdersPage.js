@@ -155,9 +155,6 @@ const ActiveOrdersPage = () => {
             return;
         }
 
-        console.log("CALL RAW PHONE:", rawPhone);
-        console.log("CALL NORMALIZED PHONE:", phoneForTel);
-
         window.location.href = `tel:${encodeURIComponent(phoneForTel)}`;
     };
 
@@ -442,11 +439,6 @@ const ActiveOrdersPage = () => {
             const formData = new FormData();
 
             files.forEach((file, index) => {
-                console.log("SELECTED IOS FILE:", {
-                    name: file?.name,
-                    type: file?.type,
-                    size: file?.size,
-                });
 
                 const fileName =
                     file?.name ||
@@ -484,7 +476,6 @@ const ActiveOrdersPage = () => {
                 }
             );
 
-            console.log("PHOTO UPLOAD RESPONSE:", response.data);
 
             if (!response.data?.success) {
                 throw new Error("Сервер не сохранил фотографии");
@@ -674,7 +665,7 @@ const ActiveOrdersPage = () => {
             });
 
             if (!r.data?.success) {
-                console.log("EXPRESS ERROR BODY:", r?.data);
+
                 console.error("express/me not success:", r.data);
                 return;
             }

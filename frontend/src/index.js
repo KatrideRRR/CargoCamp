@@ -112,8 +112,6 @@ function App() {
 
     useEffect(() => {
         const handlePush = (payload) => {
-            console.log("🔔 socket push_notification:", payload);
-
             if (!payload) return;
 
             const type = payload.type || payload?.data?.type;

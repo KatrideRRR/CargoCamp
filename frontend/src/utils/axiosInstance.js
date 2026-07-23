@@ -131,15 +131,6 @@ axiosInstance.interceptors.request.use(
             config.headers.Authorization = `Bearer ${token}`;
         }
 
-        console.log("API REQUEST:", {
-            baseURL: config.baseURL,
-            url: config.url,
-            method: config.method,
-            hasToken: Boolean(token && !publicGet),
-            envApiUrl: process.env.REACT_APP_API_URL,
-            publicGet,
-        });
-
         return config;
     },
     (error) => Promise.reject(error)
@@ -270,7 +261,6 @@ const refreshAccessToken = async () => {
         localStorage.setItem("authToken", newAccessToken);
         axiosInstance.defaults.headers.Authorization = `Bearer ${newAccessToken}`;
 
-        console.log("🔄 Токен обновлён в фоне");
     } catch (error) {
         console.error("⚠️ Ошибка обновления токена в фоне:", error);
     }

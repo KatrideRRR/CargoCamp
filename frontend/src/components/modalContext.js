@@ -272,7 +272,6 @@ export const ModalProvider = ({ children }) => {
     };
 
     const handleExpressOrderAccepted = (data) => {
-        console.log("🔔 Экспресс-заказ принят:", data, "current userId:", userId);
 
         if (!data?.orderId) return;
 
@@ -550,10 +549,6 @@ export const ModalProvider = ({ children }) => {
                     }
                 );
 
-            console.log(
-                "REVIEW CREATED:",
-                response.data
-            );
 
             // ✅ больше не показываем напоминание по этому заказу
             markReviewSubmitted(selectedOrder.id, orderType);
@@ -643,7 +638,6 @@ export const ModalProvider = ({ children }) => {
         socket.emit("register", userId);
 
         const handleOrderApproved = (data) => {
-            console.log("🔔 Заказ одобрен:", data);
 
             if (typeof data.debt === "number") {
                 setCurrUser((prev) => (prev ? { ...prev, debt: data.debt } : prev));
@@ -673,7 +667,6 @@ export const ModalProvider = ({ children }) => {
         };
 
         const handleExpressOrderCompleted = (data) => {
-            console.log("🔔 Экспресс-заказ завершён:", data);
 
             if (!data?.orderId) return;
 
@@ -701,7 +694,6 @@ export const ModalProvider = ({ children }) => {
         };
 
         const handleOrderCompleted = (data) => {
-            console.log("🔔 Заказ окончательно завершён:", data);
 
             /*
              * Заказ уже завершён на сервере.
