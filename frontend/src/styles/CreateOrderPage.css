@@ -1037,3 +1037,712 @@
         margin-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
     }
 }
+
+/* =========================
+   SERVICE SMART SEARCH
+   ========================= */
+
+.create-page .serviceSearchField {
+    position: relative;
+    overflow: visible;
+}
+
+.create-page .serviceSearchControlWrap {
+    position: relative;
+}
+
+.create-page .serviceSearchControl {
+    padding-right: 44px;
+}
+
+.create-page .serviceSearchControl.selected {
+    border-color: rgba(34, 197, 94, 0.30);
+    background: rgba(34, 197, 94, 0.07);
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.08);
+}
+
+.create-page .serviceSearchClear {
+    appearance: none;
+    position: absolute;
+    top: 50%;
+    right: 9px;
+    transform: translateY(-50%);
+
+    width: 28px;
+    height: 28px;
+    padding: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border: 0;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.07);
+    color: rgba(71, 85, 105, 0.92);
+
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1;
+
+    cursor: pointer;
+    transition:
+            background 0.18s ease,
+            transform 0.18s ease;
+}
+
+.create-page .serviceSearchClear:hover {
+    background: rgba(15, 23, 42, 0.12);
+}
+
+.create-page .serviceSearchClear:active {
+    transform: translateY(-50%) scale(0.94);
+}
+
+.create-page .serviceSearchSpinner {
+    position: absolute;
+    top: 50%;
+    right: 13px;
+    transform: translateY(-50%);
+
+    width: 18px;
+    height: 18px;
+
+    border-radius: 999px;
+    border: 2px solid rgba(29, 78, 216, 0.18);
+    border-top-color: rgba(29, 78, 216, 0.92);
+
+    animation: serviceSearchSpin 0.75s linear infinite;
+}
+
+@keyframes serviceSearchSpin {
+    from {
+        transform: translateY(-50%) rotate(0deg);
+    }
+
+    to {
+        transform: translateY(-50%) rotate(360deg);
+    }
+}
+
+/* suggestions panel */
+
+.create-page .serviceSuggestionPanel {
+    margin-top: 9px;
+    padding: 8px;
+
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.52);
+    background: rgba(255, 255, 255, 0.88);
+
+    backdrop-filter: blur(20px) saturate(190%);
+    -webkit-backdrop-filter: blur(20px) saturate(190%);
+
+    box-shadow:
+            0 22px 54px rgba(15, 23, 42, 0.14),
+            inset 0 1px 0 rgba(255, 255, 255, 0.76);
+
+    animation: serviceSuggestionsIn 0.18s ease both;
+}
+
+@keyframes serviceSuggestionsIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.create-page .serviceSuggestionTitle {
+    padding: 4px 5px 8px;
+
+    font-size: 11.5px;
+    font-weight: 900;
+    color: rgba(100, 116, 139, 0.96);
+}
+
+.create-page .serviceSuggestionList {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+
+    max-height: 330px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.create-page .serviceSuggestionItem {
+    appearance: none;
+    width: 100%;
+    padding: 11px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    text-align: left;
+
+    border: 1px solid transparent;
+    border-radius: 15px;
+    background: rgba(29, 78, 216, 0.045);
+    color: rgba(15, 23, 42, 0.92);
+
+    cursor: pointer;
+
+    transition:
+            transform 0.16s ease,
+            background 0.16s ease,
+            border-color 0.16s ease;
+}
+
+.create-page .serviceSuggestionItem:hover {
+    background: rgba(29, 78, 216, 0.10);
+    border-color: rgba(29, 78, 216, 0.12);
+    transform: translateY(-1px);
+}
+
+.create-page .serviceSuggestionItem:active {
+    transform: scale(0.992);
+}
+
+.create-page .serviceSuggestionMain {
+    min-width: 0;
+
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.create-page .serviceSuggestionName {
+    font-size: 12.5px;
+    font-weight: 900;
+    line-height: 1.25;
+    color: rgba(15, 23, 42, 0.94);
+}
+
+.create-page .serviceSuggestionCategory {
+    font-size: 11px;
+    font-weight: 800;
+    color: rgba(100, 116, 139, 0.94);
+}
+
+.create-page .serviceSuggestionType {
+    flex: 0 0 auto;
+
+    padding: 6px 8px;
+    border-radius: 999px;
+
+    font-size: 10.5px;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.create-page .serviceSuggestionType.subcategory {
+    color: rgba(29, 78, 216, 0.96);
+    background: rgba(29, 78, 216, 0.10);
+    border: 1px solid rgba(29, 78, 216, 0.14);
+}
+
+.create-page .serviceSuggestionType.category {
+    color: rgba(100, 116, 139, 0.96);
+    background: rgba(100, 116, 139, 0.10);
+    border: 1px solid rgba(100, 116, 139, 0.14);
+}
+
+.create-page .serviceSuggestionEmpty {
+    padding: 11px;
+
+    border-radius: 14px;
+    background: rgba(100, 116, 139, 0.07);
+
+    font-size: 11.5px;
+    font-weight: 800;
+    line-height: 1.45;
+    color: rgba(100, 116, 139, 0.96);
+}
+
+/* selected result */
+
+.create-page .selectedServiceCard {
+    margin-top: 10px;
+    padding: 11px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    border-radius: 16px;
+    border: 1px solid rgba(34, 197, 94, 0.18);
+    background: rgba(34, 197, 94, 0.07);
+}
+
+.create-page .selectedServiceTop {
+    min-width: 0;
+
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.create-page .selectedServiceCheck {
+    flex: 0 0 auto;
+
+    width: 26px;
+    height: 26px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 999px;
+    background: rgba(34, 197, 94, 0.14);
+    color: rgba(22, 163, 74, 0.98);
+
+    font-size: 14px;
+    font-weight: 900;
+}
+
+.create-page .selectedServiceContent {
+    min-width: 0;
+}
+
+.create-page .selectedServiceName {
+    font-size: 12.5px;
+    font-weight: 900;
+    line-height: 1.25;
+    color: rgba(15, 23, 42, 0.94);
+}
+
+.create-page .selectedServiceCategory {
+    margin-top: 4px;
+
+    font-size: 11px;
+    font-weight: 800;
+    color: rgba(100, 116, 139, 0.94);
+}
+
+.create-page .selectedServiceChange {
+    appearance: none;
+    flex: 0 0 auto;
+
+    border: 0;
+    background: transparent;
+    padding: 6px;
+
+    color: rgba(29, 78, 216, 0.96);
+    font-size: 11px;
+    font-weight: 900;
+
+    cursor: pointer;
+}
+
+.create-page .selectedServiceChange:hover {
+    text-decoration: underline;
+}
+
+@media (max-width: 420px) {
+    .create-page .serviceSuggestionItem {
+        align-items: flex-start;
+    }
+
+    .create-page .serviceSuggestionType {
+        padding: 5px 7px;
+        font-size: 10px;
+    }
+
+    .create-page .selectedServiceCard {
+        align-items: flex-start;
+    }
+}
+
+/* =========================
+   DYNAMIC SERVICE FIELDS
+   ========================= */
+
+.create-page .dynamicServiceFields {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.create-page .dynamicBooleanField {
+    padding: 12px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    border-radius: var(--r-lg);
+    border: 1px solid rgba(255, 255, 255, 0.40);
+    background: rgba(255, 255, 255, 0.48);
+
+    box-shadow:
+            inset 0 0 0 1px
+            rgba(255, 255, 255, 0.22);
+}
+
+.create-page .dynamicBooleanText {
+    font-size: 12.5px;
+    font-weight: 900;
+    color: rgba(15, 23, 42, 0.90);
+}
+
+.create-page .dynamicBooleanField input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+
+    accent-color: rgba(29, 78, 216, 0.98);
+    cursor: pointer;
+}
+
+/* =========================
+   RECOMMENDED PRICE
+   ========================= */
+
+.create-page .recommendedPriceCard {
+    margin-bottom: 10px;
+    padding: 12px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+
+    border-radius: var(--r-lg);
+    border: 1px solid rgba(29, 78, 216, 0.18);
+
+    background:
+            linear-gradient(
+                    135deg,
+                    rgba(29, 78, 216, 0.10),
+                    rgba(99, 102, 241, 0.08)
+            );
+
+    box-shadow:
+            inset 0 1px 0
+            rgba(255, 255, 255, 0.56);
+}
+
+.create-page .recommendedPriceContent {
+    min-width: 0;
+}
+
+.create-page .recommendedPriceTitle {
+    font-size: 11.5px;
+    font-weight: 900;
+    color: rgba(71, 85, 105, 0.96);
+}
+
+.create-page .recommendedPriceRange {
+    margin-top: 4px;
+
+    font-size: 17px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+
+    color: rgba(29, 78, 216, 0.98);
+}
+
+.create-page .recommendedPriceHint {
+    margin-top: 5px;
+
+    max-width: 320px;
+
+    font-size: 10.5px;
+    font-weight: 800;
+    line-height: 1.35;
+
+    color: rgba(100, 116, 139, 0.95);
+}
+
+.create-page .recommendedPriceApply {
+    appearance: none;
+    flex: 0 0 auto;
+
+    padding: 10px 12px;
+
+    border-radius: 14px;
+    border: 1px solid rgba(29, 78, 216, 0.22);
+
+    background: rgba(255, 255, 255, 0.68);
+    color: rgba(29, 78, 216, 0.98);
+
+    font-size: 11.5px;
+    font-weight: 900;
+
+    cursor: pointer;
+
+    transition:
+            transform 0.16s ease,
+            background 0.16s ease;
+}
+
+.create-page .recommendedPriceApply:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.88);
+}
+
+.create-page .recommendedPriceApply:active {
+    transform: scale(0.98);
+}
+
+@media (max-width: 420px) {
+    .create-page .recommendedPriceCard {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .create-page .recommendedPriceApply {
+        width: 100%;
+    }
+}
+
+.create-page .recommendedPriceBreakdown {
+    margin-top: 10px;
+    padding-top: 9px;
+
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    border-top: 1px solid
+    rgba(29, 78, 216, 0.12);
+}
+
+.create-page .recommendedPriceBreakdownRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    font-size: 10.8px;
+    font-weight: 800;
+
+    color: rgba(
+            71,
+            85,
+            105,
+            0.96
+    );
+}
+
+.create-page .recommendedPriceBreakdownRow span {
+    min-width: 0;
+}
+
+.create-page .recommendedPriceBreakdownRow strong {
+    flex: 0 0 auto;
+
+    color: rgba(
+            15,
+            23,
+            42,
+            0.92
+    );
+
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+/* =========================
+   DYNAMIC ADDRESS FIELD
+   Второй адрес: доставка,
+   переезд, конечная точка
+   ========================= */
+
+.create-page .dynamicAddressField {
+    position: relative;
+    overflow: visible;
+    z-index: 1;
+}
+
+.create-page .dynamicAddressField:focus-within {
+    z-index: 20;
+}
+
+.create-page .dynamicAddressControlWrap {
+    position: relative;
+}
+
+.create-page .dynamicAddressControlWrap .control {
+    padding-right: 44px;
+}
+
+.create-page .dynamicAddressSelected {
+    border-color: rgba(34, 197, 94, 0.30);
+    background: rgba(34, 197, 94, 0.07);
+
+    box-shadow:
+            0 0 0 4px rgba(34, 197, 94, 0.08),
+            0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+.create-page .dynamicAddressSelected:focus {
+    border-color: rgba(34, 197, 94, 0.42);
+    background: rgba(255, 255, 255, 0.78);
+
+    box-shadow:
+            0 0 0 4px rgba(34, 197, 94, 0.11),
+            0 8px 22px rgba(15, 23, 42, 0.06);
+}
+
+/* Подтверждение выбора точного адреса */
+
+.create-page .dynamicAddressConfirmed {
+    margin-top: 8px;
+
+    display: flex;
+    align-items: center;
+    gap: 7px;
+
+    font-size: 11.5px;
+    font-weight: 900;
+    color: rgba(22, 163, 74, 0.96);
+}
+
+.create-page .dynamicAddressCheck {
+    flex: 0 0 auto;
+
+    width: 20px;
+    height: 20px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 999px;
+
+    background: rgba(34, 197, 94, 0.14);
+    border: 1px solid rgba(34, 197, 94, 0.18);
+
+    color: rgba(22, 163, 74, 0.98);
+
+    font-size: 11px;
+    font-weight: 900;
+}
+
+/* Выпадающий список второго адреса */
+
+.create-page .dynamicAddressSuggestions {
+    position: relative;
+    z-index: 30;
+
+    margin-top: 9px;
+    padding: 8px;
+
+    max-height: 300px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.58);
+
+    background: rgba(255, 255, 255, 0.94);
+
+    backdrop-filter: blur(20px) saturate(190%);
+    -webkit-backdrop-filter: blur(20px) saturate(190%);
+
+    box-shadow:
+            0 22px 54px rgba(15, 23, 42, 0.16),
+            inset 0 1px 0 rgba(255, 255, 255, 0.82);
+
+    animation: dynamicAddressSuggestionsIn 0.18s ease both;
+
+    scrollbar-width: thin;
+    scrollbar-color:
+            rgba(29, 78, 216, 0.24)
+            transparent;
+}
+
+.create-page .dynamicAddressSuggestions::-webkit-scrollbar {
+    width: 6px;
+}
+
+.create-page .dynamicAddressSuggestions::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.create-page .dynamicAddressSuggestions::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(29, 78, 216, 0.22);
+}
+
+@keyframes dynamicAddressSuggestionsIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px) scale(0.995);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.create-page .dynamicAddressSuggestion {
+    appearance: none;
+
+    width: 100%;
+    padding: 11px;
+
+    display: block;
+
+    border: 1px solid transparent;
+    border-radius: 14px;
+
+    background: rgba(29, 78, 216, 0.045);
+    color: rgba(15, 23, 42, 0.92);
+
+    text-align: left;
+
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 850;
+    line-height: 1.4;
+
+    cursor: pointer;
+
+    transition:
+            transform 0.16s ease,
+            background 0.16s ease,
+            border-color 0.16s ease;
+}
+
+.create-page .dynamicAddressSuggestion +
+.create-page .dynamicAddressSuggestion {
+    margin-top: 5px;
+}
+
+.create-page .dynamicAddressSuggestion:hover,
+.create-page .dynamicAddressSuggestion:focus-visible {
+    background: rgba(29, 78, 216, 0.10);
+    border-color: rgba(29, 78, 216, 0.14);
+
+    transform: translateY(-1px);
+
+    outline: none;
+}
+
+.create-page .dynamicAddressSuggestion:active {
+    transform: scale(0.992);
+}
+
+@media (max-width: 520px) {
+    .create-page .dynamicAddressSuggestions {
+        max-height: 250px;
+        border-radius: 16px;
+    }
+
+    .create-page .dynamicAddressSuggestion {
+        padding: 10px;
+        font-size: 11.5px;
+    }
+}

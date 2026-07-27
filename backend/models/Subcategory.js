@@ -23,6 +23,23 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.INTEGER,
             allowNull: true,
         },
+        code: {
+            type: DataTypes.STRING(100),
+            allowNull: true,
+            unique: true,
+        },
+
+        formConfig: {
+            type: DataTypes.JSON,
+            allowNull: true,
+            defaultValue: null,
+        },
+
+        pricingConfig: {
+            type: DataTypes.JSON,
+            allowNull: true,
+            defaultValue: null,
+        },
 
     }, {
         tableName: 'subcategory',
@@ -37,6 +54,10 @@ module.exports = (sequelize, DataTypes) => {
         Subcategory.hasMany(models.Service, {
             foreignKey: 'subcategoryId',
             as: 'services',
+        });
+        Subcategory.hasMany(models.ServiceSearchAlias, {
+            foreignKey: "subcategoryId",
+            as: "searchAliases",
         });
 
     };

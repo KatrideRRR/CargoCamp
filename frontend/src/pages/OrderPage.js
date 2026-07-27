@@ -3,6 +3,8 @@ import { ModalContext } from "../components/modalContext";
 import { Capacitor } from "@capacitor/core";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import axiosInstance from "../utils/axiosInstance";
+import OrderServiceDetails from "../components/OrderServiceDetails";
+import { getOrderServiceDetails } from "../utils/orderServiceDetails";
 import "../styles/OrdersPage.css";
 import Modal from "react-modal";
 import {
@@ -295,15 +297,40 @@ const OrderPage = () => {
     const openRequestModal = () => {
         if (!order?.id) return;
 
-        const token = localStorage.getItem("authToken");
+        const token =
+            localStorage.getItem(
+                "authToken"
+            );
 
         if (!token) {
-            toast.info("Войдите, чтобы запросить выполнение");
+            toast.info(
+                "Войдите, чтобы запросить выполнение"
+            );
+
             navigate("/login");
             return;
         }
 
-        setRequestSum("");
+        const pricing =
+            getOrderServiceDetails(order);
+
+        const suggestedSum =
+            pricing.recommendedPrice ??
+            Number(order.proposedSum);
+
+        setRequestSum(
+            Number.isFinite(
+                Number(suggestedSum)
+            ) &&
+            Number(suggestedSum) > 0
+                ? String(
+                    Math.round(
+                        Number(suggestedSum)
+                    )
+                )
+                : ""
+        );
+
         setRequestComment("");
         setRequestModalOpen(true);
     };
@@ -814,6 +841,12 @@ const OrderPage = () => {
                                 <span className="k">Описание</span>
                                 <div className="v">{description}</div>
                             </div>
+                        )}
+
+                        {!isExpress && (
+                            <OrderServiceDetails
+                                order={order}
+                            />
                         )}
 
                         <div className="order-actions">

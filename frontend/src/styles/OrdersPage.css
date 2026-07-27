@@ -3031,3 +3031,233 @@
             0 8px 18px rgba(22, 163, 74, 0.08),
             inset 0 1px 0 rgba(255, 255, 255, 1);
 }
+
+/* =========================================
+   ORDER SERVICE DETAILS
+   ========================================= */
+
+.orders-page .order-service-details {
+    margin-top: 14px;
+    padding: 14px;
+
+    border-radius: 18px;
+    border: 1px solid rgba(29, 78, 216, 0.14);
+
+    background:
+            linear-gradient(
+                    135deg,
+                    rgba(29, 78, 216, 0.065),
+                    rgba(99, 102, 241, 0.045)
+            );
+
+    box-shadow:
+            inset 0 1px 0
+            rgba(255, 255, 255, 0.55);
+}
+
+.orders-page .order-service-details--compact {
+    padding: 12px;
+}
+
+.orders-page .order-service-details__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.orders-page .order-service-details__title {
+    color: rgba(15, 23, 42, 0.94);
+
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.orders-page .order-service-details__subtitle {
+    margin-top: 3px;
+
+    color: rgba(100, 116, 139, 0.92);
+
+    font-size: 10.5px;
+    font-weight: 800;
+}
+
+.orders-page .order-service-details__range {
+    flex: 0 0 auto;
+
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+
+    text-align: right;
+}
+
+.orders-page .order-service-details__range span {
+    color: rgba(100, 116, 139, 0.92);
+
+    font-size: 9.5px;
+    font-weight: 800;
+}
+
+.orders-page .order-service-details__range strong {
+    color: rgba(29, 78, 216, 0.98);
+
+    font-size: 12.5px;
+    font-weight: 900;
+}
+
+.orders-page .order-service-details__grid {
+    margin-top: 11px;
+
+    display: grid;
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(0, 1fr)
+        );
+
+    gap: 8px;
+}
+
+.orders-page .order-service-detail {
+    min-width: 0;
+    padding: 9px 10px;
+
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    border-radius: 13px;
+    border: 1px solid
+    rgba(255, 255, 255, 0.55);
+
+    background: rgba(
+            255,
+            255,
+            255,
+            0.48
+    );
+}
+
+.orders-page .order-service-detail__label {
+    color: rgba(100, 116, 139, 0.95);
+
+    font-size: 9.5px;
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.orders-page .order-service-detail__value {
+    color: rgba(15, 23, 42, 0.92);
+
+    font-size: 11.5px;
+    font-weight: 900;
+    line-height: 1.35;
+
+    overflow-wrap: anywhere;
+}
+
+.orders-page .order-service-details__more {
+    margin-top: 8px;
+
+    color: rgba(71, 85, 105, 0.92);
+
+    font-size: 10.5px;
+    font-weight: 800;
+}
+
+/* Расшифровка цены */
+
+.orders-page .order-pricing-details {
+    margin-top: 14px;
+    padding-top: 12px;
+
+    border-top: 1px solid
+    rgba(29, 78, 216, 0.13);
+}
+
+.orders-page .order-pricing-details__title {
+    margin-bottom: 8px;
+
+    color: rgba(15, 23, 42, 0.92);
+
+    font-size: 11.5px;
+    font-weight: 900;
+}
+
+.orders-page .order-pricing-details__rows {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.orders-page .order-pricing-details__row,
+.orders-page .order-pricing-details__total {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.orders-page .order-pricing-details__row {
+    color: rgba(71, 85, 105, 0.94);
+
+    font-size: 10.8px;
+    font-weight: 800;
+}
+
+.orders-page .order-pricing-details__row strong {
+    flex: 0 0 auto;
+
+    color: rgba(15, 23, 42, 0.92);
+
+    white-space: nowrap;
+}
+
+.orders-page .order-pricing-details__total {
+    margin-top: 10px;
+    padding-top: 10px;
+
+    border-top: 1px dashed
+    rgba(29, 78, 216, 0.18);
+
+    color: rgba(15, 23, 42, 0.94);
+
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.orders-page .order-pricing-details__total strong {
+    color: rgba(29, 78, 216, 0.98);
+
+    font-size: 14px;
+}
+
+.orders-page .order-pricing-details__notice {
+    margin-top: 9px;
+
+    color: rgba(100, 116, 139, 0.92);
+
+    font-size: 9.8px;
+    font-weight: 800;
+    line-height: 1.4;
+}
+
+@media (max-width: 560px) {
+    .orders-page
+    .order-service-details__head {
+        flex-direction: column;
+    }
+
+    .orders-page
+    .order-service-details__range {
+        align-items: flex-start;
+        text-align: left;
+    }
+
+    .orders-page
+    .order-service-details__grid {
+        grid-template-columns: 1fr;
+    }
+}

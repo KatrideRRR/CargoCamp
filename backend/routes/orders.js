@@ -17,6 +17,7 @@ const uploadExecutorAfter = buildOrderPhotoUploader("executor_after");
 const uploadCustomerBefore = buildOrderPhotoUploader("customer_before");
 const uploadCustomerAfter = buildOrderPhotoUploader("customer_after");
 const { sendNotifications } = require("../socket");
+const { calculateRecommendedPrice } = require("../services/recommendedPriceService");
 
 /* ===============================
    Папки uploads
@@ -210,6 +211,145 @@ function cleanPhoneForPayment(phone) {
     return String(phone || "").replace(/[^\d+]/g, "");
 }
 
+function sanitizeServiceDetails(value, depth = 0) {
+    if (depth > 3) {
+        return null;
+    }
+
+    if (value === null) {
+        return null;
+    }
+
+    if (typeof value === "string") {
+        return value.trim().slice(0, 1000);
+    }
+
+    if (typeof value === "number") {
+        return Number.isFinite(value) ? value : null;
+    }
+
+    if (typeof value === "boolean") {
+        return value;
+    }
+
+    if (Array.isArray(value)) {
+        return value
+            .slice(0, 30)
+            .map((item) =>
+                sanitizeServiceDetails(item, depth + 1)
+            );
+    }
+
+    if (typeof value === "object") {
+        const result = {};
+
+        Object.entries(value)
+            .slice(0, 50)
+            .forEach(([key, item]) => {
+                const safeKey = String(key)
+                    .replace(/[^a-zA-Z0-9А-Яа-яЁё_-]/g, "")
+                    .slice(0, 80);
+
+                if (!safeKey) return;
+
+                result[safeKey] =
+                    sanitizeServiceDetails(item, depth + 1);
+            });
+
+        return result;
+    }
+
+    return null;
+}
+
+function isValidLatLngObject(value) {
+    if (
+        !value ||
+        typeof value !== "object" ||
+        Array.isArray(value)
+    ) {
+        return false;
+    }
+
+    const lat = Number(value.lat);
+    const lng = Number(value.lng);
+
+    if (
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lng)
+    ) {
+        return false;
+    }
+
+    if (lat < -90 || lat > 90) {
+        return false;
+    }
+
+    if (lng < -180 || lng > 180) {
+        return false;
+    }
+
+    if (
+        Math.abs(lat) < 0.000001 &&
+        Math.abs(lng) < 0.000001
+    ) {
+        return false;
+    }
+
+    return true;
+}
+
+function calculateStraightDistanceKm(
+    startLat,
+    startLng,
+    endLat,
+    endLng
+) {
+    const lat1 = Number(startLat);
+    const lng1 = Number(startLng);
+    const lat2 = Number(endLat);
+    const lng2 = Number(endLng);
+
+    if (
+        !Number.isFinite(lat1) ||
+        !Number.isFinite(lng1) ||
+        !Number.isFinite(lat2) ||
+        !Number.isFinite(lng2)
+    ) {
+        return null;
+    }
+
+    const earthRadiusKm = 6371;
+
+    const toRadians = (degrees) =>
+        degrees * (Math.PI / 180);
+
+    const deltaLat =
+        toRadians(lat2 - lat1);
+
+    const deltaLng =
+        toRadians(lng2 - lng1);
+
+    const a =
+        Math.sin(deltaLat / 2) ** 2 +
+        Math.cos(toRadians(lat1)) *
+        Math.cos(toRadians(lat2)) *
+        Math.sin(deltaLng / 2) ** 2;
+
+    const c =
+        2 *
+        Math.atan2(
+            Math.sqrt(a),
+            Math.sqrt(1 - a)
+        );
+
+    return (
+        Math.round(
+            earthRadiusKm * c * 10
+        ) / 10
+    );
+}
+
 async function tryPayCommissionFromSavedCard({ req, executor, order, amountKopecks }) {
     if (!executor.yookassa_payment_method_id) {
         return {
@@ -384,6 +524,7 @@ module.exports = (io) => {
                 categoryId,
                 subcategoryId,
                 serviceId,
+                serviceDetails,
                 coordinates: incomingCoords,
                 promotion,
                 paymentType,
@@ -400,6 +541,57 @@ module.exports = (io) => {
             } catch (e) {
                 parsedPromotion = {};
             }
+
+            let parsedServiceDetails = {};
+
+            try {
+                if (typeof serviceDetails === "string") {
+                    parsedServiceDetails = JSON.parse(serviceDetails || "{}");
+                } else if (
+                    serviceDetails &&
+                    typeof serviceDetails === "object" &&
+                    !Array.isArray(serviceDetails)
+                ) {
+                    parsedServiceDetails = serviceDetails;
+                }
+            } catch (e) {
+                return res.status(400).json({
+                    message: "Некорректные дополнительные параметры услуги",
+                });
+            }
+
+            if (
+                !parsedServiceDetails ||
+                typeof parsedServiceDetails !== "object" ||
+                Array.isArray(parsedServiceDetails)
+            ) {
+                return res.status(400).json({
+                    message: "Дополнительные параметры услуги должны быть объектом",
+                });
+            }
+
+            parsedServiceDetails =
+                sanitizeServiceDetails(parsedServiceDetails);
+
+            const serviceDetailsSize = Buffer.byteLength(
+                JSON.stringify(parsedServiceDetails),
+                "utf8"
+            );
+
+            if (serviceDetailsSize > 20000) {
+                return res.status(400).json({
+                    message: "Слишком большой объём дополнительных параметров заказа",
+                });
+            }
+
+            delete parsedServiceDetails.recommendedPrice;
+            delete parsedServiceDetails.recommendedPriceMin;
+            delete parsedServiceDetails.recommendedPriceMax;
+            delete parsedServiceDetails.pricingCalculator;
+            delete parsedServiceDetails.pricingConfigVersion;
+            delete parsedServiceDetails.pricingCalculatedAt;
+            delete parsedServiceDetails.pricingSource;
+            delete parsedServiceDetails.pricingBreakdown;
 
             // helpers
             const looksLikeCoordsAddress = (v) => {
@@ -486,10 +678,6 @@ module.exports = (io) => {
                 }
             }
 
-            // paymentType может прийти массивом
-            paymentType = Array.isArray(paymentType) ? paymentType[0] : paymentType;
-            if (!paymentType) return res.status(400).json({ message: "paymentType обязателен" });
-
             // promotionTotal
             const promotionTotal = Object.entries(parsedPromotion).reduce((sum, [key, enabled]) => {
                 return enabled && PROMOTION_PRICES[key] ? sum + PROMOTION_PRICES[key] : sum;
@@ -497,17 +685,301 @@ module.exports = (io) => {
 
             const status = promotionTotal > 0 ? "pending_payment" : "pending";
 
-            // --- normalize ids ---
+            // --- normalize and validate category/subcategory ids ---
+
+            categoryId = Array.isArray(categoryId)
+                ? categoryId[0]
+                : categoryId;
+
+            subcategoryId = Array.isArray(subcategoryId)
+                ? subcategoryId[0]
+                : subcategoryId;
+
+            serviceId = Array.isArray(serviceId)
+                ? serviceId[0]
+                : serviceId;
+
             const catId = Number(categoryId);
-            if (!Number.isFinite(catId) || catId <= 0) {
-                return res.status(400).json({ message: "categoryId обязателен" });
+
+            if (!Number.isInteger(catId) || catId <= 0) {
+                return res.status(400).json({
+                    message: "Выберите корректную категорию",
+                });
             }
 
-            const subId = subcategoryId ? Number(subcategoryId) : null;
-            const normalizedSubId = Number.isFinite(subId) && subId > 0 ? subId : null;
+            const subId =
+                subcategoryId === null ||
+                subcategoryId === undefined ||
+                String(subcategoryId).trim() === ""
+                    ? null
+                    : Number(subcategoryId);
 
-            const svcId = serviceId ? Number(serviceId) : null;
-            const normalizedSvcId = Number.isFinite(svcId) && svcId > 0 ? svcId : null;
+            if (
+                subId !== null &&
+                (!Number.isInteger(subId) || subId <= 0)
+            ) {
+                return res.status(400).json({
+                    message: "Выберите корректную подкатегорию",
+                });
+            }
+
+            const normalizedSubId = subId;
+
+            const svcId =
+                serviceId === null ||
+                serviceId === undefined ||
+                String(serviceId).trim() === ""
+                    ? null
+                    : Number(serviceId);
+
+            if (
+                svcId !== null &&
+                (!Number.isInteger(svcId) || svcId <= 0)
+            ) {
+                return res.status(400).json({
+                    message: "Передан некорректный serviceId",
+                });
+            }
+
+            const normalizedSvcId = svcId;
+
+// Проверяем существование категории.
+// В этом роуте разрешены только обычные категории.
+            const selectedCategory = await Category.findOne({
+                where: {
+                    id: catId,
+                    is_express: false,
+                },
+                attributes: [
+                    "id",
+                    "name",
+                    "is_express",
+                ],
+            });
+
+            if (!selectedCategory) {
+                return res.status(400).json({
+                    message:
+                        "Категория не найдена или недоступна для обычного заказа",
+                });
+            }
+
+// Если подкатегория передана,
+// она обязательно должна принадлежать выбранной категории.
+            let selectedSubcategory = null;
+
+            if (normalizedSubId !== null) {
+                selectedSubcategory = await Subcategory.findOne({
+                    where: {
+                        id: normalizedSubId,
+                        categoryId: catId,
+                    },
+                    attributes: [
+                        "id",
+                        "name",
+                        "code",
+                        "categoryId",
+                        "price",
+                        "formConfig",
+                        "pricingConfig",
+                    ],
+                });
+
+                if (!selectedSubcategory) {
+                    return res.status(400).json({
+                        message:
+                            "Подкатегория не найдена или не относится к выбранной категории",
+                    });
+                }
+            }
+
+            const configuredFields = Array.isArray(
+                selectedSubcategory?.formConfig?.fields
+            )
+                ? selectedSubcategory.formConfig.fields
+                : [];
+
+            for (const field of configuredFields) {
+                let value =
+                    parsedServiceDetails?.[field.key];
+
+                if (field.required) {
+                    const isEmpty =
+                        value === undefined ||
+                        value === null ||
+                        String(value).trim() === "";
+
+                    if (isEmpty) {
+                        return res.status(400).json({
+                            message:
+                                `Заполните обязательное поле «${field.label}»`,
+                        });
+                    }
+                }
+
+                if (
+                    field.type === "address" &&
+                    field.required
+                ) {
+                    const coordinatesKey =
+                        field.coordinatesKey ||
+                        `${field.key}Coordinates`;
+
+                    const coordinates =
+                        parsedServiceDetails?.[
+                            coordinatesKey
+                            ];
+
+                    if (
+                        !isValidLatLngObject(
+                            coordinates
+                        )
+                    ) {
+                        return res.status(400).json({
+                            message:
+                                `Выберите точный адрес в поле «${field.label}»`,
+                        });
+                    }
+                }
+
+                if (
+                    field.type === "number" &&
+                    value !== undefined &&
+                    value !== null &&
+                    value !== ""
+                ) {
+                    const numberValue =
+                        Number(value);
+
+                    if (
+                        !Number.isFinite(
+                            numberValue
+                        )
+                    ) {
+                        return res.status(400).json({
+                            message:
+                                `В поле «${field.label}» должно быть число`,
+                        });
+                    }
+
+                    if (
+                        field.min !== undefined &&
+                        numberValue <
+                        Number(field.min)
+                    ) {
+                        return res.status(400).json({
+                            message:
+                                `Минимальное значение поля «${field.label}» — ${field.min}`,
+                        });
+                    }
+
+                    if (
+                        field.max !== undefined &&
+                        numberValue >
+                        Number(field.max)
+                    ) {
+                        return res.status(400).json({
+                            message:
+                                `Максимальное значение поля «${field.label}» — ${field.max}`,
+                        });
+                    }
+
+                    parsedServiceDetails[
+                        field.key
+                        ] = numberValue;
+
+                    value = numberValue;
+                }
+
+                if (
+                    field.type === "boolean" &&
+                    value !== undefined &&
+                    value !== null
+                ) {
+                    const normalizedBoolean =
+                        value === true ||
+                        value === 1 ||
+                        value === "1" ||
+                        String(value)
+                            .toLowerCase() ===
+                        "true";
+
+                    parsedServiceDetails[
+                        field.key
+                        ] = normalizedBoolean;
+
+                    value = normalizedBoolean;
+                }
+
+                if (
+                    field.type === "select" &&
+                    value !== undefined &&
+                    value !== null &&
+                    value !== ""
+                ) {
+                    const allowedValues =
+                        Array.isArray(field.options)
+                            ? field.options.map(
+                                (option) =>
+                                    String(
+                                        option.value
+                                    )
+                            )
+                            : [];
+
+                    const stringValue =
+                        String(value);
+
+                    if (
+                        allowedValues.length > 0 &&
+                        !allowedValues.includes(
+                            stringValue
+                        )
+                    ) {
+                        return res.status(400).json({
+                            message:
+                                `Выберите корректное значение поля «${field.label}»`,
+                        });
+                    }
+
+                    parsedServiceDetails[
+                        field.key
+                        ] = stringValue;
+
+                    value = stringValue;
+                }
+
+                if (
+                    ["text", "textarea"].includes(
+                        field.type
+                    ) &&
+                    value !== undefined &&
+                    value !== null
+                ) {
+                    const stringValue =
+                        String(value).trim();
+
+                    const maximumLength =
+                        Number(
+                            field.maxLength ||
+                            1000
+                        );
+
+                    if (
+                        stringValue.length >
+                        maximumLength
+                    ) {
+                        return res.status(400).json({
+                            message:
+                                `Поле «${field.label}» слишком длинное`,
+                        });
+                    }
+
+                    parsedServiceDetails[
+                        field.key
+                        ] = stringValue;
+                }
+            }
 
             // --- paymentType default ---
             paymentType = Array.isArray(paymentType) ? paymentType[0] : paymentType;
@@ -520,26 +992,25 @@ module.exports = (io) => {
                 return res.status(400).json({ message: "Некорректный paymentType" });
             }
 
-            const parsedProposedSum =
-                proposedSum === "" || proposedSum === null || proposedSum === undefined
-                    ? null
-                    : Number(proposedSum);
-
-            if (parsedProposedSum !== null && !Number.isFinite(parsedProposedSum)) {
-                return res.status(400).json({ message: "Некорректная proposedSum" });
-            }
-
             if (!coordinatesStr || !latlng) {
                 return res.status(400).json({
                     message: "Координаты заказа обязательны. Выберите адрес из подсказки, по GPS или на карте.",
                 });
             }
 
+            proposedSum = Array.isArray(proposedSum)
+                ? proposedSum[0]
+                : proposedSum;
+
             const proposedSumRaw = Number(proposedSum);
 
-            if (!Number.isFinite(proposedSumRaw) || proposedSumRaw < 0) {
+            if (
+                !Number.isFinite(proposedSumRaw) ||
+                proposedSumRaw <= 0
+            ) {
                 return res.status(400).json({
-                    message: "Некорректная стоимость заказа",
+                    message:
+                        "Стоимость заказа должна быть больше нуля",
                 });
             }
 
@@ -588,6 +1059,143 @@ module.exports = (io) => {
                 normalizedWorkTime = parsedWorkTime;
             }
 
+            const destinationField =
+                configuredFields.find(
+                    (field) =>
+                        field.type === "address" &&
+                        field.required
+                );
+
+            if (destinationField) {
+                const coordinatesKey =
+                    destinationField.coordinatesKey ||
+                    `${destinationField.key}Coordinates`;
+
+                const destinationCoordinates =
+                    parsedServiceDetails[
+                        coordinatesKey
+                        ];
+
+                if (
+                    !isValidLatLngObject(
+                        destinationCoordinates
+                    )
+                ) {
+                    return res.status(400).json({
+                        message:
+                            `Выберите точный адрес в поле «${destinationField.label}»`,
+                    });
+                }
+
+                const [
+                    startLatValue,
+                    startLngValue,
+                ] = String(coordinatesStr)
+                    .split(",")
+                    .map((item) =>
+                        Number(item.trim())
+                    );
+
+                const straightDistanceKm =
+                    calculateStraightDistanceKm(
+                        startLatValue,
+                        startLngValue,
+                        destinationCoordinates.lat,
+                        destinationCoordinates.lng
+                    );
+
+                if (straightDistanceKm === null) {
+                    return res.status(400).json({
+                        message:
+                            "Не удалось рассчитать расстояние между адресами",
+                    });
+                }
+
+                const distanceCoefficient = 1.35;
+
+                const estimatedRoadDistanceKm =
+                    Math.round(
+                        straightDistanceKm *
+                        distanceCoefficient *
+                        10
+                    ) / 10;
+
+                parsedServiceDetails = {
+                    ...parsedServiceDetails,
+
+                    straightDistanceKm,
+                    estimatedRoadDistanceKm,
+
+                    distanceKm:
+                    estimatedRoadDistanceKm,
+
+                    distanceCoefficient,
+
+                    distanceType:
+                        "estimated_from_coordinates",
+                };
+            } else {
+                delete parsedServiceDetails
+                    .straightDistanceKm;
+
+                delete parsedServiceDetails
+                    .estimatedRoadDistanceKm;
+
+                delete parsedServiceDetails
+                    .distanceKm;
+
+                delete parsedServiceDetails
+                    .distanceCoefficient;
+
+                delete parsedServiceDetails
+                    .distanceType;
+            }
+
+            const serverRecommendedPrice =
+                calculateRecommendedPrice({
+                    pricingConfig:
+                    selectedSubcategory
+                        ?.pricingConfig,
+
+                    serviceDetails:
+                    parsedServiceDetails,
+                });
+
+            if (serverRecommendedPrice) {
+                parsedServiceDetails = {
+                    ...parsedServiceDetails,
+
+                    recommendedPrice:
+                    serverRecommendedPrice
+                        .recommendedPrice,
+
+                    recommendedPriceMin:
+                    serverRecommendedPrice
+                        .minPrice,
+
+                    recommendedPriceMax:
+                    serverRecommendedPrice
+                        .maxPrice,
+
+                    pricingCalculator:
+                    serverRecommendedPrice
+                        .calculator,
+
+                    pricingConfigVersion:
+                    serverRecommendedPrice
+                        .configVersion,
+
+                    pricingCalculatedAt:
+                        new Date().toISOString(),
+
+                    pricingSource:
+                        "server",
+
+                    pricingBreakdown:
+                        serverRecommendedPrice.breakdown || [],
+                };
+            }
+
             // 3) Сначала создаём заказ БЕЗ финальных путей картинок
             const newOrder = await Order.create({
                 userId,
@@ -606,6 +1214,7 @@ module.exports = (io) => {
                 categoryId: catId,
                 subcategoryId: normalizedSubId,
                 serviceId: normalizedSvcId,
+                serviceDetails: parsedServiceDetails,
                 paymentType,
 
                 promotionCost: promotionTotal,
@@ -651,18 +1260,68 @@ module.exports = (io) => {
                     isAsap: newOrder.isAsap,
                     workTime: newOrder.workTime,
                     categoryId: newOrder.categoryId,
+                    categoryName: selectedCategory.name,
                     subcategoryId: newOrder.subcategoryId,
+                    subcategoryName: selectedSubcategory?.name || null,
                     serviceId: newOrder.serviceId,
+                    serviceDetails: newOrder.serviceDetails,
                     proposedSum: newOrder.proposedSum,
                     promotionTotal: newOrder.promotionCost,
                     coords: newOrder.coordinates,
                     imagesCount: photoUrls.length,
                     imagePaths: photoUrls,
+                    recommendedPrice:
+                        serverRecommendedPrice
+                            ?.recommendedPrice || null,
+
+                    recommendedPriceMin:
+                        serverRecommendedPrice
+                            ?.minPrice || null,
+
+                    recommendedPriceMax:
+                        serverRecommendedPrice
+                            ?.maxPrice || null,
+
+                    pricingCalculator:
+                        serverRecommendedPrice
+                            ?.calculator || null,
+
+                    pricingConfigVersion:
+                        serverRecommendedPrice
+                            ?.configVersion || null,
+
+                    pricingBreakdown:
+                        serverRecommendedPrice
+                            ?.breakdown || [],
                 },
             });
 
             io.emit("orderUpdated");
-            return res.status(201).json(newOrder);
+            return res.status(201).json({
+                ...newOrder.toJSON(),
+
+                pricing: serverRecommendedPrice
+                    ? {
+                        recommendedPrice:
+                        serverRecommendedPrice.recommendedPrice,
+
+                        minPrice:
+                        serverRecommendedPrice.minPrice,
+
+                        maxPrice:
+                        serverRecommendedPrice.maxPrice,
+
+                        calculator:
+                        serverRecommendedPrice.calculator,
+
+                        source: "server",
+
+                        breakdown:
+                            serverRecommendedPrice
+                                .breakdown || [],
+                    }
+                    : null,
+            });
 
         } catch (error) {
             console.error("Ошибка при создании заказа:", error);
@@ -762,48 +1421,115 @@ module.exports = (io) => {
         }
     });
 
-    router.get('/all', async (req, res) => {
+    router.get("/all", async (req, res) => {
         try {
-            // Фильтрация по категории и подкатегории
-            const { categoryId, subcategoryId, serviceId } = req.query;
+            const {
+                categoryId,
+                subcategoryId,
+                serviceId,
+            } = req.query;
+
             const whereClause = {
                 status: "pending",
                 creatorHidden: false,
                 adminDeleted: false,
             };
 
-            if (categoryId) whereClause.categoryId = categoryId;
-            if (subcategoryId) whereClause.subcategoryId = subcategoryId;
-            if (serviceId) whereClause.serviceId = Number(serviceId);
+            if (categoryId) {
+                whereClause.categoryId =
+                    Number(categoryId);
+            }
 
-            // Запрос заказов с фильтром
+            if (subcategoryId) {
+                whereClause.subcategoryId =
+                    Number(subcategoryId);
+            }
+
+            if (serviceId) {
+                whereClause.serviceId =
+                    Number(serviceId);
+            }
+
             const orders = await Order.findAll({
                 attributes: [
-                    'id', 'createdAt', 'address', 'description', 'workTime',
-                    'images', 'proposedSum', 'creatorId', 'coordinates',
-                    'executorId', 'status', 'paymentType',
-                    'is_highlighted', 'is_recommended', 'is_push_notified', 'serviceId',
-                    'categoryId',
-                    'subcategoryId',"isAsap",
+                    "id",
+                    "createdAt",
+                    "address",
+                    "description",
                     "workTime",
+                    "isAsap",
+                    "images",
+                    "proposedSum",
+                    "creatorId",
+                    "coordinates",
+                    "executorId",
+                    "status",
+                    "paymentType",
 
+                    "is_highlighted",
+                    "is_recommended",
+                    "is_push_notified",
+
+                    "categoryId",
+                    "subcategoryId",
+                    "serviceId",
+
+                    /*
+                     * Новое поле с параметрами услуги,
+                     * расстоянием и расчётом цены.
+                     */
+                    "serviceDetails",
                 ],
+
                 where: whereClause,
+
                 include: [
-                    { model: db.Category, as: 'category', attributes: ['id', 'name'] },
-                    { model: db.Subcategory, as: 'subcategory', attributes: ['id', 'name'] },
-                    { model: db.Service, as: 'service', attributes: ['id', 'name'] },
-                ],
-                order: [
-                    ['is_recommended', 'DESC'],
+                    {
+                        model: db.Category,
+                        as: "category",
+                        attributes: [
+                            "id",
+                            "name",
+                        ],
+                    },
+
+                    {
+                        model: db.Subcategory,
+                        as: "subcategory",
+                        attributes: [
+                            "id",
+                            "name",
+                            "code",
+                            "formConfig",
+                        ],
+                    },
+
+                    {
+                        model: db.Service,
+                        as: "service",
+                        attributes: [
+                            "id",
+                            "name",
+                        ],
+                    },
                 ],
 
+                order: [
+                    ["is_recommended", "DESC"],
+                    ["createdAt", "DESC"],
+                ],
             });
 
-            res.json(orders);
+            return res.json(orders);
         } catch (error) {
-            console.error("❌ Ошибка при получении заказов:", error);
-            res.status(500).json({ message: "Ошибка сервера" });
+            console.error(
+                "❌ Ошибка при получении заказов:",
+                error
+            );
+
+            return res.status(500).json({
+                message: "Ошибка сервера",
+            });
         }
     });
 
@@ -847,27 +1573,81 @@ module.exports = (io) => {
         }
     });
 
-    router.get('/:id', async (req, res) => {
-        const { id } = req.params;
+    router.get("/:id", async (req, res) => {
+        const orderId = Number(req.params.id);
+
+        if (
+            !Number.isInteger(orderId) ||
+            orderId <= 0
+        ) {
+            return res.status(400).json({
+                message: "Некорректный ID заказа",
+            });
+        }
 
         try {
-            // Ищем заказ по ID, включая данные о пользователе
-            const order = await Order.findByPk(id, {
-                include:[ { model: db.User, as: 'users', attributes: ['id', 'username', 'phone'] },
-                          { model: db.Category, as: 'category', attributes: ['id', 'name'] },
-                          { model: db.Subcategory, as: 'subcategory', attributes: ['id', 'name'] },
-        ],
-            });
+            const order = await Order.findByPk(
+                orderId,
+                {
+                    include: [
+                        {
+                            model: db.User,
+                            as: "users",
+                            attributes: [
+                                "id",
+                                "username",
+                                "phone",
+                            ],
+                        },
 
-            // Если заказ не найден
+                        {
+                            model: db.Category,
+                            as: "category",
+                            attributes: [
+                                "id",
+                                "name",
+                            ],
+                        },
+
+                        {
+                            model: db.Subcategory,
+                            as: "subcategory",
+                            attributes: [
+                                "id",
+                                "name",
+                                "code",
+                                "formConfig",
+                            ],
+                        },
+
+                        {
+                            model: db.Service,
+                            as: "service",
+                            attributes: [
+                                "id",
+                                "name",
+                            ],
+                        },
+                    ],
+                }
+            );
+
             if (!order) {
-                return res.status(404).json({ message: 'Order not found' });
+                return res.status(404).json({
+                    message: "Заказ не найден",
+                });
             }
 
-            res.json(order);
+            return res.json(order);
         } catch (error) {
-            console.error('Error fetching order:', error);
-            res.status(500).json({ message: 'Server error' });
+            console.error(
+                "Ошибка получения заказа:",
+                error
+            );
+
+            return res.status(500).json({
+                message: "Ошибка сервера",
+            });
         }
     });
 
@@ -1699,7 +2479,7 @@ module.exports = (io) => {
                         { executorId: userId }   // Исполнитель
                     ]
                 },
-                attributes: ['id','address','proposedSum', 'status', 'completedAt', 'creatorId', 'executorId', 'description', 'contractPath'], // Указываем, какие поля хотим вернуть
+                attributes: ['id','address','proposedSum', 'status', 'completedAt', 'creatorId', 'executorId', 'description', 'contractPath', "serviceDetails"], // Указываем, какие поля хотим вернуть
             });
 
             // Отправляем заказ с актуальной датой завершения
@@ -1710,34 +2490,93 @@ module.exports = (io) => {
         }
     });
 
-    router.get('/creator/:userId', async (req, res) => {
-        const { userId } = req.params;
+    router.get("/creator/:userId", async (req, res) => {
+        const creatorId = Number(req.params.userId);
+
+        if (
+            !Number.isInteger(creatorId) ||
+            creatorId <= 0
+        ) {
+            return res.status(400).json({
+                message: "Некорректный userId",
+            });
+        }
 
         try {
             const orders = await Order.findAll({
                 where: {
-                    creatorId: userId,
-                    status: ["pending", "pending_payment"],
-                    creatorHidden: false,
-                },  // Фильтруем заказы по ID создателя
-                order: [["createdAt", "DESC"]],
-                include: [
-                    { model: db.Category, as: 'category', attributes: ['id', 'name'] },
-                    { model: db.Subcategory, as: 'subcategory', attributes: ['id', 'name'] },
-                    { model: db.User, as: 'users', attributes: ['id', 'username'] }
-                ]
+                    creatorId,
 
+                    status: {
+                        [Op.in]: [
+                            "pending",
+                            "pending_payment",
+                        ],
+                    },
+
+                    creatorHidden: false,
+                    adminDeleted: false,
+                },
+
+                order: [
+                    ["createdAt", "DESC"],
+                ],
+
+                include: [
+                    {
+                        model: db.Category,
+                        as: "category",
+                        attributes: [
+                            "id",
+                            "name",
+                        ],
+                    },
+
+                    {
+                        model: db.Subcategory,
+                        as: "subcategory",
+                        attributes: [
+                            "id",
+                            "name",
+                            "code",
+                            "formConfig",
+                        ],
+                    },
+
+                    {
+                        model: db.Service,
+                        as: "service",
+                        attributes: [
+                            "id",
+                            "name",
+                        ],
+                    },
+
+                    {
+                        model: db.User,
+                        as: "users",
+                        attributes: [
+                            "id",
+                            "username",
+                        ],
+                    },
+                ],
             });
 
-            if (!orders || orders.length === 0) {
-                return res.status(200).json([]); // Возвращаем пустой массив вместо 404
-            }
-
-
-            res.json(orders);
+            return res.status(200).json(
+                Array.isArray(orders)
+                    ? orders
+                    : []
+            );
         } catch (error) {
-            console.error('Error fetching orders:', error);
-            res.status(500).json({ message: 'Ошибка сервера' });
+            console.error(
+                "Ошибка получения заказов создателя:",
+                error
+            );
+
+            return res.status(500).json({
+                message: "Ошибка сервера",
+            });
         }
     });
 

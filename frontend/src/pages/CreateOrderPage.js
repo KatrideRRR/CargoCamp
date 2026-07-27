@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import DatePicker from "react-datepicker";
 import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrentLocation";
@@ -9,6 +9,8 @@ import imageCompression from "browser-image-compression";
 import PromotionOptions, { PROMOTION_PRICES } from "../components/PromotionOptions";
 import YandexMapModal from "../components/YandexMapModal";
 import PaymentProviderSelect from "../components/PaymentProviderSelect";
+import DynamicServiceFields from "../components/DynamicServiceFields";
+import { calculateRecommendedPrice } from "../utils/calculateRecommendedPrice";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -62,6 +64,57 @@ function parseYandexGeocoderSuggestions(data) {
             };
         })
         .filter(Boolean);
+}
+
+function calculateStraightDistanceKm(
+    startLat,
+    startLng,
+    endLat,
+    endLng
+) {
+    const lat1 = Number(startLat);
+    const lng1 = Number(startLng);
+    const lat2 = Number(endLat);
+    const lng2 = Number(endLng);
+
+    if (
+        !Number.isFinite(lat1) ||
+        !Number.isFinite(lng1) ||
+        !Number.isFinite(lat2) ||
+        !Number.isFinite(lng2)
+    ) {
+        return null;
+    }
+
+    const earthRadiusKm = 6371;
+
+    const toRadians = (degrees) =>
+        degrees * (Math.PI / 180);
+
+    const deltaLat =
+        toRadians(lat2 - lat1);
+
+    const deltaLng =
+        toRadians(lng2 - lng1);
+
+    const a =
+        Math.sin(deltaLat / 2) ** 2 +
+        Math.cos(toRadians(lat1)) *
+        Math.cos(toRadians(lat2)) *
+        Math.sin(deltaLng / 2) ** 2;
+
+    const c =
+        2 *
+        Math.atan2(
+            Math.sqrt(a),
+            Math.sqrt(1 - a)
+        );
+
+    return (
+        Math.round(
+            earthRadiusKm * c * 10
+        ) / 10
+    );
 }
 
 async function geocodeAddressYandex({ address, apiKey }) {
@@ -146,11 +199,20 @@ function CreateOrderPage() {
     const [markerPosition, setMarkerPosition] = useState(null); // [lat, lng]
     const [addressSuggestions, setAddressSuggestions] = useState([]); // [{label,address,lat,lon}]    const [images, setImages] = useState([]);
 
-    const [category, setCategory] = useState([]);
-    const [subcategory, setSubcategory] = useState([]);
+    const [serviceQuery, setServiceQuery] = useState("");
+    const [serviceSuggestions, setServiceSuggestions] = useState([]);
+    const [serviceSearchOpen, setServiceSearchOpen] = useState(false);
+    const [serviceSearching, setServiceSearching] = useState(false);
 
     const [selectedCategory, setSelectedCategory] = useState("");
     const [selectedSubcategory, setSelectedSubcategory] = useState("");
+    const [selectedService, setSelectedService] = useState(null);
+
+    const serviceSearchTimerRef = useRef(null);
+    const serviceSearchAbortRef = useRef(null);
+    const serviceSearchBoxRef = useRef(null);
+
+    const [serviceDetails, setServiceDetails] = useState({});
 
     const [addressOpen, setAddressOpen] = useState(false);
     const [timeOpen, setTimeOpen] = useState(false);
@@ -172,6 +234,289 @@ function CreateOrderPage() {
 
     // ✅ тумблер: ON = срочно
     const [isAsap, setIsAsap] = useState(true);
+
+
+    const recommendedPrice = useMemo(() => {
+        return calculateRecommendedPrice({
+            pricingConfig:
+            selectedService?.pricingConfig,
+            serviceDetails,
+        });
+    }, [
+        selectedService?.pricingConfig,
+        serviceDetails,
+    ]);
+
+    useEffect(() => {
+        setServiceDetails((previous) => {
+            const current =
+                previous || {};
+
+            if (!recommendedPrice) {
+                if (
+                    current.recommendedPrice ===
+                    undefined &&
+                    current.recommendedPriceMin ===
+                    undefined &&
+                    current.recommendedPriceMax ===
+                    undefined &&
+                    current.pricingCalculator ===
+                    undefined
+                ) {
+                    return current;
+                }
+
+                const next = {
+                    ...current,
+                };
+
+                delete next.recommendedPrice;
+                delete next.recommendedPriceMin;
+                delete next.recommendedPriceMax;
+                delete next.pricingCalculator;
+
+                return next;
+            }
+
+            if (
+                current.recommendedPrice ===
+                recommendedPrice.recommendedPrice &&
+                current.recommendedPriceMin ===
+                recommendedPrice.minPrice &&
+                current.recommendedPriceMax ===
+                recommendedPrice.maxPrice &&
+                current.pricingCalculator ===
+                recommendedPrice.calculator
+            ) {
+                return current;
+            }
+
+            return {
+                ...current,
+
+                recommendedPrice:
+                recommendedPrice.recommendedPrice,
+
+                recommendedPriceMin:
+                recommendedPrice.minPrice,
+
+                recommendedPriceMax:
+                recommendedPrice.maxPrice,
+
+                pricingCalculator:
+                recommendedPrice.calculator,
+            };
+        });
+    }, [
+        recommendedPrice?.recommendedPrice,
+        recommendedPrice?.minPrice,
+        recommendedPrice?.maxPrice,
+        recommendedPrice?.calculator,
+    ]);
+
+    useEffect(() => {
+        const destination =
+            serviceDetails
+                ?.destinationCoordinates;
+
+        const hasStart =
+            isValidOrderCoords(markerPosition);
+
+        const destinationLat =
+            Number(destination?.lat);
+
+        const destinationLng =
+            Number(destination?.lng);
+
+        const hasDestination =
+            Number.isFinite(destinationLat) &&
+            Number.isFinite(destinationLng);
+
+        if (!hasStart || !hasDestination) {
+            setServiceDetails((previous) => {
+                if (
+                    previous?.straightDistanceKm ===
+                    undefined &&
+                    previous?.estimatedRoadDistanceKm ===
+                    undefined &&
+                    previous?.distanceKm === undefined &&
+                    previous?.distanceType === undefined
+                ) {
+                    return previous;
+                }
+
+                const next = {
+                    ...(previous || {}),
+                };
+
+                delete next.straightDistanceKm;
+                delete next.estimatedRoadDistanceKm;
+                delete next.distanceKm;
+                delete next.distanceType;
+                delete next.distanceCoefficient;
+
+                // Удаляем старые данные платного маршрута,
+                // если они остались в состоянии.
+                delete next.distanceMeters;
+                delete next.durationMinutes;
+                delete next.durationSeconds;
+                delete next.routeMode;
+                delete next.routeTrafficType;
+                delete next.routeHasTolls;
+                delete next.routeCalculatedAt;
+
+                return next;
+            });
+
+            return;
+        }
+
+        const straightDistanceKm =
+            calculateStraightDistanceKm(
+                markerPosition[0],
+                markerPosition[1],
+                destinationLat,
+                destinationLng
+            );
+
+        if (straightDistanceKm === null) {
+            return;
+        }
+
+        const distanceCoefficient = 1.35;
+
+        const estimatedRoadDistanceKm =
+            Math.round(
+                straightDistanceKm *
+                distanceCoefficient *
+                10
+            ) / 10;
+
+        setServiceDetails((previous) => {
+            if (
+                previous?.straightDistanceKm ===
+                straightDistanceKm &&
+                previous?.estimatedRoadDistanceKm ===
+                estimatedRoadDistanceKm &&
+                previous?.distanceType ===
+                "estimated_from_coordinates"
+            ) {
+                return previous;
+            }
+
+            const next = {
+                ...(previous || {}),
+
+                straightDistanceKm,
+                estimatedRoadDistanceKm,
+
+                /*
+                 * distanceKm оставляем как общее поле,
+                 * чтобы будущая формула цены брала его
+                 * независимо от способа расчёта.
+                 */
+                distanceKm:
+                estimatedRoadDistanceKm,
+
+                distanceCoefficient,
+
+                distanceType:
+                    "estimated_from_coordinates",
+            };
+
+            delete next.distanceMeters;
+            delete next.durationMinutes;
+            delete next.durationSeconds;
+            delete next.routeMode;
+            delete next.routeTrafficType;
+            delete next.routeHasTolls;
+            delete next.routeCalculatedAt;
+
+            return next;
+        });
+    }, [
+        markerPosition?.[0],
+        markerPosition?.[1],
+        serviceDetails
+            ?.destinationCoordinates?.lat,
+        serviceDetails
+            ?.destinationCoordinates?.lng,
+    ]);
+
+    const validateServiceDetails = () => {
+        const fields = Array.isArray(
+            selectedService?.formConfig?.fields
+        )
+            ? selectedService.formConfig.fields
+            : [];
+
+        for (const field of fields) {
+            const value = serviceDetails?.[field.key];
+
+            if (field.required) {
+                const isEmpty =
+                    value === undefined ||
+                    value === null ||
+                    String(value).trim() === "";
+
+                if (isEmpty) {
+                    return `Заполните поле «${field.label}»`;
+                }
+            }
+
+            if (
+                field.type === "address" &&
+                value &&
+                field.required
+            ) {
+                const coordinatesKey =
+                    field.coordinatesKey ||
+                    `${field.key}Coordinates`;
+
+                const coordinates =
+                    serviceDetails?.[coordinatesKey];
+
+                const lat = Number(coordinates?.lat);
+                const lng = Number(coordinates?.lng);
+
+                if (
+                    !Number.isFinite(lat) ||
+                    !Number.isFinite(lng)
+                ) {
+                    return `Выберите точный адрес в поле «${field.label}» из подсказки`;
+                }
+            }
+
+            if (
+                field.type === "number" &&
+                value !== "" &&
+                value !== undefined &&
+                value !== null
+            ) {
+                const numberValue = Number(value);
+
+                if (!Number.isFinite(numberValue)) {
+                    return `В поле «${field.label}» должно быть число`;
+                }
+
+                if (
+                    field.min !== undefined &&
+                    numberValue < Number(field.min)
+                ) {
+                    return `Минимальное значение поля «${field.label}» — ${field.min}`;
+                }
+
+                if (
+                    field.max !== undefined &&
+                    numberValue > Number(field.max)
+                ) {
+                    return `Максимальное значение поля «${field.label}» — ${field.max}`;
+                }
+            }
+        }
+
+        return null;
+    };
 
     const promotionTotal = useMemo(() => {
         const safePromotion = {
@@ -275,13 +620,6 @@ function CreateOrderPage() {
         })();
     }, [YM_KEY]);
 
-    useEffect(() => {
-        axios
-            .get(`${apiUrl}/api/category`)
-            .then((response) => setCategory(response.data))
-            .catch((e) => console.error("Ошибка при загрузке категорий", e));
-    }, []);
-
     const handleImageChange = async (event) => {
         const files = event.target.files;
         const compressed = [];
@@ -302,27 +640,217 @@ function CreateOrderPage() {
         setImages((prev) => [...prev, ...compressed]);
     };
 
-    const handleCategoryChange = async (event) => {
-        const categoryId = event.target.value;
-        setSelectedCategory(categoryId);
+    const clearSelectedService = () => {
+        setSelectedService(null);
+        setSelectedCategory("");
         setSelectedSubcategory("");
-        setSubcategory([]);
+        setServiceDetails({});
+    };
 
-        if (!categoryId) return;
-
-        try {
-            const res = await axios.get(`${apiUrl}/api/category/subcategory/${categoryId}`);
-            setSubcategory(res.data);
-        } catch (e) {
-            console.error("Ошибка при загрузке подкатегорий", e);
+    const clearServiceSearchTimer = () => {
+        if (serviceSearchTimerRef.current) {
+            clearTimeout(serviceSearchTimerRef.current);
+            serviceSearchTimerRef.current = null;
         }
     };
 
-    const handleSubcategoryChange = async (e) => {
-        const subId = e.target.value;
-        setSelectedSubcategory(subId);
-
+    const abortServiceSearch = () => {
+        if (serviceSearchAbortRef.current) {
+            serviceSearchAbortRef.current.abort();
+            serviceSearchAbortRef.current = null;
+        }
     };
+
+    const handleServiceQueryChange = (event) => {
+        const value = event.target.value;
+
+        setServiceQuery(value);
+        setError("");
+
+        /*
+         * Если пользователь изменил текст после выбора подсказки,
+         * прежние categoryId/subcategoryId больше не считаются выбранными.
+         */
+        if (selectedService) {
+            clearSelectedService();
+        }
+
+        clearServiceSearchTimer();
+        abortServiceSearch();
+
+        const query = value.trim();
+
+        if (query.length < 2) {
+            setServiceSuggestions([]);
+            setServiceSearchOpen(false);
+            setServiceSearching(false);
+            return;
+        }
+
+        setServiceSearchOpen(true);
+        setServiceSearching(true);
+
+        serviceSearchTimerRef.current = setTimeout(async () => {
+            const controller = new AbortController();
+            serviceSearchAbortRef.current = controller;
+
+            try {
+                const response = await axios.get(
+                    `${apiUrl}/api/category/search`,
+                    {
+                        params: {
+                            q: query,
+                        },
+                        signal: controller.signal,
+                    }
+                );
+
+                const results = Array.isArray(response.data?.results)
+                    ? response.data.results
+                    : [];
+
+                /*
+                 * Дополнительная клиентская защита:
+                 * Такси и Курьер не должны отображаться в этой форме,
+                 * даже если backend случайно их вернёт.
+                 */
+                const safeResults = results.filter((item) => {
+                    const categoryName = String(item?.categoryName || "")
+                        .trim()
+                        .toLowerCase();
+
+                    return !["такси", "курьер"].includes(categoryName);
+                });
+
+                setServiceSuggestions(safeResults);
+                setServiceSearchOpen(true);
+            } catch (searchError) {
+                if (
+                    searchError?.name === "CanceledError" ||
+                    searchError?.name === "AbortError" ||
+                    searchError?.code === "ERR_CANCELED"
+                ) {
+                    return;
+                }
+
+                console.error("Ошибка поиска услуги:", searchError);
+                setServiceSuggestions([]);
+                setServiceSearchOpen(true);
+            } finally {
+                if (serviceSearchAbortRef.current === controller) {
+                    serviceSearchAbortRef.current = null;
+                    setServiceSearching(false);
+                }
+            }
+        }, 300);
+    };
+
+    const handleServiceSelect = (option) => {
+        if (!option?.categoryId) return;
+
+        const categoryId = Number(option.categoryId);
+        const subcategoryId = option.subcategoryId
+            ? Number(option.subcategoryId)
+            : null;
+
+        if (!Number.isFinite(categoryId) || categoryId <= 0) {
+            return;
+        }
+
+        setServiceDetails({});
+
+        setSelectedCategory(String(categoryId));
+
+        setSelectedSubcategory(
+            Number.isFinite(subcategoryId) && subcategoryId > 0
+                ? String(subcategoryId)
+                : ""
+        );
+
+        setSelectedService({
+            type: option.type,
+
+            categoryId,
+            categoryName: option.categoryName,
+
+            subcategoryId:
+                Number.isFinite(subcategoryId) &&
+                subcategoryId > 0
+                    ? subcategoryId
+                    : null,
+
+            subcategoryName:
+                option.subcategoryName || null,
+
+            subcategoryCode:
+                option.subcategoryCode || null,
+
+            formConfig:
+                option.formConfig || null,
+
+            pricingConfig:
+                option.pricingConfig || null,
+
+            label: option.label,
+            matchedPhrase:
+                option.matchedPhrase || null,
+
+            price: option.price ?? null,
+        });
+
+        setServiceQuery(
+            option.subcategoryName ||
+            option.categoryName ||
+            option.label ||
+            ""
+        );
+
+        setServiceSuggestions([]);
+        setServiceSearchOpen(false);
+        setServiceSearching(false);
+        setError("");
+    };
+
+    const handleServiceClear = () => {
+        clearServiceSearchTimer();
+        abortServiceSearch();
+
+        setServiceQuery("");
+        setServiceSuggestions([]);
+        setServiceSearchOpen(false);
+        setServiceSearching(false);
+
+        clearSelectedService();
+    };
+
+    useEffect(() => {
+        return () => {
+            if (serviceSearchTimerRef.current) {
+                clearTimeout(serviceSearchTimerRef.current);
+            }
+
+            if (serviceSearchAbortRef.current) {
+                serviceSearchAbortRef.current.abort();
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        const handleOutsideClick = (event) => {
+            if (
+                serviceSearchBoxRef.current &&
+                !serviceSearchBoxRef.current.contains(event.target)
+            ) {
+                setServiceSearchOpen(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleOutsideClick);
+
+        return () => {
+            document.removeEventListener("mousedown", handleOutsideClick);
+        };
+    }, []);
 
     const getMinTime = (selectedDate) => {
         if (!selectedDate || selectedDate.toDateString() === currentDate.toDateString()) {
@@ -457,8 +985,17 @@ function CreateOrderPage() {
             setAddressOpen(true);
             return;
         }
-        if (!selectedCategory) {
-            setError("Выберите категорию");
+        if (!selectedCategory || !selectedService) {
+            setError("Выберите подходящую услугу из подсказки");
+            setServiceSearchOpen(true);
+            return;
+        }
+
+        const serviceDetailsError =
+            validateServiceDetails();
+
+        if (serviceDetailsError) {
+            setError(serviceDetailsError);
             return;
         }
 
@@ -504,11 +1041,25 @@ function CreateOrderPage() {
         data.append("proposedSum", String(Math.round(proposedSumRaw * 100) / 100));
         data.append("paymentType", paymentType);
 
-        data.append("categoryId", Number(selectedCategory));
+        const normalizedCategoryId = Number(selectedCategory);
+        const normalizedSubcategoryId = Number(selectedSubcategory);
 
-        if (selectedSubcategory && Number(selectedSubcategory) > 0) {
-            data.append("subcategoryId", Number(selectedSubcategory));
+        data.append("categoryId", String(normalizedCategoryId));
+
+        if (
+            Number.isFinite(normalizedSubcategoryId) &&
+            normalizedSubcategoryId > 0
+        ) {
+            data.append(
+                "subcategoryId",
+                String(normalizedSubcategoryId)
+            );
         }
+
+        data.append(
+            "serviceDetails",
+            JSON.stringify(serviceDetails || {})
+        );
 
         const cleanPromotion = {
             highlight: !!promotion.highlight,
@@ -841,50 +1392,244 @@ function CreateOrderPage() {
                     </div>
                 )}
 
-                {/* Category */}
+                {/* Service search */}
                 <div className="glass section-card">
                     <div className="section-head">
                         <div>
-                            <div className="section-title">Категория</div>
-                            <div className="section-sub">Выберите категорию, подкатегорию и услугу</div>
+                            <div className="section-title">Что нужно сделать?</div>
+                            <div className="section-sub">
+                                Начните вводить название работы — мы предложим подходящую услугу
+                            </div>
                         </div>
                     </div>
 
-                    {/* Шаг 1: Категория всегда видна */}
-                    <div className="glass field">
-                        <div className="label">Категория</div>
-                        <select className="control" value={selectedCategory} onChange={handleCategoryChange}>
-                            <option value="">Выберите категорию</option>
-                            {category
-                                .filter((cat) => !["Такси", "Курьер"].includes(cat.name))
-                                .map((cat) => (
-                                    <option key={cat.id} value={cat.id}>
-                                        {cat.name}
-                                    </option>
-                                ))}
-                        </select>
-                    </div>
+                    <div
+                        className="glass field serviceSearchField"
+                        ref={serviceSearchBoxRef}
+                    >
+                        <div className="label">Услуга</div>
 
-                    {/* Шаг 2: Подкатегория показывается только после выбора категории */}
-                    {selectedCategory && (
-                        <div className="glass field" style={{ marginTop: 10 }}>
-                            <div className="label">Подкатегория</div>
-                            <select
-                                className="control"
-                                value={selectedSubcategory}
-                                onChange={handleSubcategoryChange}
-                            >
-                                <option value="">Выберите подкатегорию</option>
-                                {subcategory.map((sub) => (
-                                    <option key={sub.id} value={sub.id}>
-                                        {sub.name}
-                                        {sub.price ? ` — ${sub.price} ₽` : ""}
-                                    </option>
-                                ))}
-                            </select>
+                        <div className="serviceSearchControlWrap">
+                            <input
+                                className={`control serviceSearchControl ${
+                                    selectedService ? "selected" : ""
+                                }`}
+                                type="text"
+                                value={serviceQuery}
+                                onChange={handleServiceQueryChange}
+                                onFocus={() => {
+                                    if (
+                                        serviceQuery.trim().length >= 2 &&
+                                        !selectedService
+                                    ) {
+                                        setServiceSearchOpen(true);
+                                    }
+                                }}
+                                placeholder="Например: перевезти диван, починить кран"
+                                autoComplete="off"
+                                spellCheck="true"
+                                aria-label="Поиск услуги"
+                                aria-expanded={serviceSearchOpen}
+                            />
+
+                            {serviceSearching && (
+                                <span
+                                    className="serviceSearchSpinner"
+                                    aria-label="Поиск"
+                                />
+                            )}
+
+                            {!serviceSearching && serviceQuery && (
+                                <button
+                                    type="button"
+                                    className="serviceSearchClear"
+                                    onClick={handleServiceClear}
+                                    aria-label="Очистить выбранную услугу"
+                                    title="Очистить"
+                                >
+                                    ×
+                                </button>
+                            )}
                         </div>
-                    )}
+
+                        {selectedService && (
+                            <div className="selectedServiceCard">
+                                <div className="selectedServiceTop">
+                                    <div className="selectedServiceCheck">✓</div>
+
+                                    <div className="selectedServiceContent">
+                                        <div className="selectedServiceName">
+                                            {selectedService.subcategoryName ||
+                                                selectedService.categoryName}
+                                        </div>
+
+                                        {selectedService.subcategoryName && (
+                                            <div className="selectedServiceCategory">
+                                                Категория: {selectedService.categoryName}
+                                            </div>
+                                        )}
+
+                                        {!selectedService.subcategoryName && (
+                                            <div className="selectedServiceCategory">
+                                                Выбрана общая категория
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    className="selectedServiceChange"
+                                    onClick={() => {
+                                        clearSelectedService();
+                                        setServiceQuery("");
+                                        setServiceSuggestions([]);
+                                        setServiceSearchOpen(false);
+                                    }}
+                                >
+                                    Изменить
+                                </button>
+                            </div>
+                        )}
+
+                        {!selectedService &&
+                            serviceSearchOpen &&
+                            serviceQuery.trim().length >= 2 && (
+                                <div className="serviceSuggestionPanel">
+                                    <div className="serviceSuggestionTitle">
+                                        {serviceSearching
+                                            ? "Ищем подходящую услугу…"
+                                            : serviceSuggestions.length > 0
+                                                ? "Возможно, вы имели в виду"
+                                                : "Подходящая услуга не найдена"}
+                                    </div>
+
+                                    {!serviceSearching &&
+                                        serviceSuggestions.length > 0 && (
+                                            <div className="serviceSuggestionList">
+                                                {serviceSuggestions.map((option) => {
+                                                    const resultKey = option.subcategoryId
+                                                        ? `subcategory-${option.subcategoryId}`
+                                                        : `category-${option.categoryId}`;
+
+                                                    return (
+                                                        <button
+                                                            key={resultKey}
+                                                            type="button"
+                                                            className="serviceSuggestionItem"
+                                                            onMouseDown={(event) => {
+                                                                /*
+                                                                 * Не даём input потерять фокус раньше,
+                                                                 * чем отработает выбор результата.
+                                                                 */
+                                                                event.preventDefault();
+                                                            }}
+                                                            onClick={() =>
+                                                                handleServiceSelect(option)
+                                                            }
+                                                        >
+                                            <span className="serviceSuggestionMain">
+                                                <span className="serviceSuggestionName">
+                                                    {option.subcategoryName ||
+                                                        option.categoryName}
+                                                </span>
+
+                                                <span className="serviceSuggestionCategory">
+                                                    {option.subcategoryName
+                                                        ? option.categoryName
+                                                        : "Общая категория"}
+                                                </span>
+                                            </span>
+
+                                                            <span
+                                                                className={`serviceSuggestionType ${
+                                                                    option.subcategoryId
+                                                                        ? "subcategory"
+                                                                        : "category"
+                                                                }`}
+                                                            >
+                                                {option.subcategoryId
+                                                    ? "Услуга"
+                                                    : "Категория"}
+                                            </span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                    {!serviceSearching &&
+                                        serviceSuggestions.length === 0 && (
+                                            <div className="serviceSuggestionEmpty">
+                                                Попробуйте написать другими словами, например:
+                                                «нужен грузчик» или «починить розетку».
+                                            </div>
+                                        )}
+                                </div>
+                            )}
+
+                        {!selectedService && !serviceSearchOpen && (
+                            <div className="hint">
+                                Выберите один из предложенных вариантов. Подкатегории
+                                показываются в первую очередь.
+                            </div>
+                        )}
+                    </div>
                 </div>
+
+                {selectedService?.formConfig?.fields?.length > 0 && (
+                    <div className="glass section-card">
+                        <div className="section-head">
+                            <div>
+                                <div className="section-title">
+                                    Детали заказа
+                                </div>
+
+                                <div className="section-sub">
+                                    Уточните параметры, чтобы исполнители
+                                    точнее оценили работу
+                                </div>
+                            </div>
+                        </div>
+
+                        <DynamicServiceFields
+                            config={selectedService.formConfig}
+                            value={serviceDetails}
+                            onChange={setServiceDetails}
+                            yandexApiKey={YM_KEY}
+                        />
+
+                        {Number.isFinite(
+                            Number(
+                                serviceDetails
+                                    ?.estimatedRoadDistanceKm
+                            )
+                        ) && (
+                            <div className="distanceEstimateCard">
+                                <div>
+                                    <div className="distanceEstimateLabel">
+                                        Ориентировочное расстояние
+                                    </div>
+
+                                    <div className="distanceEstimateHint">
+                                        Рассчитано приблизительно между
+                                        выбранными точками с учётом
+                                        коэффициента дорожного маршрута.
+                                    </div>
+                                </div>
+
+                                <div className="distanceEstimateValue">
+                                    ≈{" "}
+                                    {Number(
+                                        serviceDetails
+                                            .estimatedRoadDistanceKm
+                                    ).toFixed(1)}{" "}
+                                    км
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Description */}
                 <div className="glass section-card">
@@ -933,8 +1678,80 @@ function CreateOrderPage() {
                         </div>
                     </div>
 
-                    {/* сумма перенесена сюда */}
                     <div className="glass field">
+
+                        {recommendedPrice && (
+                            <div className="recommendedPriceCard">
+                                <div className="recommendedPriceContent">
+                                    <div className="recommendedPriceTitle">
+                                        Рекомендуемый бюджет
+                                    </div>
+
+                                    <div className="recommendedPriceRange">
+                                        {recommendedPrice.minPrice
+                                            .toLocaleString("ru-RU")}{" "}
+                                        –{" "}
+                                        {recommendedPrice.maxPrice
+                                            .toLocaleString("ru-RU")}{" "}
+                                        ₽
+                                    </div>
+
+                                    {Array.isArray(
+                                            recommendedPrice.breakdown
+                                        ) &&
+                                        recommendedPrice.breakdown.length > 0 && (
+                                            <div className="recommendedPriceBreakdown">
+                                                {recommendedPrice.breakdown.map(
+                                                    (item) => (
+                                                        <div
+                                                            key={item.key}
+                                                            className="recommendedPriceBreakdownRow"
+                                                        >
+                        <span>
+                            {item.label}
+                        </span>
+
+                                                            <strong>
+                                                                {Math.round(
+                                                                    Number(item.amount)
+                                                                ).toLocaleString(
+                                                                    "ru-RU"
+                                                                )}{" "}
+                                                                ₽
+                                                            </strong>
+                                                        </div>
+                                                    )
+                                                )}
+                                            </div>
+                                        )}
+
+                                    <div className="recommendedPriceHint">
+                                        Ориентировочная сумма рассчитана
+                                        по указанным параметрам. Итоговая
+                                        стоимость согласовывается с
+                                        исполнителем.
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    className="recommendedPriceApply"
+                                    onClick={() => {
+                                        setFormData((previous) => ({
+                                            ...previous,
+                                            proposedSum:
+                                                String(
+                                                    recommendedPrice
+                                                        .recommendedPrice
+                                                ),
+                                        }));
+                                    }}
+                                >
+                                    Указать эту сумму
+                                </button>
+                            </div>
+                        )}
+
                         <div className="label">Сумма за работу</div>
 
                         <input

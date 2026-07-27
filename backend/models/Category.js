@@ -22,6 +22,10 @@ module.exports = (sequelize, DataTypes) => {
             as: 'subcategory',
             onDelete: 'CASCADE'
         });
+        Category.hasMany(models.ServiceSearchAlias, {
+            foreignKey: "categoryId",
+            as: "searchAliases",
+        });
     };
 
     return Category;

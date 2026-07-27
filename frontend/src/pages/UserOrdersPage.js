@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {Link, useNavigate, useParams} from 'react-router-dom';
 import axiosInstance from '../utils/axiosInstance';
+import OrderServiceDetails from "../components/OrderServiceDetails";
 import '../styles/OrdersPage.css';
 import { socket } from "../socketClient";
 import Modal from 'react-modal';
@@ -20,27 +21,91 @@ const UserOrdersPage = () => {
     const [currentImages, setCurrentImages] = useState([]);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [user, setUser] = useState(null);
+    const [
+        pageUser,
+        setPageUser,
+    ] = useState(null);
+    const [loading, setLoading] =
+        useState(true);
 
     useEffect(() => {
         const fetchUserOrders = async () => {
             try {
-                const response = await axiosInstance.get(`/orders/creator/${paramUserId}`);
-                setOrders(response.data);
-                const creatorIds = [...new Set(response.data.map(order => order.creatorId))]; // Уникальные ID создателей
+                setLoading(true);
+                setError(null);
+
+                const response =
+                    await axiosInstance.get(
+                        `/orders/creator/${paramUserId}`
+                    );
+
+                const loadedOrders =
+                    Array.isArray(response.data)
+                        ? response.data
+                        : [];
+
+                setOrders(loadedOrders);
+
+                const creatorIds = [
+                    ...new Set(
+                        loadedOrders
+                            .map(
+                                (order) =>
+                                    order.creatorId
+                            )
+                            .filter(Boolean)
+                    ),
+                ];
+
+                const creatorResults =
+                    await Promise.allSettled(
+                        creatorIds.map(
+                            async (creatorId) => {
+                                const result =
+                                    await axiosInstance.get(
+                                        `/auth/${creatorId}`
+                                    );
+
+                                return {
+                                    creatorId,
+                                    data:
+                                        result.data || {},
+                                };
+                            }
+                        )
+                    );
+
                 const creatorsData = {};
 
-                for (const id of creatorIds) {
-                    try {
-                        const res = await axiosInstance.get(`/auth/${id}`);
-                        creatorsData[id] = res.data; // Сохраняем данные
-                    } catch (err) {
-                        console.error(`Ошибка загрузки данных пользователя ${id}`, err);
+                creatorResults.forEach(
+                    (result) => {
+                        if (
+                            result.status ===
+                            "fulfilled"
+                        ) {
+                            creatorsData[
+                                result.value.creatorId
+                                ] =
+                                result.value.data;
+                        }
                     }
-                }
+                );
 
                 setCreatorsInfo(creatorsData);
             } catch (err) {
-                setError(err.response?.data?.message || 'Ошибка загрузки заказов');
+                console.error(
+                    "Ошибка загрузки заказов пользователя:",
+                    err
+                );
+
+                setOrders([]);
+
+                setError(
+                    err.response?.data?.message ||
+                    "Ошибка загрузки заказов"
+                );
+            } finally {
+                setLoading(false);
             }
         };
 
@@ -54,8 +119,29 @@ const UserOrdersPage = () => {
             }
         };
 
+        const fetchPageUser = async () => {
+            try {
+                const response =
+                    await axiosInstance.get(
+                        `/auth/${paramUserId}`
+                    );
+
+                setPageUser(
+                    response.data || null
+                );
+            } catch (error) {
+                console.error(
+                    "Ошибка получения пользователя страницы:",
+                    error
+                );
+
+                setPageUser(null);
+            }
+        };
+
         fetchUserOrders();
         fetchUserData();
+        fetchPageUser();
 
         if (userId) {
 
@@ -71,23 +157,61 @@ const UserOrdersPage = () => {
         }
     }, [userId, paramUserId]);
 
-    const handleRequestOrder = async (orderId) => {
-        const token = localStorage.getItem('authToken');
+    const handleRequestOrder = async (
+        orderId
+    ) => {
+        const token =
+            localStorage.getItem(
+                "authToken"
+            );
+
         if (!token) {
-            alert('Вы не авторизованы! Пожалуйста, войдите в систему.');
-            navigate('/login');
+            alert(
+                "Вы не авторизованы! Пожалуйста, войдите в систему."
+            );
+
+            navigate("/login");
+            return;
         }
+
         try {
-            await axiosInstance.post(`/orders/${orderId}/request`);
-            alert("Запрос отправлен заказчику!");
+            await axiosInstance.post(
+                `/orders/${orderId}/request`
+            );
+
+            alert(
+                "Запрос отправлен заказчику!"
+            );
         } catch (error) {
-            console.error("Ошибка при запросе на выполнение заказа:", error);
+            console.error(
+                "Ошибка при запросе на выполнение заказа:",
+                error
+            );
+
+            alert(
+                error.response?.data?.message ||
+                "Не удалось отправить запрос"
+            );
         }
     };
 
     const openModal = (images) => {
-        setCurrentImages(images);
-        setCurrentImageIndex(0);  // Начать с первого изображения
+        const normalizedImages =
+            Array.isArray(images)
+                ? images.filter(Boolean)
+                : [];
+
+        if (
+            normalizedImages.length === 0
+        ) {
+            return;
+        }
+
+        setCurrentImages(
+            normalizedImages
+        );
+
+        setCurrentImageIndex(0);
         setIsModalOpen(true);
     };
 
@@ -105,12 +229,20 @@ const UserOrdersPage = () => {
         setCurrentImageIndex((prevIndex) => (prevIndex - 1 + currentImages.length) % currentImages.length);  // Переход к предыдущему изображению
     };
 
-    if (error) {
-        return <div className="error-message">Ошибка: {error}</div>;
+    if (loading) {
+        return (
+            <div className="loading-message">
+                Загрузка...
+            </div>
+        );
     }
 
-    if (!orders.length) {
-        return <div className="loading-message">Загрузка...</div>;
+    if (error) {
+        return (
+            <div className="error-message">
+                Ошибка: {error}
+            </div>
+        );
     }
 
     // Функция для получения иконки по способу оплаты
@@ -134,9 +266,11 @@ const UserOrdersPage = () => {
 
                 <div className="all-orders-page">
 
-                    {user && (
+                    {pageUser && (
                         <h1 className="text-2xl font-bold mb-4">
-                            Заказы, размещенные пользователем {user.username} (ID: {user.id})
+                            Заказы пользователя{" "}
+                            {pageUser.username || "Без имени"}{" "}
+                            (ID: {paramUserId})
                         </h1>
                     )}
                     {orders.length > 0 ? (
@@ -159,15 +293,28 @@ const UserOrdersPage = () => {
                                         <div className="order-content">
                                             <div className="order-header">
                                                 <div className="order-info">
-                                                    <p className="order-title">
-                                                        <strong>Заказ
-                                                            №{order.id}</strong> от {creator.username || "Неизвестно"}.
-                                                        Создан {new Date(order.createdAt).toLocaleString()}.
+                                                    <div className="order-title">
+    <span>
+        <strong>
+            Заказ №{order.id}
+        </strong>{" "}
+        от{" "}
+        {creator.username ||
+            "Неизвестно"}.
+        Создан{" "}
+        {new Date(
+            order.createdAt
+        ).toLocaleString()}.
+    </span>
+
                                                         <div className="order-payment-icon-container">
-                                                <span
-                                                    className="payment-icon">{getPaymentIcon(order.paymentType)}</span>
+        <span className="payment-icon">
+            {getPaymentIcon(
+                order.paymentType
+            )}
+        </span>
                                                         </div>
-                                                    </p>
+                                                    </div>
 
                                                     <p><strong>ID
                                                         заказчика:</strong> {order.creatorId || "Неизвестно"}
@@ -233,12 +380,19 @@ const UserOrdersPage = () => {
                                                 </p>
                                             )}
 
+                                            <OrderServiceDetails
+                                                order={order}
+                                                compact
+                                            />
 
                                         </div>
 
 
-                                        {userId !== order.creatorId && !order.executorId && order.status === 'pending' && (
-                                            <button className="take-order-button"
+                                        {Number(userId) !==
+                                            Number(order.creatorId) &&
+                                            !order.executorId &&
+                                            order.status === "pending" && (
+                                                <button className="take-order-button"
                                                     onClick={() => handleRequestOrder(order.id)}>Запросить
                                                 выполнение</button>
                                         )}
@@ -265,11 +419,31 @@ const UserOrdersPage = () => {
                         <button onClick={closeModal} className="custom-close-button">✖</button>
 
                         {/* Изображение */}
-                        <img
-                            src={`${apiUrl}${currentImages[currentImageIndex]}`}
-                            alt="Full-size view"
-                            className="custom-modal-image"
-                        />
+                        {currentImages.length > 0 && (
+                            <img
+                                src={`${apiUrl}${currentImages[currentImageIndex]}`}
+                                alt="Full-size view"
+                                className="custom-modal-image"
+                            />
+                        )}
+
+                        {currentImages.length > 1 && (
+                            <div className="custom-image-navigation">
+                                <button
+                                    onClick={prevImage}
+                                    className="custom-nav-button"
+                                >
+                                    ◀
+                                </button>
+
+                                <button
+                                    onClick={nextImage}
+                                    className="custom-nav-button"
+                                >
+                                    ▶
+                                </button>
+                            </div>
+                        )}
 
                         {/* Кнопки переключения */}
                         <div className="custom-image-navigation">

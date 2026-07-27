@@ -240,6 +240,11 @@ module.exports = (sequelize) => {
                 allowNull: true,
                 defaultValue: null,
             },
+            serviceDetails: {
+                type: DataTypes.JSON,
+                allowNull: true,
+                defaultValue: null,
+            },
         },
         {
             sequelize,

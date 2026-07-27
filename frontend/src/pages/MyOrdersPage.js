@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import axiosInstance from "../utils/axiosInstance";
 import { socket } from "../socketClient";
+import OrderServiceDetails from "../components/OrderServiceDetails";
 import styles from "../styles/MyOrdersPage.module.css";
 import { AuthContext } from "../utils/authContext";
 import Modal from "react-modal";
@@ -755,6 +756,12 @@ const MyOrdersPage = () => {
                                                     {description}
                                                 </p>
                                             </div>
+                                        )}
+
+                                        {!isExpress && (
+                                            <OrderServiceDetails
+                                                order={order}
+                                            />
                                         )}
 
                                         {/* Pending payment actions */}

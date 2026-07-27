@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useMemo, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import OrderServiceDetails from "../components/OrderServiceDetails";
 import "../styles/ActiveOrdersPage.css";
 import { useAuth } from "../utils/authContext";
 import { socket, connectSocket } from "../socketClient";
@@ -1235,6 +1236,10 @@ const ActiveOrdersPage = () => {
                                                                 <strong>Описание:</strong> {order.description.trim()}
                                                             </p>
                                                         )}
+
+                                                        <OrderServiceDetails
+                                                            order={order}
+                                                        />
 
                                                         {order.contractPath && (
                                                             <div className="contract-download-row">

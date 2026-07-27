@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { useParams } from "react-router-dom";
 import axiosInstance from "../utils/axiosInstance";
+import OrderServiceDetails from "../components/OrderServiceDetails";
 import "../styles/OrderHistotyPage.css";
 
 import { FiFileText, FiStar, FiCheckCircle } from "react-icons/fi";
@@ -147,7 +148,10 @@ const OrderHistoryPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userId]);
 
-    const sortedOrders = useMemo(() => [...orders].reverse(), [orders]);
+    const sortedOrders = useMemo(
+        () => orders,
+        [orders]
+    );
 
     if (loading) return <div className="oh-state">Загрузка истории заказов…</div>;
     if (error) return <div className="oh-state oh-state--error">Ошибка: {error}</div>;
@@ -200,10 +204,20 @@ const OrderHistoryPage = () => {
 
                                     <div className="oh-grid">
                                         <div className="oh-kv">
-                                            <span className="oh-k">Тип</span>
-                                            <span className="oh-v">{order.type || "—"}</span>
-                                        </div>
+    <span className="oh-k">
+        Категория / услуга
+    </span>
 
+                                            <span className="oh-v">
+        {[
+            order.category?.name,
+            order.subcategory?.name,
+            order.service?.name,
+        ]
+            .filter(Boolean)
+            .join(" • ") || "—"}
+    </span>
+                                        </div>
                                         <div className="oh-kv">
                                             <span className="oh-k">Адрес</span>
                                             <span className="oh-v">{order.address || "—"}</span>
@@ -247,6 +261,10 @@ const OrderHistoryPage = () => {
                                             <span className="oh-v">{order.executorId || "—"}</span>
                                         </div>
                                     </div>
+
+                                    <OrderServiceDetails
+                                        order={order}
+                                    />
 
                                     <div className="oh-actions">
                                         {order.contractPath && (

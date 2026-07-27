@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback, useContext } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Link, useNavigate } from "react-router-dom";
+import OrderServiceDetails from "../components/OrderServiceDetails";
+import { getOrderServiceDetails } from "../utils/orderServiceDetails";
 import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrentLocation";
 import { ModalContext } from "../components/modalContext";
 import axios from "axios";
@@ -1091,8 +1093,28 @@ const OrdersPage = () => {
     }, [submitRegularOrderRequest]);
 
     const openRequestModal = (order) => {
+        const pricing =
+            getOrderServiceDetails(order);
+
+        const suggestedSum =
+            pricing.recommendedPrice ??
+            Number(order?.proposedSum);
+
         setRequestOrder(order);
-        setRequestSum("");
+
+        setRequestSum(
+            Number.isFinite(
+                Number(suggestedSum)
+            ) &&
+            Number(suggestedSum) > 0
+                ? String(
+                    Math.round(
+                        Number(suggestedSum)
+                    )
+                )
+                : ""
+        );
+
         setRequestComment("");
         setRequestModalOpen(true);
     };
@@ -1490,6 +1512,13 @@ const OrdersPage = () => {
                                                 <span className="k">Описание</span>
                                                 <div className="v">{description}</div>
                                             </div>
+                                        )}
+
+                                        {!isExpress && (
+                                            <OrderServiceDetails
+                                                order={order}
+                                                compact
+                                            />
                                         )}
 
                                         <div className="order-actions">

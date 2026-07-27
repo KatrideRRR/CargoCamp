@@ -35,6 +35,8 @@ db.SupportMessage = require("./SupportMessage")(sequelize, DataTypes);
 db.ExpressOrder = require("./ExpressOrder")(sequelize, DataTypes);
 db.ExpressSavedAddress = require("./ExpressSavedAddress")(sequelize, DataTypes);
 
+db.ServiceSearchAlias = require("./ServiceSearchAlias")(sequelize, DataTypes);
+
 // ✅ Ассоциации
 Object.values(db).forEach((model) => {
     if (model && typeof model.associate === "function") {
