@@ -64,7 +64,7 @@ body {
 
 .orders-table {
     width: 100%;
-    min-width: 760px;
+    min-width: 1180px;
     border-collapse: separate;
     border-spacing: 0;
     background: #ffffff;
@@ -245,7 +245,7 @@ body {
     }
 
     .orders-table {
-        min-width: 720px;
+        min-width: 1180px;
     }
 
     .orders-table th,
@@ -352,4 +352,189 @@ body {
 .admin-order-visibility-badge.admin-deleted {
     background: #fef2f2;
     color: #b91c1c;
+}
+
+/* =========================================================
+   SERVICE DETAILS IN ADMIN ORDERS TABLE
+========================================================= */
+
+.admin-order-service-cell {
+    min-width: 210px;
+}
+
+.admin-order-service-name {
+    color: #111827;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.admin-order-service-path {
+    margin-top: 4px;
+
+    color: #6b7280;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.admin-order-details-cell {
+    min-width: 260px;
+    max-width: 360px;
+}
+
+.admin-order-no-details {
+    display: inline-flex;
+    align-items: center;
+
+    min-height: 28px;
+    padding: 5px 9px;
+
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #f9fafb;
+
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Компактный OrderServiceDetails в таблице */
+
+.admin-order-details-cell
+.order-service-details {
+    display: block;
+}
+
+.admin-order-details-cell
+.order-service-details__section {
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.admin-order-details-cell
+.order-service-details__title {
+    display: none;
+}
+
+.admin-order-details-cell
+.order-service-details__grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.admin-order-details-cell
+.order-service-details__item {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+
+    width: auto;
+    min-width: 0;
+    padding: 5px 8px;
+
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #f9fafb;
+}
+
+.admin-order-details-cell
+.order-service-details__item:nth-child(n + 4) {
+    display: none;
+}
+
+.admin-order-details-cell
+.order-service-details__label {
+    color: #6b7280;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.admin-order-details-cell
+.order-service-details__label::after {
+    content: ":";
+}
+
+.admin-order-details-cell
+.order-service-details__value {
+    color: #111827;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.admin-order-details-cell
+.order-service-details__route,
+.admin-order-details-cell
+.order-service-details__price {
+    margin-top: 7px;
+}
+
+.admin-order-details-cell
+.order-service-details__route {
+    display: block;
+}
+
+.admin-order-details-cell
+.order-service-details__route-point {
+    padding: 6px 8px;
+    border-radius: 10px;
+}
+
+.admin-order-details-cell
+.order-service-details__route-point:nth-child(n + 2),
+.admin-order-details-cell
+.order-service-details__route-arrow {
+    display: none;
+}
+
+.admin-order-details-cell
+.order-service-details__route-label {
+    display: none;
+}
+
+.admin-order-details-cell
+.order-service-details__route-address {
+    display: -webkit-box;
+    overflow: hidden;
+
+    color: #334155;
+    font-size: 11px;
+    font-weight: 600;
+
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+}
+
+.admin-order-details-cell
+.order-service-details__price {
+    padding: 7px 9px;
+    border-radius: 11px;
+}
+
+.admin-order-details-cell
+.order-service-details__price-main {
+    display: flex;
+    gap: 6px;
+}
+
+.admin-order-details-cell
+.order-service-details__price-label {
+    font-size: 11px;
+}
+
+.admin-order-details-cell
+.order-service-details__price-value {
+    font-size: 12px;
+}
+
+.admin-order-details-cell
+.order-service-details__price-range,
+.admin-order-details-cell
+.order-service-details__breakdown {
+    display: none;
 }

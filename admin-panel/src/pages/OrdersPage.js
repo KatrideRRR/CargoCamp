@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "../styles/UserOrdersPage.css";
+import OrderServiceDetails from "../components/OrderServiceDetails";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -207,6 +208,8 @@ function OrdersPage() {
                             <thead>
                             <tr>
                                 <th>ID заказа</th>
+                                <th>Услуга</th>
+                                <th>Параметры</th>
                                 <th>Дата создания</th>
                                 <th>Статус заказа</th>
                                 <th>Видимость</th>
@@ -219,6 +222,35 @@ function OrdersPage() {
                             {filteredRegularOrders.map((order) => (
                                 <tr key={order.id}>
                                     <td>{order.id}</td>
+                                    <td className="admin-order-service-cell">
+                                        <div className="admin-order-service-name">
+                                            {order.service?.name ||
+                                                order.subcategory?.name ||
+                                                "Не указано"}
+                                        </div>
+
+                                        <div className="admin-order-service-path">
+                                            {[
+                                                order.category?.name,
+                                                order.subcategory?.name,
+                                            ]
+                                                .filter(Boolean)
+                                                .join(" • ")}
+                                        </div>
+                                    </td>
+
+                                    <td className="admin-order-details-cell">
+                                        {order.serviceDetails ? (
+                                            <OrderServiceDetails
+                                                order={order}
+                                                compact
+                                            />
+                                        ) : (
+                                            <span className="admin-order-no-details">
+            Нет параметров
+        </span>
+                                        )}
+                                    </td>
                                     <td>{new Date(order.createdAt).toLocaleDateString()}</td>
                                     <td>
         <span className={getStatusClass(order.status)}>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import "../styles/OrderDetailsPage.css";
+import OrderServiceDetails from "../components/OrderServiceDetails";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -468,6 +469,16 @@ function OrderDetailsPage() {
                     </div>
 
                     <div className="info-item">
+    <span className="info-label">
+        Услуга
+    </span>
+
+                        <span className="info-value">
+        {order.service?.name || "Не указано"}
+    </span>
+                    </div>
+
+                    <div className="info-item">
                         <span className="info-label">Цена</span>
                         <span className="info-value">{order.proposedSum ?? "—"}</span>
                     </div>
@@ -482,6 +493,36 @@ function OrderDetailsPage() {
                         <span className="info-value">{order.dealStatus || "—"}</span>
                     </div>
 
+                    <div className="info-item">
+    <span className="info-label">
+        Режим выполнения
+    </span>
+
+                        <span className="info-value">
+        {order.isAsap === true
+            ? "Как можно скорее"
+            : order.workTime
+                ? "К указанному времени"
+                : "Не указан"}
+    </span>
+                    </div>
+
+                    <div className="info-item">
+    <span className="info-label">
+        Время выполнения
+    </span>
+
+                        <span className="info-value">
+        {order.isAsap === true
+            ? "Как можно скорее"
+            : order.workTime
+                ? new Date(
+                    order.workTime
+                ).toLocaleString("ru-RU")
+                : "—"}
+    </span>
+                    </div>
+
                     <div className="info-item info-item-full">
                         <span className="info-label">Описание</span>
                         <span className="info-value">{order.description || "—"}</span>
@@ -489,6 +530,37 @@ function OrderDetailsPage() {
                 </div>
             </div>
 
+            <div className="order-card">
+                <div className="order-service-card-head">
+                    <div>
+                        <h3>Параметры услуги</h3>
+
+                        <p className="order-service-card-subtitle">
+                            Данные динамической формы,
+                            выбранные заказчиком при создании заказа.
+                        </p>
+                    </div>
+
+                    {order.subcategory?.code && (
+                        <span className="order-service-code">
+                {order.subcategory.code}
+            </span>
+                    )}
+                </div>
+
+                <OrderServiceDetails
+                    order={order}
+                />
+
+                {!order.serviceDetails && (
+                    <div className="order-service-empty">
+                        У этого заказа нет сохранённых дополнительных
+                        параметров. Вероятно, заказ был создан до
+                        добавления динамической формы.
+                    </div>
+                )}
+            </div>
+            
             <div className="order-card">
                 <h3>Споры по заказу</h3>
 

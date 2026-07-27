@@ -618,3 +618,254 @@ body {
         min-height: 40px;
     }
 }
+
+/* =========================================================
+   ORDER SERVICE DETAILS
+========================================================= */
+
+.order-service-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.order-service-card-head h3 {
+    margin-bottom: 4px;
+}
+
+.order-service-card-subtitle {
+    margin: 0;
+    color: #6b7280;
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.order-service-code {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 30px;
+    padding: 6px 10px;
+
+    border-radius: 999px;
+    border: 1px solid #bfdbfe;
+    background: #eff6ff;
+
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.order-service-empty {
+    padding: 14px 16px;
+
+    border: 1px dashed #d1d5db;
+    border-radius: 14px;
+    background: #f9fafb;
+
+    color: #6b7280;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Корневой блок OrderServiceDetails */
+
+.order-service-details {
+    display: grid;
+    gap: 16px;
+}
+
+.order-service-details__section {
+    padding: 16px;
+
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    background: #f9fafb;
+}
+
+.order-service-details__title {
+    margin: 0 0 12px;
+
+    color: #111827;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.order-service-details__grid {
+    display: grid;
+    grid-template-columns:
+        repeat(2, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.order-service-details__item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+
+    min-width: 0;
+    padding: 12px;
+
+    border: 1px solid #edf0f2;
+    border-radius: 13px;
+    background: #ffffff;
+}
+
+.order-service-details__item--full {
+    grid-column: 1 / -1;
+}
+
+.order-service-details__label {
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.035em;
+}
+
+.order-service-details__value {
+    color: #111827;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.order-service-details__route {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 12px;
+    align-items: center;
+}
+
+.order-service-details__route-point {
+    min-width: 0;
+    padding: 13px;
+
+    border: 1px solid #dbeafe;
+    border-radius: 14px;
+    background: #eff6ff;
+}
+
+.order-service-details__route-label {
+    display: block;
+    margin-bottom: 5px;
+
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.order-service-details__route-address {
+    color: #111827;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.order-service-details__route-arrow {
+    color: #6b7280;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.order-service-details__price {
+    padding: 16px;
+
+    border: 1px solid #bfdbfe;
+    border-radius: 16px;
+    background: #eff6ff;
+}
+
+.order-service-details__price-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.order-service-details__price-label {
+    color: #475569;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.order-service-details__price-value {
+    color: #1d4ed8;
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.order-service-details__price-range {
+    margin-top: 5px;
+
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.order-service-details__breakdown {
+    display: grid;
+    gap: 8px;
+
+    margin-top: 14px;
+    padding-top: 14px;
+
+    border-top: 1px solid #bfdbfe;
+}
+
+.order-service-details__breakdown-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+
+    color: #334155;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.order-service-details__breakdown-label {
+    min-width: 0;
+}
+
+.order-service-details__breakdown-amount {
+    flex: 0 0 auto;
+    color: #111827;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .order-service-details__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .order-service-details__item--full {
+        grid-column: auto;
+    }
+
+    .order-service-details__route {
+        grid-template-columns: 1fr;
+    }
+
+    .order-service-details__route-arrow {
+        display: none;
+    }
+
+    .order-service-details__price-main {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .order-service-details__breakdown-row {
+        gap: 10px;
+    }
+}

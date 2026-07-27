@@ -440,3 +440,416 @@ body {
     color: #6b7280;
     line-height: 1.4;
 }
+
+/* =========================================================
+   ADMIN DYNAMIC SERVICE SEARCH
+========================================================= */
+
+.admin-service-search {
+    position: relative;
+}
+
+.admin-service-control-wrap {
+    position: relative;
+}
+
+.admin-service-control {
+    padding-right: 48px;
+}
+
+.admin-service-control.selected {
+    border-color: #86efac;
+    background: #f0fdf4;
+}
+
+.admin-service-clear {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+
+    transform: translateY(-50%);
+
+    width: 30px;
+    height: 30px;
+
+    border: none;
+    border-radius: 999px;
+
+    background: #f3f4f6;
+    color: #4b5563;
+
+    font-size: 20px;
+    line-height: 1;
+
+    cursor: pointer;
+}
+
+.admin-service-clear:hover {
+    background: #e5e7eb;
+}
+
+.admin-service-spinner {
+    position: absolute;
+    top: 50%;
+    right: 14px;
+
+    width: 18px;
+    height: 18px;
+
+    margin-top: -9px;
+
+    border: 2px solid #dbeafe;
+    border-top-color: #2563eb;
+    border-radius: 999px;
+
+    animation:
+            admin-service-spin 0.7s
+            linear infinite;
+}
+
+@keyframes admin-service-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.admin-selected-service {
+    margin-top: 10px;
+    padding: 12px;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+
+    border: 1px solid #bbf7d0;
+    border-radius: 14px;
+
+    background: #f0fdf4;
+}
+
+.admin-selected-service-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.admin-selected-service-check {
+    flex: 0 0 auto;
+
+    width: 32px;
+    height: 32px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 999px;
+
+    background: #16a34a;
+    color: #ffffff;
+
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.admin-selected-service-name {
+    color: #111827;
+
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.admin-selected-service-category {
+    margin-top: 3px;
+
+    color: #6b7280;
+
+    font-size: 12px;
+}
+
+.admin-service-results {
+    position: absolute;
+    z-index: 50;
+
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+
+    padding: 8px;
+
+    background: #ffffff;
+
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+
+    box-shadow:
+            0 18px 40px
+            rgba(15, 23, 42, 0.14);
+}
+
+.admin-service-results-title {
+    padding: 7px 9px 9px;
+
+    color: #6b7280;
+
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.admin-service-result-list {
+    display: grid;
+    gap: 6px;
+
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.admin-service-result {
+    width: 100%;
+
+    padding: 11px 12px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    border: none;
+    border-radius: 12px;
+
+    background: transparent;
+
+    color: #111827;
+
+    text-align: left;
+    cursor: pointer;
+}
+
+.admin-service-result:hover {
+    background: #f3f4f6;
+}
+
+.admin-service-result > span:first-child {
+    display: grid;
+    gap: 3px;
+}
+
+.admin-service-result strong {
+    font-size: 14px;
+}
+
+.admin-service-result small {
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.admin-service-result-type {
+    flex: 0 0 auto;
+
+    padding: 5px 8px;
+
+    border-radius: 999px;
+
+    background: #eff6ff;
+    color: #1d4ed8;
+
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.admin-service-empty {
+    padding: 14px;
+
+    color: #6b7280;
+
+    font-size: 13px;
+    line-height: 1.45;
+    text-align: center;
+}
+
+/* =========================================================
+   DYNAMIC SERVICE DETAILS
+========================================================= */
+
+.admin-create-page .dynamic-service-fields {
+    display: grid;
+    gap: 14px;
+}
+
+.admin-create-page .dynamic-service-field {
+    display: grid;
+    gap: 7px;
+}
+
+.admin-create-page .dynamic-service-label {
+    color: #374151;
+
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.admin-create-page .dynamic-service-control,
+.admin-create-page .dynamic-service-input,
+.admin-create-page .dynamic-service-select,
+.admin-create-page .dynamic-service-textarea {
+    width: 100%;
+
+    min-height: 46px;
+    padding: 0 14px;
+
+    border: 1px solid #d1d5db;
+    border-radius: 12px;
+
+    background: #ffffff;
+    color: #111827;
+
+    font: inherit;
+    font-size: 15px;
+
+    outline: none;
+}
+
+.admin-create-page .dynamic-service-textarea {
+    min-height: 100px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    resize: vertical;
+}
+
+.admin-create-page .dynamic-service-control:focus,
+.admin-create-page .dynamic-service-input:focus,
+.admin-create-page .dynamic-service-select:focus,
+.admin-create-page .dynamic-service-textarea:focus {
+    border-color: #2563eb;
+
+    box-shadow:
+            0 0 0 4px
+            rgba(37, 99, 235, 0.12);
+}
+
+.admin-distance-card {
+    margin-top: 14px;
+    padding: 13px 14px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+
+    border: 1px solid #bfdbfe;
+    border-radius: 14px;
+
+    background: #eff6ff;
+}
+
+.admin-distance-card > div {
+    display: grid;
+    gap: 4px;
+}
+
+.admin-distance-card strong {
+    color: #1e3a8a;
+    font-size: 14px;
+}
+
+.admin-distance-card span {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.admin-distance-card b {
+    flex: 0 0 auto;
+
+    color: #1d4ed8;
+
+    font-size: 18px;
+}
+
+/* =========================================================
+   RECOMMENDED PRICE
+========================================================= */
+
+.admin-recommended-price {
+    margin-bottom: 14px;
+    padding: 14px;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+
+    border: 1px solid #bfdbfe;
+    border-radius: 16px;
+
+    background:
+            linear-gradient(
+                    180deg,
+                    #f8fbff,
+                    #eff6ff
+            );
+}
+
+.admin-recommended-price-content {
+    flex: 1 1 auto;
+}
+
+.admin-recommended-price-title {
+    color: #1e3a8a;
+
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.admin-recommended-price-range {
+    margin-top: 4px;
+
+    color: #1d4ed8;
+
+    font-size: 22px;
+    font-weight: 800;
+}
+
+.admin-recommended-breakdown {
+    margin-top: 10px;
+
+    display: grid;
+    gap: 6px;
+}
+
+.admin-recommended-breakdown-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+
+    color: #475569;
+
+    font-size: 12px;
+}
+
+.admin-recommended-breakdown-row strong {
+    color: #111827;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .admin-selected-service,
+    .admin-recommended-price,
+    .admin-distance-card {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .admin-recommended-price .admin-mini-btn {
+        width: 100%;
+    }
+
+    .admin-service-results {
+        position: static;
+        margin-top: 8px;
+    }
+
+    .admin-distance-card b {
+        font-size: 16px;
+    }
+}

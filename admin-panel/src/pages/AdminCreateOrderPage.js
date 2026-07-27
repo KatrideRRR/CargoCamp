@@ -4,8 +4,86 @@ import { useNavigate, useParams } from "react-router-dom";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import "../styles/AdminCreateOrderPage.css";
+import DynamicServiceFields from "../components/DynamicServiceFields";
+import { calculateRecommendedPrice } from "../utils/calculateRecommendedPrice";
 
 const apiUrl = process.env.REACT_APP_API_URL;
+
+function isValidOrderCoords(position) {
+    if (!Array.isArray(position) || position.length !== 2) {
+        return false;
+    }
+
+    const lat = Number(position[0]);
+    const lng = Number(position[1]);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return false;
+    }
+
+    if (lat < -90 || lat > 90) {
+        return false;
+    }
+
+    if (lng < -180 || lng > 180) {
+        return false;
+    }
+
+    if (
+        Math.abs(lat) < 0.000001 &&
+        Math.abs(lng) < 0.000001
+    ) {
+        return false;
+    }
+
+    return true;
+}
+
+function calculateStraightDistanceKm(
+    startLat,
+    startLng,
+    endLat,
+    endLng
+) {
+    const lat1 = Number(startLat);
+    const lng1 = Number(startLng);
+    const lat2 = Number(endLat);
+    const lng2 = Number(endLng);
+
+    if (
+        !Number.isFinite(lat1) ||
+        !Number.isFinite(lng1) ||
+        !Number.isFinite(lat2) ||
+        !Number.isFinite(lng2)
+    ) {
+        return null;
+    }
+
+    const earthRadiusKm = 6371;
+
+    const toRadians = (degrees) =>
+        degrees * (Math.PI / 180);
+
+    const deltaLat = toRadians(lat2 - lat1);
+    const deltaLng = toRadians(lng2 - lng1);
+
+    const a =
+        Math.sin(deltaLat / 2) ** 2 +
+        Math.cos(toRadians(lat1)) *
+        Math.cos(toRadians(lat2)) *
+        Math.sin(deltaLng / 2) ** 2;
+
+    const c =
+        2 *
+        Math.atan2(
+            Math.sqrt(a),
+            Math.sqrt(1 - a)
+        );
+
+    return Math.round(
+        earthRadiusKm * c * 10
+    ) / 10;
+}
 
 function parseYandexGeocoderSuggestions(data) {
     const members = data?.response?.GeoObjectCollection?.featureMember || [];
@@ -110,10 +188,31 @@ function AdminCreateOrderPage() {
     });
 
     const [markerPosition, setMarkerPosition] = useState(null);
-    const [categories, setCategories] = useState([]);
-    const [subcategories, setSubcategories] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState("");
     const [selectedSubcategory, setSelectedSubcategory] = useState("");
+
+    const [selectedService, setSelectedService] =
+        useState(null);
+
+    const [serviceDetails, setServiceDetails] =
+        useState({});
+
+    const [serviceQuery, setServiceQuery] =
+        useState("");
+
+    const [serviceSuggestions, setServiceSuggestions] =
+        useState([]);
+
+    const [serviceSearchOpen, setServiceSearchOpen] =
+        useState(false);
+
+    const [serviceSearching, setServiceSearching] =
+        useState(false);
+
+    const serviceSearchTimerRef = useRef(null);
+    const serviceSearchAbortRef = useRef(null);
+    const serviceSearchBoxRef = useRef(null);
+
     const [addressSuggestions, setAddressSuggestions] = useState([]);
     const suggestTimerRef = useRef(null);
     const suggestAbortRef = useRef(null);
@@ -148,6 +247,516 @@ function AdminCreateOrderPage() {
             { label: "Еда/продукты", icon: "🍔" },
             { label: "Документы", icon: "📄" },
         ],
+    };
+
+    const recommendedRegularPrice = useMemo(() => {
+        return calculateRecommendedPrice({
+            pricingConfig:
+            selectedService?.pricingConfig,
+
+            serviceDetails,
+        });
+    }, [
+        selectedService?.pricingConfig,
+        serviceDetails,
+    ]);
+    useEffect(() => {
+        setServiceDetails((previous) => {
+            const current = previous || {};
+
+            if (!recommendedRegularPrice) {
+                if (
+                    current.recommendedPrice === undefined &&
+                    current.recommendedPriceMin === undefined &&
+                    current.recommendedPriceMax === undefined &&
+                    current.pricingCalculator === undefined
+                ) {
+                    return current;
+                }
+
+                const next = { ...current };
+
+                delete next.recommendedPrice;
+                delete next.recommendedPriceMin;
+                delete next.recommendedPriceMax;
+                delete next.pricingCalculator;
+
+                return next;
+            }
+
+            if (
+                current.recommendedPrice ===
+                recommendedRegularPrice.recommendedPrice &&
+                current.recommendedPriceMin ===
+                recommendedRegularPrice.minPrice &&
+                current.recommendedPriceMax ===
+                recommendedRegularPrice.maxPrice &&
+                current.pricingCalculator ===
+                recommendedRegularPrice.calculator
+            ) {
+                return current;
+            }
+
+            return {
+                ...current,
+
+                recommendedPrice:
+                recommendedRegularPrice.recommendedPrice,
+
+                recommendedPriceMin:
+                recommendedRegularPrice.minPrice,
+
+                recommendedPriceMax:
+                recommendedRegularPrice.maxPrice,
+
+                pricingCalculator:
+                recommendedRegularPrice.calculator,
+            };
+        });
+    }, [
+        recommendedRegularPrice?.recommendedPrice,
+        recommendedRegularPrice?.minPrice,
+        recommendedRegularPrice?.maxPrice,
+        recommendedRegularPrice?.calculator,
+    ]);
+
+    useEffect(() => {
+        const destination =
+            serviceDetails?.destinationCoordinates;
+
+        const hasStart =
+            isValidOrderCoords(markerPosition);
+
+        const destinationLat =
+            Number(destination?.lat);
+
+        const destinationLng =
+            Number(destination?.lng);
+
+        const hasDestination =
+            Number.isFinite(destinationLat) &&
+            Number.isFinite(destinationLng);
+
+        if (!hasStart || !hasDestination) {
+            setServiceDetails((previous) => {
+                if (
+                    previous?.straightDistanceKm === undefined &&
+                    previous?.estimatedRoadDistanceKm === undefined &&
+                    previous?.distanceKm === undefined &&
+                    previous?.distanceType === undefined
+                ) {
+                    return previous;
+                }
+
+                const next = {
+                    ...(previous || {}),
+                };
+
+                delete next.straightDistanceKm;
+                delete next.estimatedRoadDistanceKm;
+                delete next.distanceKm;
+                delete next.distanceType;
+                delete next.distanceCoefficient;
+
+                return next;
+            });
+
+            return;
+        }
+
+        const straightDistanceKm =
+            calculateStraightDistanceKm(
+                markerPosition[0],
+                markerPosition[1],
+                destinationLat,
+                destinationLng
+            );
+
+        if (straightDistanceKm === null) {
+            return;
+        }
+
+        const distanceCoefficient = 1.35;
+
+        const estimatedRoadDistanceKm =
+            Math.round(
+                straightDistanceKm *
+                distanceCoefficient *
+                10
+            ) / 10;
+
+        setServiceDetails((previous) => {
+            if (
+                previous?.straightDistanceKm ===
+                straightDistanceKm &&
+                previous?.estimatedRoadDistanceKm ===
+                estimatedRoadDistanceKm &&
+                previous?.distanceType ===
+                "estimated_from_coordinates"
+            ) {
+                return previous;
+            }
+
+            return {
+                ...(previous || {}),
+
+                straightDistanceKm,
+                estimatedRoadDistanceKm,
+
+                distanceKm:
+                estimatedRoadDistanceKm,
+
+                distanceCoefficient,
+
+                distanceType:
+                    "estimated_from_coordinates",
+            };
+        });
+    }, [
+        markerPosition?.[0],
+        markerPosition?.[1],
+        serviceDetails?.destinationCoordinates?.lat,
+        serviceDetails?.destinationCoordinates?.lng,
+    ]);
+
+    const clearSelectedService = () => {
+        setSelectedService(null);
+        setSelectedCategory("");
+        setSelectedSubcategory("");
+        setServiceDetails({});
+    };
+
+    const clearServiceSearchTimer = () => {
+        if (serviceSearchTimerRef.current) {
+            clearTimeout(
+                serviceSearchTimerRef.current
+            );
+
+            serviceSearchTimerRef.current = null;
+        }
+    };
+
+    const abortServiceSearch = () => {
+        if (serviceSearchAbortRef.current) {
+            serviceSearchAbortRef.current.abort();
+            serviceSearchAbortRef.current = null;
+        }
+    };
+
+    const handleServiceQueryChange = (event) => {
+        const value = event.target.value;
+
+        setServiceQuery(value);
+        setError("");
+
+        if (selectedService) {
+            clearSelectedService();
+        }
+
+        clearServiceSearchTimer();
+        abortServiceSearch();
+
+        const query = value.trim();
+
+        if (query.length < 2) {
+            setServiceSuggestions([]);
+            setServiceSearchOpen(false);
+            setServiceSearching(false);
+            return;
+        }
+
+        setServiceSearchOpen(true);
+        setServiceSearching(true);
+
+        serviceSearchTimerRef.current =
+            setTimeout(async () => {
+                const controller =
+                    new AbortController();
+
+                serviceSearchAbortRef.current =
+                    controller;
+
+                try {
+                    const response =
+                        await axios.get(
+                            `${apiUrl}/api/category/search`,
+                            {
+                                params: {
+                                    q: query,
+                                },
+
+                                signal:
+                                controller.signal,
+                            }
+                        );
+
+                    const results =
+                        Array.isArray(
+                            response.data?.results
+                        )
+                            ? response.data.results
+                            : [];
+
+                    const safeResults =
+                        results.filter((item) => {
+                            const categoryName =
+                                String(
+                                    item?.categoryName ||
+                                    ""
+                                )
+                                    .trim()
+                                    .toLowerCase();
+
+                            return ![
+                                "такси",
+                                "курьер",
+                            ].includes(categoryName);
+                        });
+
+                    setServiceSuggestions(
+                        safeResults
+                    );
+
+                    setServiceSearchOpen(true);
+                } catch (searchError) {
+                    if (
+                        searchError?.name ===
+                        "CanceledError" ||
+                        searchError?.name ===
+                        "AbortError" ||
+                        searchError?.code ===
+                        "ERR_CANCELED"
+                    ) {
+                        return;
+                    }
+
+                    console.error(
+                        "Ошибка поиска услуги:",
+                        searchError
+                    );
+
+                    setServiceSuggestions([]);
+                    setServiceSearchOpen(true);
+                } finally {
+                    if (
+                        serviceSearchAbortRef.current ===
+                        controller
+                    ) {
+                        serviceSearchAbortRef.current =
+                            null;
+
+                        setServiceSearching(false);
+                    }
+                }
+            }, 300);
+    };
+
+    const handleServiceSelect = (option) => {
+        const categoryId =
+            Number(option?.categoryId);
+
+        const subcategoryId =
+            option?.subcategoryId
+                ? Number(option.subcategoryId)
+                : null;
+
+        if (
+            !Number.isFinite(categoryId) ||
+            categoryId <= 0
+        ) {
+            return;
+        }
+
+        setServiceDetails({});
+
+        setSelectedCategory(
+            String(categoryId)
+        );
+
+        setSelectedSubcategory(
+            Number.isFinite(subcategoryId) &&
+            subcategoryId > 0
+                ? String(subcategoryId)
+                : ""
+        );
+
+        setSelectedService({
+            type: option.type,
+
+            categoryId,
+            categoryName:
+            option.categoryName,
+
+            subcategoryId:
+                Number.isFinite(
+                    subcategoryId
+                ) && subcategoryId > 0
+                    ? subcategoryId
+                    : null,
+
+            subcategoryName:
+                option.subcategoryName ||
+                null,
+
+            subcategoryCode:
+                option.subcategoryCode ||
+                null,
+
+            formConfig:
+                option.formConfig || null,
+
+            pricingConfig:
+                option.pricingConfig || null,
+
+            label: option.label,
+
+            matchedPhrase:
+                option.matchedPhrase || null,
+
+            price:
+                option.price ?? null,
+        });
+
+        setServiceQuery(
+            option.subcategoryName ||
+            option.categoryName ||
+            option.label ||
+            ""
+        );
+
+        setServiceSuggestions([]);
+        setServiceSearchOpen(false);
+        setServiceSearching(false);
+        setError("");
+    };
+
+    const handleServiceClear = () => {
+        clearServiceSearchTimer();
+        abortServiceSearch();
+
+        setServiceQuery("");
+        setServiceSuggestions([]);
+        setServiceSearchOpen(false);
+        setServiceSearching(false);
+
+        clearSelectedService();
+    };
+
+    useEffect(() => {
+        return () => {
+            clearServiceSearchTimer();
+            abortServiceSearch();
+        };
+    }, []);
+
+    useEffect(() => {
+        const handleOutsideClick = (event) => {
+            if (
+                serviceSearchBoxRef.current &&
+                !serviceSearchBoxRef.current
+                    .contains(event.target)
+            ) {
+                setServiceSearchOpen(false);
+            }
+        };
+
+        document.addEventListener(
+            "mousedown",
+            handleOutsideClick
+        );
+
+        return () => {
+            document.removeEventListener(
+                "mousedown",
+                handleOutsideClick
+            );
+        };
+    }, []);
+
+    const validateServiceDetails = () => {
+        const fields = Array.isArray(
+            selectedService?.formConfig?.fields
+        )
+            ? selectedService.formConfig.fields
+            : [];
+
+        for (const field of fields) {
+            const value =
+                serviceDetails?.[field.key];
+
+            if (field.required) {
+                const isEmpty =
+                    value === undefined ||
+                    value === null ||
+                    String(value).trim() === "";
+
+                if (isEmpty) {
+                    return `Заполните поле «${field.label}»`;
+                }
+            }
+
+            if (
+                field.type === "address" &&
+                value &&
+                field.required
+            ) {
+                const coordinatesKey =
+                    field.coordinatesKey ||
+                    `${field.key}Coordinates`;
+
+                const coordinates =
+                    serviceDetails?.[
+                        coordinatesKey
+                        ];
+
+                const lat =
+                    Number(coordinates?.lat);
+
+                const lng =
+                    Number(coordinates?.lng);
+
+                if (
+                    !Number.isFinite(lat) ||
+                    !Number.isFinite(lng)
+                ) {
+                    return `Выберите точный адрес в поле «${field.label}» из подсказки`;
+                }
+            }
+
+            if (
+                field.type === "number" &&
+                value !== "" &&
+                value !== undefined &&
+                value !== null
+            ) {
+                const numberValue =
+                    Number(value);
+
+                if (
+                    !Number.isFinite(numberValue)
+                ) {
+                    return `В поле «${field.label}» должно быть число`;
+                }
+
+                if (
+                    field.min !== undefined &&
+                    numberValue <
+                    Number(field.min)
+                ) {
+                    return `Минимальное значение поля «${field.label}» — ${field.min}`;
+                }
+
+                if (
+                    field.max !== undefined &&
+                    numberValue >
+                    Number(field.max)
+                ) {
+                    return `Максимальное значение поля «${field.label}» — ${field.max}`;
+                }
+            }
+        }
+
+        return null;
     };
 
     const coordsOk = useMemo(() => {
@@ -273,37 +882,6 @@ function AdminCreateOrderPage() {
         expressForm.toLat,
         expressForm.toLng,
     ]);
-
-    useEffect(() => {
-        axios
-            .get(`${apiUrl}/api/category`)
-            .then((response) => setCategories(response.data || []))
-            .catch((e) => console.error("Ошибка при загрузке категорий", e));
-    }, []);
-
-    const handleRegularCategoryChange = async (event) => {
-        const categoryId = event.target.value;
-        setSelectedCategory(categoryId);
-        setSelectedSubcategory("");
-        setSubcategories([]);
-
-        if (!categoryId) return;
-
-        try {
-            const res = await axios.get(`${apiUrl}/api/category/subcategory/${categoryId}`);
-            setSubcategories(res.data || []);
-        } catch (e) {
-            console.error("Ошибка при загрузке подкатегорий", e);
-        }
-    };
-
-    const handleRegularSubcategoryChange = async (e) => {
-        const subId = e.target.value;
-        setSelectedSubcategory(subId);
-
-        if (!subId) return;
-
-    };
 
     const getMinTime = (selectedDate) => {
         const currentDate = new Date();
@@ -472,13 +1050,86 @@ function AdminCreateOrderPage() {
             return;
         }
 
-        if (!selectedCategory) {
-            setError("Выберите категорию");
+        if (
+            !selectedCategory ||
+            !selectedService
+        ) {
+            setError(
+                "Выберите подходящую услугу из подсказки"
+            );
+
+            setServiceSearchOpen(true);
             return;
         }
 
-        if (!markerPosition?.length) {
-            setError("Выберите адрес именно из подсказок.");
+        if (
+            !isValidOrderCoords(
+                markerPosition
+            )
+        ) {
+            setError(
+                "Выберите точный адрес из подсказки"
+            );
+
+            return;
+        }
+
+        if (
+            !isAsap &&
+            !regularForm.workTime
+        ) {
+            setError(
+                "Укажите дату и время выполнения"
+            );
+
+            return;
+        }
+
+        const serviceDetailsError =
+            validateServiceDetails();
+
+        if (serviceDetailsError) {
+            setError(serviceDetailsError);
+            return;
+        }
+
+        const proposedSum =
+            Number(
+                regularForm.proposedSum
+            );
+
+        if (
+            !Number.isFinite(proposedSum) ||
+            proposedSum <= 0
+        ) {
+            setError(
+                "Укажите корректную сумму за работу"
+            );
+
+            return;
+        }
+
+        if (proposedSum > 300000) {
+            setError(
+                "Максимальная стоимость заказа — 300 000 ₽"
+            );
+
+            return;
+        }
+
+        const normalizedUserId =
+            Number(userId);
+
+        if (
+            !Number.isFinite(
+                normalizedUserId
+            ) ||
+            normalizedUserId <= 0
+        ) {
+            setError(
+                "Некорректный ID пользователя"
+            );
+
             return;
         }
 
@@ -487,32 +1138,88 @@ function AdminCreateOrderPage() {
 
         try {
             const payload = {
-                userId,
-                description: regularForm.description || "",
-                address: regularForm.address,
-                workTime: regularForm.workTime
-                    ? new Date(regularForm.workTime).toISOString()
-                    : "",
-                proposedSum: regularForm.proposedSum || "",
+                userId:
+                normalizedUserId,
+
+                description:
+                    regularForm.description ||
+                    "",
+
+                address:
+                    regularForm.address.trim(),
+
+                isAsap,
+
+                workTime:
+                    !isAsap &&
+                    regularForm.workTime
+                        ? new Date(
+                            regularForm.workTime
+                        ).toISOString()
+                        : null,
+
+                proposedSum:
+                    Math.round(proposedSum),
+
                 paymentType: "cash",
-                categoryId: Number(selectedCategory),
-                subcategoryId: selectedSubcategory ? Number(selectedSubcategory) : null,
-                coordinates: `${markerPosition[0]},${markerPosition[1]}`,
+
+                categoryId:
+                    Number(selectedCategory),
+
+                subcategoryId:
+                    selectedSubcategory
+                        ? Number(
+                            selectedSubcategory
+                        )
+                        : null,
+
+                serviceId: null,
+
+                serviceDetails:
+                    serviceDetails || {},
+
+                coordinates:
+                    `${Number(
+                        markerPosition[0]
+                    )},${Number(
+                        markerPosition[1]
+                    )}`,
             };
 
-            await axios.post(`${apiUrl}/api/admin/create-order`, payload, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
-            });
+            await axios.post(
+                `${apiUrl}/api/admin/create-order`,
+                payload,
+                {
+                    headers: {
+                        Authorization:
+                            `Bearer ${token}`,
 
-            alert("Обычный заказ успешно создан");
+                        "Content-Type":
+                            "application/json",
+                    },
+                }
+            );
+
+            alert(
+                "Обычный заказ успешно создан"
+            );
+
             navigate("/orders");
         } catch (err) {
-            console.error("Ошибка при создании заказа:", err);
-            console.error("Ответ сервера:", err.response?.data);
-            setError(err.response?.data?.message || "Не удалось создать заказ");
+            console.error(
+                "Ошибка при создании заказа:",
+                err
+            );
+
+            console.error(
+                "Ответ сервера:",
+                err.response?.data
+            );
+
+            setError(
+                err.response?.data?.message ||
+                "Не удалось создать заказ"
+            );
         } finally {
             setSubmitting(false);
         }
@@ -644,14 +1351,17 @@ function AdminCreateOrderPage() {
                                                 className={`admin-toggle ${isAsap ? "on" : ""}`}
                                                 onClick={() => {
                                                     const next = !isAsap;
+
                                                     setIsAsap(next);
 
-                                                    if (next) {
-                                                        setRegularForm((p) => ({
-                                                            ...p,
-                                                            workTime: plusHour(new Date()),
-                                                        }));
-                                                    }
+                                                    setRegularForm((previous) => ({
+                                                        ...previous,
+
+                                                        workTime: next
+                                                            ? null
+                                                            : previous.workTime ||
+                                                            plusHour(new Date()),
+                                                    }));
                                                 }}
                                             >
                                                 <span className="admin-toggle-knob" />
@@ -715,50 +1425,244 @@ function AdminCreateOrderPage() {
                             <div className="admin-glass admin-section-card">
                                 <div className="admin-section-head">
                                     <div>
-                                        <div className="admin-section-title">Категория</div>
+                                        <div className="admin-section-title">
+                                            Что нужно сделать?
+                                        </div>
+
                                         <div className="admin-section-sub">
-                                            Категория, подкатегория и услуга
+                                            Начните вводить название работы
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="admin-field">
-                                    <div className="admin-label">Категория</div>
-                                    <select
-                                        className="admin-control"
-                                        value={selectedCategory}
-                                        onChange={handleRegularCategoryChange}
-                                    >
-                                        <option value="">Выберите категорию</option>
-                                        {categories
-                                            .filter((cat) => !["Такси", "Курьер"].includes(cat.name))
-                                            .map((cat) => (
-                                                <option key={cat.id} value={cat.id}>
-                                                    {cat.name}
-                                                </option>
-                                            ))}
-                                    </select>
-                                </div>
-
-                                {selectedCategory && (
-                                    <div className="admin-field" style={{ marginTop: 12 }}>
-                                        <div className="admin-label">Подкатегория</div>
-                                        <select
-                                            className="admin-control"
-                                            value={selectedSubcategory}
-                                            onChange={handleRegularSubcategoryChange}
-                                        >
-                                            <option value="">Выберите подкатегорию</option>
-                                            {subcategories.map((sub) => (
-                                                <option key={sub.id} value={sub.id}>
-                                                    {sub.name}
-                                                </option>
-                                            ))}
-                                        </select>
+                                <div
+                                    className="admin-field admin-service-search"
+                                    ref={serviceSearchBoxRef}
+                                >
+                                    <div className="admin-label">
+                                        Услуга
                                     </div>
-                                )}
 
+                                    <div className="admin-service-control-wrap">
+                                        <input
+                                            className={`admin-control admin-service-control ${
+                                                selectedService
+                                                    ? "selected"
+                                                    : ""
+                                            }`}
+                                            type="text"
+                                            value={serviceQuery}
+                                            onChange={
+                                                handleServiceQueryChange
+                                            }
+                                            onFocus={() => {
+                                                if (
+                                                    serviceQuery
+                                                        .trim()
+                                                        .length >= 2 &&
+                                                    !selectedService
+                                                ) {
+                                                    setServiceSearchOpen(
+                                                        true
+                                                    );
+                                                }
+                                            }}
+                                            placeholder="Например: перевезти диван, починить кран"
+                                            autoComplete="off"
+                                        />
+
+                                        {serviceSearching && (
+                                            <span className="admin-service-spinner" />
+                                        )}
+
+                                        {!serviceSearching &&
+                                            serviceQuery && (
+                                                <button
+                                                    type="button"
+                                                    className="admin-service-clear"
+                                                    onClick={
+                                                        handleServiceClear
+                                                    }
+                                                >
+                                                    ×
+                                                </button>
+                                            )}
+                                    </div>
+
+                                    {selectedService && (
+                                        <div className="admin-selected-service">
+                                            <div className="admin-selected-service-main">
+                    <span className="admin-selected-service-check">
+                        ✓
+                    </span>
+
+                                                <div>
+                                                    <div className="admin-selected-service-name">
+                                                        {selectedService
+                                                                .subcategoryName ||
+                                                            selectedService
+                                                                .categoryName}
+                                                    </div>
+
+                                                    <div className="admin-selected-service-category">
+                                                        {selectedService
+                                                            .subcategoryName
+                                                            ? `Категория: ${selectedService.categoryName}`
+                                                            : "Выбрана общая категория"}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                className="admin-mini-btn"
+                                                onClick={
+                                                    handleServiceClear
+                                                }
+                                            >
+                                                Изменить
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {!selectedService &&
+                                        serviceSearchOpen &&
+                                        serviceQuery.trim().length >=
+                                        2 && (
+                                            <div className="admin-service-results">
+                                                <div className="admin-service-results-title">
+                                                    {serviceSearching
+                                                        ? "Ищем услугу…"
+                                                        : serviceSuggestions
+                                                            .length > 0
+                                                            ? "Выберите подходящую услугу"
+                                                            : "Ничего не найдено"}
+                                                </div>
+
+                                                {!serviceSearching &&
+                                                    serviceSuggestions
+                                                        .length > 0 && (
+                                                        <div className="admin-service-result-list">
+                                                            {serviceSuggestions.map(
+                                                                (option) => {
+                                                                    const resultKey =
+                                                                        option.subcategoryId
+                                                                            ? `subcategory-${option.subcategoryId}`
+                                                                            : `category-${option.categoryId}`;
+
+                                                                    return (
+                                                                        <button
+                                                                            key={
+                                                                                resultKey
+                                                                            }
+                                                                            type="button"
+                                                                            className="admin-service-result"
+                                                                            onMouseDown={(
+                                                                                event
+                                                                            ) => {
+                                                                                event.preventDefault();
+                                                                            }}
+                                                                            onClick={() =>
+                                                                                handleServiceSelect(
+                                                                                    option
+                                                                                )
+                                                                            }
+                                                                        >
+                                                <span>
+                                                    <strong>
+                                                        {option.subcategoryName ||
+                                                            option.categoryName}
+                                                    </strong>
+
+                                                    <small>
+                                                        {option.subcategoryName
+                                                            ? option.categoryName
+                                                            : "Общая категория"}
+                                                    </small>
+                                                </span>
+
+                                                                            <span className="admin-service-result-type">
+                                                    {option.subcategoryId
+                                                        ? "Услуга"
+                                                        : "Категория"}
+                                                </span>
+                                                                        </button>
+                                                                    );
+                                                                }
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                {!serviceSearching &&
+                                                    serviceSuggestions
+                                                        .length === 0 && (
+                                                        <div className="admin-service-empty">
+                                                            Попробуйте написать
+                                                            услугу другими
+                                                            словами.
+                                                        </div>
+                                                    )}
+                                            </div>
+                                        )}
+                                </div>
                             </div>
+
+                            {selectedService?.formConfig?.fields
+                                ?.length > 0 && (
+                                <div className="admin-glass admin-section-card">
+                                    <div className="admin-section-head">
+                                        <div>
+                                            <div className="admin-section-title">
+                                                Детали заказа
+                                            </div>
+
+                                            <div className="admin-section-sub">
+                                                Параметры выбранной услуги
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <DynamicServiceFields
+                                        config={
+                                            selectedService.formConfig
+                                        }
+                                        value={serviceDetails}
+                                        onChange={
+                                            setServiceDetails
+                                        }
+                                        yandexApiKey={YM_KEY}
+                                    />
+
+                                    {Number.isFinite(
+                                        Number(
+                                            serviceDetails
+                                                ?.estimatedRoadDistanceKm
+                                        )
+                                    ) && (
+                                        <div className="admin-distance-card">
+                                            <div>
+                                                <strong>
+                                                    Ориентировочное расстояние
+                                                </strong>
+
+                                                <span>
+                        Приблизительный дорожный
+                        маршрут между адресами
+                    </span>
+                                            </div>
+
+                                            <b>
+                                                ≈{" "}
+                                                {Number(
+                                                    serviceDetails
+                                                        .estimatedRoadDistanceKm
+                                                ).toFixed(1)}{" "}
+                                                км
+                                            </b>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="admin-glass admin-section-card">
                                 <div className="admin-section-head">
@@ -782,18 +1686,131 @@ function AdminCreateOrderPage() {
                                 </div>
 
                                 <div className="admin-field" style={{ marginTop: 12 }}>
+                                    {recommendedRegularPrice && (
+                                        <div className="admin-recommended-price">
+                                            <div className="admin-recommended-price-content">
+                                                <div className="admin-recommended-price-title">
+                                                    Рекомендуемый бюджет
+                                                </div>
+
+                                                <div className="admin-recommended-price-range">
+                                                    {recommendedRegularPrice
+                                                        .minPrice
+                                                        .toLocaleString(
+                                                            "ru-RU"
+                                                        )}{" "}
+                                                    –{" "}
+                                                    {recommendedRegularPrice
+                                                        .maxPrice
+                                                        .toLocaleString(
+                                                            "ru-RU"
+                                                        )}{" "}
+                                                    ₽
+                                                </div>
+
+                                                {Array.isArray(
+                                                        recommendedRegularPrice.breakdown
+                                                    ) &&
+                                                    recommendedRegularPrice
+                                                        .breakdown.length >
+                                                    0 && (
+                                                        <div className="admin-recommended-breakdown">
+                                                            {recommendedRegularPrice.breakdown.map(
+                                                                (item) => (
+                                                                    <div
+                                                                        key={
+                                                                            item.key
+                                                                        }
+                                                                        className="admin-recommended-breakdown-row"
+                                                                    >
+                                    <span>
+                                        {
+                                            item.label
+                                        }
+                                    </span>
+
+                                                                        <strong>
+                                                                            {Math.round(
+                                                                                Number(
+                                                                                    item.amount
+                                                                                )
+                                                                            ).toLocaleString(
+                                                                                "ru-RU"
+                                                                            )}{" "}
+                                                                            ₽
+                                                                        </strong>
+                                                                    </div>
+                                                                )
+                                                            )}
+                                                        </div>
+                                                    )}
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                className="admin-mini-btn"
+                                                onClick={() => {
+                                                    setRegularForm(
+                                                        (previous) => ({
+                                                            ...previous,
+
+                                                            proposedSum:
+                                                                String(
+                                                                    recommendedRegularPrice
+                                                                        .recommendedPrice
+                                                                ),
+                                                        })
+                                                    );
+                                                }}
+                                            >
+                                                Указать сумму
+                                            </button>
+                                        </div>
+                                    )}
                                     <div className="admin-label">Сумма за работу</div>
                                     <input
                                         className="admin-control"
                                         type="number"
+                                        min="1"
+                                        max="300000"
+                                        step="1"
                                         placeholder="Например 1500"
                                         value={regularForm.proposedSum}
-                                        onChange={(e) =>
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+
+                                            if (value === "") {
+                                                setRegularForm((p) => ({
+                                                    ...p,
+                                                    proposedSum: "",
+                                                }));
+
+                                                return;
+                                            }
+
+                                            const numberValue =
+                                                Number(value);
+
+                                            if (
+                                                !Number.isFinite(
+                                                    numberValue
+                                                )
+                                            ) {
+                                                return;
+                                            }
+
                                             setRegularForm((p) => ({
                                                 ...p,
-                                                proposedSum: e.target.value,
-                                            }))
-                                        }
+
+                                                proposedSum:
+                                                    String(
+                                                        Math.min(
+                                                            numberValue,
+                                                            300000
+                                                        )
+                                                    ),
+                                            }));
+                                        }}
                                     />
                                 </div>
                             </div>

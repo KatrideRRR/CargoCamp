@@ -5,8 +5,11 @@ const NodeGeocoder = require("node-geocoder");
 const { Op } = require("sequelize");
 const fs = require("fs");
 const path = require("path");
-const { User, Message, Order, ExpressOrder, Category, Subcategory, Dispute, ActionLog, sequelize } = require("../models");
+const { User, Message, Order, ExpressOrder, Category, Subcategory, Dispute, ActionLog, sequelize, Service,} = require("../models");
 const bcrypt = require("bcrypt");
+const {
+    calculateRecommendedPrice,
+} = require("../services/recommendedPriceService");
 
 const geocoder = NodeGeocoder({
     provider: "openstreetmap",
@@ -15,6 +18,91 @@ const geocoder = NodeGeocoder({
 function toNum(v) {
     const n = typeof v === "string" ? Number(v) : v;
     return Number.isFinite(n) ? n : null;
+}
+
+function normalizeBoolean(value) {
+    if (
+        value === true ||
+        value === 1 ||
+        value === "1" ||
+        value === "true"
+    ) {
+        return true;
+    }
+
+    if (
+        value === false ||
+        value === 0 ||
+        value === "0" ||
+        value === "false"
+    ) {
+        return false;
+    }
+
+    return null;
+}
+
+function parseJsonObject(value) {
+    if (
+        value &&
+        typeof value === "object" &&
+        !Array.isArray(value)
+    ) {
+        return value;
+    }
+
+    if (typeof value !== "string") {
+        return {};
+    }
+
+    try {
+        const parsed = JSON.parse(value);
+
+        return parsed &&
+        typeof parsed === "object" &&
+        !Array.isArray(parsed)
+            ? parsed
+            : {};
+    } catch {
+        return {};
+    }
+}
+
+function normalizeNullablePositiveId(value) {
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+        return null;
+    }
+
+    const id = Number(value);
+
+    return Number.isInteger(id) && id > 0
+        ? id
+        : null;
+}
+
+function normalizeOptionalMoney(value) {
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+        return null;
+    }
+
+    const amount = Number(value);
+
+    if (
+        !Number.isFinite(amount) ||
+        amount < 0
+    ) {
+        return null;
+    }
+
+    return Math.round(amount);
 }
 
 const router = express.Router();
@@ -71,181 +159,723 @@ router.get('/user-documents/:userId', authMiddleware, adminMiddleware, async (re
 });
 
 router.post("/create-order", authMiddleware, adminMiddleware, async (req, res) => {
-    try {
-        let {
-            userId,
-            address,
-            description,
-            workTime,
-            proposedSum,
-            categoryId,
-            subcategoryId,
-            serviceId,
-            coordinates: incomingCoords,
-            paymentType,
-        } = req.body;
+        const transaction =
+            await sequelize.transaction();
 
-        if (!userId) {
-            return res.status(400).json({ message: "userId обязателен" });
-        }
+        try {
+            let {
+                userId,
+                address,
+                description,
+                workTime,
+                isAsap,
+                proposedSum,
+                categoryId,
+                subcategoryId,
+                serviceId,
+                serviceDetails,
+                coordinates: incomingCoords,
+                paymentType,
+            } = req.body;
 
-        const targetUserId = Number(userId);
-        if (!Number.isFinite(targetUserId) || targetUserId <= 0) {
-            return res.status(400).json({ message: "Некорректный userId" });
-        }
+            /*
+             * Пользователь
+             */
 
-        const looksLikeCoordsAddress = (v) => {
-            if (!v) return true;
-            const s = String(v).trim();
-            return s === "" || s.startsWith("Координаты:");
-        };
+            const targetUserId = Number(userId);
 
-        const parseLatLng = (v) => {
-            if (!v) return null;
-            const raw = Array.isArray(v) ? v[0] : v;
-            if (typeof raw !== "string" || !raw.includes(",")) return null;
+            if (
+                !Number.isInteger(targetUserId) ||
+                targetUserId <= 0
+            ) {
+                await transaction.rollback();
 
-            const [latStr, lngStr] = raw.split(",").map((x) => x.trim());
-            const lat = parseFloat(latStr);
-            const lng = parseFloat(lngStr);
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Некорректный userId",
+                });
+            }
 
-            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-            return { lat, lng };
-        };
+            const targetUser =
+                await User.findByPk(
+                    targetUserId,
+                    {
+                        transaction,
+                    }
+                );
 
-        if (!address || !String(address).trim()) {
-            return res.status(400).json({ message: "Адрес обязателен" });
-        }
+            if (!targetUser) {
+                await transaction.rollback();
 
-        let coordinatesStr = null;
-        let latlng = parseLatLng(incomingCoords);
+                return res.status(404).json({
+                    success: false,
+                    message:
+                        "Пользователь не найден",
+                });
+            }
 
-        if (latlng) {
-            coordinatesStr = `${latlng.lat},${latlng.lng}`;
-        }
+            /*
+             * Адрес
+             */
 
-        if (!coordinatesStr) {
-            try {
-                const geoData = await geocoder.geocode(address);
+            address =
+                String(address || "").trim();
 
-                if (!geoData || !geoData.length) {
+            if (!address) {
+                await transaction.rollback();
+
+                return res.status(400).json({
+                    success: false,
+                    message: "Адрес обязателен",
+                });
+            }
+
+            const looksLikeCoordsAddress = (
+                value
+            ) => {
+                const normalized =
+                    String(value || "").trim();
+
+                return (
+                    normalized === "" ||
+                    normalized.startsWith(
+                        "Координаты:"
+                    )
+                );
+            };
+
+            const parseLatLng = (value) => {
+                if (!value) {
+                    return null;
+                }
+
+                const raw = Array.isArray(value)
+                    ? value[0]
+                    : value;
+
+                if (
+                    typeof raw !== "string" ||
+                    !raw.includes(",")
+                ) {
+                    return null;
+                }
+
+                const [latString, lngString] =
+                    raw
+                        .split(",")
+                        .map((item) =>
+                            item.trim()
+                        );
+
+                const lat =
+                    Number(latString);
+
+                const lng =
+                    Number(lngString);
+
+                if (
+                    !Number.isFinite(lat) ||
+                    !Number.isFinite(lng) ||
+                    lat < -90 ||
+                    lat > 90 ||
+                    lng < -180 ||
+                    lng > 180
+                ) {
+                    return null;
+                }
+
+                return {
+                    lat,
+                    lng,
+                };
+            };
+
+            let latLng =
+                parseLatLng(incomingCoords);
+
+            let coordinatesString =
+                latLng
+                    ? `${latLng.lat},${latLng.lng}`
+                    : null;
+
+            /*
+             * Если координаты не пришли,
+             * пробуем определить их по адресу.
+             */
+
+            if (!coordinatesString) {
+                try {
+                    const geocodeResult =
+                        await geocoder.geocode(
+                            address
+                        );
+
+                    const firstResult =
+                        Array.isArray(
+                            geocodeResult
+                        )
+                            ? geocodeResult[0]
+                            : null;
+
+                    const latitude =
+                        Number(
+                            firstResult?.latitude
+                        );
+
+                    const longitude =
+                        Number(
+                            firstResult?.longitude
+                        );
+
+                    if (
+                        !Number.isFinite(
+                            latitude
+                        ) ||
+                        !Number.isFinite(
+                            longitude
+                        )
+                    ) {
+                        await transaction.rollback();
+
+                        return res
+                            .status(400)
+                            .json({
+                                success: false,
+                                message:
+                                    "Не удалось определить координаты по адресу. Выберите адрес из подсказок.",
+                            });
+                    }
+
+                    latLng = {
+                        lat: latitude,
+                        lng: longitude,
+                    };
+
+                    coordinatesString =
+                        `${latitude},${longitude}`;
+                } catch (geocodeError) {
+                    console.error(
+                        "Ошибка геокодирования:",
+                        geocodeError
+                    );
+
+                    await transaction.rollback();
+
+                    return res
+                        .status(400)
+                        .json({
+                            success: false,
+                            message:
+                                "Не удалось определить координаты адреса",
+                        });
+                }
+            }
+
+            /*
+             * Если вместо адреса пришли
+             * только координаты, определяем адрес.
+             */
+
+            if (
+                latLng &&
+                looksLikeCoordsAddress(address)
+            ) {
+                try {
+                    const reverseResult =
+                        await geocoder.reverse({
+                            lat: latLng.lat,
+                            lon: latLng.lng,
+                        });
+
+                    const firstResult =
+                        Array.isArray(
+                            reverseResult
+                        )
+                            ? reverseResult[0]
+                            : null;
+
+                    if (firstResult) {
+                        address =
+                            firstResult
+                                .formattedAddress ||
+                            firstResult.streetName ||
+                            firstResult.city ||
+                            address;
+                    }
+                } catch (reverseError) {
+                    console.error(
+                        "Ошибка reverse geocode:",
+                        reverseError
+                    );
+                }
+            }
+
+            /*
+             * Оплата
+             */
+
+            paymentType =
+                Array.isArray(paymentType)
+                    ? paymentType[0]
+                    : paymentType;
+
+            paymentType =
+                String(
+                    paymentType || "cash"
+                ).trim();
+
+            const allowedPaymentTypes =
+                new Set([
+                    "cash",
+                    "guarantee",
+                    "installment",
+                ]);
+
+            if (
+                !allowedPaymentTypes.has(
+                    paymentType
+                )
+            ) {
+                await transaction.rollback();
+
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Некорректный paymentType",
+                });
+            }
+
+            /*
+             * Категория
+             */
+
+            const normalizedCategoryId =
+                normalizeNullablePositiveId(
+                    categoryId
+                );
+
+            if (!normalizedCategoryId) {
+                await transaction.rollback();
+
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Выберите категорию",
+                });
+            }
+
+            const category =
+                await Category.findByPk(
+                    normalizedCategoryId,
+                    {
+                        transaction,
+                    }
+                );
+
+            if (!category) {
+                await transaction.rollback();
+
+                return res.status(404).json({
+                    success: false,
+                    message:
+                        "Категория не найдена",
+                });
+            }
+
+            /*
+             * Подкатегория
+             */
+
+            const normalizedSubcategoryId =
+                normalizeNullablePositiveId(
+                    subcategoryId
+                );
+
+            let subcategory = null;
+
+            if (normalizedSubcategoryId) {
+                subcategory =
+                    await Subcategory.findOne({
+                        where: {
+                            id:
+                            normalizedSubcategoryId,
+                            categoryId:
+                            normalizedCategoryId,
+                        },
+                        transaction,
+                    });
+
+                if (!subcategory) {
+                    await transaction.rollback();
+
                     return res.status(400).json({
-                        message: "Не удалось определить координаты по адресу. Выберите адрес из подсказок или на карте.",
+                        success: false,
+                        message:
+                            "Подкатегория не относится к выбранной категории",
+                    });
+                }
+            }
+
+            /*
+             * Услуга
+             */
+
+            const normalizedServiceId =
+                normalizeNullablePositiveId(
+                    serviceId
+                );
+
+            let service = null;
+
+            if (normalizedServiceId) {
+                service =
+                    await Service.findByPk(
+                        normalizedServiceId,
+                        {
+                            transaction,
+                        }
+                    );
+
+                if (!service) {
+                    await transaction.rollback();
+
+                    return res.status(404).json({
+                        success: false,
+                        message:
+                            "Услуга не найдена",
                     });
                 }
 
-                const { latitude, longitude } = geoData[0];
-                coordinatesStr = `${latitude},${longitude}`;
-                latlng = { lat: Number(latitude), lng: Number(longitude) };
-            } catch (geoError) {
-                console.error("Ошибка геокодирования:", geoError);
+                /*
+                 * Название внешнего ключа
+                 * проверь по модели Service.
+                 */
+
+                if (
+                    normalizedSubcategoryId &&
+                    service.subcategoryId != null &&
+                    Number(
+                        service.subcategoryId
+                    ) !==
+                    Number(
+                        normalizedSubcategoryId
+                    )
+                ) {
+                    await transaction.rollback();
+
+                    return res.status(400).json({
+                        success: false,
+                        message:
+                            "Услуга не относится к выбранной подкатегории",
+                    });
+                }
+            }
+
+            /*
+             * Дополнительные параметры услуги
+             */
+
+            const normalizedServiceDetails =
+                parseJsonObject(
+                    serviceDetails
+                );
+
+            /*
+             * Время выполнения
+             */
+
+            const normalizedIsAsap =
+                normalizeBoolean(isAsap);
+
+            let normalizedWorkTime = null;
+
+            if (normalizedIsAsap === true) {
+                normalizedWorkTime = null;
+            } else if (workTime) {
+                const parsedWorkTime =
+                    new Date(workTime);
+
+                if (
+                    Number.isNaN(
+                        parsedWorkTime.getTime()
+                    )
+                ) {
+                    await transaction.rollback();
+
+                    return res.status(400).json({
+                        success: false,
+                        message:
+                            "Некорректная дата выполнения",
+                    });
+                }
+
+                normalizedWorkTime =
+                    parsedWorkTime;
+            } else {
+                await transaction.rollback();
 
                 return res.status(400).json({
-                    message: "Не удалось определить координаты. Выберите адрес из подсказок, через карту или укажите полный адрес.",
+                    success: false,
+                    message:
+                        "Укажите срок выполнения или выберите «Как можно скорее»",
                 });
             }
-        }
 
-        if (latlng && looksLikeCoordsAddress(address)) {
-            try {
-                const rev = await geocoder.reverse({ lat: latlng.lat, lon: latlng.lng });
+            /*
+             * Рекомендованная стоимость
+             */
 
-                if (Array.isArray(rev) && rev[0]) {
-                    address =
-                        rev[0].formattedAddress ||
-                        rev[0].streetName ||
-                        rev[0].city ||
-                        `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
+            const pricingConfig =
+                subcategory?.pricingConfig ||
+                service?.pricingConfig ||
+                null;
+
+            let recommendedPriceResult = null;
+
+            if (
+                pricingConfig &&
+                pricingConfig.enabled === true
+            ) {
+                try {
+                    recommendedPriceResult =
+                        calculateRecommendedPrice({
+                            pricingConfig,
+                            serviceDetails:
+                            normalizedServiceDetails,
+                        });
+                } catch (
+                    calculationError
+                    ) {
+                    console.error(
+                        "Ошибка расчёта рекомендуемой цены:",
+                        calculationError
+                    );
                 }
-            } catch (e) {
-                console.error("Ошибка reverse geocode:", e);
             }
+
+            const normalizedProposedSum =
+                normalizeOptionalMoney(
+                    proposedSum
+                );
+
+            if (
+                proposedSum !== "" &&
+                proposedSum !== null &&
+                proposedSum !== undefined &&
+                normalizedProposedSum === null
+            ) {
+                await transaction.rollback();
+
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Некорректная сумма заказа",
+                });
+            }
+
+            /*
+             * Если администратор не указал сумму,
+             * используем рекомендацию калькулятора.
+             */
+
+            const finalProposedSum =
+                normalizedProposedSum ??
+                recommendedPriceResult
+                    ?.recommendedPrice ??
+                null;
+
+            /*
+             * Создание заказа
+             */
+
+            const newOrder =
+                await Order.create(
+                    {
+                        userId: targetUserId,
+                        creatorId:
+                        targetUserId,
+
+                        address,
+                        coordinates:
+                        coordinatesString,
+
+                        description:
+                            String(
+                                description || ""
+                            ).trim() || null,
+
+                        workTime:
+                        normalizedWorkTime,
+
+                        isAsap:
+                            normalizedIsAsap ===
+                            true,
+
+                        proposedSum:
+                        finalProposedSum,
+
+                        categoryId:
+                        normalizedCategoryId,
+
+                        subcategoryId:
+                        normalizedSubcategoryId,
+
+                        serviceId:
+                        normalizedServiceId,
+
+                        serviceDetails:
+                            Object.keys(
+                                normalizedServiceDetails
+                            ).length > 0
+                                ? normalizedServiceDetails
+                                : null,
+
+                        paymentType,
+
+                        paymentStatus:
+                            paymentType === "cash"
+                                ? "unpaid"
+                                : "pending",
+
+                        dealStatus: "none",
+                        status: "pending",
+
+                        images: [],
+                        completedBy: [],
+                        requests: [],
+
+                        promotionCost: 0,
+                        promotionRequested: {
+                            highlight: false,
+                            recommended: false,
+                            push: false,
+                        },
+
+                        is_highlighted: false,
+                        is_recommended: false,
+                        is_push_notified: false,
+
+                        creatorHidden: false,
+                        adminDeleted: false,
+
+                        createdAt: new Date(),
+                    },
+                    {
+                        transaction,
+                    }
+                );
+
+            await req.logAction?.({
+                req,
+                actorUserId:
+                req.user.id,
+                actorRole: "admin",
+
+                actionType:
+                    "admin_order_create",
+
+                entityType: "order",
+                entityId:
+                newOrder.id,
+                orderId:
+                newOrder.id,
+
+                severity: "info",
+                success: true,
+
+                meta: {
+                    createdForUserId:
+                    targetUserId,
+
+                    status:
+                    newOrder.status,
+
+                    paymentType:
+                    newOrder.paymentType,
+
+                    categoryId:
+                    newOrder.categoryId,
+
+                    subcategoryId:
+                    newOrder.subcategoryId,
+
+                    serviceId:
+                    newOrder.serviceId,
+
+                    isAsap:
+                    newOrder.isAsap,
+
+                    workTime:
+                    newOrder.workTime,
+
+                    proposedSum:
+                    newOrder.proposedSum,
+
+                    recommendedPrice:
+                        recommendedPriceResult
+                            ?.recommendedPrice ??
+                        null,
+
+                    serviceDetails:
+                    normalizedServiceDetails,
+
+                    coordinates:
+                    newOrder.coordinates,
+
+                    imagesCount: 0,
+                },
+            });
+
+            await transaction.commit();
+
+            /*
+             * Обновляем клиентские страницы.
+             */
+
+            req.app.locals.io?.emit(
+                "orderUpdated",
+                {
+                    orderId:
+                    newOrder.id,
+
+                    creatorId:
+                    targetUserId,
+
+                    orderType:
+                        "regular",
+
+                    action:
+                        "admin_created",
+                }
+            );
+
+            return res.status(201).json({
+                success: true,
+
+                message:
+                    "Заказ успешно создан администратором",
+
+                order:
+                newOrder,
+
+                recommendedPrice:
+                recommendedPriceResult,
+            });
+        } catch (error) {
+            await transaction.rollback();
+
+            console.error(
+                "Ошибка при создании заказа админом:",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                message: "Ошибка сервера",
+            });
         }
-
-        paymentType = Array.isArray(paymentType) ? paymentType[0] : paymentType;
-        paymentType = String(paymentType || "").trim();
-        if (!paymentType) paymentType = "cash";
-
-        const allowedPaymentTypes = new Set(["cash", "guarantee", "installment"]);
-        if (!allowedPaymentTypes.has(paymentType)) {
-            return res.status(400).json({ message: "Некорректный paymentType" });
-        }
-
-        const catId = Number(categoryId);
-        if (!Number.isFinite(catId) || catId <= 0) {
-            return res.status(400).json({ message: "categoryId обязателен" });
-        }
-
-        const subId = subcategoryId ? Number(subcategoryId) : null;
-        const normalizedSubId = Number.isFinite(subId) && subId > 0 ? subId : null;
-
-        const svcId = serviceId ? Number(serviceId) : null;
-        const normalizedSvcId = Number.isFinite(svcId) && svcId > 0 ? svcId : null;
-
-        const parsedProposedSum =
-            proposedSum === "" || proposedSum === null || proposedSum === undefined
-                ? null
-                : Number(proposedSum);
-
-        if (parsedProposedSum !== null && !Number.isFinite(parsedProposedSum)) {
-            return res.status(400).json({ message: "Некорректная proposedSum" });
-        }
-
-        const newOrder = await Order.create({
-            userId: targetUserId,
-            address,
-            description,
-            workTime,
-            proposedSum: parsedProposedSum,
-            coordinates: coordinatesStr,
-            createdAt: new Date().toISOString(),
-            images: [],
-            creatorId: targetUserId,
-            status: "pending",
-            categoryId: catId,
-            subcategoryId: normalizedSubId,
-            serviceId: normalizedSvcId,
-            paymentType,
-
-            promotionCost: 0,
-            promotionRequested: {},
-            is_highlighted: false,
-            is_recommended: false,
-            is_push_notified: false,
-        });
-
-        await req.logAction({
-            req,
-            actorUserId: req.user.id,
-            actorRole: "admin",
-            actionType: "admin_order_create",
-            entityType: "order",
-            entityId: newOrder.id,
-            orderId: newOrder.id,
-            meta: {
-                createdForUserId: targetUserId,
-                status: newOrder.status,
-                paymentType: newOrder.paymentType,
-                categoryId: newOrder.categoryId,
-                subcategoryId: newOrder.subcategoryId,
-                serviceId: newOrder.serviceId,
-                proposedSum: newOrder.proposedSum,
-                coords: newOrder.coordinates,
-                imagesCount: 0,
-            },
-        });
-
-
-        return res.status(201).json({
-            success: true,
-            message: "Заказ успешно создан администратором",
-            order: newOrder,
-        });
-    } catch (error) {
-        console.error("Ошибка при создании заказа админом:", error);
-        return res.status(500).json({ message: "Ошибка сервера" });
-    }
-});
+    });
 
 router.post("/create-express-order", authMiddleware, adminMiddleware, async (req, res) => {
     const t = await sequelize.transaction();
@@ -628,41 +1258,116 @@ router.put('/users/:id/unblock', authMiddleware, adminMiddleware, async (req, re
     }
 });
 
-router.get('/orders', authMiddleware, adminMiddleware, async (req, res) => {
-    try {
-        const orders = await Order.findAll({
-            include: [
-                {
-                    model: Dispute,
-                    as: 'disputes',
-                    required: false,
-                }
-            ],
-            order: [['createdAt', 'DESC']]
-        });
+router.get("/orders", authMiddleware, adminMiddleware, async (req, res) => {
+        try {
+            const orders =
+                await Order.findAll({
+                    include: [
+                        {
+                            model: Category,
+                            as: "category",
+                            attributes: [
+                                "id",
+                                "name",
+                            ],
+                        },
+                        {
+                            model: Subcategory,
+                            as: "subcategory",
+                            attributes: [
+                                "id",
+                                "name",
+                                "code",
+                            ],
+                        },
+                        {
+                            model: Service,
+                            as: "service",
+                            attributes: [
+                                "id",
+                                "name",
+                            ],
+                        },
+                        {
+                            model: User,
+                            as: "creator",
+                            attributes: [
+                                "id",
+                                "username",
+                                "phone",
+                            ],
+                        },
+                        {
+                            model: User,
+                            as: "executor",
+                            attributes: [
+                                "id",
+                                "username",
+                                "phone",
+                            ],
+                            required: false,
+                        },
+                        {
+                            model: Dispute,
+                            as: "disputes",
+                            required: false,
+                        },
+                    ],
 
-        const result = orders.map((order) => {
-            const plain = order.toJSON();
-            const disputes = Array.isArray(plain.disputes) ? plain.disputes : [];
+                    order: [
+                        ["createdAt", "DESC"],
+                    ],
+                });
 
-            const activeDispute =
-                disputes.find((d) =>
-                    ["open", "in_review", "waiting_creator", "waiting_executor"].includes(d.status)
-                ) || null;
+            const result =
+                orders.map((order) => {
+                    const plain =
+                        order.toJSON();
 
-            return {
-                ...plain,
-                activeDispute,
-                isHiddenByCreator: !!plain.creatorHidden,
-            };
-        });
+                    const disputes =
+                        Array.isArray(
+                            plain.disputes
+                        )
+                            ? plain.disputes
+                            : [];
 
-        res.json(result);
-    } catch (error) {
-        console.error('Ошибка загрузки заказов:', error);
-        res.status(500).json({ message: 'Ошибка сервера' });
-    }
-});
+                    const activeDispute =
+                        disputes.find(
+                            (dispute) =>
+                                [
+                                    "open",
+                                    "in_review",
+                                    "waiting_creator",
+                                    "waiting_executor",
+                                ].includes(
+                                    dispute.status
+                                )
+                        ) || null;
+
+                    return {
+                        ...plain,
+
+                        activeDispute,
+
+                        isHiddenByCreator:
+                            Boolean(
+                                plain.creatorHidden
+                            ),
+                    };
+                });
+
+            return res.json(result);
+        } catch (error) {
+            console.error(
+                "Ошибка загрузки заказов:",
+                error
+            );
+
+            return res.status(500).json({
+                message: "Ошибка сервера",
+            });
+        }
+    });
 
 router.delete("/orders/:id", authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -884,34 +1589,118 @@ router.get("/orders/:orderId/messages", authMiddleware, adminMiddleware, async (
     }
 });
 
-router.get('/orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
-    const { id } = req.params;
+router.get("/orders/:id", authMiddleware, adminMiddleware, async (req, res) => {
+        const orderId = Number(req.params.id);
 
-    try {
-        const order = await Order.findOne({
-            where: { id },
-            include: [
-                { model: Category, as: 'category' },
-                { model: Subcategory, as: 'subcategory' },
-                {
-                    model: Dispute,
-                    as: 'disputes',
-                    required: false,
-                }
-            ],
-            order: [[{ model: Dispute, as: 'disputes' }, 'createdAt', 'DESC']]
-        });
-
-        if (!order) {
-            return res.status(404).json({ message: 'Order not found' });
+        if (
+            !Number.isFinite(orderId) ||
+            orderId <= 0
+        ) {
+            return res.status(400).json({
+                message: "Некорректный ID заказа",
+            });
         }
 
-        res.json(order);
-    } catch (error) {
-        console.error('Error fetching order:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
+        try {
+            const order = await Order.findOne({
+                where: {
+                    id: orderId,
+                },
+
+                include: [
+                    {
+                        model: Category,
+                        as: "category",
+                        attributes: [
+                            "id",
+                            "name",
+                        ],
+                    },
+                    {
+                        model: Subcategory,
+                        as: "subcategory",
+                        attributes: [
+                            "id",
+                            "name",
+                            "code",
+                        ],
+                    },
+                    {
+                        model: Service,
+                        as: "service",
+                        attributes: [
+                            "id",
+                            "name",
+                        ],
+                    },
+                    {
+                        model: User,
+                        as: "creator",
+                        attributes: [
+                            "id",
+                            "username",
+                            "phone",
+                            "rating",
+                        ],
+                    },
+                    {
+                        model: User,
+                        as: "executor",
+                        attributes: [
+                            "id",
+                            "username",
+                            "phone",
+                            "rating",
+                        ],
+                        required: false,
+                    },
+                    {
+                        model: Dispute,
+                        as: "disputes",
+                        required: false,
+                    },
+                ],
+
+                order: [
+                    [
+                        {
+                            model: Dispute,
+                            as: "disputes",
+                        },
+                        "createdAt",
+                        "DESC",
+                    ],
+                ],
+            });
+
+            if (!order) {
+                return res.status(404).json({
+                    message: "Заказ не найден",
+                });
+            }
+
+            const plain = order.toJSON();
+
+            return res.json({
+                ...plain,
+
+                serviceDetails:
+                    plain.serviceDetails &&
+                    typeof plain.serviceDetails === "object"
+                        ? plain.serviceDetails
+                        : null,
+            });
+        } catch (error) {
+            console.error(
+                "Ошибка получения заказа:",
+                error
+            );
+
+            return res.status(500).json({
+                message: "Ошибка сервера",
+            });
+        }
+    });
 
 router.get("/users/:id/complaints", authMiddleware, adminMiddleware, async (req, res) => {
     const { id } = req.params;
@@ -936,15 +1725,156 @@ router.get("/users/:id/complaints", authMiddleware, adminMiddleware, async (req,
 });
 
 router.get("/users/:userId/orders", authMiddleware, adminMiddleware, async (req, res) => {
-    try {
-        const { userId } = req.params;
-        const orders = await Order.findAll({ where: { userId } });
-        res.json({ orders });
-    } catch (error) {
-        console.error("Ошибка при получении заказов пользователя:", error);
-        res.status(500).json({ error: "Ошибка сервера" });
-    }
-});
+        try {
+            const userId =
+                Number(
+                    req.params.userId
+                );
+
+            if (
+                !Number.isInteger(userId) ||
+                userId <= 0
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Некорректный userId",
+                });
+            }
+
+            const user =
+                await User.findByPk(
+                    userId,
+                    {
+                        attributes: [
+                            "id",
+                            "username",
+                            "phone",
+                            "role",
+                            "userStatus",
+                        ],
+                    }
+                );
+
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message:
+                        "Пользователь не найден",
+                });
+            }
+
+            const orders =
+                await Order.findAll({
+                    where: {
+                        [Op.or]: [
+                            {
+                                creatorId:
+                                userId,
+                            },
+                            {
+                                userId,
+                            },
+                        ],
+                    },
+
+                    include: [
+                        {
+                            model: Category,
+                            as: "category",
+                            attributes: [
+                                "id",
+                                "name",
+                            ],
+                        },
+                        {
+                            model: Subcategory,
+                            as: "subcategory",
+                            attributes: [
+                                "id",
+                                "name",
+                                "code",
+                            ],
+                        },
+                        {
+                            model: Service,
+                            as: "service",
+                            attributes: [
+                                "id",
+                                "name",
+                            ],
+                        },
+                        {
+                            model: User,
+                            as: "executor",
+                            attributes: [
+                                "id",
+                                "username",
+                                "phone",
+                            ],
+                            required: false,
+                        },
+                        {
+                            model: Dispute,
+                            as: "disputes",
+                            required: false,
+                        },
+                    ],
+
+                    order: [
+                        ["createdAt", "DESC"],
+                    ],
+                });
+
+            const normalizedOrders =
+                orders.map((order) => {
+                    const plain =
+                        order.toJSON();
+
+                    const disputes =
+                        Array.isArray(
+                            plain.disputes
+                        )
+                            ? plain.disputes
+                            : [];
+
+                    const activeDispute =
+                        disputes.find(
+                            (dispute) =>
+                                [
+                                    "open",
+                                    "in_review",
+                                    "waiting_creator",
+                                    "waiting_executor",
+                                ].includes(
+                                    dispute.status
+                                )
+                        ) || null;
+
+                    return {
+                        ...plain,
+                        activeDispute,
+                    };
+                });
+
+            return res.json({
+                success: true,
+                user,
+                orders:
+                normalizedOrders,
+            });
+        } catch (error) {
+            console.error(
+                "Ошибка получения заказов пользователя:",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                message: "Ошибка сервера",
+            });
+        }
+    });
 
 router.get("/action-logs", authMiddleware, adminMiddleware, async (req, res) => {
     try {

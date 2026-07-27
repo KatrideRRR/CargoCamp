@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import "../styles/UserOrdersPage.css";
+import OrderServiceDetails from "../components/OrderServiceDetails";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -12,6 +13,7 @@ function UserOrdersPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [pageUser, setPageUser] = useState(null);
 
     const token = localStorage.getItem("authToken");
     const navigate = useNavigate();
@@ -46,7 +48,15 @@ function UserOrdersPage() {
                 headers: { Authorization: `Bearer ${token}` },
             })
             .then((response) => {
-                const data = response.data.orders || [];
+                const data =
+                    Array.isArray(response.data?.orders)
+                        ? response.data.orders
+                        : [];
+
+                setPageUser(
+                    response.data?.user || null
+                );
+
                 setOrders(data);
                 setFilteredOrders(data);
                 setLoading(false);
@@ -102,7 +112,12 @@ function UserOrdersPage() {
     if (loading) {
         return (
             <div className="orders-container">
-                <h1>Заказы пользователя #{userId}</h1>
+                <h1>
+                    Заказы пользователя{" "}
+                    {pageUser?.username
+                        ? `${pageUser.username} (#${userId})`
+                        : `#${userId}`}
+                </h1>
                 <p className="orders-message">Загрузка...</p>
             </div>
         );
