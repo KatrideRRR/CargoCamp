@@ -1221,8 +1221,12 @@ module.exports = (io) => {
             });
 
             // 4) Создаём папку заказа и переносим туда файлы из temp
-            const orderDir = path.join(__dirname, "..", "uploads", "orders", `order_${newOrder.id}`);
-            ensureDir(orderDir);
+            const orderDir = path.join(
+                ordersRoot,
+                `order_${newOrder.id}`
+            );
+
+            ensureDirectory(orderDir);
 
             let photoUrls = [];
 
