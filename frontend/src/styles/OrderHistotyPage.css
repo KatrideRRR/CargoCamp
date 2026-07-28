@@ -411,3 +411,299 @@
         padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)) !important;
     }
 }
+
+/* =========================================================
+   History summary
+========================================================= */
+
+.oh-history-summary {
+    margin-top: 11px;
+
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.oh-history-summary__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+
+    min-height: 30px;
+    padding: 6px 10px;
+
+    border-radius: 999px;
+
+    color: #475569;
+    background: rgba(248, 250, 252, 0.82);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+
+    font-size: 12px;
+    line-height: 1;
+    font-weight: 750;
+}
+
+.oh-history-summary__item strong {
+    color: #0f172a;
+    font-weight: 950;
+}
+
+.oh-history-summary__item--express {
+    color: #166534;
+
+    background: rgba(240, 253, 244, 0.82);
+    border-color: rgba(74, 222, 128, 0.25);
+}
+
+.oh-history-summary__item--express strong {
+    color: #166534;
+}
+
+
+/* =========================================================
+   Order type
+========================================================= */
+
+.oh-order-title-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.oh-order-type-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+
+    min-height: 27px;
+    padding: 5px 9px;
+
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+
+    font-size: 11.5px;
+    line-height: 1;
+    font-weight: 900;
+}
+
+.oh-order-type-badge svg {
+    flex: 0 0 auto;
+}
+
+.oh-order-type-badge--regular {
+    color: #1d4ed8;
+
+    background: rgba(239, 246, 255, 0.9);
+    border-color: rgba(96, 165, 250, 0.3);
+}
+
+.oh-order-type-badge--express {
+    color: #166534;
+
+    background: rgba(240, 253, 244, 0.92);
+    border-color: rgba(74, 222, 128, 0.3);
+}
+
+
+/* =========================================================
+   Express history card
+========================================================= */
+
+.oh-card--express {
+    position: relative;
+    overflow: hidden;
+
+    border-color: rgba(74, 222, 128, 0.28);
+
+    background:
+            linear-gradient(
+                    180deg,
+                    rgba(255, 255, 255, 0.78),
+                    rgba(240, 253, 244, 0.64)
+            );
+}
+
+.oh-card--express::before {
+    content: "";
+
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+
+    height: 5px;
+
+    background:
+            linear-gradient(
+                    90deg,
+                    rgba(34, 197, 94, 0.95),
+                    rgba(187, 247, 208, 0.55)
+            );
+
+    pointer-events: none;
+}
+
+.oh-card--express > * {
+    position: relative;
+    z-index: 1;
+}
+
+.oh-card--express .oh-price {
+    color: #166534;
+
+    background: rgba(240, 253, 244, 0.92);
+    border-color: rgba(74, 222, 128, 0.3);
+}
+
+
+/* =========================================================
+   Express route A → B
+========================================================= */
+
+.oh-express-route {
+    margin-top: 13px;
+    padding: 12px;
+
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1fr)
+        auto
+        minmax(0, 1fr);
+
+    align-items: stretch;
+    gap: 10px;
+
+    border-radius: 17px;
+
+    background:
+            linear-gradient(
+                    180deg,
+                    rgba(255, 255, 255, 0.84),
+                    rgba(248, 250, 252, 0.68)
+            );
+
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.oh-route-point {
+    min-width: 0;
+
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+}
+
+.oh-route-point__icon {
+    flex: 0 0 auto;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 31px;
+    height: 31px;
+
+    border-radius: 11px;
+
+    font-size: 12px;
+    line-height: 1;
+    font-weight: 950;
+}
+
+.oh-route-point__icon--from {
+    color: #1d4ed8;
+
+    background: rgba(219, 234, 254, 0.88);
+    border: 1px solid rgba(96, 165, 250, 0.28);
+}
+
+.oh-route-point__icon--to {
+    color: #166534;
+
+    background: rgba(220, 252, 231, 0.9);
+    border: 1px solid rgba(74, 222, 128, 0.28);
+}
+
+.oh-route-point__content {
+    min-width: 0;
+
+    display: grid;
+    gap: 4px;
+}
+
+.oh-route-point__content .oh-v {
+    overflow-wrap: anywhere;
+}
+
+.oh-route-divider {
+    align-self: center;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 34px;
+    height: 34px;
+
+    border-radius: 999px;
+
+    color: #64748b;
+
+    background: rgba(248, 250, 252, 0.92);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+
+/* =========================================================
+   Additional history blocks
+========================================================= */
+
+.oh-grid--express-meta,
+.oh-participants-grid {
+    margin-top: 12px;
+}
+
+.oh-description-box {
+    margin-top: 12px;
+    padding: 11px;
+
+    border-radius: 15px;
+
+    background: rgba(248, 250, 252, 0.64);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.oh-actions .btn {
+    gap: 8px;
+}
+
+.oh-actions .oh-pill {
+    gap: 6px;
+}
+
+
+/* =========================================================
+   Mobile express history
+========================================================= */
+
+@media (max-width: 620px) {
+    .oh-card-head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .oh-price {
+        width: 100%;
+    }
+
+    .oh-express-route {
+        grid-template-columns: 1fr;
+    }
+
+    .oh-route-divider {
+        margin-left: 0;
+        transform: rotate(90deg);
+    }
+}
