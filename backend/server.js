@@ -15,6 +15,11 @@ const cors = require("cors");
 const http = require("http");
 const jwt = require("jsonwebtoken");
 
+const {
+    uploadsRoot,
+    contractsRoot,
+} = require("./config/storagePaths");
+
 const makeActionLogger = require("./utils/actionLogger");
 const { initializeSocket } = require("./socket");
 const orderRoutes = require("./routes/orders");
@@ -97,8 +102,40 @@ app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
 app.use(bodyParser.json());
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use("/contracts", express.static(path.join(__dirname, "contracts")));
+app.use(
+    "/uploads",
+    express.static(uploadsRoot)
+);
+
+app.use("/contracts", express.static(contractsRoot, {
+        fallthrough: false,
+        setHeaders: (res, filePath) => {
+            if (
+                path.extname(filePath)
+                    .toLowerCase() === ".pdf"
+            ) {
+                res.setHeader(
+                    "Content-Type",
+                    "application/pdf"
+                );
+
+                res.setHeader(
+                    "Content-Disposition",
+                    "inline"
+                );
+            }
+        },
+    }));
+
+console.log(
+    "Uploads directory:",
+    uploadsRoot
+);
+
+console.log(
+    "Contracts directory:",
+    contractsRoot
+);
 
 app.use("/api/orders", orderRoutes(io));
 app.use("/api/disputes", disputeRoutes);

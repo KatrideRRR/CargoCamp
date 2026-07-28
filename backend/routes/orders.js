@@ -23,23 +23,18 @@ const { calculateRecommendedPrice } = require("../services/recommendedPriceServi
    Папки uploads
 ================================ */
 
-const uploadsRoot = path.join(__dirname, "..", "uploads");
-const ordersRoot = path.join(uploadsRoot, "orders");
-const tempRoot = path.join(uploadsRoot, "temp");
-const uploadDocumentRoot = path.join("upload-document");
-const contractsRoot = path.join(__dirname, "..", "contracts");
+const {
+    uploadsRoot,
+    ordersRoot,
+    tempRoot,
+    contractsRoot,
+    ensureDirectory,
+} = require("../config/storagePaths");
 
-function ensureDir(dirPath) {
-    if (!fs.existsSync(dirPath)) {
-        fs.mkdirSync(dirPath, { recursive: true });
-    }
-}
+const uploadDocumentRoot =
+    path.resolve(__dirname, "..", "upload-document");
 
-ensureDir(uploadsRoot);
-ensureDir(ordersRoot);
-ensureDir(tempRoot);
-ensureDir(uploadDocumentRoot);
-ensureDir(contractsRoot);
+ensureDirectory(uploadDocumentRoot);
 
 /* ===============================
    MULTER для создания заказа
@@ -78,7 +73,7 @@ function buildOrderPhotoUploader(type) {
                     `order_${orderId}`
                 );
 
-                ensureDir(dir);
+                ensureDirectory(dir);
 
                 cb(null, dir);
 
@@ -98,7 +93,7 @@ function buildOrderPhotoUploader(type) {
                     `order_${orderId}`
                 );
 
-                ensureDir(dir);
+                ensureDirectory(dir);
 
                 const ext = path.extname(file.originalname) || ".jpg";
 
@@ -2138,15 +2133,30 @@ module.exports = (io) => {
                 completedBy: [],
             };
 
-            const filePath = path.join(contractsRoot, `contract_${fullOrder.id}.pdf`);
+            const contractFileName =
+                `contract_${fullOrder.id}.pdf`;
+
+            const filePath =
+                path.join(
+                    contractsRoot,
+                    contractFileName
+                );
 
             try {
-                await generateContractPDF(contractData, filePath);
+                await generateContractPDF(
+                    contractData,
+                    filePath
+                );
 
-                fullOrder.contractPath = path.relative(path.join(__dirname, ".."), filePath);
-                await fullOrder.save();
+                await fullOrder.update({
+                    contractPath:
+                        `/contracts/${contractFileName}`,
+                });
             } catch (err) {
-                console.error("❌ Ошибка генерации PDF договора:", err);
+                console.error(
+                    "❌ Ошибка генерации PDF договора:",
+                    err
+                );
             }
 
             io.emit("orderUpdated");
@@ -2441,11 +2451,24 @@ module.exports = (io) => {
                 };
 
                 try {
-                    const contractPath = path.join(contractsRoot, `contract_${order.id}.pdf`);
-                    await generateContractPDF(data, contractPath);
+                    const contractFileName =
+                        `contract_${fullOrder.id}.pdf`;
 
-                    fullOrder.contractPath = path.relative(path.join(__dirname, ".."), contractPath);
-                    await fullOrder.save();
+                    const physicalContractPath =
+                        path.join(
+                            contractsRoot,
+                            contractFileName
+                        );
+
+                    await generateContractPDF(
+                        data,
+                        physicalContractPath
+                    );
+
+                    await fullOrder.update({
+                        contractPath:
+                            `/contracts/${contractFileName}`,
+                    });
                 } catch (pdfError) {
                     console.error("Ошибка генерации договора:", pdfError);
                 }

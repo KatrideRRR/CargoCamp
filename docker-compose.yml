@@ -11,9 +11,12 @@ services:
       DB_USER: cargocamp            # поменяй на своего пользователя
       DB_PASSWORD: root        # поменяй на пароль
       DB_NAME: cargo_camp
+
+      CONTRACTS_DIR: /data/contracts
+
     volumes:
       - ./uploads:/app/uploads
-      - ./contracts:/app/contracts
+      - /var/lib/cargocamp/contracts:/data/contracts
       - /root/cargocamp-secrets/firebase-service-account.json:/app/secrets/firebase-service-account.json:ro
     command: ["npm", "start"]
 

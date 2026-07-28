@@ -29,3 +29,8 @@ backend/secrets/
 backend/secrets/*.json
 backend/secrets/firebase-service-account.json
 frontend/android/app/google-services.json
+backend/contracts/*
+!backend/contracts/.gitkeep
+
+contracts/*
+!contracts/.gitkeep
