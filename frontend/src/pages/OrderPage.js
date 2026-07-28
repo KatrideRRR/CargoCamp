@@ -852,11 +852,17 @@ const OrderPage = () => {
                         <div className="order-actions">
                             <Link
                                 to={`/complaints/${order.creatorId}`}
-                                className="btn btn-ghost-danger btn-inline"
+                                className="btn btn-ghost-danger btn-inline complaint-btn"
                                 aria-label={`Жалобы (${creator.complaintsCount || 0})`}
                             >
-                                <FiAlertTriangle style={{ marginRight: 8 }} />
-                                {creator.complaintsCount || 0}
+                                <FiAlertTriangle
+                                    className="complaint-btn-icon"
+                                    aria-hidden="true"
+                                />
+
+                                <span className="complaint-btn-count">
+        {creator.complaintsCount || 0}
+    </span>
                             </Link>
 
                             {isExpress && (

@@ -3261,3 +3261,376 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* =========================================================
+   ORDER ACTIONS — FINAL LAYOUT
+   Компактная кнопка жалоб и естественные переносы кнопок
+========================================================= */
+
+/* Кнопка жалоб всегда небольшая */
+.orders-page .complaint-btn,
+.orders-page a.complaint-btn {
+    flex: 0 0 auto;
+
+    width: auto !important;
+    min-width: 48px !important;
+    max-width: max-content;
+
+    min-height: 42px;
+    padding: 8px 10px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+
+    border-radius: 15px;
+    white-space: nowrap;
+}
+
+.orders-page .complaint-btn-icon {
+    flex: 0 0 auto;
+
+    display: block;
+    width: 17px;
+    height: 17px;
+
+    stroke-width: 2.3;
+}
+
+.orders-page .complaint-btn-count {
+    flex: 0 0 auto;
+
+    font-size: 12.5px;
+    line-height: 1;
+    font-weight: 950;
+}
+
+
+/* =========================================================
+   СТРАНИЦА ВСЕХ ЗАКАЗОВ
+========================================================= */
+
+.orders-page:not(.order-detail-page) .order-actions {
+    width: 100%;
+    min-width: 0;
+
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px;
+
+    align-items: start;
+    justify-content: stretch;
+}
+
+/* Жалобы — маленькая кнопка слева */
+.orders-page:not(.order-detail-page)
+.order-actions > .complaint-btn {
+    grid-column: 1;
+    grid-row: 1;
+
+    align-self: start;
+    justify-self: start;
+
+    width: auto !important;
+}
+
+/*
+ * Все остальные кнопки справа.
+ * Используем flex-wrap — ширина зависит от текста,
+ * а не от жёсткого количества колонок.
+ */
+.orders-page:not(.order-detail-page)
+.order-main-actions {
+    grid-column: 2;
+    grid-row: 1;
+
+    width: 100%;
+    min-width: 0;
+
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    justify-content: flex-end;
+
+    gap: 8px;
+}
+
+/* Обычные кнопки естественно растут и переносятся */
+.orders-page:not(.order-detail-page)
+.order-main-actions > .btn {
+    width: auto !important;
+    min-width: 0;
+
+    flex: 1 1 130px;
+
+    padding-left: 11px;
+    padding-right: 11px;
+
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+}
+
+/* Кнопка «Открыть» компактнее остальных */
+.orders-page:not(.order-detail-page)
+.order-main-actions > .btn:first-child {
+    flex: 0 1 auto;
+    min-width: 88px;
+}
+
+/* Главная кнопка занимает больше места */
+.orders-page:not(.order-detail-page)
+.order-main-actions > .btn.btn-primary {
+    flex: 1 1 170px;
+}
+
+
+/* =========================================================
+   EXPRESS ROUTE BUTTONS
+========================================================= */
+
+.orders-page .express-nav {
+    min-width: 0;
+    max-width: 100%;
+
+    display: flex;
+    flex: 1 1 180px;
+    flex-wrap: wrap;
+
+    gap: 8px;
+    align-items: stretch;
+}
+
+/*
+ * Кнопки маршрута получают ширину по тексту.
+ * Когда места не хватает — целиком переходят ниже.
+ */
+.orders-page .express-nav .express-nav-btn {
+    width: auto !important;
+    min-width: 120px;
+    max-width: 100%;
+
+    flex: 1 1 145px;
+
+    padding-left: 11px;
+    padding-right: 11px;
+
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+.orders-page .express-nav-btn .btn-text {
+    min-width: 0;
+
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+
+    line-height: 1.2;
+}
+
+
+/* =========================================================
+   СТРАНИЦА ОДНОГО ЗАКАЗА
+========================================================= */
+
+.order-detail-page .order-actions {
+    width: 100%;
+    min-width: 0;
+
+    display: flex;
+    flex-wrap: wrap;
+
+    align-items: stretch;
+    justify-content: flex-end;
+
+    gap: 8px;
+}
+
+/* Жалобы не растягиваются */
+.order-detail-page
+.order-actions > .complaint-btn {
+    width: auto !important;
+    min-width: 48px !important;
+
+    flex: 0 0 auto;
+}
+
+/* Навигация занимает оставшееся место */
+.order-detail-page
+.order-actions > .express-nav {
+    width: auto;
+    min-width: 180px;
+
+    flex: 1 1 220px;
+}
+
+/* Принять / Мои активные */
+.order-detail-page
+.order-actions > button {
+    width: auto !important;
+    min-width: 130px;
+
+    flex: 1 1 150px;
+
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+}
+
+
+/* =========================================================
+   BLOCKED HINT
+========================================================= */
+
+.orders-page:not(.order-detail-page)
+.order-actions > .blocked-order-hint {
+    grid-column: 1 / -1;
+
+    width: 100%;
+    max-width: none;
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 860px) {
+    /*
+     * Оставляем маленькую кнопку жалоб слева,
+     * остальные действия — справа с естественным переносом.
+     */
+    .orders-page:not(.order-detail-page)
+    .order-actions {
+        grid-template-columns: 48px minmax(0, 1fr);
+        gap: 8px;
+    }
+
+    .orders-page:not(.order-detail-page)
+    .order-actions > .complaint-btn {
+        width: 48px !important;
+        min-width: 48px !important;
+        max-width: 48px;
+
+        padding-left: 6px;
+        padding-right: 6px;
+    }
+
+    .orders-page:not(.order-detail-page)
+    .order-main-actions {
+        justify-content: stretch;
+    }
+
+    .orders-page:not(.order-detail-page)
+    .order-main-actions > .btn {
+        flex: 1 1 125px;
+    }
+
+    .orders-page:not(.order-detail-page)
+    .order-main-actions > .btn:first-child {
+        flex: 1 1 86px;
+    }
+
+    .orders-page:not(.order-detail-page)
+    .order-main-actions > .btn.btn-primary {
+        flex: 1 1 165px;
+    }
+
+    /*
+     * ExpressRouteButtons переносит кнопки по доступной ширине.
+     * Не заставляем каждую занимать всю строку.
+     */
+    .orders-page .express-nav,
+    .orders-page .express-nav .express-nav-btn,
+    .orders-page .express-nav-btn {
+        width: auto !important;
+    }
+
+    .orders-page .express-nav {
+        flex: 1 1 170px;
+    }
+
+    .orders-page .express-nav .express-nav-btn {
+        flex: 1 1 135px;
+        min-width: 115px;
+    }
+
+    /* Детальная страница */
+    .order-detail-page .order-actions {
+        justify-content: stretch;
+    }
+
+    .order-detail-page
+    .order-actions > .complaint-btn {
+        width: 48px !important;
+        min-width: 48px !important;
+        max-width: 48px;
+
+        flex: 0 0 48px;
+    }
+
+    .order-detail-page
+    .order-actions > .express-nav {
+        min-width: 180px;
+        flex: 1 1 calc(100% - 56px);
+    }
+
+    .order-detail-page
+    .order-actions > button {
+        width: 100% !important;
+        flex: 1 1 100%;
+    }
+}
+
+
+/* Совсем узкие экраны */
+@media (max-width: 380px) {
+    .orders-page:not(.order-detail-page)
+    .order-actions {
+        grid-template-columns: 44px minmax(0, 1fr);
+        gap: 7px;
+    }
+
+    .orders-page .complaint-btn,
+    .orders-page a.complaint-btn,
+    .orders-page:not(.order-detail-page)
+    .order-actions > .complaint-btn,
+    .order-detail-page
+    .order-actions > .complaint-btn {
+        width: 44px !important;
+        min-width: 44px !important;
+        max-width: 44px;
+        min-height: 40px;
+
+        padding: 6px 5px;
+        gap: 4px;
+    }
+
+    .orders-page .complaint-btn-icon {
+        width: 15px;
+        height: 15px;
+    }
+
+    .orders-page .complaint-btn-count {
+        font-size: 11.5px;
+    }
+
+    .orders-page:not(.order-detail-page)
+    .order-main-actions > .btn {
+        flex-basis: 115px;
+        font-size: 12.5px;
+    }
+
+    .orders-page .express-nav .express-nav-btn {
+        min-width: 105px;
+        flex-basis: 120px;
+
+        font-size: 12.5px;
+    }
+}

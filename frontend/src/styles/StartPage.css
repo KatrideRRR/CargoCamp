@@ -466,3 +466,426 @@ body {
         transition: none;
     }
 }
+
+/* =========================================================
+   iPhone / TestFlight modal
+========================================================= */
+
+.start-page-ios-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding:
+            calc(16px + env(safe-area-inset-top, 0px))
+            14px
+            calc(16px + env(safe-area-inset-bottom, 0px));
+
+    background: rgba(15, 23, 42, 0.56);
+
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+
+    overflow-y: auto;
+    overscroll-behavior: contain;
+
+    animation: startPageIosOverlayIn 180ms ease both;
+}
+
+.start-page-ios-modal {
+    position: relative;
+
+    width: min(480px, 100%);
+    max-height: calc(
+            100dvh -
+            32px -
+            env(safe-area-inset-top, 0px) -
+            env(safe-area-inset-bottom, 0px)
+    );
+
+    padding: 22px;
+
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+
+    border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.76);
+
+    background:
+            radial-gradient(
+                    circle at 20% 0%,
+                    rgba(219, 234, 254, 0.76),
+                    transparent 34%
+            ),
+            linear-gradient(
+                    180deg,
+                    rgba(255, 255, 255, 0.98),
+                    rgba(248, 250, 252, 0.96)
+            );
+
+    box-shadow:
+            0 32px 90px rgba(15, 23, 42, 0.3),
+            0 10px 30px rgba(15, 23, 42, 0.14),
+            inset 0 1px 0 rgba(255, 255, 255, 1);
+
+    color: #0f172a;
+
+    animation: startPageIosModalIn
+    240ms
+    cubic-bezier(0.22, 1, 0.36, 1)
+    both;
+}
+
+.start-page-ios-modal-close {
+    position: absolute;
+    top: 13px;
+    right: 13px;
+
+    width: 38px;
+    height: 38px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 0;
+
+    border-radius: 999px;
+    border: 1px solid rgba(203, 213, 225, 0.82);
+
+    background: rgba(255, 255, 255, 0.82);
+    color: #475569;
+
+    font-family: inherit;
+    font-size: 24px;
+    line-height: 1;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    box-shadow:
+            0 7px 18px rgba(15, 23, 42, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 1);
+
+    -webkit-tap-highlight-color: transparent;
+}
+
+.start-page-ios-modal-close:active {
+    transform: scale(0.94);
+}
+
+.start-page-ios-modal-icon {
+    width: 56px;
+    height: 56px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    margin-bottom: 14px;
+
+    border-radius: 19px;
+
+    color: #111827;
+
+    background:
+            linear-gradient(
+                    145deg,
+                    rgba(255, 255, 255, 1),
+                    rgba(226, 232, 240, 0.76)
+            );
+
+    border: 1px solid rgba(203, 213, 225, 0.72);
+
+    box-shadow:
+            0 12px 28px rgba(15, 23, 42, 0.1),
+            inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+.start-page-ios-modal-icon svg {
+    width: 29px;
+    height: 29px;
+}
+
+.start-page-ios-modal-title {
+    margin: 0;
+    padding-right: 34px;
+
+    font-size: 23px;
+    line-height: 1.15;
+    font-weight: 900;
+    letter-spacing: -0.035em;
+
+    color: #0f172a;
+}
+
+.start-page-ios-modal-description {
+    margin: 9px 0 0;
+
+    max-width: 410px;
+
+    color: #64748b;
+
+    font-size: 14px;
+    line-height: 1.45;
+    font-weight: 650;
+}
+
+.start-page-ios-steps {
+    margin-top: 19px;
+
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+.start-page-ios-step {
+    min-width: 0;
+
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 11px;
+    align-items: flex-start;
+
+    padding: 12px;
+
+    border-radius: 18px;
+    border: 1px solid rgba(226, 232, 240, 0.88);
+
+    background: rgba(255, 255, 255, 0.76);
+
+    box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.95),
+            0 5px 14px rgba(15, 23, 42, 0.035);
+}
+
+.start-page-ios-step-number {
+    width: 36px;
+    height: 36px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 13px;
+
+    color: #2563eb;
+    background: rgba(219, 234, 254, 0.82);
+    border: 1px solid rgba(147, 197, 253, 0.48);
+
+    font-size: 14px;
+    line-height: 1;
+    font-weight: 900;
+}
+
+.start-page-ios-step-content {
+    min-width: 0;
+}
+
+.start-page-ios-step-title {
+    color: #0f172a;
+
+    font-size: 13.5px;
+    line-height: 1.25;
+    font-weight: 900;
+}
+
+.start-page-ios-step-text {
+    margin-top: 4px;
+
+    color: #64748b;
+
+    font-size: 12.5px;
+    line-height: 1.4;
+    font-weight: 650;
+}
+
+.start-page-ios-modal-actions {
+    margin-top: 18px;
+
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+}
+
+.start-page-ios-modal-button {
+    appearance: none;
+    min-width: 0;
+    min-height: 54px;
+
+    padding: 10px 12px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+
+    border-radius: 17px;
+
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.2;
+    font-weight: 900;
+    text-align: center;
+
+    cursor: pointer;
+
+    transition:
+            transform 140ms ease,
+            box-shadow 160ms ease,
+            background 160ms ease;
+
+    -webkit-tap-highlight-color: transparent;
+}
+
+.start-page-ios-modal-button:active {
+    transform: scale(0.98);
+}
+
+.start-page-ios-modal-button-secondary {
+    color: #334155;
+
+    border: 1px solid rgba(203, 213, 225, 0.88);
+
+    background:
+            linear-gradient(
+                    180deg,
+                    #ffffff,
+                    #f1f5f9
+            );
+
+    box-shadow:
+            0 8px 18px rgba(15, 23, 42, 0.07),
+            inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+.start-page-ios-modal-button-primary {
+    color: #ffffff;
+
+    border: 1px solid rgba(37, 99, 235, 0.88);
+
+    background:
+            linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #4f46e5
+            );
+
+    box-shadow:
+            0 12px 26px rgba(37, 99, 235, 0.25),
+            inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.start-page-ios-button-step {
+    opacity: 0.72;
+
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.start-page-ios-modal-note {
+    margin: 12px 0 0;
+
+    padding: 10px 11px;
+
+    border-radius: 15px;
+    border: 1px solid rgba(191, 219, 254, 0.66);
+
+    background: rgba(239, 246, 255, 0.76);
+    color: #475569;
+
+    font-size: 11.5px;
+    line-height: 1.4;
+    font-weight: 700;
+}
+
+@keyframes startPageIosOverlayIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes startPageIosModalIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.975);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@media (max-width: 520px) {
+    .start-page-ios-modal-overlay {
+        align-items: flex-end;
+
+        padding:
+                10px
+                10px
+                calc(10px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .start-page-ios-modal {
+        width: 100%;
+        max-height: calc(
+                100dvh -
+                20px -
+                env(safe-area-inset-bottom, 0px)
+        );
+
+        padding: 19px 17px 17px;
+
+        border-radius: 26px;
+    }
+
+    .start-page-ios-modal-title {
+        font-size: 21px;
+    }
+
+    .start-page-ios-modal-description {
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 390px) {
+    .start-page-ios-modal-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .start-page-ios-modal-button {
+        min-height: 50px;
+    }
+
+    .start-page-ios-step {
+        grid-template-columns: 32px minmax(0, 1fr);
+        gap: 9px;
+        padding: 10px;
+    }
+
+    .start-page-ios-step-number {
+        width: 32px;
+        height: 32px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .start-page-ios-modal-overlay,
+    .start-page-ios-modal {
+        animation: none;
+    }
+}

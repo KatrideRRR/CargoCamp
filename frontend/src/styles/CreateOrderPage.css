@@ -1746,3 +1746,266 @@
         font-size: 11.5px;
     }
 }
+
+/* =========================
+   PROMOTION OPTIONS
+   ========================= */
+
+.create-page .promoOptions {
+    width: 100%;
+    min-width: 0;
+}
+
+.create-page .promoOptionsHead {
+    width: 100%;
+    margin-bottom: 10px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.create-page .promoOptionsHead > div:first-child {
+    min-width: 0;
+}
+
+.create-page .promoOptionsTitle {
+    font-size: 12.5px;
+    font-weight: 900;
+    line-height: 1.25;
+    color: rgba(15, 23, 42, 0.94);
+}
+
+.create-page .promoOptionsSub {
+    margin-top: 3px;
+
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.3;
+    color: rgba(100, 116, 139, 0.94);
+}
+
+.create-page .promoOptionsTotal {
+    flex: 0 0 auto;
+
+    padding: 7px 10px;
+    border-radius: 13px;
+
+    background: rgba(29, 78, 216, 0.10);
+    border: 1px solid rgba(29, 78, 216, 0.16);
+
+    color: rgba(29, 78, 216, 0.98);
+    font-size: 12px;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+/* Список всегда идёт одной колонкой */
+.create-page .promoOptionsList {
+    width: 100%;
+
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/*
+ * Вся строка является кликабельной.
+ * Колонки:
+ * иконка | название и цена | наша галочка
+ */
+.create-page .promoOption {
+    position: relative;
+
+    width: 100%;
+    min-width: 0;
+    min-height: 58px;
+    padding: 10px 11px;
+
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) 26px;
+    align-items: center;
+    gap: 10px;
+
+    border-radius: 16px;
+    border: 1px solid rgba(29, 78, 216, 0.10);
+    background: rgba(255, 255, 255, 0.52);
+
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+
+    transition:
+            transform 0.16s ease,
+            background 0.16s ease,
+            border-color 0.16s ease,
+            box-shadow 0.16s ease;
+}
+
+/*
+ * Нативный checkbox оставляем доступным для формы
+ * и клавиатуры, но убираем из визуальной раскладки.
+ */
+.create-page .promoOption > input[type="checkbox"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    padding: 0;
+
+    opacity: 0;
+    pointer-events: none;
+}
+
+.create-page .promoOption:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.72);
+    border-color: rgba(29, 78, 216, 0.18);
+}
+
+.create-page .promoOption:active {
+    transform: scale(0.992);
+}
+
+.create-page .promoOption.active {
+    background:
+            linear-gradient(
+                    135deg,
+                    rgba(29, 78, 216, 0.13),
+                    rgba(99, 102, 241, 0.09)
+            );
+
+    border-color: rgba(29, 78, 216, 0.28);
+
+    box-shadow:
+            0 0 0 3px rgba(29, 78, 216, 0.07),
+            inset 0 1px 0 rgba(255, 255, 255, 0.64);
+}
+
+.create-page .promoOption:focus-within {
+    border-color: rgba(29, 78, 216, 0.34);
+
+    box-shadow:
+            0 0 0 4px rgba(29, 78, 216, 0.10),
+            inset 0 1px 0 rgba(255, 255, 255, 0.64);
+}
+
+/* Иконка слева */
+.create-page .promoOptionIcon {
+    width: 36px;
+    height: 36px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 12px;
+    background: rgba(29, 78, 216, 0.09);
+    border: 1px solid rgba(29, 78, 216, 0.12);
+
+    color: rgba(29, 78, 216, 0.92);
+}
+
+.create-page .promoIcon {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2.2;
+}
+
+/* Центральная часть */
+.create-page .promoOptionText {
+    min-width: 0;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+}
+
+.create-page .promoOptionLabel {
+    min-width: 0;
+
+    font-size: 12.5px;
+    font-weight: 900;
+    line-height: 1.28;
+    color: rgba(15, 23, 42, 0.92);
+
+    overflow-wrap: anywhere;
+}
+
+.create-page .promoOptionPrice {
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1.2;
+    color: rgba(29, 78, 216, 0.94);
+}
+
+/* Собственная галочка всегда строго по центру справа */
+.create-page .promoOptionCheck {
+    width: 24px;
+    height: 24px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+
+    border-radius: 8px;
+    border: 1.5px solid rgba(100, 116, 139, 0.28);
+    background: rgba(255, 255, 255, 0.66);
+
+    color: transparent;
+    font-size: 13px;
+    font-weight: 900;
+    line-height: 1;
+
+    transition:
+            background 0.16s ease,
+            border-color 0.16s ease,
+            color 0.16s ease,
+            transform 0.16s ease;
+}
+
+.create-page .promoOption.active .promoOptionCheck {
+    background: rgba(29, 78, 216, 0.96);
+    border-color: rgba(29, 78, 216, 0.96);
+    color: #ffffff;
+
+    box-shadow: 0 6px 14px rgba(29, 78, 216, 0.22);
+}
+
+/* На узких экранах ничего не перестраиваем,
+   только слегка уменьшаем размеры */
+@media (max-width: 420px) {
+    .create-page .promoBox {
+        padding: 9px;
+    }
+
+    .create-page .promoOption {
+        min-height: 56px;
+        padding: 9px;
+
+        grid-template-columns: 34px minmax(0, 1fr) 24px;
+        gap: 9px;
+    }
+
+    .create-page .promoOptionIcon {
+        width: 34px;
+        height: 34px;
+    }
+
+    .create-page .promoIcon {
+        width: 17px;
+        height: 17px;
+    }
+
+    .create-page .promoOptionLabel {
+        font-size: 12px;
+    }
+
+    .create-page .promoOptionCheck {
+        width: 23px;
+        height: 23px;
+    }
+}
