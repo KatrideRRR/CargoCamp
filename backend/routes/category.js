@@ -320,25 +320,44 @@ router.get("/search", async (req, res) => {
 
             if (score <= 0) continue;
 
-            // Прямое совпадение с названием подкатегории
-            // должно быть выше совпадения по общей категории.
             score += 650;
 
             candidates.push({
                 type: "subcategory",
 
-                categoryId: subcategory.category.id,
-                categoryName: subcategory.category.name,
+                categoryId:
+                subcategory.category.id,
 
-                subcategoryId: subcategory.id,
-                subcategoryName: subcategory.name,
+                categoryName:
+                subcategory.category.name,
 
-                price: subcategory.price,
+                subcategoryId:
+                subcategory.id,
 
-                label: subcategory.name,
-                matchedPhrase: subcategory.name,
-                matchedBy: "subcategory_name",
-                pricingConfig: subcategory.pricingConfig,
+                subcategoryName:
+                subcategory.name,
+
+                subcategoryCode:
+                    subcategory.code || null,
+
+                formConfig:
+                    subcategory.formConfig || null,
+
+                pricingConfig:
+                    subcategory.pricingConfig || null,
+
+                price:
+                    subcategory.price ?? null,
+
+                label:
+                subcategory.name,
+
+                matchedPhrase:
+                subcategory.name,
+
+                matchedBy:
+                    "subcategory_name",
+
                 score,
             });
         }
@@ -404,9 +423,65 @@ router.get("/search", async (req, res) => {
 
             const existing = uniqueMap.get(key);
 
+            if (!existing) {
+                uniqueMap.set(key, candidate);
+                continue;
+            }
+
+            const existingHasForm =
+                Array.isArray(
+                    existing.formConfig?.fields
+                ) &&
+                existing.formConfig.fields.length > 0;
+
+            const candidateHasForm =
+                Array.isArray(
+                    candidate.formConfig?.fields
+                ) &&
+                candidate.formConfig.fields.length > 0;
+
+            const existingHasPricing =
+                existing.pricingConfig &&
+                typeof existing.pricingConfig ===
+                "object";
+
+            const candidateHasPricing =
+                candidate.pricingConfig &&
+                typeof candidate.pricingConfig ===
+                "object";
+
+            /*
+             * Сначала предпочитаем результат,
+             * у которого есть форма и калькулятор.
+             * Затем смотрим на поисковый score.
+             */
+            const candidateIsMoreComplete =
+                (
+                    candidateHasForm &&
+                    !existingHasForm
+                ) ||
+                (
+                    candidateHasPricing &&
+                    !existingHasPricing
+                );
+
+            const existingIsMoreComplete =
+                (
+                    existingHasForm &&
+                    !candidateHasForm
+                ) ||
+                (
+                    existingHasPricing &&
+                    !candidateHasPricing
+                );
+
             if (
-                !existing ||
-                candidate.score > existing.score
+                candidateIsMoreComplete ||
+                (
+                    !existingIsMoreComplete &&
+                    candidate.score >
+                    existing.score
+                )
             ) {
                 uniqueMap.set(key, candidate);
             }
