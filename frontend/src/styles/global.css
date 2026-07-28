@@ -79,21 +79,21 @@ html,
 body,
 #root {
     width: 100%;
-    min-height: 100%;
     margin: 0;
+
+    background-color:
+            var(--app-system-bar-background);
 }
 
 html {
+    height: 100%;
     min-height: 100%;
+
     overflow-x: hidden;
-    background: var(--app-system-bar-background);
 }
 
 body {
-    min-height: 100vh;
-    min-height: 100dvh;
-
-    margin: 0;
+    min-height: 100%;
 
     overflow-x: hidden;
     overflow-y: auto;
@@ -105,31 +105,37 @@ body {
             "Segoe UI",
             sans-serif;
 
-    background: var(--app-system-bar-background);
     color: #1f2933;
 
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeSpeed;
-
-    /*
-      Не ставить:
-      position: fixed;
-      overflow: hidden;
-
-      Иначе ломается прокрутка iOS WebView.
-    */
 }
 
 #root {
-    min-height: 100vh;
-    min-height: 100dvh;
+    width: 100%;
+    min-height: 100%;
 
     position: relative;
     overflow: visible;
 
+    background-color:
+            var(--app-system-bar-background);
+
     isolation: isolate;
 }
 
+/*
+  100dvh применяем только тогда,
+  когда экран не уменьшен Android-клавиатурой.
+*/
+@media (min-width: 769px),
+(hover: hover) {
+    body,
+    #root {
+        min-height: 100vh;
+        min-height: 100dvh;
+    }
+}
 /* =========================================================
    BASE ELEMENTS
    ========================================================= */
@@ -386,13 +392,19 @@ body.hide-bottom-menu .auth-page {
 */
 .active-orders .pageContainer {
     width: 100%;
-    min-height: 100vh;
-    min-height: 100dvh;
+    min-height: 100%;
 
-    padding-top: var(--app-page-top) !important;
-    padding-right: max(12px, var(--safe-right)) !important;
-    padding-bottom: var(--app-page-bottom) !important;
-    padding-left: max(12px, var(--safe-left)) !important;
+    padding-top:
+            var(--app-page-top) !important;
+
+    padding-right:
+            max(12px, var(--safe-right)) !important;
+
+    padding-bottom:
+            var(--app-page-bottom) !important;
+
+    padding-left:
+            max(12px, var(--safe-left)) !important;
 }
 
 body.hide-bottom-menu .active-orders .pageContainer {
