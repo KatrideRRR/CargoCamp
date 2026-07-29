@@ -2023,8 +2023,26 @@ module.exports = (io) => {
             }
 
             const executor = await User.findByPk(normalizedExecutorId);
+
             if (!executor) {
-                return res.status(404).json({ message: "Исполнитель не найден" });
+                return res.status(404).json({
+                    message: "Исполнитель не найден",
+                });
+            }
+
+// Загружаем заказчика, потому что скидка на комиссию
+// зависит от статуса создателя заказа.
+            const creator = await User.findByPk(order.creatorId, {
+                attributes: [
+                    "id",
+                    "userStatus",
+                ],
+            });
+
+            if (!creator) {
+                return res.status(404).json({
+                    message: "Заказчик не найден",
+                });
             }
 
             const isPremium =
@@ -2033,10 +2051,34 @@ module.exports = (io) => {
                 new Date(executor.subscription_expires_at) > new Date();
 
             const isCash = order.paymentType === "cash";
-            const isRecommended = !!order.is_recommended;
+            const isRecommended = Boolean(order.is_recommended);
 
-            const feeRub = isRecommended ? 100 : 200;
-            const commissionKopecks = !isPremium && isCash ? feeRub * 100 : 0;
+            const creatorStatus = String(
+                creator.userStatus || ""
+            )
+                .trim()
+                .toLowerCase();
+
+            const isPensionerCreator =
+                creatorStatus === "pensioner";
+
+// Базовая комиссия:
+// обычный заказ — 200 ₽
+// рекомендованный — 100 ₽
+            const baseFeeRub = isRecommended ? 100 : 200;
+
+// Если заказчик — пенсионер,
+// комиссия исполнителя уменьшается в два раза.
+            const feeRub = isPensionerCreator
+                ? baseFeeRub / 2
+                : baseFeeRub;
+
+// Premium или безналичная сделка через гарантию —
+// комиссию в задолженность не начисляем.
+            const commissionKopecks =
+                !isPremium && isCash
+                    ? Math.round(feeRub * 100)
+                    : 0;
 
             let finalDebtKopecks = Number(executor.debt || 0);
 
@@ -2092,9 +2134,16 @@ module.exports = (io) => {
                     finalPriceKopecks: order.finalPriceKopecks,
                     status: order.status,
                     dealStatus: order.dealStatus,
+
+                    creatorUserStatus: creatorStatus,
+                    isPensionerCreator,
+
+                    baseCommissionKopecks: baseFeeRub * 100,
                     commissionKopecks,
+
                     debtKopecks: finalDebtKopecks,
                     isPremium,
+
                     autoPaymentTried: commissionPayment.autoPaymentTried,
                     autoPaymentPaid: commissionPayment.autoPaymentPaid,
                     autoPaymentProcessing: commissionPayment.autoPaymentProcessing,
@@ -2168,18 +2217,26 @@ module.exports = (io) => {
             let executorMessage = "Ваш запрос на выполнение заказа одобрен!";
 
             if (commissionKopecks > 0) {
+                const commissionRub =
+                    commissionKopecks / 100;
+
+                const pensionerText =
+                    isPensionerCreator
+                        ? " Комиссия уменьшена вдвое, поскольку заказчик имеет статус пенсионера."
+                        : "";
+
                 if (commissionPayment.autoPaymentPaid) {
                     executorMessage =
-                        "Ваш запрос одобрен! Комиссия списана с привязанной карты ✅";
+                        `Ваш запрос одобрен! Комиссия ${commissionRub} ₽ списана с привязанной карты ✅${pensionerText}`;
                 } else if (commissionPayment.autoPaymentProcessing) {
                     executorMessage =
-                        "Ваш запрос одобрен! Пробуем списать комиссию с привязанной карты.";
+                        `Ваш запрос одобрен! Пробуем списать комиссию ${commissionRub} ₽ с привязанной карты.${pensionerText}`;
                 } else if (commissionPayment.autoPaymentTried) {
                     executorMessage =
-                        "Ваш запрос одобрен! Автоматическое списание не прошло, комиссия осталась в задолженности.";
+                        `Ваш запрос одобрен! Автоматическое списание не прошло, комиссия ${commissionRub} ₽ осталась в задолженности.${pensionerText}`;
                 } else {
                     executorMessage =
-                        "Ваш запрос одобрен! Комиссия начислена в задолженность.";
+                        `Ваш запрос одобрен! Комиссия ${commissionRub} ₽ начислена в задолженность.${pensionerText}`;
                 }
             } else if (isPremium) {
                 executorMessage =

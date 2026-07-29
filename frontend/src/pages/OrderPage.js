@@ -19,6 +19,14 @@ import ExpressRouteButtons from "../components/ExpressRouteButtons";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
+function isPensionerUser(user) {
+    return (
+        String(user?.userStatus || "")
+            .trim()
+            .toLowerCase() === "pensioner"
+    );
+}
+
 function normalizeBoolean(value) {
     if (
         value === true ||
@@ -623,6 +631,18 @@ const OrderPage = () => {
     const isExpress = !!order.express;
     const displayId = isExpress ? order.expressId : order.id;
 
+    const isPensionerOrder =
+        !isExpress &&
+        isPensionerUser(creator);
+
+    const baseCommissionRub =
+        order.is_recommended
+            ? 100
+            : 200;
+
+    const discountedCommissionRub =
+        baseCommissionRub / 2;
+
     const orderTiming = isExpress
         ? null
         : getOrderTiming(order);
@@ -708,6 +728,15 @@ const OrderPage = () => {
 
                                     {!isExpress && canRequestRegular && (
                                         <span className="badge badge-can-take">Можно взять</span>
+                                    )}
+
+                                    {isPensionerOrder && (
+                                        <span
+                                            className="badge badge-pensioner-order"
+                                            title={`Комиссия исполнителя снижена с ${baseCommissionRub} ₽ до ${discountedCommissionRub} ₽`}
+                                        >
+        Льготный заказ · комиссия −50%
+    </span>
                                     )}
 
                                     {isExpress && canAcceptExpress && (
@@ -847,6 +876,28 @@ const OrderPage = () => {
                             <OrderServiceDetails
                                 order={order}
                             />
+                        )}
+
+                        {isPensionerOrder && (
+                            <div className="pensioner-order-notice">
+        <span className="pensioner-order-notice__icon">
+            %
+        </span>
+
+                                <div className="pensioner-order-notice__content">
+            <span className="pensioner-order-notice__title">
+                Льготный заказ
+            </span>
+
+                                    <span className="pensioner-order-notice__text">
+                Заказ создан пользователем со статусом пенсионера.
+                Комиссия исполнителя снижена вдвое:{" "}
+                                        <strong>
+                    {discountedCommissionRub} ₽ вместо {baseCommissionRub} ₽
+                </strong>.
+            </span>
+                                </div>
+                            </div>
                         )}
 
                         <div className="order-actions">

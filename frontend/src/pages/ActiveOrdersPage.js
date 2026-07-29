@@ -20,6 +20,24 @@ const apiUrl = process.env.REACT_APP_API_URL;
 const hasDescription = (value) =>
     typeof value === "string" && value.trim().length > 0;
 
+
+function getContractUrl(contractPath) {
+    if (!contractPath) {
+        return null;
+    }
+
+    if (/^https?:\/\//i.test(contractPath)) {
+        return contractPath;
+    }
+
+    const normalizedPath =
+        String(contractPath).startsWith("/")
+            ? String(contractPath)
+            : `/${contractPath}`;
+
+    return `${apiUrl}${normalizedPath}`;
+}
+
 const ActiveOrdersPage = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -995,6 +1013,9 @@ const ActiveOrdersPage = () => {
                                         const creator = creatorsInfo[order.creatorId] || {};
                                         const executor = executorsInfo[order.executorId] || {};
 
+                                        const contractUrl =
+                                            getContractUrl(order.contractPath);
+
                                         return (
                                             <li key={order.id} className="order-card">
                                                 <div className="order-header">
@@ -1241,18 +1262,28 @@ const ActiveOrdersPage = () => {
                                                             order={order}
                                                         />
 
-                                                        {order.contractPath && (
+                                                        {contractUrl && (
                                                             <div className="contract-download-row">
                                                                 <a
-                                                                    href={`${apiUrl}/${String(order.contractPath).replace(/\\/g, "/")}`}
+                                                                    href={contractUrl}
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
                                                                     className="contract-download-button"
-                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                    }}
                                                                 >
-                                                                    <span className="contract-download-icon">📄</span>
-                                                                    <span className="contract-download-text">Скачать договор</span>
-                                                                    <span className="contract-download-format">PDF</span>
+            <span className="contract-download-icon">
+                📄
+            </span>
+
+                                                                    <span className="contract-download-text">
+                Скачать договор
+            </span>
+
+                                                                    <span className="contract-download-format">
+                PDF
+            </span>
                                                                 </a>
                                                             </div>
                                                         )}

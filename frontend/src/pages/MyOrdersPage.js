@@ -48,6 +48,35 @@ const formatOrderDate = (value) => {
     return date.toLocaleString("ru-RU");
 };
 
+const normalizeUserStatus = (user) => {
+    const status = String(
+        user?.userStatus ??
+        user?.user_status ??
+        ""
+    )
+        .trim()
+        .toLowerCase();
+
+    if (status === "verified") {
+        return {
+            status: "verified",
+            label: "Верифицирован",
+        };
+    }
+
+    if (status === "pensioner") {
+        return {
+            status: "pensioner",
+            label: "Пенсионер",
+        };
+    }
+
+    return {
+        status: "unverified",
+        label: "Не верифицирован",
+    };
+};
+
 const normalizeBoolean = (value) => {
     if (
         value === true ||
@@ -831,51 +860,93 @@ const MyOrdersPage = () => {
                                                     {isExecExpanded ? (
                                                         hasExecutors ? (
                                                             <div className={styles.execList}>
-                                                                {order.requestedExecutors.map((executor) => (
-                                                                    <div key={executor.id} className={styles.execCard}>
-                                                                        <div className={styles.execInfo}>
-                                                                            <div className={styles.execName}>
-                                                                                {executor.username}{" "}
-                                                                                <span className={styles.execMeta}>
-                                            • {executor.rating ? executor.rating.toFixed(1) : "—"} ⭐ • {executor.ratingCount || 0}
-                                        </span>
-                                                                            </div>
+                                                                {order.requestedExecutors.map((executor) => {
+                                                                    const verification = normalizeUserStatus(executor);
 
-                                                                            <div className={styles.execLine}>
-                                                                                <span className={styles.k}>Цена</span>
-                                                                                <span className={styles.v}>
-                                            {executor.proposedSum ? `${executor.proposedSum} ₽` : "—"}
-                                        </span>
-                                                                            </div>
+                                                                    return (
+                                                                        <div key={executor.id} className={styles.execCard}>
+                                                                            <div className={styles.execInfo}>
+                                                                                <div className={styles.execName}>
+                                                                                    {executor.username || `Пользователь ${executor.id}`}{" "}
 
-                                                                            {executor.comment ? (
-                                                                                <div className={styles.execLine}>
-                                                                                    <span className={styles.k}>Комментарий</span>
-                                                                                    <span className={styles.v}>{executor.comment}</span>
+                                                                                    <span className={styles.execMeta}>
+                        •{" "}
+                                                                                        {Number(executor.rating) > 0
+                                                                                            ? Number(executor.rating).toFixed(1)
+                                                                                            : "—"}{" "}
+                                                                                        ⭐ • {Number(executor.ratingCount || 0)}
+                    </span>
                                                                                 </div>
-                                                                            ) : null}
 
-                                                                            {executor.isVerified && <span className={styles.verifiedBadge}>✔ Верифицирован</span>}
+                                                                                <div className={styles.executorStatusRow}>
+                    <span
+                        className={[
+                            styles.verificationBadge,
+                            verification.status === "verified"
+                                ? styles.verificationBadgeVerified
+                                : "",
+                            verification.status === "pensioner"
+                                ? styles.verificationBadgePensioner
+                                : "",
+                            verification.status === "unverified"
+                                ? styles.verificationBadgeUnverified
+                                : "",
+                        ]
+                            .filter(Boolean)
+                            .join(" ")}
+                    >
+                        {verification.status === "verified" && "✓ "}
+                        {verification.status === "pensioner" && "◆ "}
+                        {verification.status === "unverified" && "○ "}
+
+                        {verification.label}
+                    </span>
+                                                                                </div>
+
+                                                                                <div className={styles.execLine}>
+                                                                                    <span className={styles.k}>Цена</span>
+
+                                                                                    <span className={styles.v}>
+                        {Number(executor.proposedSum) > 0
+                            ? `${Number(executor.proposedSum).toLocaleString("ru-RU")} ₽`
+                            : "—"}
+                    </span>
+                                                                                </div>
+
+                                                                                {executor.comment ? (
+                                                                                    <div className={styles.execLine}>
+                                                                                        <span className={styles.k}>Комментарий</span>
+
+                                                                                        <span className={styles.v}>
+                            {executor.comment}
+                        </span>
+                                                                                    </div>
+                                                                                ) : null}
+                                                                            </div>
+
+                                                                            <div className={styles.execActions}>
+                                                                                <button
+                                                                                    onClick={() =>
+                                                                                        navigate(`/complaints/${executor.id}`)
+                                                                                    }
+                                                                                    className={styles.ghostBtnDanger}
+                                                                                >
+                                                                                    Жалобы
+                                                                                </button>
+
+                                                                                <button
+                                                                                    disabled={approving}
+                                                                                    onClick={() =>
+                                                                                        approveExecutor(order.id, executor.id)
+                                                                                    }
+                                                                                    className={styles.ghostBtn}
+                                                                                >
+                                                                                    {approving ? "..." : "Одобрить"}
+                                                                                </button>
+                                                                            </div>
                                                                         </div>
-
-                                                                        <div className={styles.execActions}>
-                                                                            <button
-                                                                                onClick={() => navigate(`/complaints/${executor.id}`)}
-                                                                                className={styles.ghostBtnDanger}
-                                                                            >
-                                                                                Жалобы
-                                                                            </button>
-
-                                                                            <button
-                                                                                disabled={approving}
-                                                                                onClick={() => approveExecutor(order.id, executor.id)}
-                                                                                className={styles.ghostBtn}
-                                                                            >
-                                                                                {approving ? "..." : "Одобрить"}
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
+                                                                    );
+                                                                })}
                                                             </div>
                                                         ) : (
                                                             <div className={styles.mutedText}>Пока нет запросов</div>

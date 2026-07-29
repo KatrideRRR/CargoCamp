@@ -1073,3 +1073,57 @@
 .orderTimeScheduled .orderTimeValue {
     color: #1d4ed8;
 }
+
+.executorStatusRow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+
+    margin-top: 7px;
+    margin-bottom: 2px;
+}
+
+.verificationBadge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: fit-content;
+    min-height: 27px;
+    padding: 6px 9px;
+
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.26);
+
+    font-size: 11px;
+    line-height: 1;
+    font-weight: 900;
+
+    background: rgba(248, 250, 252, 0.82);
+    color: rgba(71, 85, 105, 0.96);
+
+    box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.verificationBadgeVerified {
+    color: rgba(21, 128, 61, 0.98);
+
+    background: rgba(220, 252, 231, 0.76);
+    border-color: rgba(34, 197, 94, 0.24);
+}
+
+.verificationBadgePensioner {
+    color: rgba(154, 52, 18, 0.98);
+
+    background: rgba(255, 237, 213, 0.8);
+    border-color: rgba(249, 115, 22, 0.26);
+}
+
+.verificationBadgeUnverified {
+    color: rgba(100, 116, 139, 0.98);
+
+    background: rgba(241, 245, 249, 0.86);
+    border-color: rgba(148, 163, 184, 0.26);
+}

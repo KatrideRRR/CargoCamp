@@ -29,6 +29,14 @@ const publicApi = axios.create({
 const RADIUS_KM = 50;
 const HIDE_FROM_DRAWER = new Set(["Такси", "Курьер"]);
 
+function isPensionerUser(user) {
+    return (
+        String(user?.userStatus || "")
+            .trim()
+            .toLowerCase() === "pensioner"
+    );
+}
+
 function normalizeBoolean(value) {
     if (
         value === true ||
@@ -1370,6 +1378,18 @@ const OrdersPage = () => {
                                 const isCreator = Number(order.creatorId) === Number(userId);
                                 const isExpress = !!order.express;
 
+                                const isPensionerOrder =
+                                    !isExpress &&
+                                    isPensionerUser(creator);
+
+                                const baseCommissionRub =
+                                    order.is_recommended
+                                        ? 100
+                                        : 200;
+
+                                const discountedCommissionRub =
+                                    baseCommissionRub / 2;
+
                                 const orderTiming = isExpress
                                     ? null
                                     : getOrderTiming(order);
@@ -1428,6 +1448,15 @@ const OrdersPage = () => {
                                                     {isCreator && <span className="badge badge-my-order">Мой заказ</span>}
 
                                                     {canTakeOrder && <span className="badge badge-can-take">Можно взять</span>}
+
+                                                    {isPensionerOrder && (
+                                                        <span
+                                                            className="badge badge-pensioner-order"
+                                                            title={`Комиссия исполнителя ${discountedCommissionRub} ₽ вместо ${baseCommissionRub} ₽`}
+                                                        >
+        Льготный · −50% комиссии
+    </span>
+                                                    )}
 
                                                     {order.is_recommended && <span className="badge badge-priority">В приоритете</span>}
                                                     {order.taxi_courier && <span className="badge badge-courier">{courierBadgeText}</span>}
