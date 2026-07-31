@@ -228,6 +228,334 @@ function calculateFloorCharge({
     return safeFloor * pricePerFloor;
 }
 
+function calculateTwoAddressFloorCharges(
+    config,
+    details
+) {
+    const pricePerFloor = Math.max(
+        0,
+        toFiniteNumber(
+            config.pricePerFloorWithoutElevator
+        )
+    );
+
+    const fromFloorCharge =
+        calculateFloorCharge({
+            floor: details.floorFrom,
+            hasElevator:
+            details.hasElevatorFrom,
+            pricePerFloor,
+        });
+
+    const toFloorCharge =
+        calculateFloorCharge({
+            floor: details.floorTo,
+            hasElevator:
+            details.hasElevatorTo,
+            pricePerFloor,
+        });
+
+    return {
+        fromFloorCharge,
+        toFloorCharge,
+        total:
+            fromFloorCharge +
+            toFloorCharge,
+    };
+}
+
+/*
+ * Городские грузоперевозки:
+ *
+ * вызов машины один раз
+ * + машина × количество часов
+ * + грузчики × количество часов
+ * + этажи без лифта один раз
+ */
+function calculateCargoHourlyPrice(
+    config,
+    details
+) {
+    const calloutPrice = Math.max(
+        0,
+        toFiniteNumber(
+            config.calloutPrice
+        )
+    );
+
+    const vehicleHourlyRate = Math.max(
+        0,
+        toFiniteNumber(
+            config.vehicleHourlyRate
+        )
+    );
+
+    const helperHourlyRate = Math.max(
+        0,
+        toFiniteNumber(
+            config.helperHourlyRate
+        )
+    );
+
+    const helpersCount = Math.max(
+        0,
+        toFiniteNumber(
+            details.helpersCount
+        )
+    );
+
+    const requestedHours = Math.max(
+        0,
+        toFiniteNumber(
+            details.estimatedHours
+        )
+    );
+
+    const minimumHours = Math.max(
+        1,
+        toFiniteNumber(
+            config.minimumHours,
+            1
+        )
+    );
+
+    const billedHours = Math.max(
+        requestedHours,
+        minimumHours
+    );
+
+    const vehicleCharge =
+        vehicleHourlyRate *
+        billedHours;
+
+    const helpersHourlyTotal =
+        helpersCount *
+        helperHourlyRate;
+
+    const helpersCharge =
+        helpersHourlyTotal *
+        billedHours;
+
+    const {
+        fromFloorCharge,
+        toFloorCharge,
+        total: floorsCharge,
+    } = calculateTwoAddressFloorCharges(
+        config,
+        details
+    );
+
+    const firstHourPrice =
+        calloutPrice +
+        vehicleHourlyRate +
+        helpersHourlyTotal +
+        floorsCharge;
+
+    const nextHourPrice =
+        vehicleHourlyRate +
+        helpersHourlyTotal;
+
+    const breakdown = [];
+
+    if (calloutPrice > 0) {
+        breakdown.push({
+            key: "vehicle_callout",
+            label: "Вызов машины",
+            amount: calloutPrice,
+        });
+    }
+
+    if (vehicleCharge > 0) {
+        breakdown.push({
+            key: "vehicle_hours",
+            label:
+                `Машина: ${billedHours} ч × ${vehicleHourlyRate} ₽`,
+            amount: vehicleCharge,
+        });
+    }
+
+    if (helpersCharge > 0) {
+        breakdown.push({
+            key: "helpers_hours",
+            label:
+                `${helpersCount} грузчик(а) × ${billedHours} ч × ${helperHourlyRate} ₽`,
+            amount: helpersCharge,
+        });
+    }
+
+    if (fromFloorCharge > 0) {
+        breakdown.push({
+            key: "floor_from",
+            label:
+                "Этажи без лифта по первому адресу",
+            amount: fromFloorCharge,
+        });
+    }
+
+    if (toFloorCharge > 0) {
+        breakdown.push({
+            key: "floor_to",
+            label:
+                "Этажи без лифта по второму адресу",
+            amount: toFloorCharge,
+        });
+    }
+
+    return {
+        rawPrice:
+            calloutPrice +
+            vehicleCharge +
+            helpersCharge +
+            floorsCharge,
+
+        breakdown,
+
+        pricingModel: "hourly",
+        billedHours,
+        firstHourPrice,
+        nextHourPrice,
+        calloutPrice,
+        vehicleHourlyRate,
+        helperHourlyRate,
+    };
+}
+
+/*
+ * Межгород:
+ *
+ * подача машины
+ * + километраж
+ * + грузчики по часам
+ * + этажи без лифта
+ */
+function calculateCargoIntercityPrice(
+    config,
+    details
+) {
+    const calloutPrice = Math.max(
+        0,
+        toFiniteNumber(
+            config.calloutPrice
+        )
+    );
+
+    const distanceKm = Math.max(
+        0,
+        toFiniteNumber(
+            details.distanceKm
+        )
+    );
+
+    const pricePerKm = Math.max(
+        0,
+        toFiniteNumber(
+            config.pricePerKm
+        )
+    );
+
+    const distanceCharge =
+        distanceKm *
+        pricePerKm;
+
+    const helpersCount = Math.max(
+        0,
+        toFiniteNumber(
+            details.helpersCount
+        )
+    );
+
+    const helperHours = Math.max(
+        helpersCount > 0 ? 1 : 0,
+        toFiniteNumber(
+            details.helperHours,
+            helpersCount > 0 ? 1 : 0
+        )
+    );
+
+    const helperHourlyRate = Math.max(
+        0,
+        toFiniteNumber(
+            config.helperHourlyRate
+        )
+    );
+
+    const helpersCharge =
+        helpersCount *
+        helperHours *
+        helperHourlyRate;
+
+    const {
+        fromFloorCharge,
+        toFloorCharge,
+        total: floorsCharge,
+    } = calculateTwoAddressFloorCharges(
+        config,
+        details
+    );
+
+    const breakdown = [];
+
+    if (calloutPrice > 0) {
+        breakdown.push({
+            key: "vehicle_callout",
+            label: "Подача машины",
+            amount: calloutPrice,
+        });
+    }
+
+    if (distanceCharge > 0) {
+        breakdown.push({
+            key: "distance",
+            label:
+                `Расстояние: ${distanceKm.toFixed(1)} км × ${pricePerKm} ₽`,
+            amount: distanceCharge,
+        });
+    }
+
+    if (helpersCharge > 0) {
+        breakdown.push({
+            key: "helpers_hours",
+            label:
+                `${helpersCount} грузчик(а) × ${helperHours} ч × ${helperHourlyRate} ₽`,
+            amount: helpersCharge,
+        });
+    }
+
+    if (fromFloorCharge > 0) {
+        breakdown.push({
+            key: "floor_from",
+            label:
+                "Этажи без лифта при погрузке",
+            amount: fromFloorCharge,
+        });
+    }
+
+    if (toFloorCharge > 0) {
+        breakdown.push({
+            key: "floor_to",
+            label:
+                "Этажи без лифта при выгрузке",
+            amount: toFloorCharge,
+        });
+    }
+
+    return {
+        rawPrice:
+            calloutPrice +
+            distanceCharge +
+            helpersCharge +
+            floorsCharge,
+
+        breakdown,
+
+        pricingModel: "distance",
+        distanceKm,
+        pricePerKm,
+        helperHourlyRate,
+        helperHours,
+    };
+}
+
 function calculateMovingPrice(
     config,
     details
@@ -383,10 +711,13 @@ function calculateLoadersPrice(
         )
     );
 
-    const rawPrice =
+    const hourlyTotal =
         helpersCount *
-        billedHours *
         pricePerHelperHour;
+
+    const rawPrice =
+        hourlyTotal *
+        billedHours;
 
     return {
         rawPrice,
@@ -396,11 +727,18 @@ function calculateLoadersPrice(
                 {
                     key: "loaders",
                     label:
-                        `${helpersCount} грузчик(а) × ${billedHours} ч`,
+                        `${helpersCount} грузчик(а) × ${billedHours} ч × ${pricePerHelperHour} ₽`,
                     amount: rawPrice,
                 },
             ]
             : [],
+
+        pricingModel: "hourly",
+        billedHours,
+        firstHourPrice: hourlyTotal,
+        nextHourPrice: hourlyTotal,
+        helperHourlyRate:
+        pricePerHelperHour,
     };
 }
 
@@ -1073,6 +1411,30 @@ function hasValidRequiredDetails(
     details
 ) {
     switch (calculator) {
+        case "cargo_hourly":
+            return (
+                Number.isFinite(
+                    Number(
+                        details.estimatedHours
+                    )
+                ) &&
+                Number(
+                    details.estimatedHours
+                ) > 0
+            );
+
+        case "cargo_intercity":
+            return (
+                Number.isFinite(
+                    Number(details.distanceKm)
+                ) &&
+                Number(details.distanceKm) >= 0
+            );
+
+        /*
+         * Оставляем поддержку старых конфигураций,
+         * пока база полностью не обновлена.
+         */
         case "moving":
         case "large_delivery":
             return (
@@ -1087,7 +1449,15 @@ function hasValidRequiredDetails(
                 Number.isFinite(
                     Number(details.helpersCount)
                 ) &&
-                Number(details.helpersCount) > 0
+                Number(details.helpersCount) > 0 &&
+                Number.isFinite(
+                    Number(
+                        details.estimatedHours
+                    )
+                ) &&
+                Number(
+                    details.estimatedHours
+                ) > 0
             );
 
         case "cleaning":
@@ -1181,6 +1551,27 @@ function calculateRecommendedPrice({
     let calculation = null;
 
     switch (calculator) {
+        case "cargo_hourly":
+            calculation =
+                calculateCargoHourlyPrice(
+                    pricingConfig,
+                    details
+                );
+            break;
+
+        case "cargo_intercity":
+            calculation =
+                calculateCargoIntercityPrice(
+                    pricingConfig,
+                    details
+                );
+            break;
+
+        /*
+         * Временная обратная совместимость.
+         * После обновления базы новые заказы сюда
+         * попадать уже не должны.
+         */
         case "moving":
         case "large_delivery":
             calculation =
@@ -1340,6 +1731,79 @@ function calculateRecommendedPrice({
 
         calculator,
         breakdown,
+
+        pricingModel:
+            calculation?.pricingModel ||
+            pricingConfig.pricingModel ||
+            "fixed",
+
+        billedHours:
+            Number.isFinite(
+                Number(calculation?.billedHours)
+            )
+                ? Number(
+                    calculation.billedHours
+                )
+                : null,
+
+        firstHourPrice:
+            Number.isFinite(
+                Number(
+                    calculation?.firstHourPrice
+                )
+            )
+                ? Math.round(
+                    Number(
+                        calculation.firstHourPrice
+                    )
+                )
+                : null,
+
+        nextHourPrice:
+            Number.isFinite(
+                Number(
+                    calculation?.nextHourPrice
+                )
+            )
+                ? Math.round(
+                    Number(
+                        calculation.nextHourPrice
+                    )
+                )
+                : null,
+
+        calloutPrice:
+            Number.isFinite(
+                Number(
+                    calculation?.calloutPrice
+                )
+            )
+                ? Number(
+                    calculation.calloutPrice
+                )
+                : null,
+
+        vehicleHourlyRate:
+            Number.isFinite(
+                Number(
+                    calculation?.vehicleHourlyRate
+                )
+            )
+                ? Number(
+                    calculation.vehicleHourlyRate
+                )
+                : null,
+
+        helperHourlyRate:
+            Number.isFinite(
+                Number(
+                    calculation?.helperHourlyRate
+                )
+            )
+                ? Number(
+                    calculation.helperHourlyRate
+                )
+                : null,
 
         configVersion:
             toFiniteNumber(

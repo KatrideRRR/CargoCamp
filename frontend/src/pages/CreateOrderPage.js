@@ -247,6 +247,26 @@ function CreateOrderPage() {
         serviceDetails,
     ]);
 
+    const isCargoCategory =
+        Number(
+            selectedService?.categoryId
+        ) === 3;
+
+    const isHourlyCargo =
+        isCargoCategory &&
+        selectedService?.pricingConfig
+            ?.pricingModel === "hourly";
+
+    const isIntercityCargo =
+        isCargoCategory &&
+        selectedService?.pricingConfig
+            ?.pricingModel === "distance";
+
+    const isWasteRemoval =
+        Number(
+            selectedService?.subcategoryId
+        ) === 41;
+
     useEffect(() => {
         setServiceDetails((previous) => {
             const current =
@@ -305,6 +325,27 @@ function CreateOrderPage() {
 
                 pricingCalculator:
                 recommendedPrice.calculator,
+
+                pricingModel:
+                recommendedPrice.pricingModel,
+
+                pricingBilledHours:
+                recommendedPrice.billedHours,
+
+                pricingFirstHourPrice:
+                recommendedPrice.firstHourPrice,
+
+                pricingNextHourPrice:
+                recommendedPrice.nextHourPrice,
+
+                pricingCalloutPrice:
+                recommendedPrice.calloutPrice,
+
+                pricingVehicleHourlyRate:
+                recommendedPrice.vehicleHourlyRate,
+
+                pricingHelperHourlyRate:
+                recommendedPrice.helperHourlyRate,
             };
         });
     }, [
@@ -364,6 +405,14 @@ function CreateOrderPage() {
                 delete next.routeTrafficType;
                 delete next.routeHasTolls;
                 delete next.routeCalculatedAt;
+
+                delete next.pricingModel;
+                delete next.pricingBilledHours;
+                delete next.pricingFirstHourPrice;
+                delete next.pricingNextHourPrice;
+                delete next.pricingCalloutPrice;
+                delete next.pricingVehicleHourlyRate;
+                delete next.pricingHelperHourlyRate;
 
                 return next;
             });
@@ -1684,7 +1733,11 @@ function CreateOrderPage() {
                             <div className="recommendedPriceCard">
                                 <div className="recommendedPriceContent">
                                     <div className="recommendedPriceTitle">
-                                        Рекомендуемый бюджет
+                                        {isHourlyCargo
+                                            ? `Ориентировочная стоимость за ${
+                                                recommendedPrice.billedHours || 1
+                                            } ч`
+                                            : "Рекомендуемый бюджет"}
                                     </div>
 
                                     <div className="recommendedPriceRange">
@@ -1695,6 +1748,52 @@ function CreateOrderPage() {
                                             .toLocaleString("ru-RU")}{" "}
                                         ₽
                                     </div>
+
+                                    {isHourlyCargo && (
+                                        <div className="cargoHourlySummary">
+                                            {Number.isFinite(
+                                                Number(
+                                                    recommendedPrice.firstHourPrice
+                                                )
+                                            ) && (
+                                                <div className="cargoHourlySummaryRow">
+                <span>
+                    Первый час
+                </span>
+
+                                                    <strong>
+                                                        {Number(
+                                                            recommendedPrice.firstHourPrice
+                                                        ).toLocaleString(
+                                                            "ru-RU"
+                                                        )}{" "}
+                                                        ₽
+                                                    </strong>
+                                                </div>
+                                            )}
+
+                                            {Number.isFinite(
+                                                Number(
+                                                    recommendedPrice.nextHourPrice
+                                                )
+                                            ) && (
+                                                <div className="cargoHourlySummaryRow">
+                <span>
+                    Каждый следующий час
+                </span>
+
+                                                    <strong>
+                                                        {Number(
+                                                            recommendedPrice.nextHourPrice
+                                                        ).toLocaleString(
+                                                            "ru-RU"
+                                                        )}{" "}
+                                                        ₽/ч
+                                                    </strong>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {Array.isArray(
                                             recommendedPrice.breakdown
@@ -1726,10 +1825,29 @@ function CreateOrderPage() {
                                         )}
 
                                     <div className="recommendedPriceHint">
-                                        Ориентировочная сумма рассчитана
-                                        по указанным параметрам. Итоговая
-                                        стоимость согласовывается с
-                                        исполнителем.
+                                        {isHourlyCargo ? (
+                                            <>
+                                                В первый час включены вызов машины,
+                                                работа машины, выбранные грузчики и
+                                                доплата за этажи без лифта. В каждый
+                                                следующий час оплачиваются машина и
+                                                грузчики. Итоговое время согласовывается
+                                                с исполнителем.
+                                            </>
+                                        ) : isIntercityCargo ? (
+                                            <>
+                                                Расчёт выполнен по приблизительному
+                                                расстоянию, подаче машины, выбранным
+                                                грузчикам и этажам. Итоговая стоимость
+                                                маршрута согласовывается с исполнителем.
+                                            </>
+                                        ) : (
+                                            <>
+                                                Ориентировочная сумма рассчитана по
+                                                указанным параметрам. Итоговая стоимость
+                                                согласовывается с исполнителем.
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 
@@ -1752,7 +1870,13 @@ function CreateOrderPage() {
                             </div>
                         )}
 
-                        <div className="label">Сумма за работу</div>
+                        <div className="label">
+                            {isHourlyCargo
+                                ? "Ориентировочная сумма"
+                                : isIntercityCargo
+                                    ? "Ориентировочная сумма за перевозку"
+                                    : "Сумма за работу"}
+                        </div>
 
                         <input
                             className="control"
@@ -1790,8 +1914,67 @@ function CreateOrderPage() {
                             required
                         />
 
+                        {isHourlyCargo && (
+                            <div className="cargoHourlyNotice">
+                                <div className="cargoHourlyNoticeIcon">
+                                    ⏱
+                                </div>
+
+                                <div>
+                                    <strong>
+                                        Перевозка оплачивается по времени
+                                    </strong>
+
+                                    <span>
+    Указанная сумма рассчитана за{" "}
+                                        {recommendedPrice?.billedHours ||
+                                            Number(serviceDetails?.estimatedHours) ||
+                                            1}{" "}
+                                        ч. Если работа займёт больше времени,
+    дополнительные часы оплачиваются по
+    согласованной ставке. Вызов машины
+    повторно не начисляется.
+</span>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="hint">
-                            Эту сумму вы оплачиваете исполнителю. Сейчас оплачивается только продвижение.
+
+                            {isHourlyCargo ? (
+
+                                <>
+                                    Фактическая стоимость зависит от реального
+                                    времени выполнения и согласовывается с
+                                    исполнителем.
+                                </>
+
+                            ) : isWasteRemoval ? (
+
+                                <>
+
+                                    Стоимость рассчитана по типу и объёму
+
+                                    мусора, необходимости погрузки и этажу.
+
+                                    Итоговая сумма согласовывается с
+
+                                    исполнителем.
+
+                                </>
+
+                            ) : (
+
+                                <>
+
+                                    Эту сумму вы оплачиваете исполнителю.
+
+                                    Сейчас оплачивается только продвижение.
+
+                                </>
+
+                            )}
+
                         </div>
                     </div>
 
