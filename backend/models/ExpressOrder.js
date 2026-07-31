@@ -182,6 +182,45 @@ module.exports = (sequelize, DataTypes) => {
                 type: DataTypes.INTEGER,
                 allowNull: true,
             },
+
+            recommendedPrice: {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+                field: "recommended_price",
+            },
+
+            pricingVersion: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+                defaultValue: 1,
+                field: "pricing_version",
+            },
+
+            commissionKopecks: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+                defaultValue: 0,
+                field: "commission_kopecks",
+            },
+
+            commissionStatus: {
+                type: DataTypes.ENUM(
+                    "none",
+                    "paid",
+                    "debt",
+                    "waived"
+                ),
+                allowNull: false,
+                defaultValue: "none",
+                field: "commission_status",
+            },
+
+            commissionChargedAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+                field: "commission_charged_at",
+            },
+
         },
         {
             tableName: 'express_orders',

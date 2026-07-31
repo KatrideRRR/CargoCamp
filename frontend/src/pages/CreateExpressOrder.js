@@ -93,10 +93,79 @@ async function calcRouteByYmaps({ apiKey, fromLat, fromLng, toLat, toLng }) {
     };
 }
 
-const PRICING = {
-    taxi: { base: 150, perKm: 20 },
-    courier: { base: 120, perKm: 15 },
+const EXPRESS_PRICING = {
+    taxi: {
+        version: 1,
+        basePrice: 200,
+        pricePerKm: 25,
+        minimumPrice: 350,
+        maximumPrice: 300000,
+    },
+
+    courier: {
+        version: 1,
+        basePrice: 150,
+        pricePerKm: 20,
+        minimumPrice: 300,
+        maximumPrice: 300000,
+    },
 };
+
+function clampPrice(value, min, max) {
+    return Math.min(
+        Math.max(value, min),
+        max
+    );
+}
+
+function calculateExpressRecommendedPrice({
+                                              type,
+                                              distanceKm,
+                                          }) {
+    const pricing =
+        EXPRESS_PRICING[type] ||
+        EXPRESS_PRICING.taxi;
+
+    const safeDistanceKm =
+        Number(distanceKm);
+
+    if (
+        !Number.isFinite(safeDistanceKm) ||
+        safeDistanceKm < 0
+    ) {
+        return null;
+    }
+
+    const rawPrice =
+        pricing.basePrice +
+        safeDistanceKm *
+        pricing.pricePerKm;
+
+    const roundedPrice =
+        Math.round(rawPrice / 10) * 10;
+
+    const recommendedPrice =
+        clampPrice(
+            roundedPrice,
+            pricing.minimumPrice,
+            pricing.maximumPrice
+        );
+
+    return {
+        pricingVersion: pricing.version,
+
+        recommendedPrice,
+
+        basePrice: pricing.basePrice,
+        pricePerKm: pricing.pricePerKm,
+        minimumPrice: pricing.minimumPrice,
+
+        distanceKm:
+            Math.round(
+                safeDistanceKm * 100
+            ) / 100,
+    };
+}
 
 const CreateExpressOrder = () => {
     const apiKey = process.env.REACT_APP_YANDEX_API_KEY;
@@ -247,12 +316,100 @@ const CreateExpressOrder = () => {
     };
 
     const recommended = useMemo(() => {
-        const km = routeCalc.distanceKm;
-        if (!Number.isFinite(km)) return null;
-        const { base, perKm } = PRICING[type] || PRICING.taxi;
-        const rec = Math.round(base + perKm * km);
-        return { rec, km, min: routeCalc.durationMin };
-    }, [routeCalc.distanceKm, routeCalc.durationMin, type]);
+        const calculation =
+            calculateExpressRecommendedPrice({
+                type,
+                distanceKm:
+                routeCalc.distanceKm,
+            });
+
+        if (!calculation) {
+            return null;
+        }
+
+        return {
+            ...calculation,
+
+            rec:
+            calculation.recommendedPrice,
+
+            km:
+            calculation.distanceKm,
+
+            min:
+                Number.isFinite(
+                    Number(
+                        routeCalc.durationMin
+                    )
+                )
+                    ? Number(
+                        routeCalc.durationMin
+                    )
+                    : null,
+        };
+    }, [
+        type,
+        routeCalc.distanceKm,
+        routeCalc.durationMin,
+    ]);
+
+    const enteredPrice =
+        Number(form.totalPrice);
+
+    const priceDifference = useMemo(() => {
+        const recommendedValue =
+            Number(
+                recommended?.recommendedPrice
+            );
+
+        if (
+            !Number.isFinite(enteredPrice) ||
+            enteredPrice <= 0 ||
+            !Number.isFinite(recommendedValue) ||
+            recommendedValue <= 0
+        ) {
+            return null;
+        }
+
+        const differencePercent =
+            Math.round(
+                (
+                    (
+                        enteredPrice -
+                        recommendedValue
+                    ) /
+                    recommendedValue
+                ) *
+                100
+            );
+
+        if (differencePercent <= -30) {
+            return {
+                type: "low",
+                text:
+                    `Цена на ${Math.abs(
+                        differencePercent
+                    )}% ниже рекомендуемой. Исполнители могут не принять такой заказ.`,
+            };
+        }
+
+        if (differencePercent >= 30) {
+            return {
+                type: "high",
+                text:
+                    `Цена на ${differencePercent}% выше рекомендуемой.`,
+            };
+        }
+
+        return {
+            type: "normal",
+            text:
+                "Указанная цена находится рядом с рекомендуемой.",
+        };
+    }, [
+        enteredPrice,
+        recommended?.recommendedPrice,
+    ]);
 
     useEffect(() => {
         const load = async () => {
@@ -354,15 +511,62 @@ const CreateExpressOrder = () => {
         return () => { alive = false; };
     }, [coordsOk, apiKey, form.fromLat, form.fromLng, form.toLat, form.toLng]);
 
-    const applyRecommended = useCallback(() => {
-        if (!recommended?.rec) return;
-        setField("totalPrice", String(recommended.rec));
-    }, [recommended?.rec]);
+    const applyRecommended =
+        useCallback(() => {
+            const recommendedValue =
+                Number(
+                    recommended
+                        ?.recommendedPrice
+                );
+
+            if (
+                !Number.isFinite(
+                    recommendedValue
+                ) ||
+                recommendedValue <= 0
+            ) {
+                return;
+            }
+
+            setField(
+                "totalPrice",
+                String(
+                    recommendedValue
+                )
+            );
+        }, [
+            recommended?.recommendedPrice,
+        ]);
 
     const validate = () => {
         if (!form.fromAddress?.trim() || !form.toAddress?.trim()) return "Заполните Откуда и Куда";
         if (!coordsOk) return "Нужны координаты точек A и B (карта/сохранённые/GPS)";
-        if (!form.totalPrice || Number(form.totalPrice) <= 0) return "Укажите цену";
+        const totalPrice =
+            Number(form.totalPrice);
+
+        if (
+            !Number.isFinite(totalPrice) ||
+            totalPrice <= 0
+        ) {
+            return "Укажите корректную цену";
+        }
+
+        if (totalPrice > 300000) {
+            return "Максимальная цена заказа — 300 000 ₽";
+        }
+
+        if (
+            !Number.isFinite(
+                Number(
+                    routeCalc.distanceKm
+                )
+            ) ||
+            Number(
+                routeCalc.distanceKm
+            ) <= 0
+        ) {
+            return "Не удалось рассчитать расстояние маршрута";
+        }
         return "";
     };
 
@@ -379,23 +583,73 @@ const CreateExpressOrder = () => {
         setIsSubmitting(true);
 
         try {
+            const pricing =
+                EXPRESS_PRICING[type] ||
+                EXPRESS_PRICING.taxi;
+
             const payload = {
                 type,
-                subcategory: form.subcategory || null,
+
+                subcategory:
+                    form.subcategory || null,
+
                 paymentType: "cash",
-                totalPrice: Number(form.totalPrice),
-                description: form.description || null,
 
-                fromAddress: form.fromAddress,
-                fromLat: Number(form.fromLat),
-                fromLng: Number(form.fromLng),
+                // Цена, которую самостоятельно
+                // указал заказчик.
+                totalPrice:
+                    Number(form.totalPrice),
 
-                toAddress: form.toAddress,
-                toLat: Number(form.toLat),
-                toLng: Number(form.toLng),
+                description:
+                    form.description || null,
 
-                basePrice: 0,
-                pricePerKm: 0,
+                fromAddress:
+                form.fromAddress,
+
+                fromLat:
+                    Number(form.fromLat),
+
+                fromLng:
+                    Number(form.fromLng),
+
+                toAddress:
+                form.toAddress,
+
+                toLat:
+                    Number(form.toLat),
+
+                toLng:
+                    Number(form.toLng),
+
+                distanceKm:
+                    Number(
+                        routeCalc.distanceKm
+                    ),
+
+                estimatedTimeMin:
+                    Number.isFinite(
+                        Number(
+                            routeCalc.durationMin
+                        )
+                    )
+                        ? Number(
+                            routeCalc.durationMin
+                        )
+                        : null,
+
+                /*
+                 * Эти данные сервер не должен
+                 * принимать как источник истины.
+                 * Они нужны как снимок расчёта
+                 * клиента для диагностики.
+                 */
+                clientRecommendedPrice:
+                    recommended
+                        ?.recommendedPrice ||
+                    null,
+
+                clientPricingVersion:
+                pricing.version,
             };
 
             const r = await axiosInstance.post("/express/express-orders", payload);
@@ -579,26 +833,172 @@ const CreateExpressOrder = () => {
                         </button>
                     </div>
 
-                    {/* Price compact */}
-                    <div className="exo-field" style={{ marginTop: 10 }}>
+                    {/* Price */}
+                    <div
+                        className="exo-field"
+                        style={{ marginTop: 10 }}
+                    >
                         <div className="exo-labelRow">
-                            <div className="exo-label">Цена</div>
-                            {recommended?.rec ? (
-                                <button type="button" className="exo-miniBtn" onClick={applyRecommended} title="Поставить рекомендуемую">
-                                    Рекомендуем {recommended.rec} ₽
+                            <div className="exo-label">
+                                Ваша цена
+                            </div>
+
+                            {recommended?.recommendedPrice ? (
+                                <button
+                                    type="button"
+                                    className="exo-miniBtn"
+                                    onClick={applyRecommended}
+                                    title="Установить рекомендуемую цену"
+                                >
+                                    Рекомендуем{" "}
+                                    {recommended
+                                        .recommendedPrice
+                                        .toLocaleString(
+                                            "ru-RU"
+                                        )}{" "}
+                                    ₽
                                 </button>
                             ) : (
-                                <div className="exo-recoMini">{coordsOk ? "—" : ""}</div>
+                                <div className="exo-recoMini">
+                                    {coordsOk ? "—" : ""}
+                                </div>
                             )}
                         </div>
 
                         <input
                             className="exo-control"
                             type="number"
+                            min="1"
+                            max="300000"
+                            step="1"
+                            inputMode="numeric"
                             value={form.totalPrice}
-                            onChange={(e) => setField("totalPrice", e.target.value)}
-                            placeholder="Например 500"
+                            onChange={(event) => {
+                                const value =
+                                    event.target.value;
+
+                                if (value === "") {
+                                    setField(
+                                        "totalPrice",
+                                        ""
+                                    );
+                                    return;
+                                }
+
+                                const numberValue =
+                                    Number(value);
+
+                                if (
+                                    !Number.isFinite(
+                                        numberValue
+                                    )
+                                ) {
+                                    return;
+                                }
+
+                                if (numberValue > 300000) {
+                                    setField(
+                                        "totalPrice",
+                                        "300000"
+                                    );
+                                    return;
+                                }
+
+                                if (numberValue < 0) {
+                                    return;
+                                }
+
+                                setField(
+                                    "totalPrice",
+                                    value
+                                );
+                            }}
+                            placeholder="Укажите свою цену"
                         />
+
+                        {recommended && (
+                            <div className="exo-priceCalculation">
+                                <div className="exo-priceCalculationRow">
+                <span>
+                    Подача
+                </span>
+
+                                    <strong>
+                                        {recommended
+                                            .basePrice
+                                            .toLocaleString(
+                                                "ru-RU"
+                                            )}{" "}
+                                        ₽
+                                    </strong>
+                                </div>
+
+                                <div className="exo-priceCalculationRow">
+                <span>
+                    {recommended.km} км ×{" "}
+                    {recommended.pricePerKm} ₽
+                </span>
+
+                                    <strong>
+                                        {Math.round(
+                                            recommended.km *
+                                            recommended.pricePerKm
+                                        ).toLocaleString(
+                                            "ru-RU"
+                                        )}{" "}
+                                        ₽
+                                    </strong>
+                                </div>
+
+                                <div className="exo-priceCalculationRow total">
+                <span>
+                    Рекомендуемая цена
+                </span>
+
+                                    <strong>
+                                        {recommended
+                                            .recommendedPrice
+                                            .toLocaleString(
+                                                "ru-RU"
+                                            )}{" "}
+                                        ₽
+                                    </strong>
+                                </div>
+
+                                {Number.isFinite(
+                                    recommended.min
+                                ) && (
+                                    <div className="exo-priceRouteInfo">
+                                        Примерное время в пути:{" "}
+                                        {recommended.min} мин.
+                                        Время показывается для
+                                        информации и пока не
+                                        увеличивает стоимость.
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {priceDifference && (
+                            <div
+                                className={
+                                    `exo-priceDifference ` +
+                                    `exo-priceDifference--${priceDifference.type}`
+                                }
+                            >
+                                {priceDifference.text}
+                            </div>
+                        )}
+
+                        <div
+                            className="exo-hint"
+                            style={{ marginTop: 9 }}
+                        >
+                            Вы можете поставить свою цену.
+                            Рекомендация рассчитывается по
+                            расстоянию и тарифу, но окончательную
+                            сумму определяет заказчик.
+                        </div>
                     </div>
 
                     {/* Extra (collapsed) */}

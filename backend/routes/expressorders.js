@@ -44,6 +44,85 @@ function toNum(v) {
     return Number.isFinite(n) ? n : null;
 }
 
+const EXPRESS_PRICING = {
+    taxi: {
+        version: 1,
+        basePrice: 200,
+        pricePerKm: 25,
+        minimumPrice: 350,
+        maximumPrice: 300000,
+    },
+
+    courier: {
+        version: 1,
+        basePrice: 150,
+        pricePerKm: 20,
+        minimumPrice: 300,
+        maximumPrice: 300000,
+    },
+};
+
+function clampExpressPrice(value, min, max) {
+    return Math.min(
+        Math.max(value, min),
+        max
+    );}
+
+function calculateExpressRecommendedPrice({type, distanceKm,}) {
+    const pricing =
+        EXPRESS_PRICING[type];
+
+    if (!pricing) {
+        return null;
+    }
+
+    const safeDistanceKm =
+        Number(distanceKm);
+
+    if (
+        !Number.isFinite(
+            safeDistanceKm
+        ) ||
+        safeDistanceKm <= 0 ||
+        safeDistanceKm > 5000
+    ) {
+        return null;
+    }
+
+    const rawPrice =
+        pricing.basePrice +
+        safeDistanceKm *
+        pricing.pricePerKm;
+
+    const roundedPrice =
+        Math.round(
+            rawPrice / 10
+        ) * 10;
+
+    const recommendedPrice =
+        clampExpressPrice(
+            roundedPrice,
+            pricing.minimumPrice,
+            pricing.maximumPrice
+        );
+
+    return {
+        pricingVersion:
+        pricing.version,
+
+        recommendedPrice,
+
+        basePrice:
+        pricing.basePrice,
+
+        pricePerKm:
+        pricing.pricePerKm,
+
+        minimumPrice:
+        pricing.minimumPrice,
+    };
+}
+
 function isFiniteNumberish(v) {
     const n = typeof v === "string" ? Number(v) : v;
     return Number.isFinite(n);
@@ -263,11 +342,14 @@ router.post("/express-orders", authenticateToken, async (req, res) => {
             paymentType,
             subcategory = null,
             description = null,
-            basePrice,
-            pricePerKm,
             totalPrice,
 
-            // ✅ optional: если выбрали из сохранённых
+            distanceKm,
+            estimatedTimeMin,
+
+            clientRecommendedPrice = null,
+            clientPricingVersion = null,
+
             fromSavedAddressId = null,
             toSavedAddressId = null,
         } = req.body;
@@ -309,8 +391,58 @@ router.post("/express-orders", authenticateToken, async (req, res) => {
             });
         }
 
-        const bp = Number.isFinite(Number(basePrice)) ? Number(basePrice) : 0;
-        const ppk = Number.isFinite(Number(pricePerKm)) ? Number(pricePerKm) : 0;
+        const normalizedDistanceKm =
+            Number(distanceKm);
+
+        if (
+            !Number.isFinite(
+                normalizedDistanceKm
+            ) ||
+            normalizedDistanceKm <= 0 ||
+            normalizedDistanceKm > 5000
+        ) {
+            await t.rollback();
+
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Не удалось проверить расстояние маршрута",
+            });
+        }
+
+        const normalizedEstimatedTimeMin =
+            Number.isFinite(
+                Number(
+                    estimatedTimeMin
+                )
+            )
+                ? Math.max(
+                    0,
+                    Math.round(
+                        Number(
+                            estimatedTimeMin
+                        )
+                    )
+                )
+                : null;
+
+        const serverCalculation =
+            calculateExpressRecommendedPrice({
+                type,
+                distanceKm:
+                normalizedDistanceKm,
+            });
+
+        if (!serverCalculation) {
+            await t.rollback();
+
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Не удалось рассчитать рекомендуемую стоимость",
+            });
+        }
+
         const tpRaw = Number(totalPrice);
 
         if (!Number.isFinite(tpRaw) || tpRaw < 0) {
@@ -342,11 +474,32 @@ router.post("/express-orders", authenticateToken, async (req, res) => {
                 toAddress,
                 toLat: tLat,
                 toLng: tLng,
-                distanceKm: null,
-                estimatedTimeMin: null,
-                basePrice: bp,
-                pricePerKm: ppk,
-                totalPrice: tp,
+                distanceKm:
+                    Math.round(
+                        normalizedDistanceKm *
+                        100
+                    ) / 100,
+
+                estimatedTimeMin:
+                normalizedEstimatedTimeMin,
+
+                basePrice:
+                serverCalculation.basePrice,
+
+                pricePerKm:
+                serverCalculation.pricePerKm,
+
+
+                totalPrice:
+                tp,
+
+                recommendedPrice:
+                serverCalculation
+                    .recommendedPrice,
+
+                pricingVersion:
+                serverCalculation
+                    .pricingVersion,
                 paymentType,
                 dealStatus: "none",
                 status: "created",
@@ -375,13 +528,76 @@ router.post("/express-orders", authenticateToken, async (req, res) => {
             entityId: order.id,
             expressOrderId: order.id,
             meta: {
-                type: order.type,
-                paymentType: order.paymentType,
-                totalPrice: order.totalPrice,
-                basePrice: order.basePrice,
-                pricePerKm: order.pricePerKm,
-                from: { address: order.fromAddress, lat: order.fromLat, lng: order.fromLng },
-                to: { address: order.toAddress, lat: order.toLat, lng: order.toLng },
+                type:
+                order.type,
+
+                paymentType:
+                order.paymentType,
+
+                offeredPrice:
+                order.totalPrice,
+
+                recommendedPrice:
+                order.recommendedPrice,
+
+                pricingVersion:
+                order.pricingVersion,
+
+                basePrice:
+                order.basePrice,
+
+                pricePerKm:
+                order.pricePerKm,
+
+                distanceKm:
+                order.distanceKm,
+
+                estimatedTimeMin:
+                order.estimatedTimeMin,
+
+                clientRecommendedPrice:
+                    Number.isFinite(
+                        Number(
+                            clientRecommendedPrice
+                        )
+                    )
+                        ? Number(
+                            clientRecommendedPrice
+                        )
+                        : null,
+
+                clientPricingVersion:
+                    Number.isFinite(
+                        Number(
+                            clientPricingVersion
+                        )
+                    )
+                        ? Number(
+                            clientPricingVersion
+                        )
+                        : null,
+
+                from: {
+                    address:
+                    order.fromAddress,
+
+                    lat:
+                    order.fromLat,
+
+                    lng:
+                    order.fromLng,
+                },
+
+                to: {
+                    address:
+                    order.toAddress,
+
+                    lat:
+                    order.toLat,
+
+                    lng:
+                    order.toLng,
+                },
             },
         });
 
@@ -629,107 +845,46 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
             return res.status(409).json({ success: false, message: "Заказ уже принят" });
         }
 
-        // ✅ 2) считаем комиссию (premium — 0)
-        const now = new Date();
-        const premiumActive =
-            executor.subscription_type === "premium" &&
-            (!executor.subscription_expires_at || new Date(executor.subscription_expires_at) > now);
-
-        const raw = Number(order.totalPrice || 0);
-
-        // Приводим к копейкам (умно, чтобы не словить 100%)
-        const totalKopecks = raw >= 10000 ? raw : Math.round(raw * 100);
-
-        // 10% комиссии
-        const feeKopecks = premiumActive ? 0 : Math.round(totalKopecks * 0.10);
-
         // ✅ 3) назначаем исполнителя
         order.executorId = executorId;
         order.status = "accepted";
         await order.save({ transaction: t });
 
-        // ✅ 4) пробуем сразу списать комиссию (если есть привязанная карта), иначе — в долг
-        let paidBySavedCard = false;
-        let debtAdded = false;
 
-        if (feeKopecks > 0) {
-            if (executor.yookassa_payment_method_id) {
-                try {
-                    const amountValue = (feeKopecks / 100).toFixed(2);
-                    const idempotenceKey = uuidv4();
-
-                    const payment = await yooKassa.createPayment(
-                        {
-                            amount: { value: amountValue, currency: "RUB" },
-                            capture: true,
-                            payment_method_id: executor.yookassa_payment_method_id,
-                            description: `Комиссия за взятие экспресс-заказа #${order.id} (исполнитель #${executorId})`,
-                            metadata: {
-                                type: "debt", // ✅ используем твой вебхук debt
-                                userId: String(executorId),
-                                expectedKopecks: String(feeKopecks),
-                                expressOrderId: String(order.id),
-                                reason: "express_accept_fee",
-                            },
-                            receipt: {
-                                customer: { phone: String(executor.phone || "").replace(/[^\d+]/g, "") },
-                                items: [
-                                    {
-                                        description: `Комиссия за экспресс-заказ #${order.id}`,
-                                        quantity: 1,
-                                        amount: { value: amountValue, currency: "RUB" },
-                                        vat_code: 1,
-                                        payment_mode: "full_payment",
-                                        payment_subject: "service",
-                                    },
-                                ],
-                                tax_system_code: 2,
-                            },
-                        },
-                        idempotenceKey
-                    );
-
-                    paidBySavedCard = payment?.status === "succeeded";
-                } catch (e) {
-                    console.error("express accept fee autopay error:", e?.message || e);
-                }
-            }
-
-            // если не оплатилось (или карты нет) — в debt
-            if (!paidBySavedCard) {
-                executor.debt = Number(executor.debt || 0) + feeKopecks;
-                await executor.save({ transaction: t });
-                debtAdded = true;
-            }
-
-            await req.logAction({
-                req,
-                actorUserId: executorId,
-                actorRole: "user",
-                actionType: "commission_debt_added",
-                entityType: "user",
-                entityId: executorId,
-                expressOrderId: order.id,
-                severity: "warn",
-                meta: { feeKopecks, reason: "express_accept_fee" },
-            });
-        }
 
         await req.logAction({
             req,
-            actorUserId: executorId,
-            actorRole: "user",
-            actionType: "express_order_accept",
-            entityType: "express_order",
-            entityId: order.id,
-            expressOrderId: order.id,
+
+            actorUserId:
+            executorId,
+
+            actorRole:
+                "user",
+
+            actionType:
+                "express_order_accept",
+
+            entityType:
+                "express_order",
+
+            entityId:
+            order.id,
+
+            expressOrderId:
+            order.id,
+
             meta: {
-                status: order.status,
-                premiumActive,
-                totalKopecks,
-                feeKopecks,
-                paidBySavedCard,
-                debtAdded,
+                status:
+                order.status,
+
+                totalPrice:
+                order.totalPrice,
+
+                recommendedPrice:
+                order.recommendedPrice,
+
+                commissionStatus:
+                order.commissionStatus,
             },
         });
 
@@ -764,10 +919,9 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
         return res.json({
             success: true,
             order,
-            feeKopecks,
-            premium: premiumActive,
-            paidBySavedCard,
-            debtAdded,
+
+            message:
+                "Заказ принят. Комиссия будет начислена только после завершения.",
         });
     } catch (e) {
         try {
@@ -1141,102 +1295,579 @@ router.post("/express-orders/:id/start", authenticateToken, async (req, res) => 
 });
 
 router.post("/express-orders/:id/complete", authenticateToken, async (req, res) => {
-    try {
-        const executorId = req.user.id;
-        const id = Number(req.params.id);
+        const t =
+            await sequelize.transaction();
 
-        const order = await ExpressOrder.findByPk(id);
-        if (!order) return res.status(404).json({ success: false, message: "Заказ не найден" });
+        try {
+            const executorId =
+                req.user.id;
 
-        if (Number(order.executorId) !== Number(executorId)) {
-            return res.status(403).json({ success: false, message: "Только исполнитель" });
+            const id =
+                Number(
+                    req.params.id
+                );
+
+            if (
+                !Number.isFinite(id) ||
+                id <= 0
+            ) {
+                await t.rollback();
+
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Некорректный id",
+                });
+            }
+
+            const order =
+                await ExpressOrder.findByPk(
+                    id,
+                    {
+                        transaction: t,
+                        lock:
+                        t.LOCK.UPDATE,
+                    }
+                );
+
+            if (!order) {
+                await t.rollback();
+
+                return res.status(404).json({
+                    success: false,
+                    message:
+                        "Заказ не найден",
+                });
+            }
+
+            if (
+                Number(
+                    order.executorId
+                ) !==
+                Number(
+                    executorId
+                )
+            ) {
+                await t.rollback();
+
+                return res.status(403).json({
+                    success: false,
+                    message:
+                        "Только исполнитель",
+                });
+            }
+
+            if (
+                order.status !==
+                "in_progress"
+            ) {
+                await t.rollback();
+
+                return res.status(409).json({
+                    success: false,
+                    message:
+                        "Заказ ещё не в процессе",
+                });
+            }
+
+            if (
+                order.commissionStatus !==
+                "none"
+            ) {
+                await t.rollback();
+
+                return res.status(409).json({
+                    success: false,
+                    message:
+                        "Комиссия по этому заказу уже обработана",
+                });
+            }
+
+            const executor =
+                await User.findByPk(
+                    executorId,
+                    {
+                        transaction: t,
+                        lock:
+                        t.LOCK.UPDATE,
+                    }
+                );
+
+            if (!executor) {
+                await t.rollback();
+
+                return res.status(404).json({
+                    success: false,
+                    message:
+                        "Исполнитель не найден",
+                });
+            }
+
+            const now =
+                new Date();
+
+            const premiumActive =
+                executor
+                    .subscription_type ===
+                "premium" &&
+                (
+                    !executor
+                        .subscription_expires_at ||
+                    new Date(
+                        executor
+                            .subscription_expires_at
+                    ) > now
+                );
+
+            /*
+             * totalPrice хранится в рублях.
+             * Всегда переводим рубли
+             * в копейки одинаково.
+             */
+            const totalRubles =
+                Number(
+                    order.totalPrice
+                );
+
+            if (
+                !Number.isFinite(
+                    totalRubles
+                ) ||
+                totalRubles <= 0
+            ) {
+                await t.rollback();
+
+                return res.status(409).json({
+                    success: false,
+                    message:
+                        "У заказа указана некорректная стоимость",
+                });
+            }
+
+            const totalKopecks =
+                Math.round(
+                    totalRubles *
+                    100
+                );
+
+            const feeKopecks =
+                premiumActive
+                    ? 0
+                    : Math.round(
+                        totalKopecks *
+                        0.10
+                    );
+
+            let paidBySavedCard =
+                false;
+
+            let debtAdded =
+                false;
+
+            let commissionStatus =
+                premiumActive
+                    ? "waived"
+                    : "none";
+
+            if (feeKopecks > 0) {
+                if (
+                    executor
+                        .yookassa_payment_method_id
+                ) {
+                    try {
+                        const amountValue =
+                            (
+                                feeKopecks /
+                                100
+                            ).toFixed(2);
+
+                        const payment =
+                            await yooKassa
+                                .createPayment(
+                                    {
+                                        amount: {
+                                            value:
+                                            amountValue,
+
+                                            currency:
+                                                "RUB",
+                                        },
+
+                                        capture:
+                                            true,
+
+                                        payment_method_id:
+                                        executor
+                                            .yookassa_payment_method_id,
+
+                                        description:
+                                            `Комиссия за завершённый экспресс-заказ #${order.id}`,
+
+                                        metadata: {
+                                            type:
+                                                "debt",
+
+                                            userId:
+                                                String(
+                                                    executorId
+                                                ),
+
+                                            expectedKopecks:
+                                                String(
+                                                    feeKopecks
+                                                ),
+
+                                            expressOrderId:
+                                                String(
+                                                    order.id
+                                                ),
+
+                                            reason:
+                                                "express_complete_fee",
+                                        },
+
+                                        receipt: {
+                                            customer: {
+                                                phone:
+                                                    String(
+                                                        executor.phone ||
+                                                        ""
+                                                    ).replace(
+                                                        /[^\d+]/g,
+                                                        ""
+                                                    ),
+                                            },
+
+                                            items: [
+                                                {
+                                                    description:
+                                                        `Комиссия за экспресс-заказ #${order.id}`,
+
+                                                    quantity:
+                                                        1,
+
+                                                    amount: {
+                                                        value:
+                                                        amountValue,
+
+                                                        currency:
+                                                            "RUB",
+                                                    },
+
+                                                    vat_code:
+                                                        1,
+
+                                                    payment_mode:
+                                                        "full_payment",
+
+                                                    payment_subject:
+                                                        "service",
+                                                },
+                                            ],
+
+                                            tax_system_code:
+                                                2,
+                                        },
+                                    },
+
+                                    uuidv4()
+                                );
+
+                        paidBySavedCard =
+                            payment
+                                ?.status ===
+                            "succeeded";
+                    } catch (
+                        paymentError
+                        ) {
+                        console.error(
+                            "express complete fee autopay error:",
+                            paymentError
+                                ?.message ||
+                            paymentError
+                        );
+                    }
+                }
+
+                if (
+                    paidBySavedCard
+                ) {
+                    commissionStatus =
+                        "paid";
+                } else {
+                    executor.debt =
+                        Number(
+                            executor.debt ||
+                            0
+                        ) +
+                        feeKopecks;
+
+                    await executor.save({
+                        transaction: t,
+                    });
+
+                    debtAdded =
+                        true;
+
+                    commissionStatus =
+                        "debt";
+                }
+            }
+
+            const from =
+                order.status;
+
+            order.status =
+                "completed";
+
+            order.completedAt =
+                now;
+
+            order.commissionKopecks =
+                feeKopecks;
+
+            order.commissionStatus =
+                commissionStatus;
+
+            order.commissionChargedAt =
+                now;
+
+            await order.save({
+                transaction: t,
+            });
+
+            await req.logAction({
+                req,
+
+                actorUserId:
+                executorId,
+
+                actorRole:
+                    "user",
+
+                actionType:
+                    "express_order_complete",
+
+                entityType:
+                    "express_order",
+
+                entityId:
+                order.id,
+
+                expressOrderId:
+                order.id,
+
+                meta: {
+                    from,
+
+                    to:
+                    order.status,
+
+                    totalRubles,
+
+                    totalKopecks,
+
+                    premiumActive,
+
+                    feeKopecks,
+
+                    commissionStatus,
+
+                    paidBySavedCard,
+
+                    debtAdded,
+                },
+            });
+
+            await t.commit();
+
+            const io =
+                req.app.locals.io;
+
+            emitExpressStatusToParticipants(
+                io,
+                order,
+                {
+                    from,
+
+                    completedAt:
+                    order.completedAt,
+
+                    message:
+                        "Экспресс-заказ завершён",
+                }
+            );
+
+            await notifyUser({
+                userId:
+                order.creatorId,
+
+                type:
+                    "review_needed",
+
+                title:
+                    "Экспресс-заказ завершён",
+
+                body:
+                    "Оцените исполнителя",
+
+                orderId:
+                order.id,
+
+                orderType:
+                    "express",
+
+                data: {
+                    creatorId:
+                    order.creatorId,
+
+                    executorId:
+                    order.executorId,
+
+                    expressType:
+                    order.type,
+
+                    status:
+                    order.status,
+
+                    completedAt:
+                    order.completedAt,
+                },
+
+                socketEvent:
+                    "expressOrderCompleted",
+
+                socketPayload: {
+                    message:
+                        "Экспресс-заказ завершён. Оцените исполнителя.",
+
+                    orderId:
+                    order.id,
+
+                    creatorId:
+                    order.creatorId,
+
+                    executorId:
+                    order.executorId,
+
+                    orderType:
+                        "express",
+
+                    type:
+                    order.type,
+                },
+            });
+
+            await notifyUser({
+                userId:
+                order.executorId,
+
+                type:
+                    "express_completed",
+
+                title:
+                    "Экспресс-заказ завершён",
+
+                body:
+                    `Заказ №${order.id} успешно завершён`,
+
+                orderId:
+                order.id,
+
+                orderType:
+                    "express",
+
+                data: {
+                    creatorId:
+                    order.creatorId,
+
+                    executorId:
+                    order.executorId,
+
+                    expressType:
+                    order.type,
+
+                    status:
+                    order.status,
+
+                    completedAt:
+                    order.completedAt,
+
+                    commissionKopecks:
+                    feeKopecks,
+
+                    commissionStatus,
+                },
+
+                socketEvent:
+                    "expressOrderCompletedForExecutor",
+
+                socketPayload: {
+                    orderId:
+                    order.id,
+
+                    orderType:
+                        "express",
+
+                    message:
+                        "Экспресс-заказ завершён",
+
+                    commissionKopecks:
+                    feeKopecks,
+
+                    commissionStatus,
+                },
+            });
+
+            return res.json({
+                success: true,
+
+                order,
+
+                commission: {
+                    premium:
+                    premiumActive,
+
+                    feeKopecks,
+
+                    feeRubles:
+                        feeKopecks /
+                        100,
+
+                    status:
+                    commissionStatus,
+
+                    paidBySavedCard,
+
+                    debtAdded,
+                },
+            });
+        } catch (e) {
+            try {
+                if (!t.finished) {
+                    await t.rollback();
+                }
+            } catch (
+                rollbackError
+                ) {
+                console.error(
+                    "express complete rollback error:",
+                    rollbackError
+                );
+            }
+
+            console.error(
+                "express-orders complete error:",
+                e
+            );
+
+            return res.status(500).json({
+                success: false,
+                message:
+                    "Ошибка сервера",
+            });
         }
-
-        if (order.status !== "in_progress") {
-            return res.status(409).json({ success: false, message: "Заказ ещё не в процессе" });
-        }
-
-        const from = order.status;
-        order.status = "completed";
-        order.completedAt = new Date();
-        await order.save();
-
-        const io = req.app.locals.io;
-
-        emitExpressStatusToParticipants(io, order, {
-            from,
-            completedAt: order.completedAt,
-            message: "Экспресс-заказ завершён",
-        });
-
-        await req.logAction({
-            req,
-            actorUserId: executorId,
-            actorRole: "user",
-            actionType: "express_status_change",
-            entityType: "express_order",
-            entityId: order.id,
-            expressOrderId: order.id,
-            meta: { from, to: order.status },
-        });
-
-        // ✅ уведомляем заказчика, что можно оставить отзыв
-        await notifyUser({
-            userId: order.creatorId,
-            type: "review_needed",
-            title: "Экспресс-заказ завершён",
-            body: "Оцените исполнителя",
-            orderId: order.id,
-            orderType: "express",
-            data: {
-                creatorId: order.creatorId,
-                executorId: order.executorId,
-                expressType: order.type,
-                status: order.status,
-                completedAt: order.completedAt,
-            },
-            socketEvent: "expressOrderCompleted",
-            socketPayload: {
-                message: "Экспресс-заказ завершён. Оцените исполнителя.",
-                orderId: order.id,
-                creatorId: order.creatorId,
-                executorId: order.executorId,
-                orderType: "express",
-                type: order.type,
-            },
-        });
-
-        await notifyUser({
-            userId: order.executorId,
-            type: "express_completed",
-            title: "Экспресс-заказ завершён",
-            body: `Заказ №${order.id} успешно завершён`,
-            orderId: order.id,
-            orderType: "express",
-            data: {
-                creatorId: order.creatorId,
-                executorId: order.executorId,
-                expressType: order.type,
-                status: order.status,
-                completedAt: order.completedAt,
-            },
-            socketEvent: "expressOrderCompletedForExecutor",
-            socketPayload: {
-                orderId: order.id,
-                orderType: "express",
-                message: "Экспресс-заказ завершён",
-            },
-        });
-
-        return res.json({
-            success: true,
-            order,
-        });
-    } catch (e) {
-        console.error("express-orders complete error:", e);
-        return res.status(500).json({ success: false, message: "Ошибка сервера" });
-    }
-});
+    });
 
 router.post("/express-orders/:id/cancel", authenticateToken, async (req, res) => {
     try {
