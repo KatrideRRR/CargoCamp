@@ -95,6 +95,18 @@ const OrderPage = () => {
     const location = useLocation();
     const { id } = useParams();
 
+    const queryParams =
+        useMemo(
+            () =>
+                new URLSearchParams(
+                    location.search
+                ),
+            [location.search]
+        );
+
+    const isAdminPreview =
+        queryParams.get("admin") === "1";
+
     const { openDebtModal } = useContext(ModalContext);
 
     const isExpressPage = location.pathname.startsWith("/express-order");
@@ -197,16 +209,47 @@ const OrderPage = () => {
             let loadedOrder;
 
             if (isExpressPage) {
-                const token = localStorage.getItem("authToken");
+                const token =
+                    localStorage.getItem(
+                        "authToken"
+                    );
 
-                const response = await axiosInstance.get(`/express/express-orders/${id}`, {
-                    headers: token ? { Authorization: `Bearer ${token}` } : {},
-                });
+                const endpoint =
+                    isAdminPreview
+                        ? `/express/express-orders/admin/${id}`
+                        : `/express/express-orders/${id}`;
 
-                loadedOrder = normalizeExpressOrder(response.data?.order || response.data);
+                const response =
+                    await axiosInstance.get(
+                        endpoint,
+                        {
+                            headers: token
+                                ? {
+                                    Authorization:
+                                        `Bearer ${token}`,
+                                }
+                                : {},
+                        }
+                    );
+
+                loadedOrder =
+                    normalizeExpressOrder(
+                        response.data?.order ||
+                        response.data
+                    );
             } else {
-                const response = await axiosInstance.get(`/orders/${id}`);
-                loadedOrder = response.data;
+                const endpoint =
+                    isAdminPreview
+                        ? `/orders/admin/${id}`
+                        : `/orders/${id}`;
+
+                const response =
+                    await axiosInstance.get(
+                        endpoint
+                    );
+
+                loadedOrder =
+                    response.data;
             }
 
             if (!loadedOrder) {
@@ -233,7 +276,11 @@ const OrderPage = () => {
         fetchProfile();
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id, isExpressPage]);
+    }, [
+        id,
+        isExpressPage,
+        isAdminPreview,
+    ]);
 
     useEffect(() => {
         const onPullToRefresh = async (e) => {
@@ -254,7 +301,11 @@ const OrderPage = () => {
         };
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id, isExpressPage]);
+    }, [
+        id,
+        isExpressPage,
+        isAdminPreview,
+    ]);
 
     const openModal = (images) => {
         setCurrentImages(images || []);
@@ -605,19 +656,51 @@ const OrderPage = () => {
 
     const getStatusLabel = (status) => {
         const map = {
-            created: "Ожидает исполнителя",
-            pending: "Ожидает исполнителя",
-            accepted: "Принят",
-            on_the_way_to_A: "В пути к точке А",
-            arrived_at_A: "На месте",
-            waiting_at_A: "Ожидание",
-            picked_up: "Посылка забрана",
-            in_progress: "Выполняется",
-            completed: "Завершён",
-            cancelled: "Отменён",
+            created:
+                "Ожидает исполнителя",
+
+            pending:
+                "Ожидает исполнителя",
+
+            pending_payment:
+                "Ожидает оплаты продвижения",
+
+            active:
+                "Выполняется",
+
+            accepted:
+                "Принят",
+
+            on_the_way_to_A:
+                "В пути к точке А",
+
+            arrived_at_A:
+                "На месте",
+
+            waiting_at_A:
+                "Ожидание",
+
+            picked_up:
+                "Посылка забрана",
+
+            in_progress:
+                "Выполняется",
+
+            completed:
+                "Завершён",
+
+            expired:
+                "Срок заказа истёк",
+
+            cancelled:
+                "Отменён",
         };
 
-        return map[status] || status || "—";
+        return (
+            map[status] ||
+            status ||
+            "—"
+        );
     };
 
     if (error) {
@@ -725,6 +808,20 @@ const OrderPage = () => {
                                     {Number(order.creatorId) === Number(userId) && (
                                         <span className="badge badge-my-order">Мой заказ</span>
                                     )}
+
+                                    {isAdminPreview && (
+                                        <span className="badge badge-admin-preview">
+        Просмотр администратора
+    </span>
+                                    )}
+
+                                    {!isExpress &&
+                                        order.status ===
+                                        "pending_payment" && (
+                                            <span className="badge badge-payment-pending">
+            Ожидает оплаты продвижения
+        </span>
+                                        )}
 
                                     {!isExpress && canRequestRegular && (
                                         <span className="badge badge-can-take">Можно взять</span>

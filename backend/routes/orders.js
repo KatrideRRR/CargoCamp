@@ -673,6 +673,145 @@ async function tryPayCommissionFromSavedCard({ req, executor, order, amountKopec
 
 module.exports = (io) => {
 
+    router.get("/admin/:id", authenticateToken, async (req, res) => {
+            const orderId =
+                Number(req.params.id);
+
+            if (
+                !Number.isInteger(orderId) ||
+                orderId <= 0
+            ) {
+                return res.status(400).json({
+                    message:
+                        "Некорректный ID заказа",
+                });
+            }
+
+            try {
+                /*
+                 * Не доверяем роли только с фронтенда.
+                 * Проверяем её по базе.
+                 */
+                const currentUser =
+                    await User.findByPk(
+                        req.user.id,
+                        {
+                            attributes: [
+                                "id",
+                                "role",
+                            ],
+                        }
+                    );
+
+                if (
+                    !currentUser ||
+                    currentUser.role !== "admin"
+                ) {
+                    return res.status(403).json({
+                        message:
+                            "Доступ разрешён только администратору",
+                    });
+                }
+
+                const order =
+                    await Order.findByPk(
+                        orderId,
+                        {
+                            include: [
+                                {
+                                    model:
+                                    db.User,
+
+                                    as:
+                                        "users",
+
+                                    attributes: [
+                                        "id",
+                                        "username",
+                                        "phone",
+                                    ],
+                                },
+
+                                {
+                                    model:
+                                    db.Category,
+
+                                    as:
+                                        "category",
+
+                                    attributes: [
+                                        "id",
+                                        "name",
+                                    ],
+                                },
+
+                                {
+                                    model:
+                                    db.Subcategory,
+
+                                    as:
+                                        "subcategory",
+
+                                    attributes: [
+                                        "id",
+                                        "name",
+                                        "code",
+                                        "formConfig",
+                                        "pricingConfig",
+                                    ],
+                                },
+
+                                {
+                                    model:
+                                    db.Service,
+
+                                    as:
+                                        "service",
+
+                                    attributes: [
+                                        "id",
+                                        "name",
+                                    ],
+                                },
+                            ],
+                        }
+                    );
+
+                if (!order) {
+                    return res.status(404).json({
+                        message:
+                            "Заказ не найден",
+                    });
+                }
+
+                /*
+                 * Администратор видит любой статус:
+                 *
+                 * pending
+                 * pending_payment
+                 * active
+                 * completed
+                 * expired
+                 */
+                return res.json({
+                    ...order.toJSON(),
+
+                    adminPreview:
+                        true,
+                });
+            } catch (error) {
+                console.error(
+                    "Ошибка административного просмотра заказа:",
+                    error
+                );
+
+                return res.status(500).json({
+                    message:
+                        "Ошибка сервера",
+                });
+            }
+        });
+
     router.post('/:id/restore', authenticateToken, async (req, res) => {
         const { id } = req.params;
 
@@ -1843,6 +1982,16 @@ module.exports = (io) => {
             if (!order) {
                 return res.status(404).json({
                     message: "Заказ не найден",
+                });
+            }
+
+            if (
+                String(order.status) ===
+                "pending_payment"
+            ) {
+                return res.status(404).json({
+                    message:
+                        "Заказ не найден",
                 });
             }
 

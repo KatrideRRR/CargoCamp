@@ -309,6 +309,36 @@ function navigateFromPush(rawData, navigate, options = {}) {
         return;
     }
 
+    if (
+        type ===
+        "admin_new_order" &&
+        orderId
+    ) {
+        navigate(
+            `/order/${orderId}?admin=1&fromPush=1`,
+            {
+                replace: true,
+            }
+        );
+
+        return;
+    }
+
+    if (
+        type ===
+        "admin_new_express_order" &&
+        orderId
+    ) {
+        navigate(
+            `/express-order/${orderId}?admin=1&fromPush=1`,
+            {
+                replace: true,
+            }
+        );
+
+        return;
+    }
+
     if (type === "order_push" && orderId) {
         if (orderType === "express") {
             navigate(`/express-order/${orderId}`, { replace: true });

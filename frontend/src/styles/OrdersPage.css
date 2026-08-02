@@ -3728,3 +3728,15 @@
     color: #9a3412;
     font-weight: 950;
 }
+
+.badge-admin-preview {
+    color: #6d28d9;
+    background: rgba(237, 233, 254, 0.95);
+    border: 1px solid rgba(167, 139, 250, 0.45);
+}
+
+.badge-payment-pending {
+    color: #92400e;
+    background: rgba(255, 251, 235, 0.95);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+}

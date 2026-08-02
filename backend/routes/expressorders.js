@@ -195,6 +195,195 @@ function emitExpressOrderUpdate(io, order, payload = {}) {
     });
 }
 
+const notifyAdminsAboutNewExpressOrder = async ({order, creatorId,}) => {
+        try {
+            if (!order?.id) {
+                return;
+            }
+
+            const admins =
+                await User.findAll({
+                    where: {
+                        role: "admin",
+                    },
+
+                    attributes: [
+                        "id",
+                    ],
+                });
+
+            const adminIds = [
+                ...new Set(
+                    admins
+                        .map((admin) =>
+                            Number(admin.id)
+                        )
+                        .filter(
+                            (id) =>
+                                Number.isInteger(id) &&
+                                id > 0
+                        )
+                ),
+            ];
+
+            if (
+                adminIds.length === 0
+            ) {
+                console.warn(
+                    `Администраторы не найдены. Уведомление по экспресс-заказу №${order.id} не отправлено.`
+                );
+
+                return;
+            }
+
+            const typeLabel =
+                order.type === "taxi"
+                    ? "Такси"
+                    : order.type ===
+                    "courier"
+                        ? "Курьер"
+                        : "Экспресс";
+
+            const amount =
+                Number(
+                    order.totalPrice ||
+                    0
+                );
+
+            const title =
+                `Новый экспресс-заказ №${order.id}`;
+
+            const body = [
+                typeLabel,
+
+                amount > 0
+                    ? `${amount.toLocaleString(
+                        "ru-RU"
+                    )} ₽`
+                    : null,
+
+                order.fromAddress &&
+                order.toAddress
+                    ? `${order.fromAddress} → ${order.toAddress}`
+                    : null,
+            ]
+                .filter(Boolean)
+                .join(" • ");
+
+            const notificationData = {
+                orderId:
+                order.id,
+
+                expressOrderId:
+                order.id,
+
+                orderType:
+                    "express",
+
+                creatorId:
+                    creatorId ||
+                    order.creatorId,
+
+                executorId:
+                    order.executorId ||
+                    null,
+
+                expressType:
+                order.type,
+
+                fromAddress:
+                order.fromAddress,
+
+                toAddress:
+                order.toAddress,
+
+                fromLat:
+                order.fromLat,
+
+                fromLng:
+                order.fromLng,
+
+                toLat:
+                order.toLat,
+
+                toLng:
+                order.toLng,
+
+                proposedSum:
+                amount,
+
+                totalPrice:
+                amount,
+
+                status:
+                order.status,
+
+                adminUnfiltered:
+                    true,
+            };
+
+            await notifyMany(
+                adminIds,
+                {
+                    type:
+                        "admin_new_express_order",
+
+                    title,
+
+                    body,
+
+                    orderId:
+                    order.id,
+
+                    orderType:
+                        "express",
+
+                    data:
+                    notificationData,
+
+                    socketEvent:
+                        "adminNewExpressOrder",
+
+                    socketPayload: {
+                        ...notificationData,
+
+                        message:
+                            `Создан новый экспресс-заказ №${order.id}`,
+                    },
+                }
+            );
+
+            console.log(
+                "ADMIN NEW EXPRESS ORDER NOTIFICATION:",
+                {
+                    orderId:
+                    order.id,
+
+                    adminIds,
+
+                    type:
+                    order.type,
+
+                    status:
+                    order.status,
+                }
+            );
+        } catch (error) {
+            console.error(
+                "Ошибка уведомления администраторов об экспресс-заказе:",
+                {
+                    orderId:
+                        order?.id ||
+                        null,
+
+                    error:
+                        error?.message ||
+                        error,
+                }
+            );
+        }
+    };
+
 function emitExpressStatusToParticipants(io, order, payload = {}) {
     if (!io || !order) return;
 
@@ -251,6 +440,81 @@ async function bumpSavedAddressUsage({ userId, id, transaction }) {
 }
 
 /* ================= orders ================= */
+
+router.get("/express-orders/admin/:id", authenticateToken, async (req, res) => {
+        const orderId =
+            Number(req.params.id);
+
+        if (
+            !Number.isInteger(orderId) ||
+            orderId <= 0
+        ) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Некорректный ID экспресс-заказа",
+            });
+        }
+
+        try {
+            const currentUser =
+                await User.findByPk(
+                    req.user.id,
+                    {
+                        attributes: [
+                            "id",
+                            "role",
+                        ],
+                    }
+                );
+
+            if (
+                !currentUser ||
+                currentUser.role !== "admin"
+            ) {
+                return res.status(403).json({
+                    success: false,
+                    message:
+                        "Доступ разрешён только администратору",
+                });
+            }
+
+            const order =
+                await ExpressOrder.findByPk(
+                    orderId
+                );
+
+            if (!order) {
+                return res.status(404).json({
+                    success: false,
+                    message:
+                        "Экспресс-заказ не найден",
+                });
+            }
+
+            return res.json({
+                success: true,
+
+                order: {
+                    ...order.toJSON(),
+
+                    adminPreview:
+                        true,
+                },
+            });
+        } catch (error) {
+            console.error(
+                "Ошибка административного просмотра экспресс-заказа:",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                message:
+                    "Ошибка сервера",
+            });
+        }
+    });
 
 router.get("/express-orders/available", async (req, res) => {
     try {
@@ -607,31 +871,62 @@ router.post("/express-orders", authenticateToken, async (req, res) => {
 
         await t.commit();
 
+        await notifyAdminsAboutNewExpressOrder({
+            order,
+            creatorId,
+        });
+
         try {
             await notifyNearbyExpressExecutors({
                 req,
                 order,
             });
         } catch (pushError) {
-            console.error("express nearby push error:", pushError);
+            console.error(
+                "express nearby push error:",
+                pushError
+            );
 
             await req.logAction?.({
                 req,
-                actorUserId: creatorId,
-                actorRole: "system",
-                actionType: "express_push_failed",
-                entityType: "express_order",
-                entityId: order.id,
-                expressOrderId: order.id,
-                severity: "error",
-                success: false,
+                actorUserId:
+                creatorId,
+
+                actorRole:
+                    "system",
+
+                actionType:
+                    "express_push_failed",
+
+                entityType:
+                    "express_order",
+
+                entityId:
+                order.id,
+
+                expressOrderId:
+                order.id,
+
+                severity:
+                    "error",
+
+                success:
+                    false,
+
                 meta: {
-                    error: String(pushError?.message || pushError),
+                    error:
+                        String(
+                            pushError?.message ||
+                            pushError
+                        ),
                 },
             });
         }
 
-        res.status(201).json({ success: true, order });
+        return res.status(201).json({
+            success: true,
+            order,
+        });
     } catch (e) {
         await t.rollback();
         console.error("express-orders POST error:", e);
