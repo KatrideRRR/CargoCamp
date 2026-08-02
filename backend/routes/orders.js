@@ -345,6 +345,207 @@ function calculateStraightDistanceKm(
     );
 }
 
+const notifyAdminsAboutNewOrder = async ({order, category, subcategory, creatorId,}) => {
+    try {
+        if (!order?.id) {
+            return;
+        }
+
+        /*
+         * Никаких фильтров по:
+         * - координатам;
+         * - радиусу;
+         * - категории администратора;
+         * - подкатегории;
+         * - выбранному платному продвижению.
+         */
+        const admins = await User.findAll({
+            where: {
+                role: "admin",
+            },
+            attributes: [
+                "id",
+            ],
+        });
+
+        const adminIds = admins
+            .map((admin) => Number(admin.id))
+            .filter(
+                (id) =>
+                    Number.isInteger(id) &&
+                    id > 0
+            );
+
+        if (adminIds.length === 0) {
+            console.warn(
+                `Администраторы не найдены. Push по заказу №${order.id} не отправлен.`
+            );
+
+            return;
+        }
+
+        const categoryName =
+            category?.name ||
+            "Без категории";
+
+        const subcategoryName =
+            subcategory?.name ||
+            null;
+
+        const serviceName =
+            subcategoryName
+                ? `${categoryName} • ${subcategoryName}`
+                : categoryName;
+
+        const amount =
+            Number(order.proposedSum || 0);
+
+        const formattedAmount =
+            amount.toLocaleString(
+                "ru-RU"
+            );
+
+        const title =
+            `Новый заказ №${order.id}`;
+
+        const bodyParts = [
+            serviceName,
+            formattedAmount
+                ? `${formattedAmount} ₽`
+                : null,
+            order.address || null,
+        ].filter(Boolean);
+
+        const body =
+            bodyParts.join(" • ");
+
+        /*
+         * Если notifyMany у тебя умеет принимать
+         * массив userId, это наиболее удобный вариант.
+         */
+        await notifyMany(adminIds, {
+            type: "admin_new_order",
+
+            title,
+
+            body,
+
+            orderId: order.id,
+
+            orderType: "regular",
+
+            data: {
+                orderId:
+                order.id,
+
+                orderType:
+                    "regular",
+
+                creatorId:
+                    creatorId ||
+                    order.creatorId,
+
+                categoryId:
+                order.categoryId,
+
+                categoryName,
+
+                subcategoryId:
+                    order.subcategoryId ||
+                    null,
+
+                subcategoryName,
+
+                proposedSum:
+                amount,
+
+                address:
+                order.address,
+
+                coordinates:
+                order.coordinates,
+
+                status:
+                order.status,
+
+                isAsap:
+                    !!order.isAsap,
+
+                workTime:
+                    order.workTime ||
+                    null,
+
+                /*
+                 * Администратор получает уведомление
+                 * независимо от покупки push.
+                 */
+                adminUnfiltered:
+                    true,
+
+                paidPromotionPush:
+                    Boolean(
+                        order
+                            ?.promotionRequested
+                            ?.push
+                    ),
+            },
+
+            socketEvent:
+                "adminNewOrder",
+
+            socketPayload: {
+                orderId:
+                order.id,
+
+                orderType:
+                    "regular",
+
+                creatorId:
+                    creatorId ||
+                    order.creatorId,
+
+                categoryId:
+                order.categoryId,
+
+                categoryName,
+
+                subcategoryId:
+                    order.subcategoryId ||
+                    null,
+
+                subcategoryName,
+
+                proposedSum:
+                amount,
+
+                address:
+                order.address,
+
+                coordinates:
+                order.coordinates,
+
+                status:
+                order.status,
+
+                adminUnfiltered:
+                    true,
+
+                message:
+                    `Создан новый заказ №${order.id}`,
+            },
+        });
+    } catch (error) {
+        /*
+         * Ошибка административного push не должна
+         * отменять уже успешно созданный заказ.
+         */
+        console.error(
+            "Ошибка уведомления администраторов о новом заказе:",
+            error
+        );
+    }
+};
+
 async function tryPayCommissionFromSavedCard({ req, executor, order, amountKopecks }) {
     if (!executor.yookassa_payment_method_id) {
         return {
@@ -1293,6 +1494,14 @@ module.exports = (io) => {
                         serverRecommendedPrice
                             ?.breakdown || [],
                 },
+            });
+
+            await notifyAdminsAboutNewOrder({
+                order: newOrder,
+                category: selectedCategory,
+                subcategory:
+                selectedSubcategory,
+                creatorId: userId,
             });
 
             io.emit("orderUpdated");
@@ -2312,11 +2521,123 @@ module.exports = (io) => {
             const order = await Order.findByPk(orderId);
             if (!order) return res.status(404).json({ message: "Заказ не найден" });
 
-            if (order.completedBy.includes(userId)) {
-                return res.status(400).json({ message: "Вы уже подтвердили завершение" });
+            const creatorId = Number(
+
+                order.creatorId
+
+            );
+
+            const executorId = Number(
+
+                order.executorId
+
+            );
+
+            const normalizedUserId = Number(
+
+                userId
+
+            );
+
+            const isCreator =
+
+                creatorId === normalizedUserId;
+
+            const isExecutor =
+
+                executorId === normalizedUserId;
+
+            if (
+
+                !isCreator &&
+
+                !isExecutor
+
+            ) {
+
+                return res.status(403).json({
+
+                    message:
+
+                        "Подтвердить завершение может только участник заказа",
+
+                });
+
             }
 
-            const isExecutor = Number(order.executorId) === Number(userId);
+            /*
+
+             * JSON может вернуть числа или строки.
+
+             * Поэтому все ID нормализуем в Number.
+
+             */
+
+            const completedBy = Array.isArray(
+
+                order.completedBy
+
+            )
+
+                ? order.completedBy
+
+                    .map(Number)
+
+                    .filter(Number.isFinite)
+
+                : [];
+
+            if (
+
+                completedBy.includes(
+
+                    normalizedUserId
+
+                )
+
+            ) {
+
+                return res.status(400).json({
+
+                    message:
+
+                        "Вы уже подтвердили завершение",
+
+                });
+
+            }
+
+            /*
+
+             * Первый участник, который нажал завершение,
+
+             * останавливает фактический таймер.
+
+             *
+
+             * workEndedAt больше не меняется,
+
+             * когда вторая сторона подтверждает заказ.
+
+             */
+
+            if (
+
+                order.workStartedAt &&
+
+                !order.workEndedAt
+
+            ) {
+
+                order.workEndedAt =
+
+                    new Date();
+
+                order.workEndedBy =
+
+                    normalizedUserId;
+
+            }
 
             if (isExecutor) {
                 const beforePhotos = Array.isArray(order.executorBeforePhotos) ? order.executorBeforePhotos : [];
@@ -2339,7 +2660,13 @@ module.exports = (io) => {
                 });
             }
 
-            order.completedBy = [...order.completedBy, userId];
+            order.completedBy = [
+
+                ...completedBy,
+
+                normalizedUserId,
+
+            ];
 
             await req.logAction({
                 req,
@@ -2349,10 +2676,28 @@ module.exports = (io) => {
                 entityType: "order",
                 entityId: order.id,
                 orderId: order.id,
-                meta: { completedBy: order.completedBy },
+                meta: {
+                    completedBy:
+                    order.completedBy,
+
+                    workStartedAt:
+                        order.workStartedAt ||
+                        null,
+
+                    workEndedAt:
+                        order.workEndedAt ||
+                        null,
+
+                    workEndedBy:
+                        order.workEndedBy ||
+                        null,
+                },
             });
 
-            if (order.completedBy.includes(order.creatorId) && !order.completedBy.includes(order.executorId)) {
+            if (
+                order.completedBy.includes(creatorId) &&
+                !order.completedBy.includes(executorId)
+            ) {
                 await notifyUser({
                     userId: order.executorId,
                     type: "order_completion_requested",
@@ -2376,7 +2721,10 @@ module.exports = (io) => {
                 });
             }
 
-            if (order.completedBy.includes(order.executorId) && !order.completedBy.includes(order.creatorId)) {
+            if (
+                order.completedBy.includes(executorId) &&
+                !order.completedBy.includes(creatorId)
+            ) {
                 await notifyUser({
                     userId: order.creatorId,
                     type: "order_completion_requested",
@@ -2402,7 +2750,10 @@ module.exports = (io) => {
 
             let fullyCompleted = false;
 
-            if (order.completedBy.includes(order.creatorId) && order.completedBy.includes(order.executorId)) {
+            if (
+                order.completedBy.includes(creatorId) &&
+                order.completedBy.includes(executorId)
+            ) {
                 order.status = "completed";
                 order.completedAt = new Date();
                 fullyCompleted = true;
@@ -2452,9 +2803,26 @@ module.exports = (io) => {
                     entityId: order.id,
                     orderId: order.id,
                     meta: {
-                        paymentType: order.paymentType,
-                        dealStatus: order.dealStatus,
-                        completedAt: order.completedAt,
+                        paymentType:
+                        order.paymentType,
+
+                        dealStatus:
+                        order.dealStatus,
+
+                        completedAt:
+                        order.completedAt,
+
+                        workStartedAt:
+                            order.workStartedAt ||
+                            null,
+
+                        workEndedAt:
+                            order.workEndedAt ||
+                            null,
+
+                        workEndedBy:
+                            order.workEndedBy ||
+                            null,
                     },
                 });
             }
@@ -2467,17 +2835,41 @@ module.exports = (io) => {
                     orderId: order.id,
                     orderType: "regular",
                     data: {
-                        creatorId: order.creatorId,
-                        executorId: order.executorId,
-                        completedAt: order.completedAt,
+                        creatorId:
+                        order.creatorId,
+
+                        executorId:
+                        order.executorId,
+
+                        completedAt:
+                        order.completedAt,
+
+                        workStartedAt:
+                            order.workStartedAt ||
+                            null,
+
+                        workEndedAt:
+                            order.workEndedAt ||
+                            null,
                     },
                     socketEvent: "reviewNeeded",
                     socketPayload: {
                         orderId: order.id,
-                        message: "Заказ завершён. Оставьте отзыв.",
-                        creatorId: order.creatorId,
-                        executorId: order.executorId,
+                        message:
+                            "Заказ завершён. Оставьте отзыв.",
+                        creatorId:
+                        order.creatorId,
+                        executorId:
+                        order.executorId,
                         orderType: "regular",
+
+                        workStartedAt:
+                            order.workStartedAt ||
+                            null,
+
+                        workEndedAt:
+                            order.workEndedAt ||
+                            null,
                     },
                 });
             }
@@ -2508,7 +2900,14 @@ module.exports = (io) => {
                     paymentType: fullOrder.paymentType,
                     dueDate: new Date(fullOrder.createdAt.getTime() + 5 * 24 * 60 * 60 * 1000).toLocaleDateString("ru-RU"),
                     completeAt: fullOrder.completedAt,
-                    completedBy: fullOrder.completedBy
+                    completedBy: fullOrder.completedBy,
+                    workStartedAt:
+                        fullOrder.workStartedAt ||
+                        null,
+
+                    workEndedAt:
+                        fullOrder.workEndedAt ||
+                        null,
                 };
 
                 try {
@@ -2841,69 +3240,238 @@ module.exports = (io) => {
         });
 
     router.post("/:id/start-work", authenticateToken, async (req, res) => {
-        try {
-            const orderId = req.params.id;
-            const userId = req.user.id;
+            try {
+                const orderId = Number(
+                    req.params.id
+                );
 
-            const order = await Order.findByPk(orderId);
-            if (!order) return res.status(404).json({ message: "Заказ не найден" });
+                const userId = Number(
+                    req.user.id
+                );
 
-            if (Number(order.executorId) !== Number(userId)) {
-                return res.status(403).json({ message: "Только исполнитель может начать работу" });
-            }
+                if (
+                    !Number.isFinite(orderId) ||
+                    orderId <= 0
+                ) {
+                    return res.status(400).json({
+                        message:
+                            "Некорректный номер заказа",
+                    });
+                }
 
-            const beforePhotos = Array.isArray(order.executorBeforePhotos) ? order.executorBeforePhotos : [];
+                const order =
+                    await Order.findByPk(orderId);
 
-            if (!order.workStartedAt) {
-                order.workStartedAt = new Date();
+                if (!order) {
+                    return res.status(404).json({
+                        message:
+                            "Заказ не найден",
+                    });
+                }
+
+                const creatorId = Number(
+                    order.creatorId
+                );
+
+                const executorId = Number(
+                    order.executorId
+                );
+
+                const isCreator =
+                    creatorId === userId;
+
+                const isExecutor =
+                    executorId === userId;
+
+                if (
+                    !isCreator &&
+                    !isExecutor
+                ) {
+                    return res.status(403).json({
+                        message:
+                            "Начать работу может только участник заказа",
+                    });
+                }
+
+                if (
+                    !Number.isFinite(executorId) ||
+                    executorId <= 0
+                ) {
+                    return res.status(400).json({
+                        message:
+                            "Исполнитель ещё не выбран",
+                    });
+                }
+
+                if (
+                    order.status === "completed" ||
+                    order.status === "expired"
+                ) {
+                    return res.status(400).json({
+                        message:
+                            "Этот заказ уже нельзя начать",
+                    });
+                }
+
+                /*
+                 * Если таймер уже запущен,
+                 * повторное нажатие не меняет время.
+                 */
+                if (order.workStartedAt) {
+                    return res.json({
+                        success: true,
+                        alreadyStarted: true,
+                        order,
+                        workStartedAt:
+                        order.workStartedAt,
+                        workStartedBy:
+                        order.workStartedBy,
+                    });
+                }
+
+                order.workStartedAt =
+                    new Date();
+
+                order.workStartedBy =
+                    userId;
+
+                /*
+                 * На случай повторного запуска
+                 * старые данные окончания очищаем.
+                 * Обычно их здесь быть не должно.
+                 */
+                order.workEndedAt = null;
+                order.workEndedBy = null;
+
                 await order.save();
-            }
 
-            await req.logAction({
-                req,
-                actorUserId: userId,
-                actorRole: "user",
-                actionType: "order_work_started",
-                entityType: "order",
-                entityId: order.id,
-                orderId: order.id,
-                meta: {
-                    workStartedAt: order.workStartedAt,
-                    executorBeforePhotosCount: beforePhotos.length,
-                },
-            });
+                const beforePhotos =
+                    Array.isArray(
+                        order.executorBeforePhotos
+                    )
+                        ? order.executorBeforePhotos
+                        : [];
 
-            await notifyUser({
-                userId: order.creatorId,
-                type: "order_started",
-                title: "Исполнитель начал работу",
-                body: `По заказу №${order.id} отмечено начало работы`,
-                orderId: order.id,
-                orderType: "regular",
-                data: {
-                    creatorId: order.creatorId,
-                    executorId: order.executorId,
-                    workStartedAt: order.workStartedAt,
-                },
-                socketEvent: "orderStarted",
-                socketPayload: {
+                const startedByRole =
+                    isCreator
+                        ? "creator"
+                        : "executor";
+
+                const startedByText =
+                    isCreator
+                        ? "Заказчик отметил начало работы"
+                        : "Исполнитель отметил начало работы";
+
+                await req.logAction({
+                    req,
+                    actorUserId: userId,
+                    actorRole: "user",
+                    actionType:
+                        "order_work_started",
+                    entityType: "order",
+                    entityId: order.id,
                     orderId: order.id,
-                    creatorId: order.creatorId,
-                    executorId: order.executorId,
-                    workStartedAt: order.workStartedAt,
-                    message: "Исполнитель начал работу",
-                },
-            });
+                    meta: {
+                        workStartedAt:
+                        order.workStartedAt,
+                        workStartedBy:
+                        order.workStartedBy,
+                        startedByRole,
+                        executorBeforePhotosCount:
+                        beforePhotos.length,
+                    },
+                });
 
-            return res.json({
-                success: true,
-                workStartedAt: order.workStartedAt,
-            });
-        } catch (error) {
-            console.error("Ошибка начала работы:", error);
-            return res.status(500).json({ message: "Ошибка сервера" });
-        }
-    });
+                const otherUserId =
+                    isCreator
+                        ? executorId
+                        : creatorId;
+
+                await notifyUser({
+                    userId: otherUserId,
+                    type: "order_started",
+                    title: "Работа начата",
+                    body:
+                        `${startedByText} по заказу №${order.id}`,
+                    orderId: order.id,
+                    orderType: "regular",
+                    data: {
+                        creatorId,
+                        executorId,
+                        workStartedAt:
+                        order.workStartedAt,
+                        workStartedBy:
+                        order.workStartedBy,
+                        startedByRole,
+                    },
+                    socketEvent: "orderStarted",
+                    socketPayload: {
+                        orderId: order.id,
+                        orderType: "regular",
+                        creatorId,
+                        executorId,
+                        workStartedAt:
+                        order.workStartedAt,
+                        workStartedBy:
+                        order.workStartedBy,
+                        startedByRole,
+                        message: startedByText,
+                    },
+                });
+
+                /*
+                 * Событие обновления получают обе стороны.
+                 * Даже если notifyUser отправляется только
+                 * второму участнику.
+                 */
+                io.to(`user_${creatorId}`).emit(
+                    "activeOrdersUpdated",
+                    {
+                        orderId: order.id,
+                        orderType: "regular",
+                        creatorId,
+                        executorId,
+                        workStartedAt:
+                        order.workStartedAt,
+                        workStartedBy:
+                        order.workStartedBy,
+                    }
+                );
+
+                io.to(`user_${executorId}`).emit(
+                    "activeOrdersUpdated",
+                    {
+                        orderId: order.id,
+                        orderType: "regular",
+                        creatorId,
+                        executorId,
+                        workStartedAt:
+                        order.workStartedAt,
+                        workStartedBy:
+                        order.workStartedBy,
+                    }
+                );
+
+                return res.json({
+                    success: true,
+                    alreadyStarted: false,
+                    order,
+                    workStartedAt:
+                    order.workStartedAt,
+                    workStartedBy:
+                    order.workStartedBy,
+                });
+            } catch (error) {
+                console.error(
+                    "Ошибка начала работы:",
+                    error
+                );
+
+                return res.status(500).json({
+                    message: "Ошибка сервера",
+                });
+            }
+        });
 
     router.patch("/:orderId/hide-by-creator", authenticateToken, async (req, res) => {
         try {

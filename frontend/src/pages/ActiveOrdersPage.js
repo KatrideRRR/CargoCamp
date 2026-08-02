@@ -14,12 +14,229 @@ import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "r
 import ExpressOrderCard from "../components/ExpressOrderCard";
 import { ModalContext } from "../components/modalContext";
 import { openOrderRoute } from "../utils/orderNavigation";
+import OrderWorkTimer from "../components/OrderWorkTimer";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
 const hasDescription = (value) =>
     typeof value === "string" && value.trim().length > 0;
 
+const parseServiceDetails = (value) => {
+    if (!value) {
+        return {};
+    }
+
+    if (
+        typeof value === "object" &&
+        !Array.isArray(value)
+    ) {
+        return value;
+    }
+
+    if (typeof value === "string") {
+        try {
+            const parsed = JSON.parse(value);
+
+            return parsed &&
+            typeof parsed === "object" &&
+            !Array.isArray(parsed)
+                ? parsed
+                : {};
+        } catch {
+            return {};
+        }
+    }
+
+    return {};
+};
+
+const isHourlyOrder = (order) => {
+    const details = parseServiceDetails(
+        order?.serviceDetails
+    );
+
+    return (
+        details?.pricingModel === "hourly" ||
+        details?.pricingCalculator ===
+        "cargo_hourly" ||
+        order?.pricingModel === "hourly"
+    );
+};
+
+const getWorkEndTime = (order) => {
+    return (
+        order?.workEndedAt ||
+        (
+            order?.status === "completed"
+                ? order?.completedAt
+                : null
+        ) ||
+        null
+    );
+};
+
+const getWorkDurationMs = (
+    startedAt,
+    endedAt = null
+) => {
+    if (!startedAt) {
+        return 0;
+    }
+
+    const startTime =
+        new Date(startedAt).getTime();
+
+    const endTime = endedAt
+        ? new Date(endedAt).getTime()
+        : Date.now();
+
+    if (
+        !Number.isFinite(startTime) ||
+        !Number.isFinite(endTime) ||
+        endTime <= startTime
+    ) {
+        return 0;
+    }
+
+    return endTime - startTime;
+};
+
+const formatWorkTimer = (durationMs) => {
+    const totalSeconds = Math.max(
+        0,
+        Math.floor(durationMs / 1000)
+    );
+
+    const hours = Math.floor(
+        totalSeconds / 3600
+    );
+
+    const minutes = Math.floor(
+        (totalSeconds % 3600) / 60
+    );
+
+    const seconds =
+        totalSeconds % 60;
+
+    return [
+        String(hours).padStart(2, "0"),
+        String(minutes).padStart(2, "0"),
+        String(seconds).padStart(2, "0"),
+    ].join(":");
+};
+
+const formatWorkDurationText = (
+    durationMs
+) => {
+    const totalMinutes = Math.max(
+        0,
+        Math.ceil(durationMs / 60000)
+    );
+
+    const hours = Math.floor(
+        totalMinutes / 60
+    );
+
+    const minutes =
+        totalMinutes % 60;
+
+    if (hours > 0 && minutes > 0) {
+        return `${hours} ч ${minutes} мин`;
+    }
+
+    if (hours > 0) {
+        return `${hours} ч`;
+    }
+
+    return `${minutes} мин`;
+};
+
+const calculateHourlyCompletionPrice = ({
+                                            durationMs,
+                                            firstHourPrice,
+                                            nextHourPrice,
+                                        }) => {
+    const safeDurationMs = Math.max(
+        0,
+        Number(durationMs) || 0
+    );
+
+    const safeFirstHourPrice = Math.max(
+        0,
+        Number(firstHourPrice) || 0
+    );
+
+    const safeNextHourPrice = Math.max(
+        0,
+        Number(nextHourPrice) || 0
+    );
+
+    if (
+        safeFirstHourPrice <= 0 ||
+        safeNextHourPrice <= 0
+    ) {
+        return null;
+    }
+
+    const actualMinutes =
+        safeDurationMs / 60000;
+
+    /*
+     * Минимум оплачивается один полный час.
+     *
+     * Всё время свыше часа округляется вверх
+     * блоками по 30 минут.
+     *
+     * 2:25 -> 2,5 часа
+     * 2:35 -> 3 часа
+     */
+    const billedHalfHourBlocks =
+        Math.max(
+            2,
+            Math.ceil(actualMinutes / 30)
+        );
+
+    const billedHours =
+        billedHalfHourBlocks / 2;
+
+    const extraHours =
+        Math.max(
+            0,
+            billedHours - 1
+        );
+
+    const extraTimePrice =
+        extraHours *
+        safeNextHourPrice;
+
+    const totalPrice =
+        safeFirstHourPrice +
+        extraTimePrice;
+
+    return {
+        actualMinutes:
+            Math.max(
+                0,
+                Math.ceil(actualMinutes)
+            ),
+
+        billedHours,
+
+        extraHours,
+
+        firstHourPrice:
+        safeFirstHourPrice,
+
+        nextHourPrice:
+        safeNextHourPrice,
+
+        extraTimePrice:
+            Math.round(extraTimePrice),
+
+        totalPrice:
+            Math.round(totalPrice),
+    };
+};
 
 function getContractUrl(contractPath) {
     if (!contractPath) {
@@ -116,6 +333,16 @@ const ActiveOrdersPage = () => {
         return saved ? JSON.parse(saved) : [];
     });
 
+    const [
+        completionModalOrder,
+        setCompletionModalOrder,
+    ] = useState(null);
+
+    const [
+        completionSubmitting,
+        setCompletionSubmitting,
+    ] = useState(false);
+
     const [photoUploading, setPhotoUploading] = useState({});
     const [startingWork, setStartingWork] = useState({});
 
@@ -196,12 +423,35 @@ const ActiveOrdersPage = () => {
         return {
             orderId: order.id,
             orderType: "regular",
-            title: `Заказ №${order.id} выполнен.`,
-            amount: Number(order.proposedSum || 0),
-            startedAt: order.workStartedAt || null,
-            completedAt: order.completedAt || null,
-            creatorId: order.creatorId,
-            executorId: order.executorId,
+            title:
+                `Заказ №${order.id} выполнен.`,
+
+            amount:
+                Number(
+                    order.proposedSum || 0
+                ),
+
+            startedAt:
+                order.workStartedAt ||
+                null,
+
+            /*
+             * Для длительности используем
+             * фактическое окончание работы.
+             *
+             * completedAt — только запасной вариант
+             * для старых заказов.
+             */
+            completedAt:
+                order.workEndedAt ||
+                order.completedAt ||
+                null,
+
+            creatorId:
+            order.creatorId,
+
+            executorId:
+            order.executorId,
         };
     };
 
@@ -543,7 +793,9 @@ const ActiveOrdersPage = () => {
             });
 
             await fetchActiveOrders();
-            alert("Работа отмечена как начатая ✅");
+            alert(
+                "Работа начата. Таймер запущен у обеих сторон ✅"
+            );
         } catch (e) {
             console.error("Ошибка начала работы:", e);
             alert(e.response?.data?.message || "Ошибка при начале работы");
@@ -584,50 +836,105 @@ const ActiveOrdersPage = () => {
         );
     };
 
-    const completeOrderRequest = async (orderId) => {
-        const ok = window.confirm("Подтвердить завершение заказа?");
-        if (!ok) return;
+    const openCompletionModal = (order) => {
+        if (!order?.id) {
+            return;
+        }
 
-        try {
-            const t = localStorage.getItem("authToken");
-            if (!t) {
-                alert("Вы не авторизованы");
-                navigate("/login");
+        setCompletionModalOrder(order);
+    };
+
+    const completeOrderRequest =
+        async () => {
+            const order =
+                completionModalOrder;
+
+            if (!order?.id) {
                 return;
             }
 
-            const res = await axiosInstance.post(
-                `/orders/complete/${orderId}`,
-                {},
-                { headers: { Authorization: `Bearer ${t}` } }
-            );
+            const orderId = order.id;
 
-            const updatedOrder = res.data;
+            try {
+                const t =
+                    localStorage.getItem(
+                        "authToken"
+                    );
 
-            setOrders((prev) =>
-                prev.map((o) => (o.id === orderId ? updatedOrder : o))
-            );
+                if (!t) {
+                    alert(
+                        "Вы не авторизованы"
+                    );
 
-            await fetchActiveOrders();
+                    navigate("/login");
+                    return;
+                }
 
-            const creatorId = updatedOrder?.creatorId;
-            const executorId = updatedOrder?.executorId;
+                setCompletionSubmitting(true);
 
-            if (updatedOrder?.status === "completed") {
-                openReviewFromCompletion(
-                    updatedOrder?.id || orderId,
-                    creatorId,
-                    executorId,
-                    "regular"
+                const res =
+                    await axiosInstance.post(
+                        `/orders/complete/${orderId}`,
+                        {},
+                        {
+                            headers: {
+                                Authorization:
+                                    `Bearer ${t}`,
+                            },
+                        }
+                    );
+
+                const updatedOrder =
+                    res.data;
+
+                setCompletionModalOrder(null);
+
+                setOrders((previous) =>
+                    previous.map((item) =>
+                        Number(item.id) ===
+                        Number(orderId)
+                            ? updatedOrder
+                            : item
+                    )
                 );
-            } else {
-                alert("Вы подтвердили завершение. Ожидаем подтверждение второй стороны.");
+
+                await fetchActiveOrders();
+
+                const creatorId =
+                    updatedOrder?.creatorId;
+
+                const executorId =
+                    updatedOrder?.executorId;
+
+                if (
+                    updatedOrder?.status ===
+                    "completed"
+                ) {
+                    openCompletionSuccessModal(
+                        buildCompletionPayload({
+                            order:
+                            updatedOrder,
+                            orderType:
+                                "regular",
+                        })
+                    );
+                } else {
+                    alert(
+                        "Вы подтвердили завершение. Ожидаем подтверждение второй стороны."
+                    );
+                }
+            } catch (error) {
+                console.error(error);
+
+                alert(
+                    error.response?.data
+                        ?.message ||
+                    "Ошибка при завершении заказа"
+                );
+            } finally {
+                setCompletionSubmitting(false);
             }
-        } catch (e) {
-            console.error(e);
-            alert(e.response?.data?.message || "Ошибка при завершении заказа");
-        }
-    };
+        };
 
     const remindCompleteOrder = async (orderId) => {
         try {
@@ -1010,6 +1317,12 @@ const ActiveOrdersPage = () => {
                                         const isExecutor = order.executorId === user.id;
                                         const isCreator = order.creatorId === user.id;
 
+                                        const hourly =
+                                            isHourlyOrder(order);
+
+                                        const workEndedAt =
+                                            getWorkEndTime(order);
+
                                         const creator = creatorsInfo[order.creatorId] || {};
                                         const executor = executorsInfo[order.executorId] || {};
 
@@ -1070,6 +1383,15 @@ const ActiveOrdersPage = () => {
                                                     </div>
 
                                                     <div className="order-subline">Создан {new Date(order.createdAt).toLocaleString()}</div>
+
+                                                    {hourly && order.workStartedAt && (
+                                                        <OrderWorkTimer
+                                                            startedAt={
+                                                                order.workStartedAt
+                                                            }
+                                                            endedAt={workEndedAt}
+                                                        />
+                                                    )}
 
                                                     {isExecutor ? (
                                                         <>
@@ -1191,25 +1513,45 @@ const ActiveOrdersPage = () => {
                                                                     Напомнить
                                                                 </button>
                                                             </>
-                                                        ) : isExecutor && !order.workStartedAt ? (
+                                                        ) : !order.workStartedAt &&
+                                                        (
+                                                            hourly
+                                                                ? isCreator || isExecutor
+                                                                : isExecutor
+                                                        ) ? (
                                                             <button
                                                                 className="start-main-button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+
+                                                                    const message = hourly
+                                                                        ? "Начать отсчёт рабочего времени? Таймер запустится у обеих сторон."
+                                                                        : "Отметить работу как начатую?";
+
+                                                                    if (!window.confirm(message)) {
+                                                                        return;
+                                                                    }
+
                                                                     startWork(order.id);
                                                                 }}
-                                                                disabled={startingWork[order.id]}
+                                                                disabled={
+                                                                    startingWork[order.id]
+                                                                }
                                                             >
                                                                 {startingWork[order.id]
-                                                                    ? isMobile ? <FaPlay /> : "Запуск..."
-                                                                    : isMobile ? <FaPlay /> : "Начать"}
+                                                                    ? isMobile
+                                                                        ? <FaPlay />
+                                                                        : "Запуск..."
+                                                                    : isMobile
+                                                                        ? <FaPlay />
+                                                                        : "Начать работу"}
                                                             </button>
                                                         ) : (
                                                             <button
                                                                 className="complete-button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    completeOrderRequest(order.id);
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    openCompletionModal(order);
                                                                 }}
                                                             >
                                                                 {isMobile ? <FaCheck /> : isWaitingForMe ? "Подтвердить завершение" : "Завершить"}
@@ -1664,6 +2006,318 @@ const ActiveOrdersPage = () => {
                                 </button>
                             </div>
                         </div>
+                    </Modal>
+
+                    <Modal
+                        appElement={document.getElementById("root")}
+                        isOpen={Boolean(completionModalOrder)}
+                        onRequestClose={() => {
+                            if (completionSubmitting) {
+                                return;
+                            }
+
+                            setCompletionModalOrder(null);
+                        }}
+                        contentLabel="Завершение заказа"
+                        className="completion-work-modal"
+                        overlayClassName="completion-work-modal-overlay"
+                    >
+
+                        {completionModalOrder && (() => {
+                            const hourly =
+                                isHourlyOrder(
+                                    completionModalOrder
+                                );
+
+                            const endTime =
+                                getWorkEndTime(
+                                    completionModalOrder
+                                ) || new Date().toISOString();
+
+                            const durationMs =
+                                getWorkDurationMs(
+                                    completionModalOrder
+                                        .workStartedAt,
+                                    endTime
+                                );
+
+                            const details =
+                                parseServiceDetails(
+                                    completionModalOrder
+                                        .serviceDetails
+                                );
+
+                            const firstHourPrice =
+                                Number(
+                                    details
+                                        ?.pricingFirstHourPrice
+                                );
+
+                            const nextHourPrice =
+                                Number(
+                                    details
+                                        ?.pricingNextHourPrice
+                                );
+
+                            const hourlyPriceCalculation =
+                                hourly &&
+                                completionModalOrder.workStartedAt
+                                    ? calculateHourlyCompletionPrice({
+                                        durationMs,
+                                        firstHourPrice,
+                                        nextHourPrice,
+                                    })
+                                    : null;
+
+                            return (
+                                <div className="completion-work-modal__content">
+                                    <button
+                                        type="button"
+                                        className="completion-work-modal__close"
+                                        disabled={
+                                            completionSubmitting
+                                        }
+                                        onClick={() =>
+                                            setCompletionModalOrder(
+                                                null
+                                            )
+                                        }
+                                    >
+                                        ✖
+                                    </button>
+
+                                    <div className="completion-work-modal__icon">
+                                        ⏱
+                                    </div>
+
+                                    <h2 className="completion-work-modal__title">
+                                        Завершить заказ?
+                                    </h2>
+
+                                    <p className="completion-work-modal__order">
+                                        Заказ №
+                                        {
+                                            completionModalOrder.id
+                                        }
+                                    </p>
+
+                                    {hourly &&
+                                    completionModalOrder
+                                        .workStartedAt ? (
+                                        <div className="completion-work-summary">
+                                            <div className="completion-work-summary__row">
+                            <span>
+                                Работа начата
+                            </span>
+
+                                                <strong>
+                                                    {new Date(
+                                                        completionModalOrder
+                                                            .workStartedAt
+                                                    ).toLocaleString(
+                                                        "ru-RU"
+                                                    )}
+                                                </strong>
+                                            </div>
+
+                                            <div className="completion-work-summary__row completion-work-summary__row--main">
+                            <span>
+                                Продолжительность
+                            </span>
+
+                                                <strong>
+                                                    {formatWorkDurationText(
+                                                        durationMs
+                                                    )}
+                                                </strong>
+                                            </div>
+
+                                            {Number.isFinite(
+                                                firstHourPrice
+                                            ) && (
+                                                <div className="completion-work-summary__row">
+                                <span>
+                                    Первый час
+                                </span>
+
+                                                    <strong>
+                                                        {firstHourPrice
+                                                            .toLocaleString(
+                                                                "ru-RU"
+                                                            )}{" "}
+                                                        ₽
+                                                    </strong>
+                                                </div>
+                                            )}
+
+                                            {Number.isFinite(
+                                                nextHourPrice
+                                            ) && (
+                                                <div className="completion-work-summary__row">
+                                <span>
+                                    Следующий час
+                                </span>
+
+                                                    <strong>
+                                                        {nextHourPrice
+                                                            .toLocaleString(
+                                                                "ru-RU"
+                                                            )}{" "}
+                                                        ₽/ч
+                                                    </strong>
+                                                </div>
+                                            )}
+
+                                            {hourlyPriceCalculation && (
+                                                <>
+                                                    <div className="completion-work-summary__row">
+            <span>
+                Оплачиваемое время
+            </span>
+
+                                                        <strong>
+                                                            {hourlyPriceCalculation
+                                                                .billedHours
+                                                                .toLocaleString(
+                                                                    "ru-RU",
+                                                                    {
+                                                                        minimumFractionDigits:
+                                                                            hourlyPriceCalculation
+                                                                                .billedHours %
+                                                                            1 ===
+                                                                            0
+                                                                                ? 0
+                                                                                : 1,
+
+                                                                        maximumFractionDigits:
+                                                                            1,
+                                                                    }
+                                                                )}{" "}
+                                                            ч
+                                                        </strong>
+                                                    </div>
+
+                                                    {hourlyPriceCalculation.extraHours >
+                                                        0 && (
+                                                            <div className="completion-work-summary__row">
+                <span>
+                    Время после первого часа
+                </span>
+
+                                                                <strong>
+                                                                    {hourlyPriceCalculation
+                                                                        .extraHours
+                                                                        .toLocaleString(
+                                                                            "ru-RU",
+                                                                            {
+                                                                                minimumFractionDigits:
+                                                                                    hourlyPriceCalculation
+                                                                                        .extraHours %
+                                                                                    1 ===
+                                                                                    0
+                                                                                        ? 0
+                                                                                        : 1,
+
+                                                                                maximumFractionDigits:
+                                                                                    1,
+                                                                            }
+                                                                        )}{" "}
+                                                                    ч ×{" "}
+                                                                    {hourlyPriceCalculation
+                                                                        .nextHourPrice
+                                                                        .toLocaleString(
+                                                                            "ru-RU"
+                                                                        )}{" "}
+                                                                    ₽
+                                                                </strong>
+                                                            </div>
+                                                        )}
+
+                                                    {hourlyPriceCalculation.extraHours >
+                                                        0 && (
+                                                            <div className="completion-work-summary__row">
+                <span>
+                    Дополнительное время
+                </span>
+
+                                                                <strong>
+                                                                    {hourlyPriceCalculation
+                                                                        .extraTimePrice
+                                                                        .toLocaleString(
+                                                                            "ru-RU"
+                                                                        )}{" "}
+                                                                    ₽
+                                                                </strong>
+                                                            </div>
+                                                        )}
+
+                                                    <div className="completion-work-summary__row completion-work-summary__row--price-total">
+            <span>
+                Общая сумма
+            </span>
+
+                                                        <strong>
+                                                            {hourlyPriceCalculation
+                                                                .totalPrice
+                                                                .toLocaleString(
+                                                                    "ru-RU"
+                                                                )}{" "}
+                                                            ₽
+                                                        </strong>
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            <div className="completion-work-summary__notice">
+                                                Проверьте фактическое время
+                                                и согласуйте итоговую сумму
+                                                со второй стороной перед
+                                                подтверждением.
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p className="completion-work-modal__text">
+                                            Подтвердите, что работа
+                                            выполнена. Заказ полностью
+                                            завершится после подтверждения
+                                            обеих сторон.
+                                        </p>
+                                    )}
+
+                                    <div className="completion-work-modal__actions">
+                                        <button
+                                            type="button"
+                                            className="completion-work-modal__cancel"
+                                            disabled={
+                                                completionSubmitting
+                                            }
+                                            onClick={() =>
+                                                setCompletionModalOrder(
+                                                    null
+                                                )
+                                            }
+                                        >
+                                            Отмена
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            className="completion-work-modal__submit"
+                                            disabled={
+                                                completionSubmitting
+                                            }
+                                            onClick={
+                                                completeOrderRequest
+                                            }
+                                        >
+                                            {completionSubmitting
+                                                ? "Завершаем..."
+                                                : "Подтвердить завершение"}
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </Modal>
 
                     {/* Images Modal */}

@@ -245,6 +245,19 @@ module.exports = (sequelize) => {
                 allowNull: true,
                 defaultValue: null,
             },
+            workStartedBy: {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+            },
+            workEndedAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
+            workEndedBy: {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+            },
+
         },
         {
             sequelize,

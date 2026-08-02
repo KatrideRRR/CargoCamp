@@ -1,5 +1,113 @@
-import React from "react";
+import React, { useEffect, useMemo } from "react";
 import DynamicAddressField from "./DynamicAddressField";
+
+function checkFieldCondition(condition, values) {
+    if (!condition || typeof condition !== "object") {
+        return true;
+    }
+
+    const dependentField = condition.field;
+
+    if (!dependentField) {
+        return true;
+    }
+
+    const currentValue =
+        values?.[dependentField];
+
+    if (
+        Object.prototype.hasOwnProperty.call(
+            condition,
+            "equals"
+        )
+    ) {
+        return currentValue === condition.equals;
+    }
+
+    if (
+        Object.prototype.hasOwnProperty.call(
+            condition,
+            "notEquals"
+        )
+    ) {
+        return currentValue !== condition.notEquals;
+    }
+
+    if (Array.isArray(condition.in)) {
+        return condition.in.includes(currentValue);
+    }
+
+    if (Array.isArray(condition.notIn)) {
+        return !condition.notIn.includes(currentValue);
+    }
+
+    if (condition.truthy === true) {
+        return Boolean(currentValue);
+    }
+
+    if (condition.falsy === true) {
+        return !currentValue;
+    }
+
+    return true;
+}
+
+export function isDynamicFieldVisible(
+    field,
+    values
+) {
+    if (!field?.showWhen) {
+        return true;
+    }
+
+    /*
+     * Можно передать либо один объект:
+     *
+     * showWhen: {
+     *     field: "helpersRequired",
+     *     equals: true,
+     * }
+     *
+     * либо массив условий:
+     *
+     * showWhen: [
+     *     {
+     *         field: "helpersRequired",
+     *         equals: true,
+     *     },
+     *     {
+     *         field: "cargoType",
+     *         equals: "moving",
+     *     },
+     * ]
+     */
+    const conditions = Array.isArray(
+        field.showWhen
+    )
+        ? field.showWhen
+        : [field.showWhen];
+
+    const conditionMode =
+        field.showWhenMode === "any"
+            ? "any"
+            : "all";
+
+    if (conditionMode === "any") {
+        return conditions.some((condition) =>
+            checkFieldCondition(
+                condition,
+                values
+            )
+        );
+    }
+
+    return conditions.every((condition) =>
+        checkFieldCondition(
+            condition,
+            values
+        )
+    );
+}
 
 function DynamicServiceFields({
                                   config,
@@ -11,22 +119,147 @@ function DynamicServiceFields({
         ? config.fields
         : [];
 
+    const visibleFields = useMemo(
+        () =>
+            fields.filter((field) =>
+                isDynamicFieldVisible(
+                    field,
+                    value
+                )
+            ),
+        [fields, value]
+    );
+
+    /*
+     * При скрытии зависимых полей удаляем их старые значения.
+     *
+     * Например:
+     * пользователь включил грузчиков,
+     * заполнил этажи, а затем выбрал
+     * «Нужна только машина».
+     *
+     * helpersCount, этажи и лифты не должны
+     * остаться в serviceDetails и повлиять
+     * на расчёт цены.
+     */
+    useEffect(() => {
+        const hiddenFields = fields.filter(
+            (field) =>
+                !isDynamicFieldVisible(
+                    field,
+                    value
+                )
+        );
+
+        if (hiddenFields.length === 0) {
+            return;
+        }
+
+        onChange((previous) => {
+            const current = {
+                ...(previous || {}),
+            };
+
+            let changed = false;
+
+            hiddenFields.forEach((field) => {
+                if (
+                    Object.prototype.hasOwnProperty.call(
+                        current,
+                        field.key
+                    )
+                ) {
+                    delete current[field.key];
+                    changed = true;
+                }
+
+                if (field.type === "address") {
+                    const coordinatesKey =
+                        field.coordinatesKey ||
+                        `${field.key}Coordinates`;
+
+                    if (
+                        Object.prototype.hasOwnProperty.call(
+                            current,
+                            coordinatesKey
+                        )
+                    ) {
+                        delete current[
+                            coordinatesKey
+                            ];
+
+                        changed = true;
+                    }
+                }
+            });
+
+            return changed
+                ? current
+                : previous;
+        });
+    }, [fields, value, onChange]);
+
     if (fields.length === 0) {
         return null;
     }
 
-    const updateField = (key, nextValue) => {
-        onChange((previous) => ({
-            ...(previous || {}),
-            [key]: nextValue,
-        }));
+    const updateField = (
+        key,
+        nextValue,
+        field
+    ) => {
+        onChange((previous) => {
+            const next = {
+                ...(previous || {}),
+                [key]: nextValue,
+            };
+
+            /*
+             * Позволяет задавать связанные значения.
+             *
+             * Пример:
+             *
+             * onFalseSet: {
+             *     helpersCount: 0,
+             *     helperHours: 0,
+             *     floorFrom: 0,
+             *     floorTo: 0,
+             * }
+             */
+            if (
+                field?.type === "boolean"
+            ) {
+                const relatedValues =
+                    nextValue === true
+                        ? field.onTrueSet
+                        : field.onFalseSet;
+
+                if (
+                    relatedValues &&
+                    typeof relatedValues ===
+                    "object" &&
+                    !Array.isArray(
+                        relatedValues
+                    )
+                ) {
+                    Object.assign(
+                        next,
+                        relatedValues
+                    );
+                }
+            }
+
+            return next;
+        });
     };
 
     return (
         <div className="dynamicServiceFields">
-            {fields.map((field) => {
+            {visibleFields.map((field) => {
                 const fieldValue =
-                    value?.[field.key] ?? "";
+                    value?.[field.key] ??
+                    field.defaultValue ??
+                    "";
 
                 if (field.type === "address") {
                     const coordinatesKey =
@@ -37,33 +270,54 @@ function DynamicServiceFields({
                         <DynamicAddressField
                             key={field.key}
                             field={field}
-                            value={value?.[field.key] || ""}
+                            value={
+                                value?.[field.key] ||
+                                ""
+                            }
                             coordinates={
-                                value?.[coordinatesKey] || null
+                                value?.[
+                                    coordinatesKey
+                                    ] || null
                             }
                             apiKey={yandexApiKey}
-                            onAddressChange={(nextAddress) => {
-                                onChange((previous) => ({
-                                    ...(previous || {}),
+                            onAddressChange={(
+                                nextAddress
+                            ) => {
+                                onChange(
+                                    (previous) => ({
+                                        ...(previous ||
+                                            {}),
 
-                                    [field.key]: nextAddress,
+                                        [field.key]:
+                                        nextAddress,
 
-                                    /*
-                                     * Пользователь изменил текст:
-                                     * старые координаты сбрасываем.
-                                     */
-                                    [coordinatesKey]: null,
-                                }));
+                                        /*
+                                         * Пользователь изменил
+                                         * текст — старые координаты
+                                         * больше не считаются
+                                         * точными.
+                                         */
+                                        [coordinatesKey]:
+                                            null,
+                                    })
+                                );
                             }}
                             onAddressSelect={({
                                                   address,
                                                   coordinates,
                                               }) => {
-                                onChange((previous) => ({
-                                    ...(previous || {}),
-                                    [field.key]: address,
-                                    [coordinatesKey]: coordinates,
-                                }));
+                                onChange(
+                                    (previous) => ({
+                                        ...(previous ||
+                                            {}),
+
+                                        [field.key]:
+                                        address,
+
+                                        [coordinatesKey]:
+                                        coordinates,
+                                    })
+                                );
                             }}
                         />
                     );
@@ -81,11 +335,15 @@ function DynamicServiceFields({
 
                             <input
                                 type="checkbox"
-                                checked={fieldValue === true}
+                                checked={
+                                    fieldValue === true
+                                }
                                 onChange={(event) =>
                                     updateField(
                                         field.key,
-                                        event.target.checked
+                                        event.target
+                                            .checked,
+                                        field
                                     )
                                 }
                             />
@@ -101,31 +359,45 @@ function DynamicServiceFields({
                         >
                             <div className="label">
                                 {field.label}
-                                {field.required ? " *" : ""}
+                                {field.required
+                                    ? " *"
+                                    : ""}
                             </div>
 
                             <select
                                 className="control"
                                 value={fieldValue}
-                                required={!!field.required}
+                                required={
+                                    !!field.required
+                                }
                                 onChange={(event) =>
                                     updateField(
                                         field.key,
-                                        event.target.value
+                                        event.target
+                                            .value,
+                                        field
                                     )
                                 }
                             >
                                 <option value="">
-                                    Выберите вариант
+                                    {field.placeholder ||
+                                        "Выберите вариант"}
                                 </option>
 
-                                {(field.options || []).map(
+                                {(field.options ||
+                                    []).map(
                                     (option) => (
                                         <option
-                                            key={option.value}
-                                            value={option.value}
+                                            key={
+                                                option.value
+                                            }
+                                            value={
+                                                option.value
+                                            }
                                         >
-                                            {option.label}
+                                            {
+                                                option.label
+                                            }
                                         </option>
                                     )
                                 )}
@@ -134,7 +406,9 @@ function DynamicServiceFields({
                     );
                 }
 
-                if (field.type === "textarea") {
+                if (
+                    field.type === "textarea"
+                ) {
                     return (
                         <div
                             key={field.key}
@@ -142,23 +416,31 @@ function DynamicServiceFields({
                         >
                             <div className="label">
                                 {field.label}
-                                {field.required ? " *" : ""}
+                                {field.required
+                                    ? " *"
+                                    : ""}
                             </div>
 
                             <textarea
                                 className="control textarea"
                                 value={fieldValue}
-                                required={!!field.required}
+                                required={
+                                    !!field.required
+                                }
                                 maxLength={
-                                    field.maxLength || undefined
+                                    field.maxLength ||
+                                    undefined
                                 }
                                 placeholder={
-                                    field.placeholder || ""
+                                    field.placeholder ||
+                                    ""
                                 }
                                 onChange={(event) =>
                                     updateField(
                                         field.key,
-                                        event.target.value
+                                        event.target
+                                            .value,
+                                        field
                                     )
                                 }
                             />
@@ -173,47 +455,69 @@ function DynamicServiceFields({
                     >
                         <div className="label">
                             {field.label}
-                            {field.required ? " *" : ""}
+                            {field.required
+                                ? " *"
+                                : ""}
                         </div>
 
                         <input
                             className="control"
                             type={
-                                field.type === "number"
+                                field.type ===
+                                "number"
                                     ? "number"
                                     : "text"
                             }
                             value={fieldValue}
-                            required={!!field.required}
+                            required={
+                                !!field.required
+                            }
                             min={
-                                field.min !== undefined
+                                field.min !==
+                                undefined
                                     ? field.min
                                     : undefined
                             }
                             max={
-                                field.max !== undefined
+                                field.max !==
+                                undefined
                                     ? field.max
                                     : undefined
                             }
+                            step={
+                                field.step !==
+                                undefined
+                                    ? field.step
+                                    : undefined
+                            }
                             maxLength={
-                                field.maxLength || undefined
+                                field.maxLength ||
+                                undefined
                             }
                             placeholder={
-                                field.placeholder || ""
+                                field.placeholder ||
+                                ""
                             }
                             onChange={(event) => {
                                 const nextValue =
-                                    field.type === "number"
-                                        ? event.target.value === ""
+                                    field.type ===
+                                    "number"
+                                        ? event.target
+                                            .value ===
+                                        ""
                                             ? ""
                                             : Number(
-                                                event.target.value
+                                                event
+                                                    .target
+                                                    .value
                                             )
-                                        : event.target.value;
+                                        : event.target
+                                            .value;
 
                                 updateField(
                                     field.key,
-                                    nextValue
+                                    nextValue,
+                                    field
                                 );
                             }}
                         />

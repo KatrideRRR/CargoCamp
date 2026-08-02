@@ -9,7 +9,7 @@ import imageCompression from "browser-image-compression";
 import PromotionOptions, { PROMOTION_PRICES } from "../components/PromotionOptions";
 import YandexMapModal from "../components/YandexMapModal";
 import PaymentProviderSelect from "../components/PaymentProviderSelect";
-import DynamicServiceFields from "../components/DynamicServiceFields";
+import DynamicServiceFields, { isDynamicFieldVisible } from "../components/DynamicServiceFields";
 import { calculateRecommendedPrice } from "../utils/calculateRecommendedPrice";
 
 const apiUrl = process.env.REACT_APP_API_URL;
@@ -500,7 +500,21 @@ function CreateOrderPage() {
             : [];
 
         for (const field of fields) {
-            const value = serviceDetails?.[field.key];
+            const isVisible =
+                isDynamicFieldVisible(
+                    field,
+                    serviceDetails
+                );
+
+            /*
+             * Скрытые условные поля не валидируем.
+             */
+            if (!isVisible) {
+                continue;
+            }
+
+            const value =
+                serviceDetails?.[field.key];
 
             if (field.required) {
                 const isEmpty =

@@ -1515,8 +1515,13 @@ export const ModalProvider = ({ children }) => {
 
                         <div className="modal-summary">
                             <div className="modal-summary-row">
-                                <span>Ваш доход</span>
-                                <b>{formatRub(completionSuccessData.amount)}</b>
+                                <span>Сумма заказа</span>
+
+                                <b>
+                                    {formatRub(
+                                        completionSuccessData.amount
+                                    )}
+                                </b>
                             </div>
 
                             <div className="modal-summary-row">

@@ -304,6 +304,10 @@ function calculateCargoHourlyPrice(
         )
     );
 
+    const helpersRequired =
+        details.helpersRequired === true &&
+        helpersCount > 0;
+
     const requestedHours = Math.max(
         0,
         toFiniteNumber(
@@ -329,8 +333,10 @@ function calculateCargoHourlyPrice(
         billedHours;
 
     const helpersHourlyTotal =
-        helpersCount *
-        helperHourlyRate;
+        helpersRequired
+            ? helpersCount *
+            helperHourlyRate
+            : 0;
 
     const helpersCharge =
         helpersHourlyTotal *
@@ -340,10 +346,16 @@ function calculateCargoHourlyPrice(
         fromFloorCharge,
         toFloorCharge,
         total: floorsCharge,
-    } = calculateTwoAddressFloorCharges(
-        config,
-        details
-    );
+    } = helpersRequired
+        ? calculateTwoAddressFloorCharges(
+            config,
+            details
+        )
+        : {
+            fromFloorCharge: 0,
+            toFloorCharge: 0,
+            total: 0,
+        };
 
     const firstHourPrice =
         calloutPrice +
@@ -464,13 +476,20 @@ function calculateCargoIntercityPrice(
         )
     );
 
-    const helperHours = Math.max(
-        helpersCount > 0 ? 1 : 0,
-        toFiniteNumber(
-            details.helperHours,
-            helpersCount > 0 ? 1 : 0
-        )
-    );
+    const helpersRequired =
+        details.helpersRequired === true &&
+        helpersCount > 0;
+
+    const helperHours =
+        helpersRequired
+            ? Math.max(
+                1,
+                toFiniteNumber(
+                    details.helperHours,
+                    1
+                )
+            )
+            : 0;
 
     const helperHourlyRate = Math.max(
         0,
@@ -480,18 +499,26 @@ function calculateCargoIntercityPrice(
     );
 
     const helpersCharge =
-        helpersCount *
-        helperHours *
-        helperHourlyRate;
+        helpersRequired
+            ? helpersCount *
+            helperHours *
+            helperHourlyRate
+            : 0;
 
     const {
         fromFloorCharge,
         toFloorCharge,
         total: floorsCharge,
-    } = calculateTwoAddressFloorCharges(
-        config,
-        details
-    );
+    } = helpersRequired
+        ? calculateTwoAddressFloorCharges(
+            config,
+            details
+        )
+        : {
+            fromFloorCharge: 0,
+            toFloorCharge: 0,
+            total: 0,
+        };
 
     const breakdown = [];
 
@@ -1412,16 +1439,12 @@ function hasValidRequiredDetails(
 ) {
     switch (calculator) {
         case "cargo_hourly":
-            return (
-                Number.isFinite(
-                    Number(
-                        details.estimatedHours
-                    )
-                ) &&
-                Number(
-                    details.estimatedHours
-                ) > 0
-            );
+            /*
+             * Даже при незаполненном времени
+             * калькулятор использует minimumHours
+             * из pricingConfig.
+             */
+            return true;
 
         case "cargo_intercity":
             return (

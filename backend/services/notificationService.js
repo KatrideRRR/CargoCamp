@@ -158,27 +158,59 @@ async function notifyUser({
     return notification;
 }
 
-async function notifyMany(users = [], payload = {}) {
+async function notifyMany(
+    users = [],
+    payload = {}
+) {
     const uniqueUsers = [
         ...new Set(
             users
-                .filter(Boolean)
                 .map(Number)
+                .filter(
+                    (userId) =>
+                        Number.isInteger(userId) &&
+                        userId > 0
+                )
         ),
     ];
 
-    const results = [];
+    const settledResults =
+        await Promise.allSettled(
+            uniqueUsers.map((userId) =>
+                notifyUser({
+                    ...payload,
+                    userId,
+                })
+            )
+        );
 
-    for (const userId of uniqueUsers) {
-        const result = await notifyUser({
-            ...payload,
-            userId,
-        });
+    settledResults.forEach(
+        (result, index) => {
+            if (
+                result.status ===
+                "rejected"
+            ) {
+                console.error(
+                    "notifyMany user failed:",
+                    {
+                        userId:
+                            uniqueUsers[index],
 
-        results.push(result);
-    }
+                        type:
+                        payload.type,
 
-    return results;
+                        orderId:
+                        payload.orderId,
+
+                        error:
+                        result.reason,
+                    }
+                );
+            }
+        }
+    );
+
+    return settledResults;
 }
 
 module.exports = {
