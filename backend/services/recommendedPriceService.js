@@ -84,17 +84,23 @@ function calculateSewerCleaningPrice(
         )
     );
 
-    const complexity = String(
-        details.complexity || "unknown"
-    );
+    const complexity =
+        details.complexity
+            ? String(
+                details.complexity
+            )
+            : null;
 
-    const complexityCharge = Math.max(
-        0,
-        getObjectPrice(
-            config.complexityPrices,
-            complexity
-        )
-    );
+    const complexityCharge =
+        complexity
+            ? Math.max(
+                0,
+                getObjectPrice(
+                    config.complexityPrices,
+                    complexity
+                )
+            )
+            : 0;
 
     const emergencyCharge =
         details.isEmergency === true
@@ -308,12 +314,6 @@ function calculateCargoHourlyPrice(
         details.helpersRequired === true &&
         helpersCount > 0;
 
-    const requestedHours = Math.max(
-        0,
-        toFiniteNumber(
-            details.estimatedHours
-        )
-    );
 
     const minimumHours = Math.max(
         1,
@@ -323,10 +323,8 @@ function calculateCargoHourlyPrice(
         )
     );
 
-    const billedHours = Math.max(
-        requestedHours,
-        minimumHours
-    );
+    const billedHours =
+        minimumHours;
 
     const vehicleCharge =
         vehicleHourlyRate *
@@ -423,9 +421,13 @@ function calculateCargoHourlyPrice(
         breakdown,
 
         pricingModel: "hourly",
+
         billedHours,
+        minimumHours,
+
         firstHourPrice,
         nextHourPrice,
+
         calloutPrice,
         vehicleHourlyRate,
         helperHourlyRate,
@@ -482,13 +484,7 @@ function calculateCargoIntercityPrice(
 
     const helperHours =
         helpersRequired
-            ? Math.max(
-                1,
-                toFiniteNumber(
-                    details.helperHours,
-                    1
-                )
-            )
+            ? 1
             : 0;
 
     const helperHourlyRate = Math.max(
@@ -711,24 +707,12 @@ function calculateLoadersPrice(
         )
     );
 
-    const requestedHours = Math.max(
-        0,
-        toFiniteNumber(
-            details.estimatedHours
-        )
-    );
-
     const minimumHours = Math.max(
         1,
         toFiniteNumber(
             config.minimumHours,
             1
         )
-    );
-
-    const billedHours = Math.max(
-        requestedHours,
-        minimumHours
     );
 
     const pricePerHelperHour = Math.max(
@@ -761,9 +745,16 @@ function calculateLoadersPrice(
             : [],
 
         pricingModel: "hourly",
+
         billedHours,
-        firstHourPrice: hourlyTotal,
-        nextHourPrice: hourlyTotal,
+        minimumHours,
+
+        firstHourPrice:
+        hourlyTotal,
+
+        nextHourPrice:
+        hourlyTotal,
+
         helperHourlyRate:
         pricePerHelperHour,
     };
@@ -1010,12 +1001,16 @@ function calculateHourlyServicePrice(
 ) {
     const visitPrice = Math.max(
         0,
-        toFiniteNumber(config.visitPrice)
+        toFiniteNumber(
+            config.visitPrice
+        )
     );
 
     const hourlyRate = Math.max(
         0,
-        toFiniteNumber(config.hourlyRate)
+        toFiniteNumber(
+            config.hourlyRate
+        )
     );
 
     const requestedHours = Math.max(
@@ -1039,22 +1034,251 @@ function calculateHourlyServicePrice(
     );
 
     const hoursCharge =
-        billedHours * hourlyRate;
+        billedHours *
+        hourlyRate;
 
     const complexity = String(
-        details.complexity || "unknown"
+        details.complexity ||
+        "unknown"
     );
 
-    const complexityCharge = Math.max(
+    const complexityCharge =
+        Math.max(
+            0,
+            getObjectPrice(
+                config.complexityPrices,
+                complexity
+            )
+        );
+
+    const workType = String(
+        details.workType ||
+        "other"
+    );
+
+    const workTypeCharge =
+        Math.max(
+            0,
+            getObjectPrice(
+                config.workTypePrices,
+                workType
+            )
+        );
+
+    const pointsCount =
+        Math.max(
+            0,
+            toFiniteNumber(
+                details.pointsCount
+            )
+        );
+
+    const pricePerPoint =
+        Math.max(
+            0,
+            toFiniteNumber(
+                config.pricePerPoint
+            )
+        );
+
+    const pointsCharge =
+        pointsCount *
+        pricePerPoint;
+
+    const tasksCount =
+        Math.max(
+            0,
+            toFiniteNumber(
+                details.tasksCount
+            )
+        );
+
+    const pricePerTask =
+        Math.max(
+            0,
+            toFiniteNumber(
+                config.pricePerTask
+            )
+        );
+
+    const tasksCharge =
+        tasksCount *
+        pricePerTask;
+
+    const materialsCharge =
+        details.materialsRequired === true
+            ? Math.max(
+                0,
+                toFiniteNumber(
+                    config.materialsPurchaseFee
+                )
+            )
+            : 0;
+
+    /*
+     * Всё кроме почасовой ставки считаем
+     * единовременными начислениями.
+     *
+     * Они входят только в первый час
+     * и не повторяются в следующих часах.
+     */
+    const oneTimeCharges =
+        visitPrice +
+        workTypeCharge +
+        complexityCharge +
+        pointsCharge +
+        tasksCharge +
+        materialsCharge;
+
+    const firstHourPrice =
+        oneTimeCharges +
+        hourlyRate;
+
+    const nextHourPrice =
+        hourlyRate;
+
+    const breakdown = [];
+
+    if (visitPrice > 0) {
+        breakdown.push({
+            key: "visit",
+            label:
+                "Выезд мастера",
+            amount:
+            visitPrice,
+        });
+    }
+
+    if (hoursCharge > 0) {
+        breakdown.push({
+            key: "hours",
+
+            label:
+                `${billedHours} ч × ${hourlyRate} ₽`,
+
+            amount:
+            hoursCharge,
+        });
+    }
+
+    if (workTypeCharge > 0) {
+        breakdown.push({
+            key:
+                "work_type",
+
+            label:
+                HOURLY_WORK_TYPE_LABELS[
+                    workType
+                    ] ||
+                "Тип работы",
+
+            amount:
+            workTypeCharge,
+        });
+    }
+
+    if (complexityCharge > 0) {
+        breakdown.push({
+            key:
+                "complexity",
+
+            label:
+                COMPLEXITY_LABELS[
+                    complexity
+                    ] ||
+                "Сложность работы",
+
+            amount:
+            complexityCharge,
+        });
+    }
+
+    if (pointsCharge > 0) {
+        breakdown.push({
+            key:
+                "points",
+
+            label:
+                `Количество точек: ${pointsCount}`,
+
+            amount:
+            pointsCharge,
+        });
+    }
+
+    if (tasksCharge > 0) {
+        breakdown.push({
+            key:
+                "tasks",
+
+            label:
+                `Количество задач: ${tasksCount}`,
+
+            amount:
+            tasksCharge,
+        });
+    }
+
+    if (materialsCharge > 0) {
+        breakdown.push({
+            key:
+                "materials",
+
+            label:
+                "Покупка материалов",
+
+            amount:
+            materialsCharge,
+        });
+    }
+
+    return {
+        /*
+         * ВАЖНО:
+         *
+         * Формула rawPrice осталась прежней.
+         * Поэтому старые услуги не меняют цену.
+         */
+        rawPrice:
+            oneTimeCharges +
+            hoursCharge,
+
+        breakdown,
+
+        pricingModel:
+            "hourly",
+
+        billedHours,
+
+        firstHourPrice,
+
+        nextHourPrice,
+
+        /*
+         * Для возможного отображения
+         * и диагностики.
+         */
+        visitPrice,
+        hourlyRate,
+
+        oneTimeCharges,
+    };
+}
+
+function calculateRepairServicePrice(
+    config,
+    details
+) {
+    const visitPrice = Math.max(
         0,
-        getObjectPrice(
-            config.complexityPrices,
-            complexity
+        toFiniteNumber(
+            config.visitPrice
         )
     );
 
     const workType = String(
-        details.workType || "other"
+        details.workType ||
+        "other"
     );
 
     const workTypeCharge = Math.max(
@@ -1067,31 +1291,39 @@ function calculateHourlyServicePrice(
 
     const pointsCount = Math.max(
         0,
-        toFiniteNumber(details.pointsCount)
+        toFiniteNumber(
+            details.pointsCount
+        )
+    );
+
+    const pricePerPoint = Math.max(
+        0,
+        toFiniteNumber(
+            config.pricePerPoint
+        )
     );
 
     const pointsCharge =
         pointsCount *
-        Math.max(
-            0,
-            toFiniteNumber(
-                config.pricePerPoint
-            )
-        );
+        pricePerPoint;
 
     const tasksCount = Math.max(
         0,
-        toFiniteNumber(details.tasksCount)
+        toFiniteNumber(
+            details.tasksCount
+        )
+    );
+
+    const pricePerTask = Math.max(
+        0,
+        toFiniteNumber(
+            config.pricePerTask
+        )
     );
 
     const tasksCharge =
         tasksCount *
-        Math.max(
-            0,
-            toFiniteNumber(
-                config.pricePerTask
-            )
-        );
+        pricePerTask;
 
     const materialsCharge =
         details.materialsRequired === true
@@ -1113,36 +1345,18 @@ function calculateHourlyServicePrice(
         });
     }
 
-    if (hoursCharge > 0) {
-        breakdown.push({
-            key: "hours",
-            label:
-                `${billedHours} ч × ${hourlyRate} ₽`,
-            amount: hoursCharge,
-        });
-    }
-
     if (workTypeCharge > 0) {
         breakdown.push({
             key: "work_type",
+
             label:
                 HOURLY_WORK_TYPE_LABELS[
                     workType
                     ] ||
                 "Тип работы",
-            amount: workTypeCharge,
-        });
-    }
 
-    if (complexityCharge > 0) {
-        breakdown.push({
-            key: "complexity",
-            label:
-                COMPLEXITY_LABELS[
-                    complexity
-                    ] ||
-                "Сложность работы",
-            amount: complexityCharge,
+            amount:
+            workTypeCharge,
         });
     }
 
@@ -1151,7 +1365,8 @@ function calculateHourlyServicePrice(
             key: "points",
             label:
                 `Количество точек: ${pointsCount}`,
-            amount: pointsCharge,
+            amount:
+            pointsCharge,
         });
     }
 
@@ -1160,29 +1375,33 @@ function calculateHourlyServicePrice(
             key: "tasks",
             label:
                 `Количество задач: ${tasksCount}`,
-            amount: tasksCharge,
+            amount:
+            tasksCharge,
         });
     }
 
     if (materialsCharge > 0) {
         breakdown.push({
             key: "materials",
-            label: "Покупка материалов",
-            amount: materialsCharge,
+            label:
+                "Покупка материалов",
+            amount:
+            materialsCharge,
         });
     }
 
     return {
         rawPrice:
             visitPrice +
-            hoursCharge +
             workTypeCharge +
-            complexityCharge +
             pointsCharge +
             tasksCharge +
             materialsCharge,
 
         breakdown,
+
+        pricingModel:
+            "fixed",
     };
 }
 
@@ -1514,6 +1733,28 @@ function hasValidRequiredDetails(
             );
         }
 
+        case "repair_service": {
+            const hasTasks =
+                Number.isFinite(
+                    Number(
+                        details.tasksCount
+                    )
+                ) &&
+                Number(
+                    details.tasksCount
+                ) > 0;
+
+            const hasWorkType =
+                Boolean(
+                    details.workType
+                );
+
+            return (
+                hasWorkType ||
+                hasTasks
+            );
+        }
+
         case "air_conditioner":
             return (
                 !!details.workType &&
@@ -1524,9 +1765,8 @@ function hasValidRequiredDetails(
             );
 
         case "fixed_service":
-            return (
-                !!details.workType &&
-                !!details.complexity
+            return Boolean(
+                details.workType
             );
 
         case "sewer_cleaning":
@@ -1668,6 +1908,14 @@ function calculateRecommendedPrice({
                 );
             break;
 
+        case "repair_service":
+            calculation =
+                calculateRepairServicePrice(
+                    pricingConfig,
+                    details
+                );
+            break;
+
         default:
             return null;
     }
@@ -1766,6 +2014,17 @@ function calculateRecommendedPrice({
             )
                 ? Number(
                     calculation.billedHours
+                )
+                : null,
+
+        minimumHours:
+            Number.isFinite(
+                Number(
+                    calculation?.minimumHours
+                )
+            )
+                ? Number(
+                    calculation.minimumHours
                 )
                 : null,
 

@@ -1258,6 +1258,189 @@ router.put('/users/:id/unblock', authMiddleware, adminMiddleware, async (req, re
     }
 });
 
+router.put("/users/:id/role", authMiddleware, adminMiddleware, async (req, res) => {
+        try {
+            const userId = req.params.id;
+            const { role } = req.body;
+
+            if (!["user", "admin"].includes(role)) {
+                return res.status(400).json({
+                    message: "Недопустимая роль",
+                });
+            }
+
+            const user = await User.findByPk(userId);
+
+            if (!user) {
+                return res.status(404).json({
+                    message: "Пользователь не найден",
+                });
+            }
+
+            if (user.role === "banned") {
+                return res.status(400).json({
+                    message:
+                        "Сначала разблокируйте пользователя",
+                });
+            }
+
+            user.role = role;
+
+            await user.save();
+
+            return res.json({
+                success: true,
+                message:
+                    role === "admin"
+                        ? "Права администратора выданы"
+                        : "Права администратора сняты",
+
+                user: {
+                    id: user.id,
+                    role: user.role,
+                },
+            });
+        } catch (error) {
+            console.error(
+                "Ошибка изменения роли пользователя:",
+                error
+            );
+
+            return res.status(500).json({
+                message:
+                    "Ошибка изменения роли пользователя",
+            });
+        }
+    });
+
+router.put("/users/:id/premium", authMiddleware, adminMiddleware, async (req, res) => {
+        try {
+            const userId = req.params.id;
+            const days = Number(req.body.days);
+
+            if (![7, 30].includes(days)) {
+                return res.status(400).json({
+                    message:
+                        "Премиум можно выдать только на 7 или 30 дней",
+                });
+            }
+
+            const user = await User.findByPk(userId);
+
+            if (!user) {
+                return res.status(404).json({
+                    message: "Пользователь не найден",
+                });
+            }
+
+            /*
+             * Если премиум уже активен —
+             * продлеваем от существующей даты.
+             *
+             * Если отсутствует или закончился —
+             * считаем от текущего момента.
+             */
+
+            const now = new Date();
+
+            let startDate = now;
+
+            if (
+                user.subscription_type === "premium" &&
+                user.subscription_expires_at
+            ) {
+                const currentExpiration =
+                    new Date(
+                        user.subscription_expires_at
+                    );
+
+                if (
+                    !Number.isNaN(
+                        currentExpiration.getTime()
+                    ) &&
+                    currentExpiration > now
+                ) {
+                    startDate =
+                        currentExpiration;
+                }
+            }
+
+            const expiresAt =
+                new Date(
+                    startDate.getTime() +
+                    days *
+                    24 *
+                    60 *
+                    60 *
+                    1000
+                );
+
+            user.subscription_type =
+                "premium";
+
+            user.subscription_expires_at =
+                expiresAt;
+
+            await user.save();
+
+            return res.json({
+                success: true,
+                message: `Премиум выдан на ${days} дней`,
+                user: {
+                    id: user.id,
+                    subscription_type:
+                    user.subscription_type,
+                    subscription_expires_at:
+                    user.subscription_expires_at,
+                },
+            });
+        } catch (error) {
+            console.error(
+                "Ошибка ручной выдачи премиума:",
+                error
+            );
+
+            return res.status(500).json({
+                message:
+                    "Ошибка выдачи премиума",
+            });
+        }
+    });
+
+router.delete("/users/:id/premium", authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const user = await User.findByPk(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({
+                message: "Пользователь не найден",
+            });
+        }
+
+        user.subscription_type = "standard";
+        user.subscription_expires_at = null;
+
+        await user.save();
+
+        return res.json({
+            success: true,
+            message: "Премиум снят",
+            user: {
+                id: user.id,
+                subscription_type: user.subscription_type,
+                subscription_expires_at: user.subscription_expires_at,
+            },
+        });
+    } catch (error) {
+        console.error("Ошибка снятия премиума:", error);
+
+        return res.status(500).json({
+            message: "Ошибка снятия премиума",
+            error: error.message,
+        });
+    }
+});
+
 router.get("/orders", authMiddleware, adminMiddleware, async (req, res) => {
         try {
             const orders =

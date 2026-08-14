@@ -263,3 +263,123 @@ body {
         min-height: 34px;
     }
 }
+
+.admin-role-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 125px;
+}
+
+.role-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 8px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.role-user {
+    background: #f1f3f5;
+    color: #495057;
+}
+
+.role-admin {
+    background: #e7f5ff;
+    color: #1971c2;
+}
+
+.role-banned {
+    background: #fff5f5;
+    color: #c92a2a;
+}
+
+.make-admin-button,
+.remove-admin-button {
+    border: none;
+    border-radius: 7px;
+    padding: 6px 9px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.make-admin-button {
+    background: #228be6;
+    color: #fff;
+}
+
+.remove-admin-button {
+    background: #ffe3e3;
+    color: #c92a2a;
+}
+
+.make-admin-button:disabled,
+.remove-admin-button:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.premium-admin-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 145px;
+}
+
+.premium-badge {
+    display: inline-flex;
+    width: fit-content;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #fff3bf;
+    color: #e67700;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.no-premium-badge {
+    font-size: 12px;
+    color: #868e96;
+    font-weight: 600;
+}
+
+.premium-expire {
+    font-size: 11px;
+    color: #868e96;
+}
+
+.premium-admin-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.premium-admin-buttons button {
+    border: 1px solid #dee2e6;
+    background: #fff;
+    color: #343a40;
+    border-radius: 6px;
+    padding: 5px 7px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.premium-admin-buttons button:hover {
+    background: #f8f9fa;
+}
+
+.premium-admin-buttons button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.premium-admin-buttons .remove-premium-button {
+    border-color: #ffc9c9;
+    color: #c92a2a;
+    background: #fff5f5;
+}

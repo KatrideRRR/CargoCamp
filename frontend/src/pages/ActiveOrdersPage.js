@@ -51,16 +51,26 @@ const parseServiceDetails = (value) => {
 };
 
 const isHourlyOrder = (order) => {
-    const details = parseServiceDetails(
-        order?.serviceDetails
-    );
+    const details =
+        parseServiceDetails(
+            order?.serviceDetails
+        );
 
-    return (
-        details?.pricingModel === "hourly" ||
-        details?.pricingCalculator ===
-        "cargo_hourly" ||
-        order?.pricingModel === "hourly"
-    );
+    const calculator =
+        String(
+            details?.pricingCalculator ||
+            ""
+        );
+
+    /*
+     * Только эти типы действительно
+     * рассчитываются по фактическому
+     * времени выполнения.
+     */
+    return [
+        "cargo_hourly",
+        "loaders",
+    ].includes(calculator);
 };
 
 const getWorkEndTime = (order) => {
@@ -155,6 +165,7 @@ const calculateHourlyCompletionPrice = ({
                                             durationMs,
                                             firstHourPrice,
                                             nextHourPrice,
+                                            minimumHours = 1,
                                         }) => {
     const safeDurationMs = Math.max(
         0,
@@ -171,6 +182,11 @@ const calculateHourlyCompletionPrice = ({
         Number(nextHourPrice) || 0
     );
 
+    const safeMinimumHours = Math.max(
+        1,
+        Number(minimumHours) || 1
+    );
+
     if (
         safeFirstHourPrice <= 0 ||
         safeNextHourPrice <= 0
@@ -182,23 +198,34 @@ const calculateHourlyCompletionPrice = ({
         safeDurationMs / 60000;
 
     /*
-     * Минимум оплачивается один полный час.
-     *
-     * Всё время свыше часа округляется вверх
-     * блоками по 30 минут.
-     *
-     * 2:25 -> 2,5 часа
-     * 2:35 -> 3 часа
+     * Один расчётный блок = 30 минут.
+     */
+    const minimumHalfHourBlocks =
+        Math.ceil(
+            safeMinimumHours * 2
+        );
+
+    /*
+     * Фактическое время округляем вверх
+     * до 30 минут, но не ниже минимального
+     * оплачиваемого периода.
      */
     const billedHalfHourBlocks =
         Math.max(
-            2,
-            Math.ceil(actualMinutes / 30)
+            minimumHalfHourBlocks,
+            Math.ceil(
+                actualMinutes / 30
+            )
         );
 
     const billedHours =
         billedHalfHourBlocks / 2;
 
+    /*
+     * firstHourPrice содержит стоимость
+     * первого часа + все одноразовые
+     * начисления.
+     */
     const extraHours =
         Math.max(
             0,
@@ -217,10 +244,15 @@ const calculateHourlyCompletionPrice = ({
         actualMinutes:
             Math.max(
                 0,
-                Math.ceil(actualMinutes)
+                Math.ceil(
+                    actualMinutes
+                )
             ),
 
         billedHours,
+
+        minimumHours:
+        safeMinimumHours,
 
         extraHours,
 
@@ -231,10 +263,14 @@ const calculateHourlyCompletionPrice = ({
         safeNextHourPrice,
 
         extraTimePrice:
-            Math.round(extraTimePrice),
+            Math.round(
+                extraTimePrice
+            ),
 
         totalPrice:
-            Math.round(totalPrice),
+            Math.round(
+                totalPrice
+            ),
     };
 };
 
@@ -2059,6 +2095,12 @@ const ActiveOrdersPage = () => {
                                         ?.pricingNextHourPrice
                                 );
 
+                            const minimumHours =
+                                Number(
+                                    details
+                                        ?.pricingMinimumHours
+                                );
+
                             const hourlyPriceCalculation =
                                 hourly &&
                                 completionModalOrder.workStartedAt
@@ -2066,6 +2108,14 @@ const ActiveOrdersPage = () => {
                                         durationMs,
                                         firstHourPrice,
                                         nextHourPrice,
+
+                                        minimumHours:
+                                            Number.isFinite(
+                                                minimumHours
+                                            ) &&
+                                            minimumHours > 0
+                                                ? minimumHours
+                                                : 1,
                                     })
                                     : null;
 

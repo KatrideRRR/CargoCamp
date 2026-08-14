@@ -268,6 +268,20 @@ function CreateOrderPage() {
         ) === 41;
 
     useEffect(() => {
+        if (!error) {
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            setError("");
+        }, 6000);
+
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [error]);
+
+    useEffect(() => {
         setServiceDetails((previous) => {
             const current =
                 previous || {};
@@ -293,7 +307,19 @@ function CreateOrderPage() {
                 delete next.recommendedPrice;
                 delete next.recommendedPriceMin;
                 delete next.recommendedPriceMax;
+
                 delete next.pricingCalculator;
+                delete next.pricingModel;
+
+                delete next.pricingBilledHours;
+                delete next.pricingMinimumHours;
+
+                delete next.pricingFirstHourPrice;
+                delete next.pricingNextHourPrice;
+
+                delete next.pricingCalloutPrice;
+                delete next.pricingVehicleHourlyRate;
+                delete next.pricingHelperHourlyRate;
 
                 return next;
             }
@@ -332,6 +358,9 @@ function CreateOrderPage() {
                 pricingBilledHours:
                 recommendedPrice.billedHours,
 
+                pricingMinimumHours:
+                recommendedPrice.minimumHours,
+
                 pricingFirstHourPrice:
                 recommendedPrice.firstHourPrice,
 
@@ -353,6 +382,17 @@ function CreateOrderPage() {
         recommendedPrice?.minPrice,
         recommendedPrice?.maxPrice,
         recommendedPrice?.calculator,
+
+        recommendedPrice?.pricingModel,
+        recommendedPrice?.billedHours,
+        recommendedPrice?.minimumHours,
+
+        recommendedPrice?.firstHourPrice,
+        recommendedPrice?.nextHourPrice,
+
+        recommendedPrice?.calloutPrice,
+        recommendedPrice?.vehicleHourlyRate,
+        recommendedPrice?.helperHourlyRate,
     ]);
 
     useEffect(() => {
@@ -408,6 +448,7 @@ function CreateOrderPage() {
 
                 delete next.pricingModel;
                 delete next.pricingBilledHours;
+                delete next.pricingMinimumHours;
                 delete next.pricingFirstHourPrice;
                 delete next.pricingNextHourPrice;
                 delete next.pricingCalloutPrice;
@@ -1232,8 +1273,40 @@ function CreateOrderPage() {
     };
 
     return (
-        <div className="create-page">
-            <div className="create-shell">
+        <>
+            {error && (
+                <div
+                    className="createOrderErrorToast"
+                    role="alert"
+                    aria-live="assertive"
+                >
+                    <div className="createOrderErrorToast__icon">
+                        !
+                    </div>
+
+                    <div className="createOrderErrorToast__content">
+                        <div className="createOrderErrorToast__title">
+                            Не удалось создать заказ
+                        </div>
+
+                        <div className="createOrderErrorToast__message">
+                            {error}
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        className="createOrderErrorToast__close"
+                        onClick={() => setError("")}
+                        aria-label="Закрыть уведомление"
+                    >
+                        ×
+                    </button>
+                </div>
+            )}
+
+            <div className="create-page">
+                <div className="create-shell">
                 {/* Header */}
                 <div className="glass header-card">
                     <div className="header-top">
@@ -1696,22 +1769,10 @@ function CreateOrderPage() {
 
                 {/* Description */}
                 <div className="glass section-card">
-                    <div className="section-head">
-                        <div>
-                            <div className="section-title">Описание</div>
-                            <div className="section-sub">Коротко и понятно</div>
-                        </div>
-                    </div>
+
 
                     <div className="glass field">
-                        <div className="label">Описание работы</div>
-                        <textarea
-                            className="control textarea"
-                            placeholder="Что нужно сделать? Нюансы, материалы, сроки"
-                            value={formData.description}
-                            onChange={handleDescriptionChange}
-                            rows="3"
-                        />
+
 
                         <label className="upload inline">
                             <input type="file" multiple accept="image/*" onChange={handleImageChange} style={{ display: "none" }} />
@@ -2027,8 +2088,9 @@ function CreateOrderPage() {
                         {isSubmitting ? "Создание…" : "Создать заказ"}
                     </button>
                 </div>
+                </div>
             </div>
-        </div>
+        </>
     );
 }
 

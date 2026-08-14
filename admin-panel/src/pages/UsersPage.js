@@ -12,6 +12,7 @@ function UsersPage() {
     const [documentsCount, setDocumentsCount] = useState({});
     const [complaintsCount, setComplaintsCount] = useState({});
     const [ordersCount, setOrdersCount] = useState({});
+    const [actionLoading, setActionLoading] = useState({});
 
     const token = localStorage.getItem("authToken");
     const navigate = useNavigate();
@@ -19,13 +20,20 @@ function UsersPage() {
     useEffect(() => {
         axios
             .get(`${apiUrl}/api/admin/users`, {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
             })
             .then((response) => {
                 setUsers(response.data);
                 setFilteredUsers(response.data);
             })
-            .catch((error) => console.error("Ошибка загрузки пользователей", error));
+            .catch((error) => {
+                console.error(
+                    "Ошибка загрузки пользователей",
+                    error
+                );
+            });
     }, [token]);
 
     useEffect(() => {
@@ -39,12 +47,20 @@ function UsersPage() {
                     const docResponse = await axios.get(
                         `${apiUrl}/api/admin/user-documents/${user.id}`,
                         {
-                            headers: { Authorization: `Bearer ${token}` },
+                            headers: {
+                                Authorization: `Bearer ${token}`,
+                            },
                         }
                     );
-                    docCounts[user.id] = docResponse.data.documents.length;
+
+                    docCounts[user.id] =
+                        docResponse.data.documents.length;
                 } catch (error) {
-                    console.error(`Ошибка загрузки документов пользователя ${user.id}`, error);
+                    console.error(
+                        `Ошибка загрузки документов пользователя ${user.id}`,
+                        error
+                    );
+
                     docCounts[user.id] = 0;
                 }
 
@@ -52,12 +68,20 @@ function UsersPage() {
                     const complaintResponse = await axios.get(
                         `${apiUrl}/api/admin/users/${user.id}/complaints`,
                         {
-                            headers: { Authorization: `Bearer ${token}` },
+                            headers: {
+                                Authorization: `Bearer ${token}`,
+                            },
                         }
                     );
-                    complaintCountsData[user.id] = complaintResponse.data.complaints.length;
+
+                    complaintCountsData[user.id] =
+                        complaintResponse.data.complaints.length;
                 } catch (error) {
-                    console.error(`Ошибка загрузки жалоб пользователя ${user.id}`, error);
+                    console.error(
+                        `Ошибка загрузки жалоб пользователя ${user.id}`,
+                        error
+                    );
+
                     complaintCountsData[user.id] = 0;
                 }
 
@@ -65,12 +89,20 @@ function UsersPage() {
                     const orderResponse = await axios.get(
                         `${apiUrl}/api/admin/users/${user.id}/orders`,
                         {
-                            headers: { Authorization: `Bearer ${token}` },
+                            headers: {
+                                Authorization: `Bearer ${token}`,
+                            },
                         }
                     );
-                    orderCountsData[user.id] = orderResponse.data.orders.length;
+
+                    orderCountsData[user.id] =
+                        orderResponse.data.orders.length;
                 } catch (error) {
-                    console.error(`Ошибка загрузки заказов пользователя ${user.id}`, error);
+                    console.error(
+                        `Ошибка загрузки заказов пользователя ${user.id}`,
+                        error
+                    );
+
                     orderCountsData[user.id] = 0;
                 }
             }
@@ -85,29 +117,60 @@ function UsersPage() {
         }
     }, [users, token]);
 
+    const updateUserLocally = (id, changes) => {
+        setUsers((prev) =>
+            prev.map((user) =>
+                user.id === id
+                    ? {
+                        ...user,
+                        ...changes,
+                    }
+                    : user
+            )
+        );
+
+        setFilteredUsers((prev) =>
+            prev.map((user) =>
+                user.id === id
+                    ? {
+                        ...user,
+                        ...changes,
+                    }
+                    : user
+            )
+        );
+    };
+
+    const setLoading = (id, action, value) => {
+        const key = `${id}_${action}`;
+
+        setActionLoading((prev) => ({
+            ...prev,
+            [key]: value,
+        }));
+    };
+
     const blockUser = async (id) => {
         try {
             await axios.put(
                 `${apiUrl}/api/admin/users/${id}/block`,
                 {},
                 {
-                    headers: { Authorization: `Bearer ${token}` },
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
                 }
             );
 
-            setUsers((prev) =>
-                prev.map((user) =>
-                    user.id === id ? { ...user, role: "banned" } : user
-                )
-            );
-
-            setFilteredUsers((prev) =>
-                prev.map((user) =>
-                    user.id === id ? { ...user, role: "banned" } : user
-                )
-            );
+            updateUserLocally(id, {
+                role: "banned",
+            });
         } catch (error) {
             console.error("Ошибка блокировки", error);
+            alert(
+                error.response?.data?.message ||
+                "Не удалось заблокировать пользователя"
+            );
         }
     };
 
@@ -117,28 +180,183 @@ function UsersPage() {
                 `${apiUrl}/api/admin/users/${id}/unblock`,
                 {},
                 {
-                    headers: { Authorization: `Bearer ${token}` },
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
                 }
             );
 
-            setUsers((prev) =>
-                prev.map((user) =>
-                    user.id === id ? { ...user, role: "user" } : user
-                )
-            );
-
-            setFilteredUsers((prev) =>
-                prev.map((user) =>
-                    user.id === id ? { ...user, role: "user" } : user
-                )
-            );
+            updateUserLocally(id, {
+                role: "user",
+            });
         } catch (error) {
             console.error("Ошибка разблокировки", error);
+            alert(
+                error.response?.data?.message ||
+                "Не удалось разблокировать пользователя"
+            );
+        }
+    };
+
+    const toggleAdmin = async (user) => {
+        if (user.role === "banned") {
+            alert(
+                "Сначала разблокируйте пользователя."
+            );
+            return;
+        }
+
+        const nextRole =
+            user.role === "admin"
+                ? "user"
+                : "admin";
+
+        const message =
+            nextRole === "admin"
+                ? `Дать пользователю ${user.username || user.phone} права администратора?`
+                : `Забрать права администратора у ${user.username || user.phone}?`;
+
+        if (!window.confirm(message)) {
+            return;
+        }
+
+        setLoading(user.id, "role", true);
+
+        try {
+            const response = await axios.put(
+                `${apiUrl}/api/admin/users/${user.id}/role`,
+                {
+                    role: nextRole,
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            updateUserLocally(user.id, {
+                role:
+                    response.data.user?.role ||
+                    nextRole,
+            });
+        } catch (error) {
+            console.error(
+                "Ошибка изменения роли",
+                error
+            );
+
+            alert(
+                error.response?.data?.message ||
+                "Не удалось изменить роль пользователя"
+            );
+        } finally {
+            setLoading(user.id, "role", false);
+        }
+    };
+
+    const givePremium = async (user, days) => {
+        const message =
+            days === 7
+                ? `Выдать пользователю ${user.username || user.phone} премиум на 7 дней?`
+                : `Выдать пользователю ${user.username || user.phone} премиум на 30 дней?`;
+
+        if (!window.confirm(message)) {
+            return;
+        }
+
+        setLoading(user.id, "premium", true);
+
+        try {
+            const response = await axios.put(
+                `${apiUrl}/api/admin/users/${user.id}/premium`,
+                {
+                    days,
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            updateUserLocally(user.id, {
+                subscription_type:
+                    response.data.user
+                        ?.subscription_type ||
+                    "premium",
+
+                subscription_expires_at:
+                response.data.user
+                    ?.subscription_expires_at,
+            });
+        } catch (error) {
+            console.error(
+                "Ошибка выдачи премиума",
+                error
+            );
+
+            alert(
+                error.response?.data?.message ||
+                "Не удалось выдать премиум"
+            );
+        } finally {
+            setLoading(
+                user.id,
+                "premium",
+                false
+            );
+        }
+    };
+
+    const removePremium = async (user) => {
+        if (
+            !window.confirm(
+                `Снять премиум у пользователя ${user.username || user.phone}?`
+            )
+        ) {
+            return;
+        }
+
+        setLoading(user.id, "premium", true);
+
+        try {
+            await axios.delete(
+                `${apiUrl}/api/admin/users/${user.id}/premium`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            updateUserLocally(user.id, {
+                subscription_type: "standard",
+                subscription_expires_at: null,
+            });
+        } catch (error) {
+            console.error(
+                "Ошибка снятия премиума",
+                error
+            );
+
+            alert(
+                error.response?.data?.message ||
+                "Не удалось снять премиум"
+            );
+        } finally {
+            setLoading(
+                user.id,
+                "premium",
+                false
+            );
         }
     };
 
     const handleSearch = (e) => {
-        const query = e.target.value.toLowerCase();
+        const query =
+            e.target.value.toLowerCase();
+
         setSearchQuery(query);
 
         if (query.trim() === "") {
@@ -147,48 +365,129 @@ function UsersPage() {
         }
 
         setFilteredUsers(
-            users.filter(
-                (user) =>
-                    user.id.toString().includes(query) ||
-                    user.phone.includes(query)
-            )
+            users.filter((user) => {
+                const id =
+                    String(user.id || "")
+                        .toLowerCase();
+
+                const phone =
+                    String(user.phone || "")
+                        .toLowerCase();
+
+                const username =
+                    String(user.username || "")
+                        .toLowerCase();
+
+                return (
+                    id.includes(query) ||
+                    phone.includes(query) ||
+                    username.includes(query)
+                );
+            })
         );
     };
 
-    const toggleVerification = async (id, currentStatus) => {
-        const statusOptions = ["unverified", "pensioner", "verified"];
-        const currentIndex = statusOptions.indexOf(currentStatus);
-        const nextStatus = statusOptions[(currentIndex + 1) % statusOptions.length];
+    const toggleVerification = async (
+        id,
+        currentStatus
+    ) => {
+        const statusOptions = [
+            "unverified",
+            "pensioner",
+            "verified",
+        ];
+
+        const currentIndex =
+            statusOptions.indexOf(
+                currentStatus
+            );
+
+        const nextStatus =
+            statusOptions[
+            (currentIndex + 1) %
+            statusOptions.length
+                ];
 
         try {
             await axios.put(
                 `${apiUrl}/api/admin/users/${id}/verify`,
-                { userStatus: nextStatus },
                 {
-                    headers: { Authorization: `Bearer ${token}` },
+                    userStatus: nextStatus,
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
                 }
             );
 
-            setUsers((prev) =>
-                prev.map((user) =>
-                    user.id === id ? { ...user, userStatus: nextStatus } : user
-                )
-            );
-
-            setFilteredUsers((prev) =>
-                prev.map((user) =>
-                    user.id === id ? { ...user, userStatus: nextStatus } : user
-                )
-            );
+            updateUserLocally(id, {
+                userStatus: nextStatus,
+            });
         } catch (error) {
-            console.error("Ошибка обновления верификации", error);
+            console.error(
+                "Ошибка обновления верификации",
+                error
+            );
         }
     };
 
-    const handleComplaints = (id) => navigate(`/users/${id}/complaints`);
-    const handleOrders = (id) => navigate(`/users/${id}/orders`);
-    const handlePhotos = (id) => navigate(`/user-documents/${id}`);
-    const handleCreateUser = () => navigate("/create-user");
+    const isPremiumActive = (user) => {
+        if (
+            user.subscription_type !==
+            "premium"
+        ) {
+            return false;
+        }
+
+        if (
+            !user.subscription_expires_at
+        ) {
+            return true;
+        }
+
+        return (
+            new Date(
+                user.subscription_expires_at
+            ).getTime() > Date.now()
+        );
+    };
+
+    const formatPremiumDate = (value) => {
+        if (!value) {
+            return "без срока";
+        }
+
+        const date = new Date(value);
+
+        if (
+            Number.isNaN(date.getTime())
+        ) {
+            return "—";
+        }
+
+        return date.toLocaleDateString(
+            "ru-RU"
+        );
+    };
+
+    const handleComplaints = (id) =>
+        navigate(
+            `/users/${id}/complaints`
+        );
+
+    const handleOrders = (id) =>
+        navigate(
+            `/users/${id}/orders`
+        );
+
+    const handlePhotos = (id) =>
+        navigate(
+            `/user-documents/${id}`
+        );
+
+    const handleCreateUser = () =>
+        navigate("/create-user");
 
     return (
         <div className="users-container">
@@ -198,12 +497,15 @@ function UsersPage() {
                 <input
                     type="text"
                     className="search-input"
-                    placeholder="Поиск по ID или номеру телефона"
+                    placeholder="Поиск по ID, имени или телефону"
                     value={searchQuery}
                     onChange={handleSearch}
                 />
 
-                <button onClick={handleCreateUser} className="create-user-button">
+                <button
+                    onClick={handleCreateUser}
+                    className="create-user-button"
+                >
                     Создать пользователя
                 </button>
             </div>
@@ -218,96 +520,357 @@ function UsersPage() {
                         <th>Дата регистрации</th>
                         <th>Рейтинг</th>
                         <th>Верификация</th>
+                        <th>Роль</th>
+                        <th>Премиум</th>
                         <th>Действия</th>
                     </tr>
                     </thead>
 
                     <tbody>
-                    {filteredUsers.map((user) => {
-                        const hasComplaints = Boolean(complaintsCount[user.id]);
-                        const hasDocuments = Boolean(documentsCount[user.id]);
-                        const hasOrders = Boolean(ordersCount[user.id]);
+                    {filteredUsers.map(
+                        (user) => {
+                            const hasComplaints =
+                                Boolean(
+                                    complaintsCount[
+                                        user.id
+                                        ]
+                                );
 
-                        return (
-                            <tr key={user.id}>
-                                <td>{user.id}</td>
-                                <td>{user.username}</td>
-                                <td>{user.phone}</td>
-                                <td>{new Date(user.createdAt).toLocaleDateString()}</td>
-                                <td>{user.rating ? user.rating.toFixed(1) : "—"}</td>
+                            const hasDocuments =
+                                Boolean(
+                                    documentsCount[
+                                        user.id
+                                        ]
+                                );
 
-                                <td>
-                                    <button
-                                        className={`verify-button ${
-                                            user.userStatus === "verified"
-                                                ? "verified"
-                                                : user.userStatus === "pensioner"
-                                                    ? "pensioner"
-                                                    : "unverified"
-                                        }`}
-                                        onClick={() =>
-                                            toggleVerification(user.id, user.userStatus)
-                                        }
-                                    >
-                                        {user.userStatus === "verified"
-                                            ? "Верифицирован"
-                                            : user.userStatus === "pensioner"
-                                                ? "Пенсионер"
-                                                : "Не верифицирован"}
-                                    </button>
-                                </td>
+                            const hasOrders =
+                                Boolean(
+                                    ordersCount[
+                                        user.id
+                                        ]
+                                );
 
-                                <td>
-                                    <div className="action-buttons">
-                                        <button
-                                            className={`complaints-button ${
-                                                !hasComplaints ? "disabled-button" : ""
-                                            }`}
-                                            onClick={() => handleComplaints(user.id)}
-                                            disabled={!hasComplaints}
-                                        >
-                                            Жалобы · {complaintsCount[user.id] || 0}
-                                        </button>
+                            const premiumActive =
+                                isPremiumActive(
+                                    user
+                                );
 
-                                        <button
-                                            className={`orders-button ${
-                                                !hasOrders ? "empty-button" : ""
-                                            }`}
-                                            onClick={() => handleOrders(user.id)}
-                                        >
-                                            Заказы · {ordersCount[user.id] || 0}
-                                        </button>
+                            const roleLoading =
+                                Boolean(
+                                    actionLoading[
+                                        `${user.id}_role`
+                                        ]
+                                );
 
-                                        <button
-                                            className={`photos-button ${
-                                                !hasDocuments ? "disabled-button" : ""
-                                            }`}
-                                            onClick={() => handlePhotos(user.id)}
-                                            disabled={!hasDocuments}
-                                        >
-                                            Фото · {documentsCount[user.id] || 0}
-                                        </button>
+                            const premiumLoading =
+                                Boolean(
+                                    actionLoading[
+                                        `${user.id}_premium`
+                                        ]
+                                );
 
-                                        {user.role === "banned" ? (
-                                            <button
-                                                className="unblock-button"
-                                                onClick={() => unblockUser(user.id)}
-                                            >
-                                                Разблок.
-                                            </button>
-                                        ) : (
-                                            <button
-                                                className="block-button"
-                                                onClick={() => blockUser(user.id)}
-                                            >
-                                                Блок
-                                            </button>
+                            return (
+                                <tr key={user.id}>
+                                    <td>
+                                        {user.id}
+                                    </td>
+
+                                    <td>
+                                        {user.username}
+                                    </td>
+
+                                    <td>
+                                        {user.phone}
+                                    </td>
+
+                                    <td>
+                                        {new Date(
+                                            user.createdAt
+                                        ).toLocaleDateString(
+                                            "ru-RU"
                                         )}
-                                    </div>
-                                </td>
-                            </tr>
-                        );
-                    })}
+                                    </td>
+
+                                    <td>
+                                        {user.rating
+                                            ? Number(
+                                                user.rating
+                                            ).toFixed(
+                                                1
+                                            )
+                                            : "—"}
+                                    </td>
+
+                                    <td>
+                                        <button
+                                            className={`verify-button ${
+                                                user.userStatus ===
+                                                "verified"
+                                                    ? "verified"
+                                                    : user.userStatus ===
+                                                    "pensioner"
+                                                        ? "pensioner"
+                                                        : "unverified"
+                                            }`}
+                                            onClick={() =>
+                                                toggleVerification(
+                                                    user.id,
+                                                    user.userStatus
+                                                )
+                                            }
+                                        >
+                                            {user.userStatus ===
+                                            "verified"
+                                                ? "Верифицирован"
+                                                : user.userStatus ===
+                                                "pensioner"
+                                                    ? "Пенсионер"
+                                                    : "Не верифицирован"}
+                                        </button>
+                                    </td>
+
+                                    <td>
+                                        {user.role ===
+                                        "banned" ? (
+                                            <div className="admin-role-cell">
+                                                <span className="role-badge role-banned">
+                                                    Заблокирован
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div className="admin-role-cell">
+                                                <span
+                                                    className={`role-badge ${
+                                                        user.role ===
+                                                        "admin"
+                                                            ? "role-admin"
+                                                            : "role-user"
+                                                    }`}
+                                                >
+                                                    {user.role ===
+                                                    "admin"
+                                                        ? "Администратор"
+                                                        : "Пользователь"}
+                                                </span>
+
+                                                <button
+                                                    className={
+                                                        user.role ===
+                                                        "admin"
+                                                            ? "remove-admin-button"
+                                                            : "make-admin-button"
+                                                    }
+                                                    disabled={
+                                                        roleLoading
+                                                    }
+                                                    onClick={() =>
+                                                        toggleAdmin(
+                                                            user
+                                                        )
+                                                    }
+                                                >
+                                                    {roleLoading
+                                                        ? "..."
+                                                        : user.role ===
+                                                        "admin"
+                                                            ? "Забрать"
+                                                            : "Дать админку"}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </td>
+
+                                    <td>
+                                        <div className="premium-admin-cell">
+                                            {premiumActive ? (
+                                                <>
+                                                    <span className="premium-badge">
+                                                        PREMIUM
+                                                    </span>
+
+                                                    <span className="premium-expire">
+                                                        до{" "}
+                                                        {formatPremiumDate(
+                                                            user.subscription_expires_at
+                                                        )}
+                                                    </span>
+
+                                                    <div className="premium-admin-buttons">
+                                                        <button
+                                                            disabled={
+                                                                premiumLoading
+                                                            }
+                                                            onClick={() =>
+                                                                givePremium(
+                                                                    user,
+                                                                    7
+                                                                )
+                                                            }
+                                                        >
+                                                            +7
+                                                        </button>
+
+                                                        <button
+                                                            disabled={
+                                                                premiumLoading
+                                                            }
+                                                            onClick={() =>
+                                                                givePremium(
+                                                                    user,
+                                                                    30
+                                                                )
+                                                            }
+                                                        >
+                                                            +30
+                                                        </button>
+
+                                                        <button
+                                                            className="remove-premium-button"
+                                                            disabled={
+                                                                premiumLoading
+                                                            }
+                                                            onClick={() =>
+                                                                removePremium(
+                                                                    user
+                                                                )
+                                                            }
+                                                        >
+                                                            Снять
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="no-premium-badge">
+                                                        Нет
+                                                    </span>
+
+                                                    <div className="premium-admin-buttons">
+                                                        <button
+                                                            disabled={
+                                                                premiumLoading
+                                                            }
+                                                            onClick={() =>
+                                                                givePremium(
+                                                                    user,
+                                                                    7
+                                                                )
+                                                            }
+                                                        >
+                                                            7 дней
+                                                        </button>
+
+                                                        <button
+                                                            disabled={
+                                                                premiumLoading
+                                                            }
+                                                            onClick={() =>
+                                                                givePremium(
+                                                                    user,
+                                                                    30
+                                                                )
+                                                            }
+                                                        >
+                                                            30 дней
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div className="action-buttons">
+                                            <button
+                                                className={`complaints-button ${
+                                                    !hasComplaints
+                                                        ? "disabled-button"
+                                                        : ""
+                                                }`}
+                                                onClick={() =>
+                                                    handleComplaints(
+                                                        user.id
+                                                    )
+                                                }
+                                                disabled={
+                                                    !hasComplaints
+                                                }
+                                            >
+                                                Жалобы ·{" "}
+                                                {complaintsCount[
+                                                    user.id
+                                                    ] || 0}
+                                            </button>
+
+                                            <button
+                                                className={`orders-button ${
+                                                    !hasOrders
+                                                        ? "empty-button"
+                                                        : ""
+                                                }`}
+                                                onClick={() =>
+                                                    handleOrders(
+                                                        user.id
+                                                    )
+                                                }
+                                            >
+                                                Заказы ·{" "}
+                                                {ordersCount[
+                                                    user.id
+                                                    ] || 0}
+                                            </button>
+
+                                            <button
+                                                className={`photos-button ${
+                                                    !hasDocuments
+                                                        ? "disabled-button"
+                                                        : ""
+                                                }`}
+                                                onClick={() =>
+                                                    handlePhotos(
+                                                        user.id
+                                                    )
+                                                }
+                                                disabled={
+                                                    !hasDocuments
+                                                }
+                                            >
+                                                Фото ·{" "}
+                                                {documentsCount[
+                                                    user.id
+                                                    ] || 0}
+                                            </button>
+
+                                            {user.role ===
+                                            "banned" ? (
+                                                <button
+                                                    className="unblock-button"
+                                                    onClick={() =>
+                                                        unblockUser(
+                                                            user.id
+                                                        )
+                                                    }
+                                                >
+                                                    Разблок.
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    className="block-button"
+                                                    onClick={() =>
+                                                        blockUser(
+                                                            user.id
+                                                        )
+                                                    }
+                                                >
+                                                    Блок
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        }
+                    )}
                     </tbody>
                 </table>
             </div>

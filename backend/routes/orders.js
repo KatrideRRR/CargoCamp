@@ -923,6 +923,14 @@ module.exports = (io) => {
             delete parsedServiceDetails.recommendedPriceMin;
             delete parsedServiceDetails.recommendedPriceMax;
             delete parsedServiceDetails.pricingCalculator;
+            delete parsedServiceDetails.pricingModel;
+            delete parsedServiceDetails.pricingBilledHours;
+            delete parsedServiceDetails.pricingMinimumHours;
+            delete parsedServiceDetails.pricingFirstHourPrice;
+            delete parsedServiceDetails.pricingNextHourPrice;
+            delete parsedServiceDetails.pricingCalloutPrice;
+            delete parsedServiceDetails.pricingVehicleHourlyRate;
+            delete parsedServiceDetails.pricingHelperHourlyRate;
             delete parsedServiceDetails.pricingConfigVersion;
             delete parsedServiceDetails.pricingCalculatedAt;
             delete parsedServiceDetails.pricingSource;
@@ -1516,18 +1524,57 @@ module.exports = (io) => {
                     serverRecommendedPrice
                         .calculator,
 
+                    pricingModel:
+                    serverRecommendedPrice
+                        .pricingModel,
+
+                    pricingBilledHours:
+                    serverRecommendedPrice
+                        .billedHours,
+
+                    pricingMinimumHours:
+                    serverRecommendedPrice
+                        .minimumHours,
+
+                    pricingFirstHourPrice:
+                    serverRecommendedPrice
+                        .firstHourPrice,
+
+                    pricingNextHourPrice:
+                    serverRecommendedPrice
+                        .nextHourPrice,
+
+                    pricingCalloutPrice:
+                    serverRecommendedPrice
+                        .calloutPrice,
+
+                    pricingVehicleHourlyRate:
+                    serverRecommendedPrice
+                        .vehicleHourlyRate,
+
+                    pricingHelperHourlyRate:
+                    serverRecommendedPrice
+                        .helperHourlyRate,
+
                     pricingConfigVersion:
                     serverRecommendedPrice
                         .configVersion,
 
                     pricingCalculatedAt:
-                        new Date().toISOString(),
+                        new Date()
+                            .toISOString(),
 
                     pricingSource:
                         "server",
 
                     pricingBreakdown:
-                        serverRecommendedPrice.breakdown || [],
+                        Array.isArray(
+                            serverRecommendedPrice
+                                .breakdown
+                        )
+                            ? serverRecommendedPrice
+                                .breakdown
+                            : [],
                 };
             }
 
