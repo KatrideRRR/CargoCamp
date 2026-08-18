@@ -510,7 +510,15 @@ router.get('/profile', authenticateToken, async (req, res) => {
                 'userStatus', 'documentPhotos',
                 'subscription_type', 'subscription_expires_at',
                 'preferredCategoryIds',
-                'locationAddress', 'locationLat', 'locationLng', 'locationSource', 'locationUpdatedAt'
+                'locationAddress', 'locationLat', 'locationLng', 'locationSource', 'locationUpdatedAt',
+                "vehicleBrand",
+                "vehicleModel",
+                "vehicleColor",
+                "vehiclePlate",
+                "vehicleYear",
+                "vehiclePhoto",
+                "vehicleVerificationStatus",
+                "vehicleVerificationNote",
             ],
         });
 
@@ -554,6 +562,17 @@ router.get('/profile', authenticateToken, async (req, res) => {
             locationLng: user.locationLng,
             locationSource: user.locationSource,
             locationUpdatedAt: user.locationUpdatedAt,
+
+            vehicleBrand: user.vehicleBrand,
+            vehicleModel: user.vehicleModel,
+            vehicleColor: user.vehicleColor,
+            vehiclePlate: user.vehiclePlate,
+            vehicleYear: user.vehicleYear,
+            vehiclePhoto: user.vehiclePhoto,
+            vehicleVerificationStatus:
+            user.vehicleVerificationStatus,
+            vehicleVerificationNote:
+            user.vehicleVerificationNote,
         });
     } catch (error) {
         console.error('Error fetching profile:', error);
@@ -1145,5 +1164,179 @@ router.post("/categories/me", authenticateToken, async (req, res) => {
         return res.status(500).json({ message: "Ошибка сервера" });
     }
 });
+
+router.post("/vehicle/me", authenticateToken, async (req, res) => {
+        try {
+            const userId = req.user.id;
+
+            const {
+                vehicleBrand,
+                vehicleModel,
+                vehicleColor,
+                vehiclePlate,
+                vehicleYear,
+            } = req.body;
+
+            const brand = String(vehicleBrand || "").trim();
+            const model = String(vehicleModel || "").trim();
+            const color = String(vehicleColor || "").trim();
+            const plate = String(vehiclePlate || "").trim().toUpperCase();
+            const yearRaw = String(vehicleYear || "").trim();
+
+            if (!brand) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Укажите марку автомобиля",
+                });
+            }
+
+            if (!model) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Укажите модель автомобиля",
+                });
+            }
+
+            if (!color) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Укажите цвет автомобиля",
+                });
+            }
+
+            if (!plate) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Укажите государственный номер автомобиля",
+                });
+            }
+
+            let normalizedYear = null;
+
+            if (yearRaw) {
+                normalizedYear = Number(yearRaw);
+
+                const currentYear =
+                    new Date().getFullYear();
+
+                if (
+                    !Number.isInteger(normalizedYear) ||
+                    normalizedYear < 1950 ||
+                    normalizedYear > currentYear + 1
+                ) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Укажите корректный год автомобиля",
+                    });
+                }
+            }
+
+            const user = await User.findByPk(userId);
+
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Пользователь не найден",
+                });
+            }
+
+            user.vehicleBrand = brand;
+            user.vehicleModel = model;
+            user.vehicleColor = color;
+            user.vehiclePlate = plate;
+            user.vehicleYear = normalizedYear;
+
+            /*
+             * Любое изменение данных автомобиля
+             * требует новой проверки администратором.
+             */
+            user.vehicleVerificationStatus = "pending";
+            user.vehicleVerificationNote = null;
+
+            await user.save();
+
+            return res.json({
+                success: true,
+                message: "Данные автомобиля отправлены на проверку",
+                vehicle: {
+                    vehicleBrand: user.vehicleBrand,
+                    vehicleModel: user.vehicleModel,
+                    vehicleColor: user.vehicleColor,
+                    vehiclePlate: user.vehiclePlate,
+                    vehicleYear: user.vehicleYear,
+                    vehiclePhoto: user.vehiclePhoto,
+                    vehicleVerificationStatus:
+                    user.vehicleVerificationStatus,
+                    vehicleVerificationNote:
+                    user.vehicleVerificationNote,
+                },
+            });
+        } catch (error) {
+            console.error(
+                "Ошибка сохранения автомобиля:",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                message: "Не удалось сохранить данные автомобиля",
+            });
+        }
+    });
+
+router.post("/vehicle/photo", authenticateToken, upload.single("vehiclePhoto"), async (req, res) => {
+        try {
+            const userId = req.user.id;
+
+            if (!req.file) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Выберите фотографию автомобиля",
+                });
+            }
+
+            const user = await User.findByPk(userId);
+
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Пользователь не найден",
+                });
+            }
+
+            /*
+             * Здесь путь подстрой под то,
+             * как у тебя multer сохраняет файлы.
+             */
+            const vehiclePhotoPath =
+                `/uploads/upload-document/${req.file.filename}`;
+
+            user.vehiclePhoto =
+                vehiclePhotoPath;
+
+
+            await user.save();
+
+            return res.json({
+                success: true,
+                message: "Фото автомобиля загружено",
+                vehiclePhoto:
+                user.vehiclePhoto,
+                vehicleVerificationStatus:
+                user.vehicleVerificationStatus,
+            });
+        } catch (error) {
+            console.error(
+                "Ошибка загрузки фото автомобиля:",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                message:
+                    "Не удалось загрузить фото автомобиля",
+            });
+        }
+    });
 
 module.exports = router;

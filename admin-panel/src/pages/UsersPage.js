@@ -14,8 +14,255 @@ function UsersPage() {
     const [ordersCount, setOrdersCount] = useState({});
     const [actionLoading, setActionLoading] = useState({});
 
+    const [
+        vehicleRejectUser,
+        setVehicleRejectUser,
+    ] = useState(null);
+
+    const [
+        vehicleRejectReason,
+        setVehicleRejectReason,
+    ] = useState("");
+
+    const [
+        vehicleActionLoading,
+        setVehicleActionLoading,
+    ] = useState({});
+
     const token = localStorage.getItem("authToken");
     const navigate = useNavigate();
+
+    const approveVehicle = async (user) => {
+        if (!user?.id) return;
+
+        const vehicleName = [
+            user.vehicleBrand,
+            user.vehicleModel,
+        ]
+            .filter(Boolean)
+            .join(" ");
+
+        const ok = window.confirm(
+            `Подтвердить автомобиль ${vehicleName || ""} ${
+                user.vehiclePlate || ""
+            }?`
+        );
+
+        if (!ok) {
+            return;
+        }
+
+        try {
+            setVehicleActionLoading((prev) => ({
+                ...prev,
+                [user.id]: true,
+            }));
+
+            const res = await axios.put(
+                `${apiUrl}/api/admin/users/${user.id}/vehicle-verification`,
+                {
+                    status: "verified",
+                },
+                {
+                    headers: {
+                        Authorization:
+                            `Bearer ${token}`,
+                    },
+                }
+            );
+
+            const updated =
+                res.data?.user || {};
+
+            updateUserLocally(
+                user.id,
+                {
+                    vehicleVerificationStatus:
+                        updated.vehicleVerificationStatus ||
+                        "verified",
+
+                    vehicleVerificationNote:
+                        updated.vehicleVerificationNote ??
+                        null,
+                }
+            );
+        } catch (error) {
+            console.error(
+                "Ошибка подтверждения автомобиля:",
+                error
+            );
+
+            alert(
+                error.response?.data?.message ||
+                "Не удалось подтвердить автомобиль"
+            );
+        } finally {
+            setVehicleActionLoading((prev) => ({
+                ...prev,
+                [user.id]: false,
+            }));
+        }
+    };
+
+    const openVehicleReject = (user) => {
+        setVehicleRejectUser(user);
+        setVehicleRejectReason("");
+    };
+
+    const closeVehicleReject = () => {
+        setVehicleRejectUser(null);
+        setVehicleRejectReason("");
+    };
+
+    const rejectVehicle = async () => {
+        const user =
+            vehicleRejectUser;
+
+        if (!user?.id) {
+            return;
+        }
+
+        const reason =
+            vehicleRejectReason.trim();
+
+        if (reason.length < 3) {
+            alert(
+                "Укажите причину отклонения"
+            );
+            return;
+        }
+
+        try {
+            setVehicleActionLoading((prev) => ({
+                ...prev,
+                [user.id]: true,
+            }));
+
+            const res = await axios.put(
+                `${apiUrl}/api/admin/users/${user.id}/vehicle-verification`,
+                {
+                    status: "rejected",
+                    note: reason,
+                },
+                {
+                    headers: {
+                        Authorization:
+                            `Bearer ${token}`,
+                    },
+                }
+            );
+
+            const updated =
+                res.data?.user || {};
+
+            updateUserLocally(
+                user.id,
+                {
+                    vehicleVerificationStatus:
+                        updated.vehicleVerificationStatus ||
+                        "rejected",
+
+                    vehicleVerificationNote:
+                        updated.vehicleVerificationNote ||
+                        reason,
+                }
+            );
+
+            closeVehicleReject();
+        } catch (error) {
+            console.error(
+                "Ошибка отклонения автомобиля:",
+                error
+            );
+
+            alert(
+                error.response?.data?.message ||
+                "Не удалось отклонить автомобиль"
+            );
+        } finally {
+            setVehicleActionLoading((prev) => ({
+                ...prev,
+                [user.id]: false,
+            }));
+        }
+    };
+
+    const removeVehicle = async (user) => {
+        if (!user?.id) {
+            return;
+        }
+
+        const vehicleName = [
+            user.vehicleBrand,
+            user.vehicleModel,
+        ]
+            .filter(Boolean)
+            .join(" ");
+
+        const ok = window.confirm(
+            `Удалить автомобиль ${
+                vehicleName || ""
+            } ${
+                user.vehiclePlate || ""
+            } у пользователя ${
+                user.username || user.phone || user.id
+            }?`
+        );
+
+        if (!ok) {
+            return;
+        }
+
+        try {
+            setVehicleActionLoading((prev) => ({
+                ...prev,
+                [user.id]: true,
+            }));
+
+            await axios.delete(
+                `${apiUrl}/api/admin/users/${user.id}/vehicle`,
+                {
+                    headers: {
+                        Authorization:
+                            `Bearer ${token}`,
+                    },
+                }
+            );
+
+            updateUserLocally(
+                user.id,
+                {
+                    vehicleBrand: null,
+                    vehicleModel: null,
+                    vehicleColor: null,
+                    vehiclePlate: null,
+                    vehicleYear: null,
+                    vehiclePhoto: null,
+
+                    vehicleVerificationStatus:
+                        "none",
+
+                    vehicleVerificationNote:
+                        null,
+                }
+            );
+        } catch (error) {
+            console.error(
+                "Ошибка удаления автомобиля:",
+                error
+            );
+
+            alert(
+                error.response?.data?.message ||
+                "Не удалось удалить автомобиль"
+            );
+        } finally {
+            setVehicleActionLoading((prev) => ({
+                ...prev,
+                [user.id]: false,
+            }));
+        }
+    };
 
     useEffect(() => {
         axios
@@ -522,6 +769,7 @@ function UsersPage() {
                         <th>Верификация</th>
                         <th>Роль</th>
                         <th>Премиум</th>
+                        <th>Автомобиль</th>
                         <th>Действия</th>
                     </tr>
                     </thead>
@@ -780,6 +1028,170 @@ function UsersPage() {
                                     </td>
 
                                     <td>
+                                        <div className="admin-vehicle-cell">
+                                            {user.vehicleBrand ||
+                                            user.vehicleModel ||
+                                            user.vehiclePlate ? (
+                                                <>
+                                                    <div className="admin-vehicle-name">
+                                                        {[
+                                                            user.vehicleBrand,
+                                                            user.vehicleModel,
+                                                        ]
+                                                            .filter(Boolean)
+                                                            .join(" ")}
+                                                    </div>
+
+                                                    <div className="admin-vehicle-meta">
+                                                        {user.vehicleColor && (
+                                                            <span>
+                            {user.vehicleColor}
+                        </span>
+                                                        )}
+
+                                                        {user.vehicleYear && (
+                                                            <span>
+                            {user.vehicleYear} г.
+                        </span>
+                                                        )}
+                                                    </div>
+
+                                                    {user.vehiclePlate && (
+                                                        <div className="admin-vehicle-plate">
+                                                            {user.vehiclePlate}
+                                                        </div>
+                                                    )}
+
+                                                    <div
+                                                        className={`admin-vehicle-status admin-vehicle-status-${
+                                                            user.vehicleVerificationStatus ||
+                                                            "none"
+                                                        }`}
+                                                    >
+                                                        {user.vehicleVerificationStatus ===
+                                                        "verified"
+                                                            ? "Подтверждён"
+                                                            : user.vehicleVerificationStatus ===
+                                                            "pending"
+                                                                ? "Ожидает проверки"
+                                                                : user.vehicleVerificationStatus ===
+                                                                "rejected"
+                                                                    ? "Отклонён"
+                                                                    : "Не проверен"}
+                                                    </div>
+
+                                                    {user.vehicleVerificationStatus ===
+                                                        "rejected" &&
+                                                        user.vehicleVerificationNote && (
+                                                            <div className="admin-vehicle-reject-note">
+                                                                {user.vehicleVerificationNote}
+                                                            </div>
+                                                        )}
+
+                                                    {user.vehiclePhoto && (
+                                                        <a
+                                                            className="admin-vehicle-photo-link"
+                                                            href={
+                                                                user.vehiclePhoto.startsWith(
+                                                                    "http"
+                                                                )
+                                                                    ? user.vehiclePhoto
+                                                                    : `${apiUrl}${user.vehiclePhoto}`
+                                                            }
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                        >
+                                                            Фото автомобиля
+                                                        </a>
+                                                    )}
+
+                                                    <div className="admin-vehicle-actions">
+                                                        {user.vehicleVerificationStatus ===
+                                                            "pending" && (
+                                                                <>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="admin-vehicle-approve"
+                                                                        disabled={
+                                                                            Boolean(
+                                                                                vehicleActionLoading[
+                                                                                    user.id
+                                                                                    ]
+                                                                            )
+                                                                        }
+                                                                        onClick={() =>
+                                                                            approveVehicle(user)
+                                                                        }
+                                                                    >
+                                                                        Одобрить
+                                                                    </button>
+
+                                                                    <button
+                                                                        type="button"
+                                                                        className="admin-vehicle-reject"
+                                                                        disabled={
+                                                                            Boolean(
+                                                                                vehicleActionLoading[
+                                                                                    user.id
+                                                                                    ]
+                                                                            )
+                                                                        }
+                                                                        onClick={() =>
+                                                                            openVehicleReject(user)
+                                                                        }
+                                                                    >
+                                                                        Отклонить
+                                                                    </button>
+                                                                </>
+                                                            )}
+
+                                                        {user.vehicleVerificationStatus ===
+                                                            "rejected" && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="admin-vehicle-approve"
+                                                                    disabled={
+                                                                        Boolean(
+                                                                            vehicleActionLoading[
+                                                                                user.id
+                                                                                ]
+                                                                        )
+                                                                    }
+                                                                    onClick={() =>
+                                                                        approveVehicle(user)
+                                                                    }
+                                                                >
+                                                                    Одобрить
+                                                                </button>
+                                                            )}
+
+                                                        <button
+                                                            type="button"
+                                                            className="admin-vehicle-remove"
+                                                            disabled={
+                                                                Boolean(
+                                                                    vehicleActionLoading[
+                                                                        user.id
+                                                                        ]
+                                                                )
+                                                            }
+                                                            onClick={() =>
+                                                                removeVehicle(user)
+                                                            }
+                                                        >
+                                                            Удалить автомобиль
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <span className="admin-vehicle-empty">
+                Не указан
+            </span>
+                                            )}
+                                        </div>
+                                    </td>
+
+                                    <td>
                                         <div className="action-buttons">
                                             <button
                                                 className={`complaints-button ${
@@ -874,6 +1286,93 @@ function UsersPage() {
                     </tbody>
                 </table>
             </div>
+            {vehicleRejectUser && (
+                <div
+                    className="admin-vehicle-modal-overlay"
+                    onClick={closeVehicleReject}
+                >
+                    <div
+                        className="admin-vehicle-modal"
+                        onClick={(e) =>
+                            e.stopPropagation()
+                        }
+                    >
+                        <h3>
+                            Отклонить автомобиль
+                        </h3>
+
+                        <p>
+                            {[
+                                vehicleRejectUser.vehicleBrand,
+                                vehicleRejectUser.vehicleModel,
+                            ]
+                                .filter(Boolean)
+                                .join(" ")}
+                            {vehicleRejectUser.vehiclePlate
+                                ? ` · ${vehicleRejectUser.vehiclePlate}`
+                                : ""}
+                        </p>
+
+                        <label className="admin-vehicle-reason-label">
+                            Причина отказа
+
+                            <textarea
+                                value={
+                                    vehicleRejectReason
+                                }
+                                onChange={(e) =>
+                                    setVehicleRejectReason(
+                                        e.target.value.slice(
+                                            0,
+                                            500
+                                        )
+                                    )
+                                }
+                                placeholder="Например: госномер не соответствует фотографии или фото автомобиля нечёткое"
+                                rows={5}
+                                maxLength={500}
+                            />
+                        </label>
+
+                        <div className="admin-vehicle-reason-count">
+                            {vehicleRejectReason.length} / 500
+                        </div>
+
+                        <div className="admin-vehicle-modal-actions">
+                            <button
+                                type="button"
+                                onClick={
+                                    closeVehicleReject
+                                }
+                                className="admin-vehicle-modal-cancel"
+                            >
+                                Отмена
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={rejectVehicle}
+                                className="admin-vehicle-modal-reject"
+                                disabled={
+                                    vehicleRejectReason.trim()
+                                        .length < 3 ||
+                                    Boolean(
+                                        vehicleActionLoading[
+                                            vehicleRejectUser.id
+                                            ]
+                                    )
+                                }
+                            >
+                                {vehicleActionLoading[
+                                    vehicleRejectUser.id
+                                    ]
+                                    ? "Сохраняем..."
+                                    : "Отклонить"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

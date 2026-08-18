@@ -339,6 +339,17 @@ function navigateFromPush(rawData, navigate, options = {}) {
         return;
     }
 
+    if (type === "vehicle_verification") {
+        navigate(
+            "/profile?section=verification",
+            {
+                replace: true,
+            }
+        );
+
+        return;
+    }
+
     if (type === "order_push" && orderId) {
         if (orderType === "express") {
             navigate(`/express-order/${orderId}`, { replace: true });

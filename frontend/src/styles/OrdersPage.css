@@ -3740,3 +3740,91 @@
     background: rgba(255, 251, 235, 0.95);
     border: 1px solid rgba(245, 158, 11, 0.35);
 }
+
+.taxi-vehicle-gate-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.taxi-vehicle-gate-modal {
+    width: min(430px, 100%);
+    padding: 24px;
+
+    border-radius: 18px;
+    background: #fff;
+
+    text-align: center;
+
+    box-shadow:
+            0 24px 70px
+            rgba(0, 0, 0, 0.25);
+}
+
+.taxi-vehicle-gate-icon {
+    width: 58px;
+    height: 58px;
+
+    margin: 0 auto 14px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+
+    background: rgba(0, 122, 255, 0.1);
+
+    font-size: 26px;
+}
+
+.taxi-vehicle-gate-modal h3 {
+    margin: 0 0 10px;
+    font-size: 20px;
+}
+
+.taxi-vehicle-gate-modal p {
+    margin: 0;
+
+    color: #6b7280;
+    font-size: 14px;
+    line-height: 1.55;
+}
+
+.taxi-vehicle-gate-actions {
+    display: flex;
+    gap: 10px;
+
+    margin-top: 20px;
+}
+
+.taxi-vehicle-gate-cancel,
+.taxi-vehicle-gate-profile {
+    flex: 1;
+
+    border: none;
+    border-radius: 10px;
+
+    padding: 11px 14px;
+
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.taxi-vehicle-gate-cancel {
+    background: #f1f3f5;
+    color: #495057;
+}
+
+.taxi-vehicle-gate-profile {
+    background: #1971c2;
+    color: #fff;
+}

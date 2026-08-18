@@ -583,7 +583,106 @@ router.get("/express-orders/me", authenticateToken, async (req, res) => {
             limit: 200,
         });
 
-        res.json({ success: true, orders });
+        /*
+         * Получаем всех исполнителей экспресс-заказов одним запросом.
+         */
+        const executorIds = [
+            ...new Set(
+                orders
+                    .map((order) => Number(order.executorId))
+                    .filter((id) => Number.isInteger(id) && id > 0)
+            ),
+        ];
+
+        let executorsMap = {};
+
+        if (executorIds.length > 0) {
+            const executors = await User.findAll({
+                where: {
+                    id: {
+                        [Op.in]: executorIds,
+                    },
+                },
+
+                attributes: [
+                    "id",
+                    "username",
+                    "rating",
+
+                    "vehicleBrand",
+                    "vehicleModel",
+                    "vehicleColor",
+                    "vehiclePlate",
+                    "vehiclePhoto",
+                    "vehicleVerificationStatus",
+                ],
+            });
+
+            executorsMap = Object.fromEntries(
+                executors.map((executor) => [
+                    Number(executor.id),
+                    executor.toJSON(),
+                ])
+            );
+        }
+
+        const normalizedOrders = orders.map((row) => {
+            const order = row.toJSON();
+
+            const executor =
+                executorsMap[Number(order.executorId)] ||
+                null;
+
+            /*
+             * Snapshot заказа имеет приоритет.
+             *
+             * Если snapshot отсутствует — берём
+             * актуальный автомобиль исполнителя.
+             */
+            if (
+                order.type === "taxi" &&
+                order.executorId
+            ) {
+                order.executorVehicleBrand =
+                    order.executorVehicleBrand ||
+                    executor?.vehicleBrand ||
+                    null;
+
+                order.executorVehicleModel =
+                    order.executorVehicleModel ||
+                    executor?.vehicleModel ||
+                    null;
+
+                order.executorVehicleColor =
+                    order.executorVehicleColor ||
+                    executor?.vehicleColor ||
+                    null;
+
+                order.executorVehiclePlate =
+                    order.executorVehiclePlate ||
+                    executor?.vehiclePlate ||
+                    null;
+
+                order.executorVehiclePhoto =
+                    order.executorVehiclePhoto ||
+                    executor?.vehiclePhoto ||
+                    null;
+
+                /*
+                 * Пока оставим executor в ответе.
+                 * Полезно для диагностики и потом
+                 * можем показывать имя/рейтинг водителя.
+                 */
+                order.executor = executor;
+            }
+
+            return order;
+        });
+
+        return res.json({
+            success: true,
+            orders: normalizedOrders,
+        });
     } catch (e) {
         console.error("express-orders/me error:", e);
         res.status(500).json({ success: false, message: "Ошибка сервера" });
@@ -1140,10 +1239,102 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
             return res.status(409).json({ success: false, message: "Заказ уже принят" });
         }
 
+        /*
+ * Для курьерских заказов автомобиль не требуется.
+ *
+ * Для такси обязательны:
+ * - заполненные данные машины
+ * - одобрение автомобиля администратором
+ */
+        if (order.type === "taxi") {
+            const hasVehicleData =
+                String(executor.vehicleBrand || "").trim() &&
+                String(executor.vehicleModel || "").trim() &&
+                String(executor.vehicleColor || "").trim() &&
+                String(executor.vehiclePlate || "").trim();
+
+            if (!hasVehicleData) {
+                await t.rollback();
+
+                return res.status(403).json({
+                    success: false,
+                    code: "TAXI_VEHICLE_REQUIRED",
+                    message:
+                        "Чтобы принимать заказы такси, сначала добавьте данные автомобиля в профиле в разделе «Верификация».",
+                });
+            }
+
+            if (
+                executor.vehicleVerificationStatus === "pending"
+            ) {
+                await t.rollback();
+
+                return res.status(403).json({
+                    success: false,
+                    code: "TAXI_VEHICLE_PENDING",
+                    message:
+                        "Данные автомобиля находятся на проверке. После одобрения администратором вы сможете принимать заказы такси.",
+                });
+            }
+
+            if (
+                executor.vehicleVerificationStatus === "rejected"
+            ) {
+                await t.rollback();
+
+                return res.status(403).json({
+                    success: false,
+                    code: "TAXI_VEHICLE_REJECTED",
+                    message:
+                        executor.vehicleVerificationNote
+                            ? `Автомобиль не прошёл проверку: ${executor.vehicleVerificationNote}`
+                            : "Автомобиль не прошёл проверку. Откройте профиль и исправьте данные.",
+                });
+            }
+
+            if (
+                executor.vehicleVerificationStatus !== "verified"
+            ) {
+                await t.rollback();
+
+                return res.status(403).json({
+                    success: false,
+                    code: "TAXI_VEHICLE_NOT_VERIFIED",
+                    message:
+                        "Для принятия заказов такси автомобиль должен быть подтверждён администратором.",
+                });
+            }
+        }
+
+        // ✅ 3) назначаем исполнителя
         // ✅ 3) назначаем исполнителя
         order.executorId = executorId;
         order.status = "accepted";
-        await order.save({ transaction: t });
+
+        /*
+         * Для такси сохраняем снимок данных автомобиля
+         * на момент принятия заказа.
+         */
+        if (order.type === "taxi") {
+            order.executorVehicleBrand =
+                executor.vehicleBrand;
+
+            order.executorVehicleModel =
+                executor.vehicleModel;
+
+            order.executorVehicleColor =
+                executor.vehicleColor;
+
+            order.executorVehiclePlate =
+                executor.vehiclePlate;
+
+            order.executorVehiclePhoto =
+                executor.vehiclePhoto || null;
+        }
+
+        await order.save({
+            transaction: t,
+        });
 
 
 
@@ -1180,6 +1371,22 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
 
                 commissionStatus:
                 order.commissionStatus,
+
+                ...(order.type === "taxi"
+                    ? {
+                        vehicleBrand:
+                        order.executorVehicleBrand,
+
+                        vehicleModel:
+                        order.executorVehicleModel,
+
+                        vehicleColor:
+                        order.executorVehicleColor,
+
+                        vehiclePlate:
+                        order.executorVehiclePlate,
+                    }
+                    : {}),
             },
         });
 
@@ -1190,21 +1397,82 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
         emitExpressAccepted(io, order);
 
         try {
+
+            let notificationTitle =
+                "Экспресс-заказ принят";
+
+            let notificationBody =
+                `Исполнитель принял ваш ${
+                    order.type === "taxi"
+                        ? "заказ такси"
+                        : "курьерский заказ"
+                } №${order.id}`;
+
+            if (order.type === "taxi") {
+                const vehicleName = [
+                    order.executorVehicleColor,
+                    order.executorVehicleBrand,
+                    order.executorVehicleModel,
+                ]
+                    .filter(Boolean)
+                    .join(" ");
+
+                notificationTitle =
+                    "Водитель принял заказ";
+
+                notificationBody =
+                    `К вам приедет ${vehicleName}, ${
+                        order.executorVehiclePlate
+                    }.`;
+            }
+
             await notifyUser({
                 userId: order.creatorId,
+
                 type: "express_status_changed",
-                title: "Экспресс-заказ принят",
-                body: `Исполнитель принял ваш ${
-                    order.type === "taxi" ? "заказ такси" : "курьерский заказ"
-                } №${order.id}`,
-                orderId: order.id,
-                orderType: "express",
+
+                title:
+                notificationTitle,
+
+                body:
+                notificationBody,
+
+                orderId:
+                order.id,
+
+                orderType:
+                    "express",
+
                 data: {
-                    creatorId: order.creatorId,
-                    executorId: order.executorId,
-                    expressType: order.type,
-                    type: order.type,
-                    status: order.status,
+                    creatorId:
+                    order.creatorId,
+
+                    executorId:
+                    order.executorId,
+
+                    expressType:
+                    order.type,
+
+                    type:
+                    order.type,
+
+                    status:
+                    order.status,
+
+                    vehicleBrand:
+                    order.executorVehicleBrand,
+
+                    vehicleModel:
+                    order.executorVehicleModel,
+
+                    vehicleColor:
+                    order.executorVehicleColor,
+
+                    vehiclePlate:
+                    order.executorVehiclePlate,
+
+                    vehiclePhoto:
+                    order.executorVehiclePhoto,
                 },
             });
         } catch (notifyError) {
@@ -1252,6 +1520,23 @@ router.post("/express-orders/:id/on-the-way", authenticateToken, async (req, res
         order.status = "on_the_way_to_A";
         await order.save();
 
+        const vehicleName = [
+            order.executorVehicleColor,
+            order.executorVehicleBrand,
+            order.executorVehicleModel,
+        ]
+            .filter(Boolean)
+            .join(" ");
+
+        const body =
+            order.type === "taxi"
+                ? `Водитель выехал к вам. ${vehicleName}${
+                    order.executorVehiclePlate
+                        ? `, ${order.executorVehiclePlate}`
+                        : ""
+                }.`
+                : `Курьер выехал к точке A по заказу №${order.id}.`;
+
         const io = req.app.locals.io;
 
         emitExpressStatusToParticipants(io, order, {
@@ -1263,19 +1548,39 @@ router.post("/express-orders/:id/on-the-way", authenticateToken, async (req, res
 
         await notifyUser({
             userId: order.creatorId,
+
             type: "express_status_changed",
-            title: order.type === "taxi" ? "Водитель в пути" : "Курьер в пути",
-            body: order.type === "taxi"
-                ? `Водитель выехал к вам по заказу №${order.id}`
-                : `Курьер выехал к точке A по заказу №${order.id}`,
+
+            title:
+                order.type === "taxi"
+                    ? "Водитель выехал"
+                    : "Курьер выехал",
+
+            body,
+
             orderId: order.id,
             orderType: "express",
+
             data: {
                 creatorId: order.creatorId,
                 executorId: order.executorId,
+
                 expressType: order.type,
                 type: order.type,
+
                 status: order.status,
+
+                vehicleBrand:
+                order.executorVehicleBrand,
+
+                vehicleModel:
+                order.executorVehicleModel,
+
+                vehicleColor:
+                order.executorVehicleColor,
+
+                vehiclePlate:
+                order.executorVehiclePlate,
             },
         });
 
@@ -1352,19 +1657,58 @@ router.post("/express-orders/:id/arrived", authenticateToken, async (req, res) =
                 ? "Выходите, водитель прибыл к точке A"
                 : "Курьер прибыл к точке A. Передайте посылку";
 
+        const vehicleName = [
+            order.executorVehicleColor,
+            order.executorVehicleBrand,
+            order.executorVehicleModel,
+        ]
+            .filter(Boolean)
+            .join(" ");
+
+        const body =
+            order.type === "taxi"
+                ? `${vehicleName || "Автомобиль"}${
+                    order.executorVehiclePlate
+                        ? `, ${order.executorVehiclePlate}`
+                        : ""
+                } ожидает вас в точке посадки.`
+                : `Курьер прибыл в точку A по заказу №${order.id}.`;
+
         await notifyUser({
             userId: order.creatorId,
+
             type: "express_arrived",
-            title: arrivedTitle,
-            body: arrivedBody,
+
+            title:
+                order.type === "taxi"
+                    ? "Водитель приехал"
+                    : "Курьер прибыл",
+
+            body,
+
             orderId: order.id,
             orderType: "express",
+
             data: {
                 creatorId: order.creatorId,
                 executorId: order.executorId,
+
                 expressType: order.type,
+                type: order.type,
+
                 status: order.status,
-                arrivedAt: order.arrivedAt,
+
+                vehicleBrand:
+                order.executorVehicleBrand,
+
+                vehicleModel:
+                order.executorVehicleModel,
+
+                vehicleColor:
+                order.executorVehicleColor,
+
+                vehiclePlate:
+                order.executorVehiclePlate,
             },
         });
 

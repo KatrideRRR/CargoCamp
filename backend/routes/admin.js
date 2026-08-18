@@ -3,8 +3,7 @@ const { authMiddleware, adminMiddleware } = require('../middlewares/adminAuth');
 const jwt = require('jsonwebtoken');
 const NodeGeocoder = require("node-geocoder");
 const { Op } = require("sequelize");
-const fs = require("fs");
-const path = require("path");
+const { notifyUser } = require("../services/notificationService");
 const { User, Message, Order, ExpressOrder, Category, Subcategory, Dispute, ActionLog, sequelize, Service,} = require("../models");
 const bcrypt = require("bcrypt");
 const {
@@ -2347,5 +2346,304 @@ router.get("/express-orders/:id/logs", authMiddleware, adminMiddleware, async (r
         res.status(500).json({ message: "Ошибка сервера" });
     }
 });
+
+router.put("/users/:id/vehicle-verification", authMiddleware, adminMiddleware, async (req, res) => {
+        try {
+            const userId = Number(req.params.id);
+
+            const {
+                status,
+                note,
+            } = req.body;
+
+            if (
+                !Number.isFinite(userId) ||
+                userId <= 0
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Некорректный ID пользователя",
+                });
+            }
+
+            if (
+                !["verified", "rejected"].includes(status)
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Допустимые статусы: verified или rejected",
+                });
+            }
+
+            const user = await User.findByPk(userId);
+
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Пользователь не найден",
+                });
+            }
+
+            /*
+             * Одобрить машину можно только если
+             * основные обязательные данные заполнены.
+             */
+            const requiredVehicleFields = [
+                user.vehicleBrand,
+                user.vehicleModel,
+                user.vehicleColor,
+                user.vehiclePlate,
+            ];
+
+            const hasAllRequiredVehicleData =
+                requiredVehicleFields.every(
+                    (value) =>
+                        String(value || "").trim().length > 0
+                );
+
+            if (!hasAllRequiredVehicleData) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Нельзя подтвердить автомобиль: не заполнены обязательные данные",
+                });
+            }
+
+            if (status === "rejected") {
+                const cleanNote =
+                    String(note || "").trim();
+
+                if (cleanNote.length < 3) {
+                    return res.status(400).json({
+                        success: false,
+                        message:
+                            "Укажите причину отклонения автомобиля",
+                    });
+                }
+
+                user.vehicleVerificationStatus =
+                    "rejected";
+
+                user.vehicleVerificationNote =
+                    cleanNote;
+            } else {
+                user.vehicleVerificationStatus =
+                    "verified";
+
+                user.vehicleVerificationNote =
+                    null;
+            }
+
+            await user.save();
+
+            try {
+                if (status === "verified") {
+                    await notifyUser({
+                        userId: user.id,
+
+                        type: "vehicle_verification",
+
+                        title: "Автомобиль подтверждён",
+
+                        body:
+                            "Ваш автомобиль прошёл проверку. Теперь вы можете принимать заказы такси.",
+
+                        orderType: "regular",
+
+                        data: {
+                            vehicleVerificationStatus:
+                                "verified",
+
+                            vehicleBrand:
+                            user.vehicleBrand,
+
+                            vehicleModel:
+                            user.vehicleModel,
+
+                            vehicleColor:
+                            user.vehicleColor,
+
+                            vehiclePlate:
+                            user.vehiclePlate,
+                        },
+                    });
+                }
+
+                if (status === "rejected") {
+                    await notifyUser({
+                        userId: user.id,
+
+                        type: "vehicle_verification",
+
+                        title:
+                            "Автомобиль не прошёл проверку",
+
+                        body:
+                            user.vehicleVerificationNote
+                                ? `Причина: ${user.vehicleVerificationNote}`
+                                : "Проверьте данные автомобиля и отправьте их повторно.",
+
+                        orderType: "regular",
+
+                        data: {
+                            vehicleVerificationStatus:
+                                "rejected",
+
+                            vehicleVerificationNote:
+                                user.vehicleVerificationNote || null,
+
+                            vehicleBrand:
+                            user.vehicleBrand,
+
+                            vehicleModel:
+                            user.vehicleModel,
+
+                            vehicleColor:
+                            user.vehicleColor,
+
+                            vehiclePlate:
+                            user.vehiclePlate,
+                        },
+                    });
+                }
+            } catch (notifyError) {
+                console.error(
+                    "vehicle verification notify error:",
+                    notifyError
+                );
+            }
+
+            return res.json({
+                success: true,
+
+                message:
+                    status === "verified"
+                        ? "Автомобиль подтверждён"
+                        : "Автомобиль отклонён",
+
+                user: {
+                    id: user.id,
+
+                    vehicleBrand:
+                    user.vehicleBrand,
+
+                    vehicleModel:
+                    user.vehicleModel,
+
+                    vehicleColor:
+                    user.vehicleColor,
+
+                    vehiclePlate:
+                    user.vehiclePlate,
+
+                    vehicleYear:
+                    user.vehicleYear,
+
+                    vehiclePhoto:
+                    user.vehiclePhoto,
+
+                    vehicleVerificationStatus:
+                    user.vehicleVerificationStatus,
+
+                    vehicleVerificationNote:
+                    user.vehicleVerificationNote,
+                },
+            });
+        } catch (error) {
+            console.error(
+                "Ошибка проверки автомобиля:",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                message:
+                    "Не удалось изменить статус проверки автомобиля",
+            });
+        }
+    });
+
+router.delete("/users/:id/vehicle", authMiddleware, adminMiddleware, async (req, res) => {
+        try {
+            const user =
+                await User.findByPk(
+                    req.params.id
+                );
+
+            if (!user) {
+                return res
+                    .status(404)
+                    .json({
+                        success: false,
+                        message:
+                            "Пользователь не найден",
+                    });
+            }
+
+            user.vehicleBrand = null;
+            user.vehicleModel = null;
+            user.vehicleColor = null;
+            user.vehiclePlate = null;
+            user.vehicleYear = null;
+            user.vehiclePhoto = null;
+
+            user.vehicleVerificationStatus =
+                "none";
+
+            user.vehicleVerificationNote =
+                null;
+
+            await user.save();
+
+            return res.json({
+                success: true,
+
+                message:
+                    "Автомобиль удалён",
+
+                user: {
+                    id: user.id,
+
+                    vehicleBrand:
+                    user.vehicleBrand,
+
+                    vehicleModel:
+                    user.vehicleModel,
+
+                    vehicleColor:
+                    user.vehicleColor,
+
+                    vehiclePlate:
+                    user.vehiclePlate,
+
+                    vehicleYear:
+                    user.vehicleYear,
+
+                    vehiclePhoto:
+                    user.vehiclePhoto,
+
+                    vehicleVerificationStatus:
+                    user.vehicleVerificationStatus,
+
+                    vehicleVerificationNote:
+                    user.vehicleVerificationNote,
+                },
+            });
+        } catch (error) {
+            console.error(
+                "admin remove vehicle error:",
+                error
+            );
+
+            return res
+                .status(500)
+                .json({
+                    success: false,
+                    message:
+                        "Не удалось удалить автомобиль",
+                });
+        }
+    });
 
 module.exports = router;

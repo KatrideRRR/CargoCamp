@@ -21,6 +21,36 @@ module.exports = (sequelize, DataTypes) => {
                 field: 'executor_id',
             },
 
+            executorVehicleBrand: {
+                type: DataTypes.STRING(100),
+                allowNull: true,
+                field: "executor_vehicle_brand",
+            },
+
+            executorVehicleModel: {
+                type: DataTypes.STRING(100),
+                allowNull: true,
+                field: "executor_vehicle_model",
+            },
+
+            executorVehicleColor: {
+                type: DataTypes.STRING(100),
+                allowNull: true,
+                field: "executor_vehicle_color",
+            },
+
+            executorVehiclePlate: {
+                type: DataTypes.STRING(30),
+                allowNull: true,
+                field: "executor_vehicle_plate",
+            },
+
+            executorVehiclePhoto: {
+                type: DataTypes.STRING(255),
+                allowNull: true,
+                field: "executor_vehicle_photo",
+            },
+
             /* === Тип заказа === */
             type: {
                 type: DataTypes.ENUM('taxi', 'courier'),

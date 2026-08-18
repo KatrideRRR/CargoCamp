@@ -24,6 +24,28 @@ const apiUrl = process.env.REACT_APP_API_URL;
 // Включать только если нужны демо-скрины привязки карты без реальной ЮKassa
 const CARD_BIND_SCREENSHOT_MODE = false;
 
+function buildFileUrl(path) {
+    if (!path) {
+        return "";
+    }
+
+    const value =
+        String(path).trim();
+
+    if (
+        /^https?:\/\//i.test(value)
+    ) {
+        return value;
+    }
+
+    const normalizedPath =
+        value.startsWith("/")
+            ? value
+            : `/${value}`;
+
+    return `${apiUrl}${normalizedPath}`;
+}
+
 function looksLikeCoordsString(v) {
     if (!v) return false;
 
@@ -169,6 +191,26 @@ const ProfilePage = () => {
     const [selectedPremiumProvider, setSelectedPremiumProvider] = useState("yookassa");
     const [selectedDebtProvider, setSelectedDebtProvider] = useState("yookassa");
 
+    const [vehicleForm, setVehicleForm] = useState({
+        vehicleBrand: "",
+        vehicleModel: "",
+        vehicleColor: "",
+        vehiclePlate: "",
+        vehicleYear: "",
+    });
+
+    const [vehicleSaving, setVehicleSaving] =
+        useState(false);
+
+    const [vehiclePhotoUploading, setVehiclePhotoUploading] =
+        useState(false);
+
+    const [identityVerificationOpen, setIdentityVerificationOpen] =
+        useState(false);
+
+    const [vehicleVerificationOpen, setVehicleVerificationOpen] =
+        useState(false);
+
     // Только для демо-режима
     const [demoCardBound, setDemoCardBound] = useState(false);
     const [demoCardData, setDemoCardData] = useState({
@@ -249,11 +291,76 @@ const ProfilePage = () => {
             return null;
         }
 
-        const response = await axios.get(`${apiUrl}/api/auth/profile`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
+        const response =
+            await axios.get(
+                `${apiUrl}/api/auth/profile`,
+                {
+                    headers: {
+                        Authorization:
+                            `Bearer ${token}`,
+                    },
+                }
+            );
 
-        setProfile(response.data);
+        const raw =
+            response.data || {};
+
+        const normalizedProfile = {
+            ...raw,
+
+            vehicleBrand:
+                raw.vehicleBrand ??
+                raw.vehicle_brand ??
+                null,
+
+            vehicleModel:
+                raw.vehicleModel ??
+                raw.vehicle_model ??
+                null,
+
+            vehicleColor:
+                raw.vehicleColor ??
+                raw.vehicle_color ??
+                null,
+
+            vehiclePlate:
+                raw.vehiclePlate ??
+                raw.vehicle_plate ??
+                null,
+
+            vehicleYear:
+                raw.vehicleYear ??
+                raw.vehicle_year ??
+                null,
+
+            vehiclePhoto:
+                raw.vehiclePhoto ??
+                raw.vehicle_photo ??
+                null,
+
+            vehicleVerificationStatus:
+                raw.vehicleVerificationStatus ??
+                raw.vehicle_verification_status ??
+                "none",
+
+            vehicleVerificationNote:
+                raw.vehicleVerificationNote ??
+                raw.vehicle_verification_note ??
+                null,
+        };
+
+        setProfile(
+            normalizedProfile
+        );
+
+        setPaymentMethodId(
+            normalizedProfile
+                .yookassaPaymentMethodId ||
+            null
+        );
+
+        return normalizedProfile;
+
         setPaymentMethodId(response.data.yookassaPaymentMethodId || null);
 
         return response.data;
@@ -368,6 +475,188 @@ const ProfilePage = () => {
             }
         }
     };
+
+    const saveVehicle = async () => {
+        const token =
+            localStorage.getItem("authToken");
+
+        if (!token) {
+            toast.error("Вы не авторизованы");
+            return;
+        }
+
+        const brand =
+            vehicleForm.vehicleBrand.trim();
+
+        const model =
+            vehicleForm.vehicleModel.trim();
+
+        const color =
+            vehicleForm.vehicleColor.trim();
+
+        const plate =
+            vehicleForm.vehiclePlate.trim();
+
+        if (!brand) {
+            toast.error("Укажите марку автомобиля");
+            return;
+        }
+
+        if (!model) {
+            toast.error("Укажите модель автомобиля");
+            return;
+        }
+
+        if (!color) {
+            toast.error("Укажите цвет автомобиля");
+            return;
+        }
+
+        if (!plate) {
+            toast.error("Укажите госномер автомобиля");
+            return;
+        }
+
+        try {
+            setVehicleSaving(true);
+
+            const res = await axios.post(
+                `${apiUrl}/api/auth/vehicle/me`,
+                {
+                    vehicleBrand: brand,
+                    vehicleModel: model,
+                    vehicleColor: color,
+                    vehiclePlate: plate,
+                    vehicleYear:
+                        vehicleForm.vehicleYear || null,
+                },
+                {
+                    headers: {
+                        Authorization:
+                            `Bearer ${token}`,
+                    },
+                }
+            );
+
+            toast.success(
+                res.data?.message ||
+                "Автомобиль отправлен на проверку"
+            );
+
+            setProfile((prev) => ({
+                ...prev,
+                ...res.data.vehicle,
+            }));
+        } catch (error) {
+            console.error(
+                "Ошибка сохранения автомобиля:",
+                error
+            );
+
+            toast.error(
+                error.response?.data?.message ||
+                "Не удалось сохранить автомобиль"
+            );
+        } finally {
+            setVehicleSaving(false);
+        }
+    };
+
+    const uploadVehiclePhoto = async (file) => {
+        if (!file) return;
+
+        const token =
+            localStorage.getItem("authToken");
+
+        if (!token) {
+            toast.error("Вы не авторизованы");
+            return;
+        }
+
+        const formData = new FormData();
+
+        formData.append(
+            "vehiclePhoto",
+            file
+        );
+
+        try {
+            setVehiclePhotoUploading(true);
+
+            const res = await axios.post(
+                `${apiUrl}/api/auth/vehicle/photo`,
+                formData,
+                {
+                    headers: {
+                        Authorization:
+                            `Bearer ${token}`,
+                        "Content-Type":
+                            "multipart/form-data",
+                    },
+                }
+            );
+
+            toast.success(
+                "Фото автомобиля загружено"
+            );
+
+            const uploadedPhoto =
+                res.data?.vehiclePhoto ||
+                res.data?.vehicle?.vehiclePhoto ||
+                null;
+
+            if (!uploadedPhoto) {
+                throw new Error(
+                    "Сервер не вернул путь к фотографии"
+                );
+            }
+
+            setProfile((prev) => ({
+                ...prev,
+
+                vehiclePhoto:
+                uploadedPhoto,
+            }));
+        } catch (error) {
+            console.error(
+                "Ошибка загрузки фото автомобиля:",
+                error
+            );
+
+            toast.error(
+                error.response?.data?.message ||
+                "Не удалось загрузить фото автомобиля"
+            );
+        } finally {
+            setVehiclePhotoUploading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!profile) return;
+
+        setVehicleForm({
+            vehicleBrand:
+                profile.vehicleBrand || "",
+            vehicleModel:
+                profile.vehicleModel || "",
+            vehicleColor:
+                profile.vehicleColor || "",
+            vehiclePlate:
+                profile.vehiclePlate || "",
+            vehicleYear:
+                profile.vehicleYear
+                    ? String(profile.vehicleYear)
+                    : "",
+        });
+    }, [
+        profile?.id,
+        profile?.vehicleBrand,
+        profile?.vehicleModel,
+        profile?.vehicleColor,
+        profile?.vehiclePlate,
+        profile?.vehicleYear,
+    ]);
 
     useEffect(() => {
         return () => {
@@ -960,6 +1249,76 @@ const ProfilePage = () => {
         }
     };
 
+    useEffect(() => {
+        if (!profile) {
+            return;
+        }
+
+        const params =
+            new URLSearchParams(
+                window.location.search
+            );
+
+        const targetSection =
+            params.get("section");
+
+        /*
+         * Если пришли именно из модалки
+         * "добавьте автомобиль".
+         */
+        if (
+            targetSection ===
+            "verification"
+        ) {
+            setVehicleVerificationOpen(true);
+
+            const timer =
+                setTimeout(() => {
+                    document
+                        .getElementById(
+                            "vehicle-verification-section"
+                        )
+                        ?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "center",
+                        });
+
+                    /*
+                     * Сразу убираем section,
+                     * чтобы следующий вход
+                     * в профиль был обычным.
+                     */
+                    params.delete("section");
+
+                    const query =
+                        params.toString();
+
+                    window.history.replaceState(
+                        {},
+                        "",
+                        `${window.location.pathname}${
+                            query
+                                ? `?${query}`
+                                : ""
+                        }`
+                    );
+                }, 300);
+
+            return () =>
+                clearTimeout(timer);
+        }
+
+        /*
+         * Обычное открытие профиля:
+         * всегда начинаем сверху.
+         */
+        window.scrollTo({
+            top: 0,
+            left: 0,
+            behavior: "auto",
+        });
+    }, [profile?.id]);
+
     const handleBindCard = async () => {
         if (CARD_BIND_SCREENSHOT_MODE) {
             setDemoCardBound(true);
@@ -1166,6 +1525,24 @@ const ProfilePage = () => {
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    const vehicleVerificationStatusText = (() => {
+        switch (
+            profile?.vehicleVerificationStatus
+            ) {
+            case "pending":
+                return "Ожидает проверки";
+
+            case "verified":
+                return "Автомобиль подтверждён";
+
+            case "rejected":
+                return "Проверка не пройдена";
+
+            default:
+                return "Автомобиль не добавлен";
+        }
+    })();
 
     if (loading) {
         return (
@@ -1425,110 +1802,574 @@ const ProfilePage = () => {
                     </div>
                 </div>
 
-                <div className="profile-card glass">
+                <div className="profile-card glass profile-verification-card">
                     <div className="card-head">
                         <div>
-                            <h2 className="card-title">Верификация</h2>
-                            <p
-                                className={`card-subtitle status-${
-                                    profile?.userStatus || "unknown"
-                                }`}
-                            >
-                                {verificationText}
+                            <h2 className="card-title">
+                                Верификация
+                            </h2>
+
+                            <p className="card-subtitle">
+                                Подтверждение личности и данных для работы в такси
                             </p>
                         </div>
 
                         <button
+                            type="button"
                             className="profile-chip"
-                            onClick={() => setShowVerificationModal(true)}
+                            onClick={() =>
+                                setShowVerificationModal(true)
+                            }
                         >
                             Подробнее
                         </button>
                     </div>
 
-                    <label className="upload-glass">
-                        <input
-                            type="file"
-                            multiple
-                            accept="image/*,.pdf"
-                            onChange={(e) => handleAutoUpload(e.target.files)}
-                            style={{ display: "none" }}
-                        />
-                        <span>Загрузить документы</span>
-                    </label>
+                    <div className="verification-sections">
 
-                    {Array.isArray(profile?.documentPhotos) &&
-                    profile.documentPhotos.length > 0 ? (
-                        <div className="docs-block">
-                            <div className="docs-head">
-                                <div className="docs-title">
-                                    Загруженные документы
-                                </div>
+                        {/* =========================
+            ЛИЧНЫЕ ДОКУМЕНТЫ
+        ========================= */}
 
-                                <div className="docs-count">
-                                    {profile.documentPhotos.length} шт.
-                                </div>
-                            </div>
-
-                            <div className="docs-grid">
-                                {visibleDocuments.map((p, idx) => {
-                                    const isPdf = String(p)
-                                        .toLowerCase()
-                                        .endsWith(".pdf");
-
-                                    const url = p.startsWith("http")
-                                        ? p
-                                        : `${apiUrl}${p}`;
-
-                                    return (
-                                        <a
-                                            key={`${p}-${idx}`}
-                                            className="doc-tile"
-                                            href={url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            title="Открыть"
-                                        >
-                                            {isPdf ? (
-                                                <div className="doc-pdf">
-                                                    <div className="doc-pdf-badge">
-                                                        PDF
-                                                    </div>
-                                                    <div className="doc-name">
-                                                        Документ {idx + 1}
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <img
-                                                        className="doc-img"
-                                                        src={url}
-                                                        alt={`Документ ${idx + 1}`}
-                                                        loading="lazy"
-                                                    />
-                                                    <div className="doc-name">
-                                                        Фото {idx + 1}
-                                                    </div>
-                                                </>
-                                            )}
-                                        </a>
-                                    );
-                                })}
-                            </div>
-
-                            {profile.documentPhotos.length >
-                                visibleDocuments.length && (
-                                    <div className="docs-empty">
-                                        Показаны первые {visibleDocuments.length} из{" "}
-                                        {profile.documentPhotos.length}
+                        <div className="verification-panel">
+                            <button
+                                type="button"
+                                className="verification-panel-head"
+                                onClick={() =>
+                                    setIdentityVerificationOpen(
+                                        (prev) => !prev
+                                    )
+                                }
+                                aria-expanded={
+                                    identityVerificationOpen
+                                }
+                            >
+                                <div className="verification-panel-head-main">
+                                    <div className="verification-panel-icon">
+                                        👤
                                     </div>
-                                )}
+
+                                    <div className="verification-panel-heading">
+                                        <div className="verification-panel-title">
+                                            Подтверждение личности
+                                        </div>
+
+                                        <div className="verification-panel-subtitle">
+                                            Паспорт или другой документ,
+                                            удостоверяющий личность
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="verification-panel-head-side">
+                    <span
+                        className={`verification-summary-status ${
+                            profile?.userStatus === "verified"
+                                ? "verified"
+                                : profile?.userStatus === "pensioner"
+                                    ? "verified"
+                                    : "empty"
+                        }`}
+                    >
+                        {verificationText}
+                    </span>
+
+                                    <span
+                                        className={`verification-chevron ${
+                                            identityVerificationOpen
+                                                ? "open"
+                                                : ""
+                                        }`}
+                                    >
+                        ›
+                    </span>
+                                </div>
+                            </button>
+
+                            {identityVerificationOpen && (
+                                <div className="verification-panel-content">
+                                    <div className="verification-info-box">
+                                        <strong>
+                                            Верификация пользователя
+                                        </strong>
+
+                                        <span>
+                            Загрузите документ, удостоверяющий
+                            личность. Проверка выполняется
+                            администратором вручную.
+                        </span>
+                                    </div>
+
+                                    <label className="upload-glass">
+                                        <input
+                                            type="file"
+                                            multiple
+                                            accept="image/*,.pdf"
+                                            onChange={(e) =>
+                                                handleAutoUpload(
+                                                    e.target.files
+                                                )
+                                            }
+                                            style={{
+                                                display: "none",
+                                            }}
+                                        />
+
+                                        <span>
+                            Загрузить документы
+                        </span>
+                                    </label>
+
+                                    {Array.isArray(
+                                        profile?.documentPhotos
+                                    ) &&
+                                    profile.documentPhotos.length >
+                                    0 ? (
+                                        <div className="docs-block">
+                                            <div className="docs-head">
+                                                <div className="docs-title">
+                                                    Загруженные документы
+                                                </div>
+
+                                                <div className="docs-count">
+                                                    {
+                                                        profile
+                                                            .documentPhotos
+                                                            .length
+                                                    }{" "}
+                                                    шт.
+                                                </div>
+                                            </div>
+
+                                            <div className="docs-grid">
+                                                {visibleDocuments.map(
+                                                    (p, idx) => {
+                                                        const isPdf =
+                                                            String(p)
+                                                                .toLowerCase()
+                                                                .endsWith(
+                                                                    ".pdf"
+                                                                );
+
+                                                        const url =
+                                                            p.startsWith(
+                                                                "http"
+                                                            )
+                                                                ? p
+                                                                : `${apiUrl}${p}`;
+
+                                                        return (
+                                                            <a
+                                                                key={`${p}-${idx}`}
+                                                                className="doc-tile"
+                                                                href={url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                title="Открыть"
+                                                            >
+                                                                {isPdf ? (
+                                                                    <div className="doc-pdf">
+                                                                        <div className="doc-pdf-badge">
+                                                                            PDF
+                                                                        </div>
+
+                                                                        <div className="doc-name">
+                                                                            Документ{" "}
+                                                                            {idx +
+                                                                                1}
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <>
+                                                                        <img
+                                                                            className="doc-img"
+                                                                            src={
+                                                                                url
+                                                                            }
+                                                                            alt={`Документ ${
+                                                                                idx +
+                                                                                1
+                                                                            }`}
+                                                                            loading="lazy"
+                                                                        />
+
+                                                                        <div className="doc-name">
+                                                                            Фото{" "}
+                                                                            {idx +
+                                                                                1}
+                                                                        </div>
+                                                                    </>
+                                                                )}
+                                                            </a>
+                                                        );
+                                                    }
+                                                )}
+                                            </div>
+
+                                            {profile.documentPhotos
+                                                    .length >
+                                                visibleDocuments.length && (
+                                                    <div className="docs-empty">
+                                                        Показаны первые{" "}
+                                                        {
+                                                            visibleDocuments.length
+                                                        }{" "}
+                                                        из{" "}
+                                                        {
+                                                            profile
+                                                                .documentPhotos
+                                                                .length
+                                                        }
+                                                    </div>
+                                                )}
+                                        </div>
+                                    ) : (
+                                        <div className="verification-empty-text">
+                                            Документы ещё не загружены
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                    ) : (
-                        <div className="docs-empty">
-                            Документы ещё не загружены
+
+                        {/* =========================
+            АВТОМОБИЛЬ
+        ========================= */}
+
+                        <div
+                            id="vehicle-verification-section"
+                            className="verification-panel verification-panel-vehicle"
+                        >
+                            <button
+                                type="button"
+                                className="verification-panel-head"
+                                onClick={() =>
+                                    setVehicleVerificationOpen(
+                                        (prev) => !prev
+                                    )
+                                }
+                                aria-expanded={
+                                    vehicleVerificationOpen
+                                }
+                            >
+                                <div className="verification-panel-head-main">
+                                    <div className="verification-panel-icon verification-panel-icon-car">
+                                        🚗
+                                    </div>
+
+                                    <div className="verification-panel-heading">
+                                        <div className="verification-panel-title">
+                                            Автомобиль для такси
+                                        </div>
+
+                                        <div className="verification-panel-subtitle">
+                                            {profile?.vehicleBrand ||
+                                            profile?.vehicleModel ||
+                                            profile?.vehiclePlate ? (
+                                                <>
+                                                    {[
+                                                        profile
+                                                            ?.vehicleColor,
+                                                        profile
+                                                            ?.vehicleBrand,
+                                                        profile
+                                                            ?.vehicleModel,
+                                                    ]
+                                                        .filter(Boolean)
+                                                        .join(" ")}
+
+                                                    {profile
+                                                        ?.vehiclePlate
+                                                        ? ` · ${profile.vehiclePlate}`
+                                                        : ""}
+                                                </>
+                                            ) : (
+                                                "Добавьте автомобиль, чтобы принимать заказы такси"
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="verification-panel-head-side">
+                    <span
+                        className={`vehicle-status vehicle-status-${
+                            profile?.vehicleVerificationStatus ||
+                            "none"
+                        }`}
+                    >
+                        {
+                            vehicleVerificationStatusText
+                        }
+                    </span>
+
+                                    <span
+                                        className={`verification-chevron ${
+                                            vehicleVerificationOpen
+                                                ? "open"
+                                                : ""
+                                        }`}
+                                    >
+                        ›
+                    </span>
+                                </div>
+                            </button>
+
+                            {vehicleVerificationOpen && (
+                                <div className="verification-panel-content">
+                                    <div className="vehicle-verification-intro">
+                                        <strong>
+                                            Данные автомобиля
+                                        </strong>
+
+                                        <span>
+                            Для курьерских заказов автомобиль
+                            не требуется. Для заказов такси
+                            автомобиль должен быть подтверждён
+                            администратором.
+                        </span>
+                                    </div>
+
+                                    {profile?.vehicleVerificationStatus ===
+                                        "rejected" &&
+                                        profile?.vehicleVerificationNote && (
+                                            <div className="vehicle-rejected-note">
+                                                <strong>
+                                                    Причина отказа:
+                                                </strong>{" "}
+                                                {
+                                                    profile
+                                                        .vehicleVerificationNote
+                                                }
+                                            </div>
+                                        )}
+
+                                    {profile?.vehicleVerificationStatus ===
+                                        "pending" && (
+                                            <div className="vehicle-pending-note">
+                                                Данные автомобиля отправлены
+                                                администратору. До подтверждения
+                                                принимать заказы такси нельзя.
+                                            </div>
+                                        )}
+
+                                    {profile?.vehicleVerificationStatus ===
+                                        "verified" && (
+                                            <div className="vehicle-verified-note">
+                                                <strong>
+                                                    ✓ Автомобиль подтверждён
+                                                </strong>
+
+                                                <span>
+                                Вы можете принимать заказы
+                                такси. Если изменить данные,
+                                потребуется повторная проверка.
+                            </span>
+                                            </div>
+                                        )}
+
+                                    <div className="vehicle-form-grid">
+                                        <label className="vehicle-field">
+                                            <span>Марка *</span>
+
+                                            <input
+                                                type="text"
+                                                value={
+                                                    vehicleForm.vehicleBrand
+                                                }
+                                                onChange={(e) =>
+                                                    setVehicleForm(
+                                                        (prev) => ({
+                                                            ...prev,
+                                                            vehicleBrand:
+                                                            e.target
+                                                                .value,
+                                                        })
+                                                    )
+                                                }
+                                                placeholder="Toyota"
+                                                maxLength={100}
+                                            />
+                                        </label>
+
+                                        <label className="vehicle-field">
+                                            <span>Модель *</span>
+
+                                            <input
+                                                type="text"
+                                                value={
+                                                    vehicleForm.vehicleModel
+                                                }
+                                                onChange={(e) =>
+                                                    setVehicleForm(
+                                                        (prev) => ({
+                                                            ...prev,
+                                                            vehicleModel:
+                                                            e.target
+                                                                .value,
+                                                        })
+                                                    )
+                                                }
+                                                placeholder="Camry"
+                                                maxLength={100}
+                                            />
+                                        </label>
+
+                                        <label className="vehicle-field">
+                                            <span>Цвет *</span>
+
+                                            <input
+                                                type="text"
+                                                value={
+                                                    vehicleForm.vehicleColor
+                                                }
+                                                onChange={(e) =>
+                                                    setVehicleForm(
+                                                        (prev) => ({
+                                                            ...prev,
+                                                            vehicleColor:
+                                                            e.target
+                                                                .value,
+                                                        })
+                                                    )
+                                                }
+                                                placeholder="Белый"
+                                                maxLength={100}
+                                            />
+                                        </label>
+
+                                        <label className="vehicle-field">
+                                            <span>Госномер *</span>
+
+                                            <input
+                                                type="text"
+                                                value={
+                                                    vehicleForm.vehiclePlate
+                                                }
+                                                onChange={(e) =>
+                                                    setVehicleForm(
+                                                        (prev) => ({
+                                                            ...prev,
+                                                            vehiclePlate:
+                                                                e.target.value.toUpperCase(),
+                                                        })
+                                                    )
+                                                }
+                                                placeholder="А123ВС82"
+                                                maxLength={30}
+                                            />
+                                        </label>
+
+                                        <label className="vehicle-field">
+                            <span>
+                                Год выпуска
+                            </span>
+
+                                            <input
+                                                type="number"
+                                                value={
+                                                    vehicleForm.vehicleYear
+                                                }
+                                                onChange={(e) =>
+                                                    setVehicleForm(
+                                                        (prev) => ({
+                                                            ...prev,
+                                                            vehicleYear:
+                                                            e.target
+                                                                .value,
+                                                        })
+                                                    )
+                                                }
+                                                placeholder="2020"
+                                                min="1950"
+                                                max={
+                                                    new Date().getFullYear() +
+                                                    1
+                                                }
+                                            />
+                                        </label>
+                                    </div>
+
+                                    <div className="vehicle-photo-block">
+                                        <div className="vehicle-photo-head">
+                                            <div>
+                                                <strong>
+                                                    Фото автомобиля
+                                                </strong>
+
+                                                <div className="vehicle-photo-hint">
+                                                    Загрузите фотографию,
+                                                    на которой хорошо видны
+                                                    автомобиль и государственный
+                                                    номер.
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {profile?.vehiclePhoto && (
+                                            <div className="vehicle-photo-preview">
+                                                <img
+                                                    src={buildFileUrl(
+                                                        profile.vehiclePhoto
+                                                    )}
+                                                    alt="Автомобиль"
+                                                />
+                                            </div>
+                                        )}
+
+                                        <label className="upload-glass vehicle-photo-upload">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                style={{
+                                                    display: "none",
+                                                }}
+                                                disabled={
+                                                    vehiclePhotoUploading
+                                                }
+                                                onChange={(e) => {
+                                                    const file =
+                                                        e.target.files?.[0];
+
+                                                    uploadVehiclePhoto(
+                                                        file
+                                                    );
+
+                                                    e.target.value = "";
+                                                }}
+                                            />
+
+                                            <span>
+                                {vehiclePhotoUploading
+                                    ? "Загрузка..."
+                                    : profile?.vehiclePhoto
+                                        ? "Изменить фото"
+                                        : "Загрузить фото автомобиля"}
+                            </span>
+                                        </label>
+                                    </div>
+
+                                    <div className="vehicle-verification-actions">
+                                        <button
+                                            type="button"
+                                            className="btn btn-primary"
+                                            disabled={
+                                                vehicleSaving ||
+                                                vehiclePhotoUploading
+                                            }
+                                            onClick={saveVehicle}
+                                        >
+                                            {vehicleSaving
+                                                ? "Сохраняем..."
+                                                : profile?.vehicleVerificationStatus ===
+                                                "verified"
+                                                    ? "Сохранить изменения"
+                                                    : "Отправить на проверку"}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    )}
+                    </div>
                 </div>
 
                 <div className="profile-card glass">

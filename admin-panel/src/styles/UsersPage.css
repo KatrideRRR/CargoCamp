@@ -383,3 +383,245 @@ body {
     color: #c92a2a;
     background: #fff5f5;
 }
+.admin-vehicle-cell {
+    min-width: 180px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.admin-vehicle-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #212529;
+}
+
+.admin-vehicle-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 11px;
+    color: #868e96;
+}
+
+.admin-vehicle-plate {
+    width: fit-content;
+    padding: 4px 8px;
+    border: 1px solid #adb5bd;
+    border-radius: 5px;
+    background: #fff;
+    color: #212529;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+}
+
+.admin-vehicle-status {
+    width: fit-content;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.admin-vehicle-status-none {
+    background: #f1f3f5;
+    color: #6c757d;
+}
+
+.admin-vehicle-status-pending {
+    background: #fff3bf;
+    color: #e67700;
+}
+
+.admin-vehicle-status-verified {
+    background: #d3f9d8;
+    color: #2b8a3e;
+}
+
+.admin-vehicle-status-rejected {
+    background: #ffe3e3;
+    color: #c92a2a;
+}
+
+.admin-vehicle-reject-note {
+    max-width: 220px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: #fff5f5;
+    color: #c92a2a;
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.admin-vehicle-photo-link {
+    width: fit-content;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1971c2;
+    text-decoration: none;
+}
+
+.admin-vehicle-photo-link:hover {
+    text-decoration: underline;
+}
+
+.admin-vehicle-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 3px;
+}
+
+.admin-vehicle-approve,
+.admin-vehicle-reject {
+    border: none;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.admin-vehicle-approve {
+    background: #2f9e44;
+    color: #fff;
+}
+
+.admin-vehicle-reject {
+    background: #fa5252;
+    color: #fff;
+}
+
+.admin-vehicle-approve:disabled,
+.admin-vehicle-reject:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.admin-vehicle-empty {
+    color: #adb5bd;
+    font-size: 12px;
+}
+
+.admin-vehicle-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.admin-vehicle-modal {
+    width: min(520px, 100%);
+    padding: 22px;
+
+    border-radius: 16px;
+    background: #fff;
+
+    box-shadow:
+            0 20px 60px
+            rgba(0, 0, 0, 0.25);
+}
+
+.admin-vehicle-modal h3 {
+    margin: 0 0 8px;
+}
+
+.admin-vehicle-modal p {
+    margin: 0 0 18px;
+    color: #6c757d;
+}
+
+.admin-vehicle-reason-label {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.admin-vehicle-reason-label textarea {
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+
+    padding: 11px 12px;
+
+    border: 1px solid #ced4da;
+    border-radius: 9px;
+
+    font-family: inherit;
+    font-size: 14px;
+}
+
+.admin-vehicle-reason-count {
+    margin-top: 5px;
+    text-align: right;
+
+    font-size: 11px;
+    color: #adb5bd;
+}
+
+.admin-vehicle-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+
+    margin-top: 18px;
+}
+
+.admin-vehicle-modal-cancel,
+.admin-vehicle-modal-reject {
+    border: none;
+    border-radius: 8px;
+    padding: 9px 14px;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.admin-vehicle-modal-cancel {
+    background: #f1f3f5;
+    color: #495057;
+}
+
+.admin-vehicle-modal-reject {
+    background: #e03131;
+    color: #fff;
+}
+
+.admin-vehicle-modal-reject:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.admin-vehicle-remove {
+    border: 1px solid rgba(220, 38, 38, 0.35);
+    border-radius: 8px;
+
+    padding: 7px 10px;
+
+    background: rgba(254, 242, 242, 0.95);
+    color: #b91c1c;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+.admin-vehicle-remove:hover {
+    background: rgba(254, 226, 226, 0.95);
+}
+
+.admin-vehicle-remove:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

@@ -122,20 +122,12 @@ const ExpressOrderCard = ({
     const actionLockRef = useRef(false);
 
     useEffect(() => {
-        if (!order?.id) return;
+        if (!order?.id) {
+            return;
+        }
+
         setLocalOrder(order);
-    }, [
-        order?.id,
-        order?.status,
-        order?.executorId,
-        order?.creatorId,
-        order?.updatedAt,
-        order?.completedAt,
-        order?.startedAt,
-        order?.arrivedAt,
-        order?.waitingStartedAt,
-        order?.pickedUpAt,
-    ]);
+    }, [order]);
 
     const currentOrder = localOrder || order;
 
@@ -430,6 +422,55 @@ const ExpressOrderCard = ({
 
     const hasDescription = description.length > 0;
 
+    const vehicleTitle = [
+        currentOrder.executorVehicleColor,
+        currentOrder.executorVehicleBrand,
+        currentOrder.executorVehicleModel,
+    ]
+        .filter(Boolean)
+        .join(" ");
+
+    const hasTaxiVehicle =
+        currentOrder.type === "taxi" &&
+        Boolean(currentOrder.executorId) &&
+        Boolean(
+            currentOrder.executorVehicleBrand ||
+            currentOrder.executorVehicleModel ||
+            currentOrder.executorVehicleColor ||
+            currentOrder.executorVehiclePlate ||
+            currentOrder.executorVehiclePhoto
+        );
+
+    console.log("TAXI VEHICLE DEBUG:", {
+        orderId: currentOrder.id,
+        type: currentOrder.type,
+        creatorId: currentOrder.creatorId,
+        executorId: currentOrder.executorId,
+
+        currentUserId: userId,
+        isCreator,
+
+        executorVehicleBrand:
+        currentOrder.executorVehicleBrand,
+
+        executorVehicleModel:
+        currentOrder.executorVehicleModel,
+
+        executorVehicleColor:
+        currentOrder.executorVehicleColor,
+
+        executorVehiclePlate:
+        currentOrder.executorVehiclePlate,
+
+        executorVehiclePhoto:
+        currentOrder.executorVehiclePhoto,
+
+        executor:
+        currentOrder.executor,
+
+        hasTaxiVehicle,
+    });
+
     return (
         <li className={`order-card express-card ${currentOrder.type === "taxi" ? "express-taxi" : "express-courier"}`}>
             <div className="order-header">
@@ -509,6 +550,51 @@ const ExpressOrderCard = ({
                 <div className="express-statusBar premium-statusBar">
                     {statusText}
                 </div>
+
+                {isCreator && hasTaxiVehicle && (
+                    <div className="express-driver-vehicle-card">
+                        <div className="express-driver-vehicle-head">
+                            <div className="express-driver-vehicle-icon">
+                                <FaCarSide />
+                            </div>
+
+                            <div>
+                                <div className="express-driver-vehicle-label">
+                                    К вам приедет
+                                </div>
+
+                                <div className="express-driver-vehicle-name">
+                                    {vehicleTitle || "Автомобиль водителя"}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="express-driver-vehicle-body">
+                            {currentOrder.executorVehiclePlate && (
+                                <div className="express-driver-plate">
+                                    {currentOrder.executorVehiclePlate}
+                                </div>
+                            )}
+
+                            {currentOrder.executorVehiclePhoto && (
+                                <div className="express-driver-vehicle-photo">
+                                    <img
+                                        src={
+                                            currentOrder.executorVehiclePhoto.startsWith("http")
+                                                ? currentOrder.executorVehiclePhoto
+                                                : `${process.env.REACT_APP_API_URL}${currentOrder.executorVehiclePhoto}`
+                                        }
+                                        alt="Автомобиль водителя"
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="express-driver-vehicle-hint">
+                            Сверьте марку, цвет и государственный номер перед посадкой.
+                        </div>
+                    </div>
+                )}
 
                 <div className="order-details">
                     <div className="express-ab premium-routeBox">
@@ -626,6 +712,7 @@ const ExpressOrderCard = ({
                     </p>
                 </div>
             </div>
+
         </li>
     );
 };

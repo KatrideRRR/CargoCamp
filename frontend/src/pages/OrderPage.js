@@ -5,6 +5,7 @@ import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import axiosInstance from "../utils/axiosInstance";
 import OrderServiceDetails from "../components/OrderServiceDetails";
 import { getOrderServiceDetails } from "../utils/orderServiceDetails";
+import TaxiVehicleGateModal from "../components/TaxiVehicleGateModal";
 import "../styles/OrdersPage.css";
 import Modal from "react-modal";
 import {
@@ -137,6 +138,11 @@ const OrderPage = () => {
     const [currentImages, setCurrentImages] = useState([]);
 
     const [acceptLoading, setAcceptLoading] = useState(false);
+
+    const [
+        vehicleGateModal,
+        setVehicleGateModal,
+    ] = useState(null);
 
     const [requestModalOpen, setRequestModalOpen] = useState(false);
     const [requestSum, setRequestSum] = useState("");
@@ -579,32 +585,79 @@ const OrderPage = () => {
 
 
     const handleAcceptExpress = async () => {
-        if (!order?.expressId) return;
+        if (!order?.expressId) {
+            return;
+        }
 
-        const token = localStorage.getItem("authToken");
+        const token =
+            localStorage.getItem(
+                "authToken"
+            );
 
         if (!token) {
-            toast.info("Войдите, чтобы принять заказ");
+            toast.info(
+                "Войдите, чтобы принять заказ"
+            );
+
             navigate("/login");
             return;
         }
 
-        const confirmed = window.confirm(
-            `Вы уверены, что хотите взять в работу экспресс-заказ №${order.expressId}?`
-        );
+        const confirmed =
+            window.confirm(
+                `Вы уверены, что хотите взять в работу экспресс-заказ №${order.expressId}?`
+            );
 
-        if (!confirmed) return;
+        if (!confirmed) {
+            return;
+        }
 
         try {
             setAcceptLoading(true);
 
-            await axiosInstance.post(`/express/express-orders/${order.expressId}/accept`);
+            await axiosInstance.post(
+                `/express/express-orders/${order.expressId}/accept`
+            );
 
-            toast.success("Экспресс-заказ принят!");
-            navigate("/active-orders");
-        } catch (e) {
-            console.error("Ошибка принятия express-заказа:", e);
-            toast.error(e.response?.data?.message || "Ошибка принятия заказа");
+            toast.success(
+                "Экспресс-заказ принят!"
+            );
+
+            navigate(
+                "/active-orders"
+            );
+        } catch (error) {
+            console.error(
+                "Ошибка принятия express-заказа:",
+                error
+            );
+
+            const code =
+                error.response?.data?.code;
+
+            if (
+                [
+                    "TAXI_VEHICLE_REQUIRED",
+                    "TAXI_VEHICLE_PENDING",
+                    "TAXI_VEHICLE_REJECTED",
+                    "TAXI_VEHICLE_NOT_VERIFIED",
+                ].includes(code)
+            ) {
+                setVehicleGateModal({
+                    code,
+
+                    message:
+                        error.response?.data?.message ||
+                        "Для работы в такси необходимо подтвердить автомобиль.",
+                });
+
+                return;
+            }
+
+            toast.error(
+                error.response?.data?.message ||
+                "Ошибка принятия заказа"
+            );
         } finally {
             setAcceptLoading(false);
         }
@@ -1159,6 +1212,21 @@ const OrderPage = () => {
                     </div>
                 </Modal>
             </div>
+            <TaxiVehicleGateModal
+                data={vehicleGateModal}
+
+                onClose={() =>
+                    setVehicleGateModal(null)
+                }
+
+                onGoToProfile={() => {
+                    setVehicleGateModal(null);
+
+                    navigate(
+                        "/profile?section=verification"
+                    );
+                }}
+            />
         </div>
     );
 };

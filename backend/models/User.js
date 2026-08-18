@@ -134,6 +134,52 @@ module.exports = (sequelize) => {
                 type: DataTypes.STRING,
                 allowNull: true,
             },
+            vehicleBrand: {
+                type: DataTypes.STRING(100),
+                allowNull: true,
+                field: "vehicle_brand",
+            },
+            vehicleModel: {
+                type: DataTypes.STRING(100),
+                allowNull: true,
+                field: "vehicle_model",
+            },
+            vehicleColor: {
+                type: DataTypes.STRING(100),
+                allowNull: true,
+                field: "vehicle_color",
+            },
+            vehiclePlate: {
+                type: DataTypes.STRING(30),
+                allowNull: true,
+                field: "vehicle_plate",
+            },
+            vehicleYear: {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+                field: "vehicle_year",
+            },
+            vehiclePhoto: {
+                type: DataTypes.STRING,
+                allowNull: true,
+                field: "vehicle_photo",
+            },
+            vehicleVerificationStatus: {
+                type: DataTypes.ENUM(
+                    "none",
+                    "pending",
+                    "verified",
+                    "rejected"
+                ),
+                allowNull: false,
+                defaultValue: "none",
+                field: "vehicle_verification_status",
+            },
+            vehicleVerificationNote: {
+                type: DataTypes.STRING(500),
+                allowNull: true,
+                field: "vehicle_verification_note",
+            },
             premium_last_payment_id: {
                 type: DataTypes.STRING,
                 allowNull: true,

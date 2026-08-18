@@ -10,7 +10,7 @@ import axiosInstance from "../utils/axiosInstance";
 import Modal from "react-modal";
 import { toast } from "react-toastify";
 import { socket } from "../socketClient";
-
+import TaxiVehicleGateModal from "../components/TaxiVehicleGateModal";
 import "../styles/OrdersPage.css";
 import YandexMapModal from "../components/YandexMapModal";
 import ExpressRouteButtons from "../components/ExpressRouteButtons";
@@ -214,6 +214,11 @@ const OrdersPage = () => {
 
     const { openDebtModal } = useContext(ModalContext);
     const creatorsCacheRef = useRef({});
+
+    const [
+        vehicleGateModal,
+        setVehicleGateModal,
+    ] = useState(null);
 
     const preferredCategoryIds = useMemo(() => {
         const ids = profile?.preferredCategoryIds;
@@ -1654,6 +1659,33 @@ const OrdersPage = () => {
 
                                                                 navigate("/active-orders");
                                                             } catch (error) {
+                                                                console.error(
+                                                                    "Ошибка принятия express-заказа:",
+                                                                    error
+                                                                );
+
+                                                                const code =
+                                                                    error.response?.data?.code;
+
+                                                                if (
+                                                                    [
+                                                                        "TAXI_VEHICLE_REQUIRED",
+                                                                        "TAXI_VEHICLE_PENDING",
+                                                                        "TAXI_VEHICLE_REJECTED",
+                                                                        "TAXI_VEHICLE_NOT_VERIFIED",
+                                                                    ].includes(code)
+                                                                ) {
+                                                                    setVehicleGateModal({
+                                                                        code,
+
+                                                                        message:
+                                                                            error.response?.data?.message ||
+                                                                            "Для работы в такси необходимо подтвердить автомобиль.",
+                                                                    });
+
+                                                                    return;
+                                                                }
+
                                                                 toast.error(
                                                                     error.response?.data?.message ||
                                                                     "Не удалось принять заказ"
@@ -2046,6 +2078,23 @@ const OrdersPage = () => {
                     </button>
                 </Modal>
             </div>
+
+            <TaxiVehicleGateModal
+                data={vehicleGateModal}
+
+                onClose={() =>
+                    setVehicleGateModal(null)
+                }
+
+                onGoToProfile={() => {
+                    setVehicleGateModal(null);
+
+                    navigate(
+                        "/profile?section=verification"
+                    );
+                }}
+            />
+
         </div>
     );
 };
