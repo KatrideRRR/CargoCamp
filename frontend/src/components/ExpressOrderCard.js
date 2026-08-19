@@ -441,36 +441,6 @@ const ExpressOrderCard = ({
             currentOrder.executorVehiclePhoto
         );
 
-    console.log("TAXI VEHICLE DEBUG:", {
-        orderId: currentOrder.id,
-        type: currentOrder.type,
-        creatorId: currentOrder.creatorId,
-        executorId: currentOrder.executorId,
-
-        currentUserId: userId,
-        isCreator,
-
-        executorVehicleBrand:
-        currentOrder.executorVehicleBrand,
-
-        executorVehicleModel:
-        currentOrder.executorVehicleModel,
-
-        executorVehicleColor:
-        currentOrder.executorVehicleColor,
-
-        executorVehiclePlate:
-        currentOrder.executorVehiclePlate,
-
-        executorVehiclePhoto:
-        currentOrder.executorVehiclePhoto,
-
-        executor:
-        currentOrder.executor,
-
-        hasTaxiVehicle,
-    });
-
     return (
         <li className={`order-card express-card ${currentOrder.type === "taxi" ? "express-taxi" : "express-courier"}`}>
             <div className="order-header">
@@ -684,7 +654,9 @@ const ExpressOrderCard = ({
 
                         <button
                             className="express-secondaryBtn express-secondaryBtnWarn"
-                            onClick={() => onOpenDispute?.(currentOrder)}
+                            onClick={() =>
+                                onOpenDispute?.(currentOrder, "express")
+                            }
                             type="button"
                         >
                             <FaExclamationTriangle />

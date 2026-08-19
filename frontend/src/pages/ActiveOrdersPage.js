@@ -21,6 +21,13 @@ const apiUrl = process.env.REACT_APP_API_URL;
 const hasDescription = (value) =>
     typeof value === "string" && value.trim().length > 0;
 
+const makeDisputeKey = (
+    orderType,
+    orderId
+) => {
+    return `${orderType}:${orderId}`;
+};
+
 const parseServiceDetails = (value) => {
     if (!value) {
         return {};
@@ -291,6 +298,103 @@ function getContractUrl(contractPath) {
     return `${apiUrl}${normalizedPath}`;
 }
 
+const REGULAR_DISPUTE_REASONS = [
+    {
+        value: "work_not_done",
+        label: "Работа не выполнена",
+    },
+    {
+        value: "poor_quality",
+        label: "Низкое качество работы",
+    },
+    {
+        value: "missed_deadline",
+        label: "Нарушены сроки",
+    },
+    {
+        value: "wrong_price",
+        label: "Спор по стоимости",
+    },
+    {
+        value: "rude_behavior",
+        label: "Некорректное поведение",
+    },
+    {
+        value: "other",
+        label: "Другое",
+    },
+];
+
+const EXPRESS_CREATOR_DISPUTE_REASONS = [
+    {
+        value: "executor_no_show",
+        label: "Исполнитель не приехал",
+    },
+    {
+        value: "executor_late",
+        label: "Исполнитель сильно опоздал",
+    },
+    {
+        value: "poor_quality",
+        label: "Низкое качество услуги",
+    },
+    {
+        value: "wrong_price",
+        label: "Проблема со стоимостью",
+    },
+    {
+        value: "rude_behavior",
+        label: "Некорректное поведение исполнителя",
+    },
+    {
+        value: "damaged_property",
+        label: "Повреждение имущества или груза",
+    },
+    {
+        value: "service_problem",
+        label: "Проблема с поездкой или доставкой",
+    },
+    {
+        value: "other",
+        label: "Другое",
+    },
+];
+
+const EXPRESS_EXECUTOR_DISPUTE_REASONS = [
+    {
+        value: "customer_no_show",
+        label: "Заказчик не появился",
+    },
+    {
+        value: "customer_unreachable",
+        label: "Не удаётся связаться с заказчиком",
+    },
+    {
+        value: "wrong_address",
+        label: "Неверный адрес или маршрут",
+    },
+    {
+        value: "order_mismatch",
+        label: "Условия заказа не соответствуют описанию",
+    },
+    {
+        value: "payment_problem",
+        label: "Проблема с оплатой",
+    },
+    {
+        value: "unsafe_situation",
+        label: "Небезопасная ситуация",
+    },
+    {
+        value: "rude_behavior",
+        label: "Некорректное поведение заказчика",
+    },
+    {
+        value: "other",
+        label: "Другое",
+    },
+];
+
 const ActiveOrdersPage = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -363,6 +467,9 @@ const ActiveOrdersPage = () => {
     const [disputeLoading, setDisputeLoading] = useState(false);
     const [orderDisputes, setOrderDisputes] = useState({});
 
+    const [selectedDisputeOrderType, setSelectedDisputeOrderType] =
+        useState("regular");
+
     // “удаленные” обычные заказы
     const [removedOrders, setRemovedOrders] = useState(() => {
         const saved = localStorage.getItem("removedOrders");
@@ -405,6 +512,25 @@ const ActiveOrdersPage = () => {
                 return <FaQuestionCircle title="Неизвестно" />;
         }
     };
+
+    const disputeIsCreator =
+        Number(selectedOrderForDispute?.creatorId) ===
+        Number(user?.id);
+
+    const disputeReasonOptions = useMemo(() => {
+        if (selectedDisputeOrderType === "regular") {
+            return REGULAR_DISPUTE_REASONS;
+        }
+
+        if (disputeIsCreator) {
+            return EXPRESS_CREATOR_DISPUTE_REASONS;
+        }
+
+        return EXPRESS_EXECUTOR_DISPUTE_REASONS;
+    }, [
+        selectedDisputeOrderType,
+        disputeIsCreator,
+    ]);
 
     const normalizePhoneForTel = (rawPhone) => {
         let digits = String(rawPhone || "").replace(/\D/g, "");
@@ -491,56 +617,99 @@ const ActiveOrdersPage = () => {
         };
     };
 
-    const disputeReasonOptions = [
-        { value: "work_not_done", label: "Работа не выполнена" },
-        { value: "poor_quality", label: "Низкое качество работы" },
-        { value: "missed_deadline", label: "Нарушены сроки" },
-        { value: "wrong_price", label: "Спор по стоимости" },
-        { value: "rude_behavior", label: "Некорректное поведение" },
-        { value: "other", label: "Другое" },
-    ];
+    const openDisputeModal = (order, orderType = "regular") => {
+        if (!order?.id) {
+            return;
+        }
 
-    const openDisputeModal = (order) => {
+        const isCreator =
+            Number(order.creatorId) ===
+            Number(user?.id);
+
+        let reasons;
+
+        if (orderType === "express") {
+            reasons = isCreator
+                ? EXPRESS_CREATOR_DISPUTE_REASONS
+                : EXPRESS_EXECUTOR_DISPUTE_REASONS;
+        } else {
+            reasons = REGULAR_DISPUTE_REASONS;
+        }
+
         setSelectedOrderForDispute(order);
-        setDisputeReasonCode("poor_quality");
+        setSelectedDisputeOrderType(orderType);
+
+        setDisputeReasonCode(
+            reasons[0]?.value || "other"
+        );
+
         setDisputeReason("");
         setDisputeDescription("");
+
         setIsDisputeModalOpen(true);
     };
 
     const closeDisputeModal = () => {
         setIsDisputeModalOpen(false);
+
         setSelectedOrderForDispute(null);
-        setDisputeReasonCode("poor_quality");
+        setSelectedDisputeOrderType("regular");
+
+        setDisputeReasonCode("work_not_done");
         setDisputeReason("");
         setDisputeDescription("");
+
         setDisputeLoading(false);
     };
 
-    const fetchOrderDispute = async (orderId) => {
+
+
+    const fetchOrderDispute = async (
+        orderId,
+        orderType = "regular"
+    ) => {
         try {
-            const t = localStorage.getItem("authToken");
-            if (!t) return null;
+            const t =
+                localStorage.getItem("authToken");
 
-            const res = await axios.get(`${apiUrl}/api/disputes/order/${orderId}`, {
-                headers: { Authorization: `Bearer ${t}` },
-            });
-
-            const dispute = res.data?.dispute || null;
-
-            if (dispute) {
-                setOrderDisputes((prev) => ({
-                    ...prev,
-                    [orderId]: dispute,
-                }));
-                return dispute;
+            if (!t) {
+                return null;
             }
 
-            return null;
+            const res = await axios.get(
+                `${apiUrl}/api/disputes/order/${orderType}/${orderId}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${t}`,
+                    },
+                }
+            );
+
+            const dispute =
+                res.data?.dispute || null;
+
+            if (!dispute) {
+                return null;
+            }
+
+            const disputeKey =
+                `${orderType}:${orderId}`;
+
+            setOrderDisputes((prev) => ({
+                ...prev,
+                [disputeKey]: dispute,
+            }));
+
+            return dispute;
+
         } catch (e) {
             if (e?.response?.status !== 404) {
-                console.error(`Ошибка получения спора по заказу ${orderId}:`, e);
+                console.error(
+                    `Ошибка получения спора ${orderType} #${orderId}:`,
+                    e
+                );
             }
+
             return null;
         }
     };
@@ -548,6 +717,7 @@ const ActiveOrdersPage = () => {
     const submitDispute = async () => {
         try {
             const t = localStorage.getItem("authToken");
+
             if (!t) {
                 alert("Вы не авторизованы");
                 navigate("/login");
@@ -560,7 +730,12 @@ const ActiveOrdersPage = () => {
             }
 
             if (!disputeReason.trim()) {
-                alert("Укажите краткую причину спора");
+                alert("Укажите краткую причину проблемы");
+                return;
+            }
+
+            if (!disputeReasonCode) {
+                alert("Выберите причину");
                 return;
             }
 
@@ -570,27 +745,40 @@ const ActiveOrdersPage = () => {
                 `${apiUrl}/api/disputes/open`,
                 {
                     orderId: selectedOrderForDispute.id,
+
+                    // ✅ ВАЖНО
+                    orderType: selectedDisputeOrderType,
+
                     reasonCode: disputeReasonCode,
                     reason: disputeReason.trim(),
                     description: disputeDescription.trim(),
                 },
                 {
-                    headers: { Authorization: `Bearer ${t}` },
+                    headers: {
+                        Authorization: `Bearer ${t}`,
+                    },
                 }
             );
 
             if (res.data?.dispute) {
+                const disputeKey =
+                    `${selectedDisputeOrderType}:${selectedOrderForDispute.id}`;
+
                 setOrderDisputes((prev) => ({
                     ...prev,
-                    [selectedOrderForDispute.id]: res.data.dispute,
+                    [disputeKey]: res.data.dispute,
                 }));
             }
 
-            alert("Спор успешно открыт");
+            alert("Обращение успешно отправлено");
             closeDisputeModal();
         } catch (e) {
             console.error("Ошибка открытия спора:", e);
-            alert(e?.response?.data?.message || "Не удалось открыть спор");
+
+            alert(
+                e?.response?.data?.message ||
+                "Не удалось отправить обращение"
+            );
         } finally {
             setDisputeLoading(false);
         }
@@ -1102,36 +1290,69 @@ const ActiveOrdersPage = () => {
             setOrders(filteredOrders);
 
             // подгрузим данные по спорам
-            const disputeEntries = await Promise.allSettled(
-                filteredOrders.map(async (order) => {
-                    try {
-                        const res = await axios.get(`${apiUrl}/api/disputes/order/${order.id}`, {
-                            headers: { Authorization: `Bearer ${t}` },
-                        });
+            const disputeEntries =
+                await Promise.allSettled(
+                    filteredOrders.map(
+                        async (order) => {
+                            try {
+                                const res =
+                                    await axios.get(
+                                        `${apiUrl}/api/disputes/order/regular/${order.id}`,
+                                        {
+                                            headers: {
+                                                Authorization:
+                                                    `Bearer ${t}`,
+                                            },
+                                        }
+                                    );
 
-                        const dispute = res.data?.dispute || null;
+                                const dispute =
+                                    res.data?.dispute ||
+                                    null;
 
-                        if (!dispute) return null;
+                                if (!dispute) {
+                                    return null;
+                                }
 
-                        return {
-                            orderId: order.id,
-                            dispute,
-                        };
-                    } catch (e) {
-                        console.error(`Ошибка загрузки спора для заказа ${order.id}:`, e);
-                        return null;
-                    }
-                })
-            );
+                                return {
+                                    disputeKey:
+                                        `regular:${order.id}`,
+                                    dispute,
+                                };
+
+                            } catch (e) {
+                                console.error(
+                                    `Ошибка загрузки спора для заказа ${order.id}:`,
+                                    e
+                                );
+
+                                return null;
+                            }
+                        }
+                    )
+                );
 
             const disputesMap = {};
-            disputeEntries.forEach((entry) => {
-                if (entry.status === "fulfilled" && entry.value?.orderId && entry.value?.dispute) {
-                    disputesMap[entry.value.orderId] = entry.value.dispute;
-                }
-            });
 
-            setOrderDisputes(disputesMap);
+            disputeEntries.forEach(
+                (entry) => {
+                    if (
+                        entry.status === "fulfilled" &&
+                        entry.value?.disputeKey &&
+                        entry.value?.dispute
+                    ) {
+                        disputesMap[
+                            entry.value.disputeKey
+                            ] =
+                            entry.value.dispute;
+                    }
+                }
+            );
+
+            setOrderDisputes((prev) => ({
+                ...prev,
+                ...disputesMap,
+            }));
 
             // unread counts
             const notifs = Array.isArray(response.data?.notifications) ? response.data.notifications : [];
@@ -1353,6 +1574,12 @@ const ActiveOrdersPage = () => {
                                         const isExecutor = order.executorId === user.id;
                                         const isCreator = order.creatorId === user.id;
 
+                                        const disputeKey =
+                                            `regular:${order.id}`;
+
+                                        const dispute =
+                                            orderDisputes[disputeKey];
+
                                         const hourly =
                                             isHourlyOrder(order);
 
@@ -1379,8 +1606,8 @@ const ActiveOrdersPage = () => {
         {isCreator ? "Вы заказчик" : "Вы исполнитель"}
     </span>
 
-                                                                {orderDisputes[order.id] && (
-                                                                    <div className={`dispute-status-badge dispute-status-${orderDisputes[order.id].status}`}>
+                                                                {dispute && (
+                                                                    <div className={`dispute-status-badge dispute-status-${dispute.status}`}>
                                                                         Спор: {orderDisputes[order.id].status}
                                                                     </div>
                                                                 )}
@@ -1498,19 +1725,28 @@ const ActiveOrdersPage = () => {
                                                             {isMobile ? <FaRoute /> : "Маршрут"}
                                                         </button>
 
-                                                        {orderDisputes[order.id] ? (
+                                                        {dispute ? (
                                                             <button
                                                                 className="dispute-opened-button"
                                                                 onClick={async (e) => {
                                                                     e.stopPropagation();
-                                                                    const dispute = orderDisputes[order.id] || (await fetchOrderDispute(order.id));
-                                                                    if (!dispute) {
+                                                                    const currentDispute =
+                                                                        dispute ||
+                                                                        (
+                                                                            await fetchOrderDispute(
+                                                                                order.id,
+                                                                                "regular"
+                                                                            )
+                                                                        );
+                                                                    if (!currentDispute) {
                                                                         return alert("Спор не найден");
                                                                     }
 
                                                                     alert(
-                                                                        `Спор уже открыт.\n\nСтатус: ${dispute.status}\nПричина: ${dispute.reason}${
-                                                                            dispute.description ? `\nОписание: ${dispute.description}` : ""
+                                                                        `Спор уже открыт.\n\nСтатус: ${currentDispute.status}\nПричина: ${currentDispute.reason}${
+                                                                            currentDispute.description
+                                                                                ? `\nОписание: ${currentDispute.description}`
+                                                                                : ""
                                                                         }`
                                                                     );
                                                                 }}
@@ -1522,7 +1758,7 @@ const ActiveOrdersPage = () => {
                                                                 className="dispute-button"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    openDisputeModal(order);
+                                                                    openDisputeModal(order, "regular");
                                                                 }}
                                                             >
                                                                 {isMobile ? <FaExclamationTriangle /> : "Открыть спор"}
@@ -1943,8 +2179,11 @@ const ActiveOrdersPage = () => {
                                                 );
                                             }}
                                             onOpenChat={(orderId) => handleOpenChat(orderId, "express")}
-                                            onOpenDispute={(order) => openDisputeModal(order)}
-                                            onCallUser={async (order) => {
+                                            onOpenDispute={(order) =>
+
+                                                openDisputeModal(order, "express")
+
+                                            }                                            onCallUser={async (order) => {
                                                 const phone = Number(order.creatorId) === Number(user.id)
                                                     ? await getUserPhone(order.executorId)
                                                     : await getUserPhone(order.creatorId);
@@ -1978,16 +2217,25 @@ const ActiveOrdersPage = () => {
                                 ✖
                             </button>
 
-                            <h2 className="dispute-modal-title">Открыть спор</h2>
+                            <h2 className="dispute-modal-title">
+                                {selectedDisputeOrderType === "express"
+                                    ? disputeIsCreator
+                                        ? "Проблема с экспресс-заказом"
+                                        : "Проблема при выполнении заказа"
+                                    : "Открыть спор"}
+                            </h2>
 
                             {selectedOrderForDispute && (
                                 <p className="dispute-order-info">
-                                    Заказ №{selectedOrderForDispute.id}
+                                    {selectedDisputeOrderType === "express"
+                                        ? "Экспресс-заказ"
+                                        : "Заказ"}{" "}
+                                    №{selectedOrderForDispute.id}
                                 </p>
                             )}
 
                             <div className="dispute-form-group">
-                                <label>Категория причины</label>
+                                <label>Что произошло?</label>
                                 <select
                                     value={disputeReasonCode}
                                     onChange={(e) => setDisputeReasonCode(e.target.value)}
@@ -2008,7 +2256,13 @@ const ActiveOrdersPage = () => {
                                     value={disputeReason}
                                     onChange={(e) => setDisputeReason(e.target.value)}
                                     className="dispute-input"
-                                    placeholder="Например: работа выполнена не полностью"
+                                    placeholder={
+                                        selectedDisputeOrderType === "express"
+                                            ? disputeIsCreator
+                                                ? "Например: исполнитель приехал с большим опозданием"
+                                                : "Например: заказчик не отвечает на звонки"
+                                            : "Например: работа выполнена не полностью"
+                                    }
                                     maxLength={255}
                                 />
                             </div>
@@ -2038,7 +2292,11 @@ const ActiveOrdersPage = () => {
                                     onClick={submitDispute}
                                     disabled={disputeLoading}
                                 >
-                                    {disputeLoading ? "Открываем..." : "Открыть спор"}
+                                    {disputeLoading
+                                        ? "Отправляем..."
+                                        : selectedDisputeOrderType === "express"
+                                            ? "Сообщить о проблеме"
+                                            : "Открыть спор"}
                                 </button>
                             </div>
                         </div>

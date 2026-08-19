@@ -353,21 +353,6 @@ const notifyAdminsAboutNewExpressOrder = async ({order, creatorId,}) => {
                 }
             );
 
-            console.log(
-                "ADMIN NEW EXPRESS ORDER NOTIFICATION:",
-                {
-                    orderId:
-                    order.id,
-
-                    adminIds,
-
-                    type:
-                    order.type,
-
-                    status:
-                    order.status,
-                }
-            );
         } catch (error) {
             console.error(
                 "Ошибка уведомления администраторов об экспресс-заказе:",

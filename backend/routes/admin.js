@@ -2170,23 +2170,61 @@ router.patch('/disputes/:id/status', authMiddleware, adminMiddleware, async (req
         await dispute.save();
 
         await ActionLog.create({
-            entityType: 'dispute',
+            entityType: "dispute",
             entityId: dispute.id,
-            orderId: dispute.orderId,
-            actorUserId: req.user.id,
-            actorRole: 'admin',
-            actionType: 'dispute_status_changed',
-            severity: 'info',
-            success: true,
-            reason: `Статус спора изменён: ${oldStatus} -> ${status}`,
-            ts: new Date(),
+
+            orderId:
+                dispute.orderType === "regular"
+                    ? dispute.orderId
+                    : null,
+
+            expressOrderId:
+                dispute.orderType === "express"
+                    ? dispute.orderId
+                    : null,
+
+            actorUserId:
+            req.user.id,
+
+            actorRole:
+                "admin",
+
+            actionType:
+                "dispute_status_changed",
+
+            severity:
+                "info",
+
+            success:
+                true,
+
+            reason:
+                `Статус спора изменён: ${oldStatus} -> ${status}`,
+
+            ts:
+                new Date(),
+
             meta: {
-                disputeId: dispute.id,
+                disputeId:
+                dispute.id,
+
+                orderType:
+                dispute.orderType,
+
+                orderId:
+                dispute.orderId,
+
                 oldStatus,
-                newStatus: status,
-                takenByAdminId: dispute.takenByAdminId || null,
-                takenAt: dispute.takenAt || null,
-            }
+
+                newStatus:
+                status,
+
+                takenByAdminId:
+                    dispute.takenByAdminId || null,
+
+                takenAt:
+                    dispute.takenAt || null,
+            },
         });
 
         res.json({
@@ -2241,22 +2279,62 @@ router.patch('/disputes/:id/resolve', authMiddleware, adminMiddleware, async (re
         await dispute.save();
 
         await ActionLog.create({
-            entityType: 'dispute',
-            entityId: dispute.id,
-            orderId: dispute.orderId,
-            actorUserId: req.user.id,
-            actorRole: 'admin',
-            actionType: 'dispute_resolved',
-            severity: 'info',
-            success: true,
-            reason: dispute.resolution,
-            ts: new Date(),
+            entityType:
+                "dispute",
+
+            entityId:
+            dispute.id,
+
+            orderId:
+                dispute.orderType === "regular"
+                    ? dispute.orderId
+                    : null,
+
+            expressOrderId:
+                dispute.orderType === "express"
+                    ? dispute.orderId
+                    : null,
+
+            actorUserId:
+            req.user.id,
+
+            actorRole:
+                "admin",
+
+            actionType:
+                "dispute_resolved",
+
+            severity:
+                "info",
+
+            success:
+                true,
+
+            reason:
+            dispute.resolution,
+
+            ts:
+                new Date(),
+
             meta: {
-                disputeId: dispute.id,
-                resolution: dispute.resolution,
-                takenByAdminId: dispute.takenByAdminId || null,
-                resolvedById: dispute.resolvedById || null,
-            }
+                disputeId:
+                dispute.id,
+
+                orderType:
+                dispute.orderType,
+
+                orderId:
+                dispute.orderId,
+
+                resolution:
+                dispute.resolution,
+
+                takenByAdminId:
+                    dispute.takenByAdminId || null,
+
+                resolvedById:
+                    dispute.resolvedById || null,
+            },
         });
 
         res.json({
@@ -2270,18 +2348,90 @@ router.patch('/disputes/:id/resolve', authMiddleware, adminMiddleware, async (re
     }
 });
 
-router.get('/disputes', authMiddleware, adminMiddleware, async (req, res) => {
-    try {
-        const disputes = await Dispute.findAll({
-            order: [['createdAt', 'DESC']]
-        });
+router.get("/disputes", authMiddleware, adminMiddleware, async (req, res) => {
+        try {
+            const {
+                orderId,
+                orderType,
+                status,
+            } = req.query;
 
-        res.json({ success: true, disputes });
-    } catch (e) {
-        console.error('Ошибка получения споров:', e);
-        res.status(500).json({ success: false, message: 'Ошибка сервера' });
-    }
-});
+            const where = {};
+
+            if (orderId) {
+                const normalizedOrderId =
+                    Number(orderId);
+
+                if (
+                    !Number.isInteger(
+                        normalizedOrderId
+                    ) ||
+                    normalizedOrderId <= 0
+                ) {
+                    return res.status(400).json({
+                        success: false,
+                        message:
+                            "Некорректный orderId",
+                    });
+                }
+
+                where.orderId =
+                    normalizedOrderId;
+            }
+
+            if (orderType) {
+                if (
+                    ![
+                        "regular",
+                        "express",
+                    ].includes(orderType)
+                ) {
+                    return res.status(400).json({
+                        success: false,
+                        message:
+                            "Некорректный orderType",
+                    });
+                }
+
+                where.orderType =
+                    orderType;
+            }
+
+            if (status) {
+                where.status =
+                    String(status);
+            }
+
+            const disputes =
+                await Dispute.findAll({
+                    where,
+
+                    order: [
+                        [
+                            "createdAt",
+                            "DESC",
+                        ],
+                    ],
+                });
+
+            return res.json({
+                success: true,
+                disputes,
+            });
+
+        } catch (e) {
+            console.error(
+                "Ошибка получения споров:",
+                e
+            );
+
+            return res.status(500).json({
+                success: false,
+                message:
+                    "Ошибка сервера",
+            });
+        }
+    });
 
 router.get("/express-orders", authMiddleware, adminMiddleware, async (req, res) => {
     try {

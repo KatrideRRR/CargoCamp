@@ -23,11 +23,6 @@ module.exports = (sequelize) => {
                 foreignKey: 'resolvedById',
                 as: 'resolvedBy'
             });
-
-            Dispute.belongsTo(models.Order, {
-                foreignKey: 'orderId',
-                as: 'relatedOrder'
-            });
         }
     }
 
@@ -42,10 +37,6 @@ module.exports = (sequelize) => {
             orderId: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
-                references: {
-                    model: 'orders',
-                    key: 'id'
-                }
             },
 
             openedById: {
@@ -82,14 +73,27 @@ module.exports = (sequelize) => {
 
             reasonCode: {
                 type: DataTypes.ENUM(
-                    'work_not_done',
-                    'poor_quality',
-                    'missed_deadline',
-                    'wrong_price',
-                    'rude_behavior',
-                    'other'
+                    "work_not_done",
+                    "poor_quality",
+                    "missed_deadline",
+                    "wrong_price",
+                    "rude_behavior",
+
+                    "executor_no_show",
+                    "executor_late",
+                    "damaged_property",
+                    "service_problem",
+
+                    "customer_no_show",
+                    "customer_unreachable",
+                    "wrong_address",
+                    "order_mismatch",
+                    "payment_problem",
+                    "unsafe_situation",
+
+                    "other"
                 ),
-                allowNull: false
+                allowNull: false,
             },
 
             reason: {
@@ -148,6 +152,15 @@ module.exports = (sequelize) => {
             takenAt: {
                 type: DataTypes.DATE,
                 allowNull: true,
+            },
+
+            orderType: {
+                type: DataTypes.ENUM(
+                    "regular",
+                    "express"
+                ),
+                allowNull: false,
+                defaultValue: "regular",
             },
 
         },
