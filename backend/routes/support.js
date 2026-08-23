@@ -44,11 +44,18 @@ router.post("/messages", authenticateToken, async (req, res) => {
         const userId = req.user.id;
         const { text } = req.body;
 
-        if (!text || !text.trim()) {
+        const cleanText = String(text || "").trim();
+
+        if (!cleanText) {
             return res.status(400).json({
                 message: "Сообщение не может быть пустым",
             });
         }
+
+        const isPlatformSuggestion =
+            cleanText.startsWith(
+                "💡 ПРЕДЛОЖЕНИЕ ПО РАЗВИТИЮ CARGOCAMP"
+            );
 
         const message = await SupportMessage.create({
             userId,
@@ -68,23 +75,6 @@ router.post("/messages", authenticateToken, async (req, res) => {
                 },
             ],
         });
-
-        const cleanText = String(text || "").trim();
-
-        if (!cleanText) {
-
-            return res.status(400).json({
-
-                message: "Сообщение не может быть пустым",
-
-            });
-
-        }
-
-        const isPlatformSuggestion =
-            cleanText.startsWith(
-                "💡 ПРЕДЛОЖЕНИЕ ПО РАЗВИТИЮ CARGOCAMP"
-            );
 
         void sendAdminNotification({
             topic:
@@ -111,7 +101,6 @@ router.post("/messages", authenticateToken, async (req, res) => {
                 .join("\n"),
 
             buttonText: "Открыть поддержку",
-
             buttonUrl: "https://admin.cargocamp.ru/support",
         });
 
@@ -125,10 +114,13 @@ router.post("/messages", authenticateToken, async (req, res) => {
             success: true,
             meta: {
                 support: true,
-                textLength: text.trim().length,
+                textLength: cleanText.length,
             },
         }).catch((e) => {
-            console.warn("Не удалось записать ActionLog support_message_sent:", e.message);
+            console.warn(
+                "Не удалось записать ActionLog support_message_sent:",
+                e.message
+            );
         });
 
         if (io) {
@@ -143,15 +135,18 @@ router.post("/messages", authenticateToken, async (req, res) => {
             });
         }
 
-        res.status(201).json(fullMessage);
+        return res.status(201).json(fullMessage);
     } catch (error) {
-        console.error("Ошибка отправки сообщения в поддержку:", error);
-        res.status(500).json({
+        console.error(
+            "Ошибка отправки сообщения в поддержку:",
+            error
+        );
+
+        return res.status(500).json({
             message: "Ошибка отправки сообщения в поддержку",
         });
     }
 });
-
 /**
  * Пользователь отметил ответы поддержки прочитанными
  * PATCH /api/support/read
