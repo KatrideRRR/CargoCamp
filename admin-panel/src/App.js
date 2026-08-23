@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import Dashboard from "./pages/Dashboard";
 import UsersPage from "./pages/UsersPage";
@@ -33,7 +33,7 @@ function App() {
                   path="/dashboard"
                   element={
                       localStorage.getItem("authToken")
-                          ? <DashboardPage />
+                          ? <Dashboard />
                           : <Navigate to="/" replace />
                   }
               />
