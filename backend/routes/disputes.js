@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
 const { notifyUser } = require("../services/notificationService");
+const {sendAdminNotification, adminOrderUrl, adminExpressOrderUrl} = require("../services/adminNotificationService");
 
 const authMiddleware = require('../middlewares/userAuth');
 const { Dispute, Order, ActionLog, ExpressOrder } = require('../models');
@@ -152,6 +153,54 @@ router.post('/open', authMiddleware, async (req, res) => {
 
                 status: "open",
             });
+
+        void sendAdminNotification({
+            topic: "disputes",
+
+            title:
+                orderType === "express"
+                    ? "⚠️ Открыта проблема по экспресс-заказу"
+                    : "⚠️ Открыт спор по заказу",
+
+            message: [
+                `Спор ID: ${dispute.id}`,
+                `Заказ ID: ${order.id}`,
+
+                `Тип заказа: ${
+                    orderType === "express"
+                        ? "экспресс"
+                        : "обычный"
+                }`,
+
+                `Открыл: ${
+                    isCreator
+                        ? "заказчик"
+                        : "исполнитель"
+                }`,
+
+                `Пользователь ID: ${userId}`,
+
+                "",
+                `Причина: ${reason}`,
+
+                reasonCode
+                    ? `Код причины: ${reasonCode}`
+                    : null,
+
+                description
+                    ? `Описание: ${description}`
+                    : null,
+            ]
+                .filter(Boolean)
+                .join("\n"),
+
+            buttonText: "Открыть заказ",
+
+            buttonUrl:
+                orderType === "express"
+                    ? adminExpressOrderUrl(order.id)
+                    : adminOrderUrl(order.id),
+        });
 
         const recipientUserId =
             isCreator

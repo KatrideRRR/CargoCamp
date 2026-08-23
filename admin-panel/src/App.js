@@ -21,8 +21,22 @@ function App() {
           <Routes>
               <Route path="/express-orders/:id" element={<AdminExpressOrderDetailsPage />} />
               <Route path="/create-user" element={<PrivateRoute><CreateUserPage /></PrivateRoute>} />
-              <Route path="/" element={<LoginPage />} />
-              <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+              <Route
+                  path="/"
+                  element={
+                      localStorage.getItem("authToken")
+                          ? <Navigate to="/dashboard" replace />
+                          : <LoginPage />
+                  }
+              />
+              <Route
+                  path="/dashboard"
+                  element={
+                      localStorage.getItem("authToken")
+                          ? <DashboardPage />
+                          : <Navigate to="/" replace />
+                  }
+              />
               <Route path="/users" element={<PrivateRoute><UsersPage /></PrivateRoute>} />
               <Route path="/orders" element={<PrivateRoute><OrdersPage /></PrivateRoute>} />
               <Route path="/:orderId/messages" element={<PrivateRoute><MessagesPage /></PrivateRoute>} />

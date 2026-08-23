@@ -5,6 +5,39 @@ const db = require("../models");
 const authenticateToken = require("../middlewares/userAuth");
 const { requestTBank, verifyNotificationToken } = require("../config/tbankClient");
 const { sendOrderPush } = require("../utils/orderPushService");
+const {sendAdminNotification, adminUsersUrl, adminOrderUrl} = require("../services/adminNotificationService");
+
+function notifyPaymentProblem({provider, type, title, message, userId = null, orderId = null,}) {
+    const buttonUrl =
+        orderId
+            ? adminOrderUrl(orderId)
+            : adminUsersUrl();
+
+    const buttonText =
+        orderId
+            ? "Открыть заказ"
+            : "Открыть пользователей";
+
+    void sendAdminNotification({
+        topic: "payments",
+
+        title,
+
+        message: [
+            `Провайдер: ${provider}`,
+            type ? `Тип: ${type}` : null,
+            userId ? `Пользователь ID: ${userId}` : null,
+            orderId ? `Заказ ID: ${orderId}` : null,
+            "",
+            message,
+        ]
+            .filter(Boolean)
+            .join("\n"),
+
+        buttonText,
+        buttonUrl,
+    });
+}
 
 function cleanPhone(phone) {
     return String(phone || "").replace(/[^\d+]/g, "");
@@ -132,6 +165,29 @@ router.post("/premium/create", authenticateToken, async (req, res) => {
         });
     } catch (e) {
         console.error("tbank premium/create error:", e);
+
+        notifyPaymentProblem({
+            provider: "T-Bank",
+            type: "webhook",
+
+            title: "🚨 Ошибка обработки платежа премиума",
+
+            message: [
+                `Ошибка: ${e?.message || "Unknown error"}`,
+                req.body?.PaymentId
+                    ? `Payment ID: ${req.body.PaymentId}`
+                    : null,
+                req.body?.OrderId
+                    ? `Order ID: ${req.body.OrderId}`
+                    : null,
+                req.body?.Status
+                    ? `Статус: ${req.body.Status}`
+                    : null,
+            ]
+                .filter(Boolean)
+                .join("\n"),
+        });
+
         return res.status(500).json({
             success: false,
             error: e?.message || "Internal server error",
@@ -217,6 +273,29 @@ router.post("/debt/create", authenticateToken, async (req, res) => {
         });
     } catch (e) {
         console.error("tbank debt/create error:", e);
+
+        notifyPaymentProblem({
+            provider: "T-Bank",
+            type: "webhook",
+
+            title: "🚨 Ошибка долга",
+
+            message: [
+                `Ошибка: ${e?.message || "Unknown error"}`,
+                req.body?.PaymentId
+                    ? `Payment ID: ${req.body.PaymentId}`
+                    : null,
+                req.body?.OrderId
+                    ? `Order ID: ${req.body.OrderId}`
+                    : null,
+                req.body?.Status
+                    ? `Статус: ${req.body.Status}`
+                    : null,
+            ]
+                .filter(Boolean)
+                .join("\n"),
+        });
+
         return res.status(500).json({
             success: false,
             error: e?.message || "Internal server error",
@@ -351,6 +430,29 @@ router.post("/order/promotion/create", authenticateToken, async (req, res) => {
         });
     } catch (e) {
         console.error("tbank order/promotion/create error:", e);
+
+        notifyPaymentProblem({
+            provider: "T-Bank",
+            type: "webhook",
+
+            title: "🚨 Ошибка оплаты продвижения",
+
+            message: [
+                `Ошибка: ${e?.message || "Unknown error"}`,
+                req.body?.PaymentId
+                    ? `Payment ID: ${req.body.PaymentId}`
+                    : null,
+                req.body?.OrderId
+                    ? `Order ID: ${req.body.OrderId}`
+                    : null,
+                req.body?.Status
+                    ? `Статус: ${req.body.Status}`
+                    : null,
+            ]
+                .filter(Boolean)
+                .join("\n"),
+        });
+
         return res.status(500).json({
             success: false,
             error: e?.message || "Internal server error",
@@ -368,6 +470,24 @@ router.post("/webhook", async (req, res) => {
 
         if (!isValid) {
             console.warn("⚠️ Invalid TBank webhook token", body);
+
+            void sendAdminNotification({
+                topic: "system",
+
+                title: "🚨 Некорректный T-Bank webhook",
+
+                message: [
+                    "Получен webhook с неправильной подписью/token.",
+                    body?.PaymentId
+                        ? `Payment ID: ${body.PaymentId}`
+                        : null,
+                    body?.OrderId
+                        ? `Order ID: ${body.OrderId}`
+                        : null,
+                ]
+                    .filter(Boolean)
+                    .join("\n"),
+            });
 
             /**
              * Важно:
@@ -435,6 +555,45 @@ router.post("/webhook", async (req, res) => {
          * Т-Банк может прислать AUTHORIZED и CONFIRMED.
          * Для простых платежей финально обрабатываем только CONFIRMED.
          */
+
+        const problemStatuses = new Set([
+            "CANCELED",
+            "REVERSED",
+            "PARTIAL_REVERSED",
+            "REJECTED",
+        ]);
+
+        if (problemStatuses.has(status)) {
+            notifyPaymentProblem({
+                provider: "T-Bank",
+                type,
+
+                title: "❌ Проблема с платежом T-Bank",
+
+                userId:
+                    type === "premium" ||
+                    type === "debt"
+                        ? userId
+                        : null,
+
+                orderId:
+                    type === "promo" ||
+                    type === "order_promotion" ||
+                    type === "promotion"
+                        ? orderId
+                        : null,
+
+                message: [
+                    `Payment ID: ${paymentId || "—"}`,
+                    `Order ID: ${body.OrderId || "—"}`,
+                    `Статус: ${status}`,
+                    `Сумма: ${kopecksToRubString(amountKopecks)} ₽`,
+                ].join("\n"),
+            });
+
+            return res.status(200).send("OK");
+        }
+
         if (status !== "CONFIRMED") {
             return res.status(200).send("OK");
         }
@@ -642,10 +801,28 @@ router.post("/webhook", async (req, res) => {
     } catch (e) {
         console.error("tbank webhook error:", e);
 
-        /**
-         * Важно:
-         * Возвращаем 200, чтобы банк не повторял webhook бесконечно.
-         */
+        notifyPaymentProblem({
+            provider: "T-Bank",
+            type: "webhook",
+
+            title: "🚨 Ошибка обработки T-Bank webhook",
+
+            message: [
+                `Ошибка: ${e?.message || "Unknown error"}`,
+                req.body?.PaymentId
+                    ? `Payment ID: ${req.body.PaymentId}`
+                    : null,
+                req.body?.OrderId
+                    ? `Order ID: ${req.body.OrderId}`
+                    : null,
+                req.body?.Status
+                    ? `Статус: ${req.body.Status}`
+                    : null,
+            ]
+                .filter(Boolean)
+                .join("\n"),
+        });
+
         return res.status(200).send("OK");
     }
 });

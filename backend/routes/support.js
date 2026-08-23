@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const {sendAdminNotification} = require("../services/adminNotificationService");
 
 const authenticateToken = require("../middlewares/userAuth");
 const { SupportMessage, User, Notification, ActionLog } = require("../models");
@@ -53,7 +54,7 @@ router.post("/messages", authenticateToken, async (req, res) => {
             userId,
             senderId: userId,
             senderRole: "user",
-            text: text.trim(),
+            text: cleanText,
             isReadByUser: true,
             isReadByAdmin: false,
         });
@@ -66,6 +67,52 @@ router.post("/messages", authenticateToken, async (req, res) => {
                     attributes: ["id", "username", "avatar", "role"],
                 },
             ],
+        });
+
+        const cleanText = String(text || "").trim();
+
+        if (!cleanText) {
+
+            return res.status(400).json({
+
+                message: "Сообщение не может быть пустым",
+
+            });
+
+        }
+
+        const isPlatformSuggestion =
+            cleanText.startsWith(
+                "💡 ПРЕДЛОЖЕНИЕ ПО РАЗВИТИЮ CARGOCAMP"
+            );
+
+        void sendAdminNotification({
+            topic:
+                isPlatformSuggestion
+                    ? "ideas"
+                    : "support",
+
+            title:
+                isPlatformSuggestion
+                    ? "💡 Новое предложение по развитию"
+                    : "💬 Новое сообщение в поддержку",
+
+            message: [
+                `Пользователь ID: ${userId}`,
+
+                fullMessage?.sender?.username
+                    ? `Имя: ${fullMessage.sender.username}`
+                    : null,
+
+                "",
+                cleanText,
+            ]
+                .filter(Boolean)
+                .join("\n"),
+
+            buttonText: "Открыть поддержку",
+
+            buttonUrl: "https://admin.cargocamp.ru/support",
         });
 
         await ActionLog.create({

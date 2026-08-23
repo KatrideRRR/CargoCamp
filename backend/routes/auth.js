@@ -11,6 +11,7 @@ const axios = require("axios");
 const fs = require('fs');
 const SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
 const { notifyUser } = require("../services/notificationService");
+const {sendAdminNotification, adminUserUrl, adminUsersUrl,} = require("../services/adminNotificationService");
 
 const avatarsDir = path.join(__dirname, "..", "uploads", "avatars");
 const uploadsRoot = path.join(__dirname, '..', 'uploads');
@@ -333,33 +334,79 @@ router.post("/password-reset/confirm", async (req, res) => {
     return res.json({ message: "Пароль успешно изменён" });
 });
 
-router.post('/upload-documents', authenticateToken, upload.array('documents', 5), async (req, res) => {
-    try {
-        const userId = req.user.id;
+router.post("/upload-documents", authenticateToken, upload.array("documents", 5), async (req, res) => {
+        try {
+            const userId = req.user.id;
 
-        const fileNames = (req.files || []).map(file => file.filename);
+            const fileNames = (req.files || []).map(
+                (file) => file.filename
+            );
 
-        const user = await User.findByPk(userId);
+            const user = await User.findByPk(userId);
 
-        if (!user) {
-            return res.status(404).json({ message: 'Пользователь не найден' });
+            if (!user) {
+                return res.status(404).json({
+                    message: "Пользователь не найден",
+                });
+            }
+
+            const existingPhotos =
+                Array.isArray(user.documentPhotos)
+                    ? user.documentPhotos
+                    : [];
+
+            const updatedPhotos = [
+                ...existingPhotos,
+                ...fileNames,
+            ];
+
+            user.documentPhotos = updatedPhotos;
+
+            await user.save();
+
+            void sendAdminNotification({
+                topic: "verification",
+
+                title: "🪪 Загружены документы на проверку",
+
+                message: [
+                    `Пользователь ID: ${user.id}`,
+
+                    user.username
+                        ? `Имя: ${user.username}`
+                        : null,
+
+                    user.phone
+                        ? `Телефон: ${user.phone}`
+                        : null,
+
+                    "",
+                    `Загружено новых файлов: ${fileNames.length}`,
+                    `Всего документов: ${updatedPhotos.length}`,
+                ]
+                    .filter(Boolean)
+                    .join("\n"),
+
+                buttonText: "Открыть пользователей",
+                buttonUrl: adminUsersUrl(),
+            });
+
+            return res.status(200).json({
+                message:
+                    "Документы загружены успешно",
+                files: updatedPhotos,
+            });
+        } catch (error) {
+            console.error(
+                "Ошибка при загрузке документов:",
+                error
+            );
+
+            return res.status(500).json({
+                message: "Ошибка сервера",
+            });
         }
-
-        const existingPhotos = Array.isArray(user.documentPhotos) ? user.documentPhotos : [];
-        const updatedPhotos = [...existingPhotos, ...fileNames];
-
-        user.documentPhotos = updatedPhotos;
-        await user.save();
-
-        res.status(200).json({
-            message: 'Документы загружены успешно',
-            files: updatedPhotos
-        });
-    } catch (error) {
-        console.error('Ошибка при загрузке документов:', error);
-        res.status(500).json({ message: 'Ошибка сервера' });
-    }
-});
+    });
 
 router.post('/register', async (req, res) => {
     const { username, phone, password, smsCode } = req.body;
@@ -1254,6 +1301,37 @@ router.post("/vehicle/me", authenticateToken, async (req, res) => {
             user.vehicleVerificationNote = null;
 
             await user.save();
+
+            void sendAdminNotification({
+                topic: "vehicles",
+
+                title: "🚗 Автомобиль отправлен на проверку",
+
+                message: [
+                    `Пользователь ID: ${user.id}`,
+                    user.username
+                        ? `Имя: ${user.username}`
+                        : null,
+                    user.phone
+                        ? `Телефон: ${user.phone}`
+                        : null,
+                    "",
+                    `Автомобиль: ${user.vehicleBrand} ${user.vehicleModel}`,
+                    `Цвет: ${user.vehicleColor}`,
+                    `Госномер: ${user.vehiclePlate}`,
+                    user.vehicleYear
+                        ? `Год: ${user.vehicleYear}`
+                        : null,
+                    user.vehiclePhoto
+                        ? "Фото автомобиля: загружено"
+                        : "Фото автомобиля: отсутствует",
+                ]
+                    .filter(Boolean)
+                    .join("\n"),
+
+                buttonText: "Открыть пользователей",
+                buttonUrl: adminUsersUrl(),
+            });
 
             return res.json({
                 success: true,

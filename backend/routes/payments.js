@@ -7,6 +7,39 @@ const authenticateToken = require('../middlewares/userAuth'); // если нуж
 const { randomUUID } = require('crypto');
 const yooKassa = require('../config/yookassaClient');
 const { sendOrderPush } = require("../utils/orderPushService");
+const {sendAdminNotification, adminUsersUrl, adminOrderUrl} = require("../services/adminNotificationService");
+
+function notifyPaymentProblem({provider, type, title, message, userId = null, orderId = null,}) {
+    const buttonUrl =
+        orderId
+            ? adminOrderUrl(orderId)
+            : adminUsersUrl();
+
+    const buttonText =
+        orderId
+            ? "Открыть заказ"
+            : "Открыть пользователей";
+
+    void sendAdminNotification({
+        topic: "payments",
+
+        title,
+
+        message: [
+            `Провайдер: ${provider}`,
+            type ? `Тип: ${type}` : null,
+            userId ? `Пользователь ID: ${userId}` : null,
+            orderId ? `Заказ ID: ${orderId}` : null,
+            "",
+            message,
+        ]
+            .filter(Boolean)
+            .join("\n"),
+
+        buttonText,
+        buttonUrl,
+    });
+}
 
 router.post('/premium/create', authenticateToken, async (req, res) => {
     try {
@@ -103,6 +136,23 @@ router.post('/premium/create', authenticateToken, async (req, res) => {
             });
 
             if (payment.status === "canceled") {
+
+                notifyPaymentProblem({
+                    provider: "YooKassa",
+                    type: "premium",
+
+                    title: "❌ Не удалось оплатить Premium",
+
+                    userId,
+
+                    message: [
+                        `Payment ID: ${payment.id}`,
+                        `Статус: ${payment.status}`,
+                        `Сумма: ${amountValue} ₽`,
+                        `Период: ${duration}`,
+                    ].join("\n"),
+                });
+
                 return res.json({
                     success: false,
                     paidBySavedCard: true,
@@ -305,6 +355,20 @@ router.post('/debt/create', authenticateToken, async (req, res) => {
             });
 
             if (payment.status === "canceled") {
+
+                notifyPaymentProblem({
+                    provider: "YooKassa",
+                    type: "debt",
+                    title: "❌ Не удалось погасить задолженность",
+                    userId,
+                    message: [
+                        `Payment ID: ${payment.id}`,
+                        `Статус: ${payment.status}`,
+                        `Сумма: ${amountValue} ₽`,
+                    ].join("\n"),
+
+                });
+
                 return res.json({
                     success: false,
                     paidBySavedCard: true,
@@ -365,6 +429,23 @@ router.post('/debt/create', authenticateToken, async (req, res) => {
         });
     } catch (e) {
         console.error('debt/pay error:', e);
+
+        notifyPaymentProblem({
+
+            provider: "YooKassa",
+
+            type: "premium",
+
+            title: "🚨 Ошибка оплаты долга за заказ",
+
+            userId: req.user?.id,
+
+            message:
+
+                `Ошибка: ${e?.message || "Unknown error"}`,
+
+        });
+
         return res.status(500).json({
             success: false,
             error: e?.message || 'Internal server error',
@@ -448,6 +529,23 @@ router.post('/card/bind/create', authenticateToken, async (req, res) => {
         });
     } catch (e) {
         console.error("card/bind/create error:", e);
+
+        notifyPaymentProblem({
+
+            provider: "YooKassa",
+
+            type: "premium",
+
+            title: "🚨 Ошибка привязки карты ",
+
+            userId: req.user?.id,
+
+            message:
+
+                `Ошибка: ${e?.message || "Unknown error"}`,
+
+        });
+
         return res.status(500).json({
             success: false,
             error: e?.message || "Internal server error",
@@ -619,6 +717,20 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
             });
 
             if (payment.status === "canceled") {
+
+                notifyPaymentProblem({
+                    provider: "YooKassa",
+                    type: "order_promotion",
+                    title: "❌ Ошибка оплаты продвижения",
+                    userId,
+                    orderId: order.id,
+                    message: [
+                        `Payment ID: ${payment.id}`,
+                        `Статус: ${payment.status}`,
+                        `Сумма: ${amountValue} ₽`,
+                    ].join("\n"),
+                });
+
                 return res.json({
                     success: false,
                     paidBySavedCard: true,
@@ -726,6 +838,22 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
         });
     } catch (e) {
         console.error('order/promotion/create error:', e);
+
+        notifyPaymentProblem({
+
+            provider: "YooKassa",
+
+            type: "premium",
+
+            title: "🚨 Ошибка оплаты продвижения",
+
+            userId: req.user?.id,
+
+            message:
+
+                `Ошибка: ${e?.message || "Unknown error"}`,
+
+        });
 
         return res.status(500).json({
             success: false,
@@ -980,6 +1108,28 @@ router.post("/yookassa/webhook", async (req, res) => {
             }
 
             if (eventName === "payment.canceled") {
+
+                notifyPaymentProblem({
+                    provider: "YooKassa",
+                    type: "debt",
+
+                    title: "⚠️ YooKassa отменила платёж задолженности",
+
+                    userId,
+                    orderId,
+
+                    message: [
+                        `Payment ID: ${payment.id}`,
+                        `Статус: ${paymentStatus}`,
+                        `Сумма: ${payment.amount?.value || "—"} ₽`,
+                        payment.cancellation_details
+                            ? `Причина: ${JSON.stringify(payment.cancellation_details)}`
+                            : null,
+                    ]
+                        .filter(Boolean)
+                        .join("\n"),
+                });
+
                 await req.logAction?.({
                     req,
                     actorUserId: userId,
@@ -1239,6 +1389,26 @@ router.post("/yookassa/webhook", async (req, res) => {
         return res.sendStatus(200);
     } catch (e) {
         console.error("yookassa webhook error:", e);
+
+        notifyPaymentProblem({
+            provider: "YooKassa",
+            type: "webhook",
+
+            title: "🚨 Ошибка обработки YooKassa webhook",
+
+            message: [
+                `Ошибка: ${e?.message || "Unknown error"}`,
+                req.body?.event
+                    ? `Event: ${req.body.event}`
+                    : null,
+                req.body?.object?.id
+                    ? `Payment ID: ${req.body.object.id}`
+                    : null,
+            ]
+                .filter(Boolean)
+                .join("\n"),
+        });
+
         return res.sendStatus(200);
     }
 });
@@ -1370,6 +1540,23 @@ router.get('/promotion/status', authenticateToken, async (req, res) => {
         return res.json({ success: true, status: payment.status });
     } catch (e) {
         console.error('promotion/status error:', e);
+
+        notifyPaymentProblem({
+
+            provider: "YooKassa",
+
+            type: "premium",
+
+            title: "🚨 Ошибка оплаты",
+
+            userId: req.user?.id,
+
+            message:
+
+                `Ошибка: ${e?.message || "Unknown error"}`,
+
+        });
+
         return res.status(500).json({ success: false, error: e?.message || 'Internal error' });
     }
 });

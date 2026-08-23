@@ -36,6 +36,7 @@ const tbankPaymentsRoutes = require("./routes/tbankPayments");
 const pushTokensRoutes = require("./routes/pushTokens");
 const supportRoutes = require("./routes/support");
 const adminSupportRoutes = require("./routes/adminSupport");
+const {notifySystemError} = require("./services/adminNotificationService");
 
 const db = require("./models");
 const sequelize = require("./config/database");
@@ -79,7 +80,18 @@ app.use((req, res, next) => {
     next();
 });
 
-db.sequelize.sync();
+db.sequelize.sync().catch((err) => {
+    console.error(
+        "Database sync error:",
+        err
+    );
+
+    void notifySystemError({
+        title: "🚨 Ошибка синхронизации базы данных",
+        error: err,
+        extra: "db.sequelize.sync()",
+    });
+});
 
 const corsOptions = {
     origin: allowedOrigins,
@@ -168,8 +180,82 @@ app.post("/api/token", (req, res) => {
     });
 });
 
+app.use((error, req, res, next) => {
+    console.error("Unhandled Express error:", error);
+
+    notifySystemError({
+        title: "🚨 Необработанная ошибка API",
+        error,
+        req,
+    });
+
+    if (res.headersSent) {
+        return next(error);
+    }
+
+    return res.status(
+        Number(error?.status) || 500
+    ).json({
+        success: false,
+        message:
+            process.env.NODE_ENV === "production"
+                ? "Внутренняя ошибка сервера"
+                : error?.message ||
+                "Внутренняя ошибка сервера",
+    });
+});
+
+process.on(
+    "unhandledRejection",
+    (reason) => {
+        console.error(
+            "Unhandled Promise Rejection:",
+            reason
+        );
+
+        void notifySystemError({
+            title: "🚨 Unhandled Promise Rejection",
+
+            error:
+                reason instanceof Error
+                    ? reason
+                    : new Error(String(reason)),
+        });
+    }
+);
+
+process.on(
+    "uncaughtException",
+    async (error) => {
+        console.error(
+            "Uncaught Exception:",
+            error
+        );
+
+        try {
+            await notifySystemError({
+                title: "💥 Uncaught Exception",
+                error,
+            });
+        } catch (notifyError) {
+            console.error(
+                "Не удалось отправить системное уведомление:",
+                notifyError
+            );
+        }
+
+        process.exit(1);
+    }
+);
+
 sequelize.authenticate().catch((err) => {
     console.error("Database connection error:", err);
+
+    notifySystemError({
+        title: "🚨 Ошибка подключения к базе данных",
+        error: err,
+        extra: "sequelize.authenticate()",
+    });
 });
 
 const PORT = process.env.PORT;
