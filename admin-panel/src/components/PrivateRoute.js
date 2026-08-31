@@ -5,8 +5,17 @@ const PrivateRoute = ({ children }) => {
     const token = localStorage.getItem("authToken");
     const role = localStorage.getItem("userRole");
 
-    if (!token || role !== "admin") {
-        return <Navigate to="/" />;
+    const hasValidLocalAuth =
+        token &&
+        token !== "null" &&
+        token !== "undefined" &&
+        role === "admin";
+
+    if (!hasValidLocalAuth) {
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("userRole");
+
+        return <Navigate to="/login" replace />;
     }
 
     return children;

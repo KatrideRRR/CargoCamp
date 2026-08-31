@@ -36,7 +36,7 @@ function LoginPage() {
             localStorage.setItem("authToken", token);
             localStorage.setItem("userRole", user.role);
 
-            navigate("/dashboard");
+            navigate("/dashboard", { replace: true });
         } catch (err) {
             setError(err.response?.data?.message || "Неверный логин или пароль.");
         }
