@@ -47,6 +47,16 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
+COPY certs/russian_trusted_root_ca.pem \
+    /usr/local/share/ca-certificates/russian_trusted_root_ca.crt
+
+COPY certs/russian_trusted_sub_ca.pem \
+    /usr/local/share/ca-certificates/russian_trusted_sub_ca.crt
+
+RUN update-ca-certificates
+
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
+
 COPY . .
 
 EXPOSE 5001
