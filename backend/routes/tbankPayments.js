@@ -6,6 +6,7 @@ const authenticateToken = require("../middlewares/userAuth");
 const { requestTBank, verifyNotificationToken } = require("../config/tbankClient");
 const { sendOrderPush } = require("../utils/orderPushService");
 const {sendAdminNotification, adminUsersUrl, adminOrderUrl} = require("../services/adminNotificationService");
+const {sendBusinessCashPayment,} = require("../services/businessCashService");
 
 function notifyPaymentProblem({provider, type, title, message, userId = null, orderId = null,}) {
     const buttonUrl =
@@ -596,6 +597,77 @@ router.post("/webhook", async (req, res) => {
 
         if (status !== "CONFIRMED") {
             return res.status(200).send("OK");
+        }
+
+        /*
+ * CONFIRMED — деньги реально
+ * подтверждены Т-Банком.
+ *
+ * Передаём только собственную
+ * выручку CargoCamp.
+ */
+        let businessCashKind =
+            null;
+
+        if (
+            type ===
+            "premium"
+        ) {
+            businessCashKind =
+                "premium";
+        }
+
+        if (
+            type ===
+            "debt"
+        ) {
+            businessCashKind =
+                "debt";
+        }
+
+        if (
+            type === "promo" ||
+            type ===
+            "order_promotion" ||
+            type ===
+            "promotion"
+        ) {
+            businessCashKind =
+                "promotion";
+        }
+
+        if (businessCashKind) {
+            void sendBusinessCashPayment({
+                provider:
+                    "tbank",
+
+                paymentId,
+
+                kind:
+                businessCashKind,
+
+                amountKopecks,
+
+                userId:
+                    (
+                        businessCashKind ===
+                        "premium" ||
+                        businessCashKind ===
+                        "debt"
+                    )
+                        ? userId
+                        : null,
+
+                orderId:
+                    businessCashKind ===
+                    "promotion"
+                        ? orderId
+                        : null,
+
+                occurredAt:
+                    new Date()
+                        .toISOString(),
+            });
         }
 
         // ====== 1) Premium ======

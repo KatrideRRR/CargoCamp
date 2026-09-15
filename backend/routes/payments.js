@@ -8,6 +8,7 @@ const { randomUUID } = require('crypto');
 const yooKassa = require('../config/yookassaClient');
 const { sendOrderPush } = require("../utils/orderPushService");
 const {sendAdminNotification, adminUsersUrl, adminOrderUrl} = require("../services/adminNotificationService");
+const {sendBusinessCashPayment,} = require("../services/businessCashService");
 
 function notifyPaymentProblem({provider, type, title, message, userId = null, orderId = null,}) {
     const buttonUrl =
@@ -993,6 +994,87 @@ router.post("/yookassa/webhook", async (req, res) => {
         const meta = payment?.metadata || {};
         const paymentStatus = payment?.status;
         const eventName = event.event;
+
+        /*
+ * Передаём подтверждённую
+ * выручку CargoCamp в BusinessCash.
+ *
+ * guarantee и bind_card
+ * сюда специально не входят.
+ */
+        if (
+            eventName ===
+            "payment.succeeded"
+        ) {
+            let businessCashKind =
+                null;
+
+            if (
+                meta.type ===
+                "premium"
+            ) {
+                businessCashKind =
+                    "premium";
+            }
+
+            if (
+                meta.type ===
+                "debt"
+            ) {
+                businessCashKind =
+                    "debt";
+            }
+
+            if (
+                meta.type ===
+                "order_promotion"
+            ) {
+                businessCashKind =
+                    "promotion";
+            }
+
+            if (businessCashKind) {
+                const amountKopecks =
+                    Math.round(
+                        Number(
+                            payment
+                                ?.amount
+                                ?.value ||
+                            0
+                        ) *
+                        100
+                    );
+
+                void sendBusinessCashPayment({
+                    provider:
+                        "yookassa",
+
+                    paymentId:
+                    payment.id,
+
+                    kind:
+                    businessCashKind,
+
+                    amountKopecks,
+
+                    userId:
+                        meta.userId ||
+                        null,
+
+                    orderId:
+                        meta.orderId ||
+                        null,
+
+                    occurredAt:
+                        payment
+                            .captured_at ||
+                        payment
+                            .created_at ||
+                        new Date()
+                            .toISOString(),
+                });
+            }
+        }
 
         await req.logAction?.({
             req,
