@@ -6,7 +6,7 @@ const authenticateToken = require("../middlewares/userAuth");
 const { requestTBank, verifyNotificationToken } = require("../config/tbankClient");
 const { sendOrderPush } = require("../utils/orderPushService");
 const {sendAdminNotification, adminUsersUrl, adminOrderUrl} = require("../services/adminNotificationService");
-const {sendBusinessCashPayment,} = require("../services/businessCashService");
+const {sendBusinessCashPayment, sendBusinessCashRefund,} = require("../services/businessCashService");
 
 function notifyPaymentProblem({provider, type, title, message, userId = null, orderId = null,}) {
     const buttonUrl =
@@ -593,6 +593,64 @@ router.post("/webhook", async (req, res) => {
             });
 
             return res.status(200).send("OK");
+        }
+
+        if (
+            status ===
+            "REFUNDED"
+        ) {
+            /*
+             * Не доверяем Amount как размеру
+             * возврата.
+             *
+             * BusinessCash сам знает исходную
+             * сумму этого paymentId и вернёт
+             * весь оставшийся остаток.
+             */
+            void sendBusinessCashRefund({
+                provider:
+                    "tbank",
+
+                paymentId,
+
+                refundId:
+                    `${paymentId}:REFUNDED`,
+
+                fullRefund:
+                    true,
+
+                occurredAt:
+                    new Date()
+                        .toISOString(),
+            });
+
+            return res
+                .status(200)
+                .send("OK");
+        }
+
+        if (
+            status ===
+            "PARTIAL_REFUNDED"
+        ) {
+            /*
+             * Пока не записываем сумму вслепую.
+             * В уведомлении нам нужно достоверно
+             * знать именно размер конкретного
+             * частичного возврата.
+             */
+            console.warn(
+                "⚠️ TBank PARTIAL_REFUNDED требует сверки суммы возврата",
+                {
+                    paymentId,
+                    orderId:
+                    body.OrderId,
+                }
+            );
+
+            return res
+                .status(200)
+                .send("OK");
         }
 
         if (status !== "CONFIRMED") {

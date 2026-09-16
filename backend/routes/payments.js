@@ -8,7 +8,7 @@ const { randomUUID } = require('crypto');
 const yooKassa = require('../config/yookassaClient');
 const { sendOrderPush } = require("../utils/orderPushService");
 const {sendAdminNotification, adminUsersUrl, adminOrderUrl} = require("../services/adminNotificationService");
-const {sendBusinessCashPayment,} = require("../services/businessCashService");
+const {sendBusinessCashPayment, sendBusinessCashRefund,} = require("../services/businessCashService");
 
 function notifyPaymentProblem({provider, type, title, message, userId = null, orderId = null,}) {
     const buttonUrl =
@@ -984,9 +984,83 @@ router.post("/yookassa/webhook", async (req, res) => {
             "payment.waiting_for_capture",
             "payment.succeeded",
             "payment.canceled",
+            "refund.succeeded",
         ];
 
         if (!allowed.includes(event?.event)) {
+            return res.sendStatus(200);
+        }
+
+        if (
+            event.event ===
+            "refund.succeeded"
+        ) {
+            const refund =
+                event.object || {};
+
+            const refundId =
+                String(
+                    refund.id || ""
+                );
+
+            const paymentId =
+                String(
+                    refund.payment_id || ""
+                );
+
+            const amountKopecks =
+                Math.round(
+                    Number(
+                        refund
+                            ?.amount
+                            ?.value ||
+                        0
+                    ) * 100
+                );
+
+            if (
+                refundId &&
+                paymentId &&
+                amountKopecks > 0
+            ) {
+                void sendBusinessCashRefund({
+                    provider:
+                        "yookassa",
+
+                    paymentId,
+
+                    refundId,
+
+                    amountKopecks,
+
+                    fullRefund:
+                        false,
+
+                    occurredAt:
+                        refund.created_at ||
+                        new Date()
+                            .toISOString(),
+                });
+            }
+
+            await req.logAction?.({
+                req,
+                actorUserId: null,
+                actorRole:
+                    "webhook",
+                actionType:
+                    "yookassa_refund_succeeded",
+                entityType:
+                    "payment",
+                paymentId,
+                severity:
+                    "info",
+                meta: {
+                    refundId,
+                    amountKopecks,
+                },
+            });
+
             return res.sendStatus(200);
         }
 

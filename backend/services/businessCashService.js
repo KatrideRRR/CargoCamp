@@ -238,6 +238,187 @@ async function sendBusinessCashPayment({
     };
 }
 
+async function sendBusinessCashRefund({
+                                          provider,
+                                          paymentId,
+                                          refundId,
+                                          amountKopecks = null,
+                                          fullRefund = false,
+                                          occurredAt = null,
+                                      }) {
+    const paymentUrl =
+        process.env
+            .BUSINESS_CASH_URL;
+
+    const secret =
+        process.env
+            .BUSINESS_CASH_API_SECRET;
+
+    if (!paymentUrl || !secret) {
+        console.warn(
+            "⚠️ BusinessCash refund: URL или secret не настроен"
+        );
+
+        return {
+            ok: false,
+            skipped: true,
+        };
+    }
+
+    const refundUrl =
+        process.env
+            .BUSINESS_CASH_REFUND_URL ||
+        paymentUrl.replace(
+            /\/payments\/?$/,
+            "/refunds"
+        );
+
+    const amount =
+        amountKopecks === null
+            ? null
+            : Number(
+                amountKopecks
+            );
+
+    if (
+        !provider ||
+        !paymentId ||
+        !refundId ||
+        (
+            !fullRefund &&
+            (
+                !Number.isSafeInteger(
+                    amount
+                ) ||
+                amount <= 0
+            )
+        )
+    ) {
+        console.warn(
+            "⚠️ BusinessCash: некорректный refund",
+            {
+                provider,
+                paymentId,
+                refundId,
+                amountKopecks,
+                fullRefund,
+            }
+        );
+
+        return {
+            ok: false,
+            skipped: true,
+        };
+    }
+
+    const payload = {
+        provider:
+            String(
+                provider
+            ).toLowerCase(),
+
+        paymentId:
+            String(
+                paymentId
+            ),
+
+        refundId:
+            String(
+                refundId
+            ),
+
+        fullRefund:
+            Boolean(
+                fullRefund
+            ),
+
+        amountKopecks:
+            amount === null
+                ? null
+                : String(
+                    amount
+                ),
+
+        occurredAt:
+            occurredAt ||
+            new Date()
+                .toISOString(),
+    };
+
+    const delays = [
+        0,
+        1000,
+        3000,
+        7000,
+    ];
+
+    for (
+        let attempt = 0;
+        attempt < delays.length;
+        attempt += 1
+    ) {
+        if (
+            delays[attempt] > 0
+        ) {
+            await sleep(
+                delays[attempt]
+            );
+        }
+
+        try {
+            const response =
+                await axios.post(
+                    refundUrl,
+                    payload,
+                    {
+                        headers: {
+                            "Content-Type":
+                                "application/json",
+
+                            "x-cargocamp-secret":
+                            secret,
+                        },
+
+                        timeout:
+                            5000,
+                    }
+                );
+
+            console.log(
+                `↩️ BusinessCash refund: ` +
+                `${provider} ` +
+                `${paymentId} ` +
+                (
+                    response.data
+                        ?.duplicate
+                        ? "(duplicate)"
+                        : response.data
+                            ?.ignored
+                            ? "(ignored)"
+                            : "(recorded)"
+                )
+            );
+
+            return {
+                ok: true,
+            };
+        } catch (error) {
+            console.error(
+                `⚠️ BusinessCash refund attempt ${attempt + 1}/${delays.length}:`,
+                error
+                    ?.response
+                    ?.data ||
+                error.message
+            );
+        }
+    }
+
+    return {
+        ok: false,
+    };
+}
+
 module.exports = {
     sendBusinessCashPayment,
+    sendBusinessCashRefund,
 };
