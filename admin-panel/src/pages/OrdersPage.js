@@ -283,6 +283,7 @@ function OrdersPage() {
                                 <th>Заказчик</th>
                                 <th>Исполнитель</th>
                                 <th>Дата</th>
+                                <th>Видимость</th>
                                 <th>Действия</th>
                             </tr>
                             </thead>
@@ -306,6 +307,7 @@ function OrdersPage() {
                                     <td>{order.creatorId || "—"}</td>
                                     <td>{order.executorId || "—"}</td>
                                     <td>{new Date(order.createdAt).toLocaleDateString()}</td>
+                                    <td>{renderVisibilityBadge(order)}</td>
                                     <td>
                                         <button
                                             className="details-button"

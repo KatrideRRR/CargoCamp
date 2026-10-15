@@ -1219,9 +1219,18 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
             return res.status(409).json({ success: false, message: "Нельзя принять свой заказ" });
         }
 
-        if (order.status !== "created" || order.executorId) {
+        if (
+            order.status !== "created" ||
+            order.executorId ||
+            order.creatorHidden ||
+            order.adminDeleted
+        ) {
             await t.rollback();
-            return res.status(409).json({ success: false, message: "Заказ уже принят" });
+
+            return res.status(409).json({
+                success: false,
+                message: "Экспресс-заказ недоступен для принятия",
+            });
         }
 
         /*

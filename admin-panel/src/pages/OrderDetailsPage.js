@@ -359,6 +359,10 @@ function OrderDetailsPage() {
     const disputes = Array.isArray(order.disputes) ? order.disputes : [];
     const visibilityStatus = getVisibilityStatus(order);
 
+    const canHideOrder =
+        ["pending", "pending_payment"].includes(order.status) &&
+        order.executorId == null;
+
     return (
         <div className="order-details-container">
             <h2>Детали заказа #{order.id}</h2>
@@ -378,17 +382,21 @@ function OrderDetailsPage() {
                                 onClick={() => restoreOrder(order.id)}
                                 disabled={orderRestoreLoading}
                             >
-                                {orderRestoreLoading ? "Восстанавливаем..." : "Восстановить"}
+                                {orderRestoreLoading
+                                    ? "Восстанавливаем..."
+                                    : "Восстановить"}
                             </button>
-                        ) : (
+                        ) : canHideOrder ? (
                             <button
                                 className="delete-button"
                                 onClick={() => deleteOrder(order.id)}
                                 disabled={orderDeleteLoading}
                             >
-                                {orderDeleteLoading ? "Удаляем..." : "Удалить"}
+                                {orderDeleteLoading
+                                    ? "Скрываем..."
+                                    : "Скрыть заказ"}
                             </button>
-                        )}
+                        ) : null}
                     </div>
                 </div>
 

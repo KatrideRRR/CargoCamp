@@ -29,6 +29,8 @@ function AdminExpressOrderDetailsPage() {
         setDisputesError,
     ] = useState("");
 
+    const [orderActionLoading, setOrderActionLoading] = useState(false);
+
     useEffect(() => {
         if (!token) {
             setError("Нет токена авторизации");
@@ -260,7 +262,64 @@ function AdminExpressOrderDetailsPage() {
     };
 
     const deleteOrder = async () => {
-        alert("Удаление express-заказа пока не подключено");
+        if (!window.confirm("Скрыть экспресс-заказ?")) return;
+
+        try {
+            setOrderActionLoading(true);
+
+            const res = await axios.delete(
+                `${apiUrl}/api/admin/express-orders/${id}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            if (res.data?.order) {
+                setOrder(res.data.order);
+            }
+
+            alert("Экспресс-заказ скрыт");
+        } catch (error) {
+            alert(
+                error.response?.data?.message ||
+                "Не удалось скрыть экспресс-заказ"
+            );
+        } finally {
+            setOrderActionLoading(false);
+        }
+    };
+
+    const restoreOrder = async () => {
+        if (!window.confirm("Восстановить экспресс-заказ?")) return;
+
+        try {
+            setOrderActionLoading(true);
+
+            const res = await axios.patch(
+                `${apiUrl}/api/admin/express-orders/${id}/restore`,
+                {},
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            if (res.data?.order) {
+                setOrder(res.data.order);
+            }
+
+            alert("Экспресс-заказ восстановлен");
+        } catch (error) {
+            alert(
+                error.response?.data?.message ||
+                "Не удалось восстановить экспресс-заказ"
+            );
+        } finally {
+            setOrderActionLoading(false);
+        }
     };
 
     if (loading) {
@@ -290,6 +349,10 @@ function AdminExpressOrderDetailsPage() {
         );
     }
 
+    const canHideOrder =
+        order.status === "created" &&
+        order.executorId == null;
+
     return (
         <div className="express-details-container">
             <h2>Детали экспресс-заказа #{order.id}</h2>
@@ -306,12 +369,27 @@ function AdminExpressOrderDetailsPage() {
                             Назад
                         </button>
 
-                        <button
-                            className="delete-button"
-                            onClick={deleteOrder}
-                        >
-                            Удалить
-                        </button>
+                        {order.adminDeleted || order.creatorHidden ? (
+                            <button
+                                className="restore-button"
+                                onClick={restoreOrder}
+                                disabled={orderActionLoading}
+                            >
+                                {orderActionLoading
+                                    ? "Восстанавливаем..."
+                                    : "Восстановить"}
+                            </button>
+                        ) : canHideOrder ? (
+                            <button
+                                className="delete-button"
+                                onClick={deleteOrder}
+                                disabled={orderActionLoading}
+                            >
+                                {orderActionLoading
+                                    ? "Скрываем..."
+                                    : "Скрыть заказ"}
+                            </button>
+                        ) : null}
                     </div>
                 </div>
 

@@ -1048,6 +1048,20 @@ router.delete("/express-orders/:id", authMiddleware, adminMiddleware, async (req
             return res.status(404).json({ message: "Экспресс-заказ не найден" });
         }
 
+        // Запрещаем скрывать экспресс-заказ, если он уже принят
+        // или находится в любом другом статусе, кроме created.
+
+        if (
+            order.status !== "created" ||
+            order.executorId !== null
+        ) {
+            return res.status(409).json({
+                success: false,
+                message:
+                    "Нельзя скрыть экспресс-заказ, который уже принят или выполняется. Используйте отмену заказа.",
+            });
+        }
+
         if (order.adminDeleted) {
             return res.status(400).json({
                 message: "Экспресс-заказ уже помечен как удалённый админом",
@@ -1063,11 +1077,37 @@ router.delete("/express-orders/:id", authMiddleware, adminMiddleware, async (req
             adminDeletedById: order.adminDeletedById,
         };
 
-        order.adminDeleted = true;
-        order.adminDeletedAt = new Date();
-        order.adminDeletedById = req.user?.id || null;
+        const [updatedCount] = await ExpressOrder.update(
+            {
+                adminDeleted: true,
+                adminDeletedAt: new Date(),
+                adminDeletedById: req.user?.id || null,
+            },
+            {
+                where: {
+                    id: order.id,
 
-        await order.save();
+                    // Заказ ещё не принят
+                    status: "created",
+                    executorId: null,
+
+                    // Заказ ещё не скрыт
+                    adminDeleted: false,
+                    creatorHidden: false,
+                },
+            }
+        );
+
+        if (updatedCount !== 1) {
+            return res.status(409).json({
+                success: false,
+                message:
+                    "Экспресс-заказ уже принят, скрыт или изменил состояние. Обновите страницу.",
+            });
+        }
+
+    // Получаем обновлённые данные для ответа и логирования
+        await order.reload();
 
         await req.logAction?.({
             req,
@@ -1580,6 +1620,21 @@ router.delete("/orders/:id", authMiddleware, adminMiddleware, async (req, res) =
             });
         }
 
+        // Скрывать обычный заказ можно только до назначения исполнителя.
+
+        const allowedStatuses = ["pending", "pending_payment"];
+
+        if (
+            !allowedStatuses.includes(order.status) ||
+            order.executorId !== null
+        ) {
+            return res.status(409).json({
+                success: false,
+                message:
+                    "Нельзя скрыть заказ, который уже принят или выполняется. Используйте отмену заказа.",
+            });
+        }
+
         const before = {
             status: order.status,
             creatorHidden: order.creatorHidden,
@@ -1589,11 +1644,37 @@ router.delete("/orders/:id", authMiddleware, adminMiddleware, async (req, res) =
             adminDeletedById: order.adminDeletedById,
         };
 
-        order.adminDeleted = true;
-        order.adminDeletedAt = new Date();
-        order.adminDeletedById = req.user?.id || null;
+        const [updatedCount] = await Order.update(
+            {
+                adminDeleted: true,
+                adminDeletedAt: new Date(),
+                adminDeletedById: req.user?.id || null,
+            },
+            {
+                where: {
+                    id: order.id,
 
-        await order.save();
+                    status: {
+                        [Op.in]: ["pending", "pending_payment"],
+                    },
+
+                    executorId: null,
+
+                    adminDeleted: false,
+                    creatorHidden: false,
+                },
+            }
+        );
+
+        if (updatedCount !== 1) {
+            return res.status(409).json({
+                success: false,
+                message:
+                    "Заказ уже принят, скрыт или изменил состояние. Обновите страницу.",
+            });
+        }
+
+        await order.reload();
 
         await req.logAction?.({
             req,
