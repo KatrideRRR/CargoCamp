@@ -2,19 +2,53 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+      <!-- CargoCamp favicon -->
+      <link
+              id="cargocamp-favicon"
+              rel="icon"
+              type="image/png"
+              href="%PUBLIC_URL%/favicon-light.png?v=1"
+      />
+
+      <script>
+          (function () {
+              const favicon = document.getElementById("cargocamp-favicon");
+
+              const theme = window.matchMedia(
+                  "(prefers-color-scheme: dark)"
+              );
+
+              function updateFavicon() {
+                  favicon.href = theme.matches
+                      ? "%PUBLIC_URL%/favicon-dark.png?v=1"
+                      : "%PUBLIC_URL%/favicon-light.png?v=1";
+              }
+
+              updateFavicon();
+
+              if (theme.addEventListener) {
+                  theme.addEventListener("change", updateFavicon);
+              } else {
+                  theme.addListener(updateFavicon);
+              }
+          })();
+      </script>
       <meta
               name="viewport"
               content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
       />
       <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&apikey=bf97867b-5ffb-4fc4-9fd5-8997874b300e" type="text/javascript"></script>
-    <meta name="theme-color" content="#000000" />
-    <meta
+      <meta name="theme-color" content="#0759D3" />
+      <meta
       name="description"
       content="Web site created using create-react-app"
     />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <!--
+      <link
+              rel="apple-touch-icon"
+              sizes="180x180"
+              href="%PUBLIC_URL%/apple-touch-icon.png"
+      />
+      <!--
       manifest.json provides metadata used when your web app is installed on a
       user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
     -->
@@ -28,7 +62,7 @@
       work correctly both with client-side routing and a non-root public URL.
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
-      <title>React App</title>
+      <title>CargoCamp — заказы и услуги рядом</title>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
