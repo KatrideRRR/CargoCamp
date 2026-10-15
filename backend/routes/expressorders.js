@@ -554,10 +554,28 @@ router.get("/express-orders/me", authenticateToken, async (req, res) => {
             };
         } else {
             // Для active-orders:
-            // все активные экспресс-заказы, где пользователь заказчик или исполнитель.
+            // показываем только экспресс-заказы,
+            // которые уже принял исполнитель.
+
             where = {
                 ...whereBase,
-                status: { [Op.notIn]: ["completed", "cancelled"] },
+
+                // Исключаем новые, завершённые и отменённые заказы
+                status: {
+                    [Op.notIn]: [
+                        "created",
+                        "completed",
+                        "cancelled",
+                    ],
+                },
+
+                // Исполнитель обязательно должен быть назначен
+                executorId: {
+                    [Op.ne]: null,
+                },
+
+                // Не показываем скрытые заказы
+                creatorHidden: false,
                 adminDeleted: false,
             };
         }

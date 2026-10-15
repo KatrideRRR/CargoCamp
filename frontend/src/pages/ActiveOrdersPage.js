@@ -1482,13 +1482,39 @@ const ActiveOrdersPage = () => {
     const performingOrders = orders.filter((order) => Number(order.executorId) === Number(user.id));
     const createdOrders = orders.filter((order) => Number(order.creatorId) === Number(user.id));
 
-    const performingExpressOrders = expressOrders.filter(
-        (order) => Number(order.executorId) === Number(user.id)
-    );
+// Экспресс-заказы, которые выполняет текущий пользователь
+    const performingExpressOrders = expressOrders.filter((order) => {
+        const isExecutor =
+            Number(order.executorId) === Number(user.id);
 
-    const createdExpressOrders = expressOrders.filter(
-        (order) => Number(order.creatorId) === Number(user.id)
-    );
+        const hasExecutor =
+            Number(order.executorId) > 0;
+
+        const isActive =
+            !["created", "completed", "cancelled"].includes(order.status);
+
+        const isVisible =
+            !order.creatorHidden && !order.adminDeleted;
+
+        return isExecutor && hasExecutor && isActive && isVisible;
+    });
+
+// Экспресс-заказы клиента, которые уже выполняются
+    const createdExpressOrders = expressOrders.filter((order) => {
+        const isCreator =
+            Number(order.creatorId) === Number(user.id);
+
+        const hasExecutor =
+            Number(order.executorId) > 0;
+
+        const isActive =
+            !["created", "completed", "cancelled"].includes(order.status);
+
+        const isVisible =
+            !order.creatorHidden && !order.adminDeleted;
+
+        return isCreator && hasExecutor && isActive && isVisible;
+    });
 
     const targetOrderId = new URLSearchParams(window.location.search).get("orderId");
 
