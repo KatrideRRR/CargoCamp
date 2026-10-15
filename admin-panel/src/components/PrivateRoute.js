@@ -1,21 +1,78 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Navigate } from "react-router-dom";
 
+import {
+    isAdminSessionValid,
+    clearAdminSession,
+    redirectToAdminLogin,
+} from "../utils/adminSession";
+
 const PrivateRoute = ({ children }) => {
-    const token = localStorage.getItem("authToken");
-    const role = localStorage.getItem("userRole");
+    const isAuthenticated = isAdminSessionValid();
 
-    const hasValidLocalAuth =
-        token &&
-        token !== "null" &&
-        token !== "undefined" &&
-        role === "admin";
+    useEffect(() => {
+        if (!isAuthenticated) {
+            clearAdminSession();
+            return;
+        }
 
-    if (!hasValidLocalAuth) {
-        localStorage.removeItem("authToken");
-        localStorage.removeItem("userRole");
+        const checkSession = () => {
+            if (!isAdminSessionValid()) {
+                redirectToAdminLogin("expired");
+            }
+        };
 
-        return <Navigate to="/login" replace />;
+        // Проверяем авторизацию каждые 30 секунд
+        const interval = window.setInterval(
+            checkSession,
+            30000
+        );
+
+        // Проверяем, когда пользователь возвращается на вкладку
+        window.addEventListener("focus", checkSession);
+
+        // Проверяем после выхода браузера из фонового режима
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                checkSession();
+            }
+        };
+
+        document.addEventListener(
+            "visibilitychange",
+            handleVisibilityChange
+        );
+
+        // Проверяем изменения авторизации в другой вкладке
+        window.addEventListener("storage", checkSession);
+
+        return () => {
+            window.clearInterval(interval);
+
+            window.removeEventListener(
+                "focus",
+                checkSession
+            );
+
+            document.removeEventListener(
+                "visibilitychange",
+                handleVisibilityChange
+            );
+
+            window.removeEventListener(
+                "storage",
+                checkSession
+            );
+        };
+    }, [isAuthenticated]);
+
+    if (!isAuthenticated) {
+        return (
+            <Navigate
+                to="/login?reason=expired"
+                replace
+            />
+        );
     }
 
     return children;

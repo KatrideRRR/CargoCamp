@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { IMaskInput } from "react-imask";
 import "../styles/LoginPage.css";
@@ -13,6 +13,14 @@ function LoginPage() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const navigate = useNavigate();
+
+    const [searchParams] = useSearchParams();
+
+    const sessionExpired =
+        searchParams.get("reason") === "expired";
+
+    const accessRevoked =
+        searchParams.get("reason") === "access_revoked";
 
     const phoneDigits = useMemo(() => normalizePhoneClient(phone), [phone]);
 
@@ -46,6 +54,21 @@ function LoginPage() {
         <div className="login-container">
             <div className="login-box">
                 <h2>Вход для администратора</h2>
+
+                {sessionExpired && (
+                    <p className="error-message">
+                        Срок действия сессии истёк.
+                        Пожалуйста, войдите повторно.
+                    </p>
+                )}
+
+                {accessRevoked && (
+                    <p className="error-message">
+                        Доступ администратора был отозван.
+                        Обратитесь к владельцу системы.
+                    </p>
+                )}
+
                 {error && <p className="error-message">{error}</p>}
 
                 <form onSubmit={handleLogin}>
