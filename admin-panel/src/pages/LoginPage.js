@@ -34,10 +34,16 @@ function LoginPage() {
         }
 
         try {
-            const response = await axios.post(`${apiUrl}/api/admin/login`, {
-                phone: phoneDigits,
-                password,
-            });
+            const response = await axios.post(
+                `${apiUrl}/api/admin/login`,
+                {
+                    phone: phoneDigits,
+                    password,
+                },
+                {
+                    withCredentials: true,
+                }
+            );
 
             const { token, user } = response.data;
 

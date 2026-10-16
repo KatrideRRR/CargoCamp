@@ -20,6 +20,7 @@ db.sequelize = sequelize;
 
 // ✅ Основные модели
 db.User = require("./User")(sequelize, DataTypes);
+db.AuthSession = require("./AuthSession")(sequelize, DataTypes);
 db.Order = require("./Order")(sequelize, DataTypes);
 db.Message = require("./Message")(sequelize, DataTypes);
 db.Category = require("./Category")(sequelize, DataTypes);

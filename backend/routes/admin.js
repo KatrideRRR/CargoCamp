@@ -6,13 +6,11 @@ const { Op } = require("sequelize");
 const { notifyUser } = require("../services/notificationService");
 const { User, Message, Order, ExpressOrder, Category, Subcategory, Dispute, ActionLog, sequelize, Service,} = require("../models");
 const bcrypt = require("bcrypt");
-const {
-    calculateRecommendedPrice,
-} = require("../services/recommendedPriceService");
+const {calculateRecommendedPrice,} = require("../services/recommendedPriceService");
+const {createAuthSession, refreshAuthSession, revokeAuthSession,} = require("../services/authSessionService");
+const {validateAdminSessionOrigin, getAdminRefreshToken, setAdminRefreshCookie, clearAdminRefreshCookie,} = require("../utils/adminSessionCookie");
 
-const geocoder = NodeGeocoder({
-    provider: "openstreetmap",
-});
+const geocoder = NodeGeocoder({provider: "openstreetmap",});
 
 function toNum(v) {
     const n = typeof v === "string" ? Number(v) : v;
@@ -1795,6 +1793,75 @@ router.patch("/orders/:id/restore", authMiddleware, adminMiddleware, async (req,
     }
 });
 
+router.post("/session/refresh", validateAdminSessionOrigin, async (req, res) => {
+        try {
+            const refreshToken =
+                getAdminRefreshToken(req);
+
+            if (!refreshToken) {
+                return res.status(401).json({
+                    message: "Сессия отсутствует",
+                });
+            }
+
+            const session = await refreshAuthSession(
+                refreshToken,
+                "admin"
+            );
+
+            setAdminRefreshCookie(
+                res,
+                session.refreshToken,
+                session.expiresAt
+            );
+
+            return res.json({
+                success: true,
+                token: session.token,
+            });
+        } catch (error) {
+            if ([401, 403].includes(error.status)) {
+                clearAdminRefreshCookie(res);
+            }
+
+            return res.status(
+                error.status || 500
+            ).json({
+                message:
+                    error.status
+                        ? error.message
+                        : "Ошибка обновления сессии",
+            });
+        }
+    });
+
+router.post("/session/logout", validateAdminSessionOrigin, async (req, res) => {
+        try {
+            const refreshToken =
+                getAdminRefreshToken(req);
+
+            await revokeAuthSession(
+                refreshToken,
+                "admin"
+            );
+
+            clearAdminRefreshCookie(res);
+
+            return res.json({
+                success: true,
+            });
+        } catch (error) {
+            console.error(
+                "Admin logout error:",
+                error
+            );
+
+            return res.status(500).json({
+                message: "Не удалось завершить сессию",
+            });
+        }
+    });
+
 router.post('/login', async (req, res) => {
     const { phone, password } = req.body;
     try {
@@ -1816,7 +1883,18 @@ router.post('/login', async (req, res) => {
         }
 
         // Создание JWT токена для администратора
-        const token = jwt.sign({ id: user.id, phone: user.phone, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        const session = await createAuthSession(
+            user,
+            "admin"
+        );
+
+        setAdminRefreshCookie(
+            res,
+            session.refreshToken,
+            session.expiresAt
+        );
+
+        const token = session.token;
 
         // Возвращаем токен и информацию о пользователе
         res.json({

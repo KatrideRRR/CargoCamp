@@ -1,72 +1,109 @@
-import React, { useEffect } from "react";
+import React, {
+    useEffect,
+    useState,
+    useCallback,
+} from "react";
+
 import { Navigate } from "react-router-dom";
 
 import {
-    isAdminSessionValid,
-    clearAdminSession,
-    redirectToAdminLogin,
+    isAdminTokenValid,
+    refreshAdminSession,
 } from "../utils/adminSession";
 
 const PrivateRoute = ({ children }) => {
-    const isAuthenticated = isAdminSessionValid();
+    const [status, setStatus] = useState("checking");
 
-    useEffect(() => {
-        if (!isAuthenticated) {
-            clearAdminSession();
+    const verifySession = useCallback(async () => {
+        // Токен должен действовать ещё хотя бы 2 минуты
+        if (isAdminTokenValid(2 * 60 * 1000)) {
+            setStatus("authenticated");
             return;
         }
 
-        const checkSession = () => {
-            if (!isAdminSessionValid()) {
-                redirectToAdminLogin("expired");
-            }
-        };
+        try {
+            await refreshAdminSession();
 
-        // Проверяем авторизацию каждые 30 секунд
+            setStatus(
+                isAdminTokenValid()
+                    ? "authenticated"
+                    : "unauthenticated"
+            );
+        } catch (error) {
+            if (
+                [401, 403].includes(
+                    error.response?.status
+                )
+            ) {
+                setStatus("unauthenticated");
+            } else {
+                // При сетевой ошибке не удаляем сессию
+                setStatus("offline");
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        verifySession();
+
         const interval = window.setInterval(
-            checkSession,
-            30000
+            verifySession,
+            60 * 1000
         );
 
-        // Проверяем, когда пользователь возвращается на вкладку
-        window.addEventListener("focus", checkSession);
-
-        // Проверяем после выхода браузера из фонового режима
-        const handleVisibilityChange = () => {
+        const onVisibility = () => {
             if (!document.hidden) {
-                checkSession();
+                verifySession();
             }
         };
 
         document.addEventListener(
             "visibilitychange",
-            handleVisibilityChange
+            onVisibility
         );
 
-        // Проверяем изменения авторизации в другой вкладке
-        window.addEventListener("storage", checkSession);
+        window.addEventListener(
+            "focus",
+            verifySession
+        );
 
         return () => {
             window.clearInterval(interval);
 
-            window.removeEventListener(
-                "focus",
-                checkSession
-            );
-
             document.removeEventListener(
                 "visibilitychange",
-                handleVisibilityChange
+                onVisibility
             );
 
             window.removeEventListener(
-                "storage",
-                checkSession
+                "focus",
+                verifySession
             );
         };
-    }, [isAuthenticated]);
+    }, [verifySession]);
 
-    if (!isAuthenticated) {
+    if (status === "checking") {
+        return <p>Проверяем сессию...</p>;
+    }
+
+    if (status === "offline") {
+        return (
+            <div style={{ padding: 30 }}>
+                <h3>Не удалось связаться с сервером</h3>
+
+                <p>
+                    Проверьте подключение к интернету.
+                    Ваша сессия не удалена.
+                </p>
+
+                <button onClick={verifySession}>
+                    Повторить
+                </button>
+            </div>
+        );
+    }
+
+    if (status === "unauthenticated") {
         return (
             <Navigate
                 to="/login?reason=expired"

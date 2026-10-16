@@ -1,53 +1,109 @@
+import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 
-const AUTH_KEYS = [
-    "authToken",
-    "adminToken",
-    "token",
-    "userRole",
-];
+const apiUrl =
+    process.env.REACT_APP_API_URL ||
+    "http://localhost:3001";
+
+let refreshPromise = null;
 
 export function clearAdminSession() {
-    AUTH_KEYS.forEach((key) => {
+    [
+        "authToken",
+        "adminToken",
+        "token",
+        "userRole",
+    ].forEach((key) => {
         localStorage.removeItem(key);
     });
 }
 
-export function isAdminSessionValid() {
+export function isAdminTokenValid(
+    minimumRemainingMs = 0
+) {
     const token = localStorage.getItem("authToken");
-    const role = localStorage.getItem("userRole");
 
-    if (!token || role !== "admin") {
-        return false;
-    }
+    if (!token) return false;
 
     try {
-        const decoded = jwtDecode(token);
+        const payload = jwtDecode(token);
 
-        // У административного JWT обязательно должен быть срок действия.
-        if (
-            typeof decoded.exp !== "number" ||
-            decoded.exp * 1000 <= Date.now()
-        ) {
-            return false;
-        }
-
-        return true;
+        return (
+            payload.role === "admin" &&
+            typeof payload.exp === "number" &&
+            payload.exp * 1000 >
+            Date.now() + minimumRemainingMs
+        );
     } catch {
         return false;
     }
 }
 
-export function redirectToAdminLogin(reason = "expired") {
-    clearAdminSession();
-
-    if (window.location.pathname === "/login") {
-        return;
+export async function refreshAdminSession() {
+    // Несколько параллельных запросов используют
+    // одно обновление сессии.
+    if (refreshPromise) {
+        return refreshPromise;
     }
 
-    const query = new URLSearchParams({
-        reason,
-    });
+    refreshPromise = axios
+        .post(
+            `${apiUrl}/api/admin/session/refresh`,
+            {},
+            {
+                withCredentials: true,
+            }
+        )
+        .then(({ data }) => {
+            if (!data?.token) {
+                throw new Error(
+                    "Сервер не вернул токен доступа"
+                );
+            }
 
-    window.location.replace(`/login?${query.toString()}`);
+            localStorage.setItem(
+                "authToken",
+                data.token
+            );
+
+            localStorage.setItem(
+                "userRole",
+                "admin"
+            );
+
+            localStorage.removeItem("adminToken");
+            localStorage.removeItem("token");
+
+            return data.token;
+        })
+        .finally(() => {
+            refreshPromise = null;
+        });
+
+    return refreshPromise;
+}
+
+export function redirectToAdminLogin() {
+    clearAdminSession();
+
+    if (window.location.pathname !== "/login") {
+        window.location.replace(
+            "/login?reason=expired"
+        );
+    }
+}
+
+export async function logoutAdminSession() {
+    try {
+        await axios.post(
+            `${apiUrl}/api/admin/session/logout`,
+            {},
+            {
+                withCredentials: true,
+            }
+        );
+    } finally {
+        clearAdminSession();
+        window.location.replace("/login");
+    }
 }

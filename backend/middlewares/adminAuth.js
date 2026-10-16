@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { User } = require('../models'); // Импортируем модель пользователя
+const {User, AuthSession,} = require("../models");
 
 const authMiddleware = async (req, res, next) => {
     try {
@@ -10,6 +10,25 @@ const authMiddleware = async (req, res, next) => {
         const user = await User.findByPk(decoded.id); // Ищем пользователя в БД
 
         if (!user) return res.status(401).json({ message: 'Пользователь не найден' });
+
+        if (decoded.scope === "admin" && decoded.sid) {
+            const session = await AuthSession.findByPk(
+                decoded.sid
+            );
+
+            if (
+                !session ||
+                session.scope !== "admin" ||
+                Number(session.userId) !== Number(user.id) ||
+                session.revokedAt ||
+                new Date(session.expiresAt) <= new Date() ||
+                new Date(session.absoluteExpiresAt) <= new Date()
+            ) {
+                return res.status(401).json({
+                    message: "Административная сессия завершена",
+                });
+            }
+        }
 
         req.user = user; // Передаём пользователя в req
         next();
