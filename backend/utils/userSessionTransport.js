@@ -8,6 +8,13 @@ const WEB_ORIGINS = new Set([
     "http://localhost:3000",
 ]);
 
+const NATIVE_ORIGINS = new Set([
+    "capacitor://localhost",
+    "ionic://localhost",
+    "http://localhost",
+    "https://localhost",
+]);
+
 function sessionError(message, status = 400) {
     const error = new Error(message);
     error.status = status;
@@ -37,6 +44,23 @@ function getSessionClient(req) {
         if (!origin || !WEB_ORIGINS.has(origin)) {
             throw sessionError(
                 "Недопустимый источник запроса",
+                403
+            );
+        }
+    }
+
+    if (client === "native") {
+        const origin = req.get("Origin");
+
+        // У CapacitorHttp Origin может отсутствовать.
+        // Если Origin присутствует, разрешаем только
+        // происхождение нативного приложения.
+        if (
+            origin &&
+            !NATIVE_ORIGINS.has(origin)
+        ) {
+            throw sessionError(
+                "Недопустимый источник нативного запроса",
                 403
             );
         }

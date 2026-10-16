@@ -5,6 +5,9 @@ import { useNavigate } from "react-router-dom";
 import ReCAPTCHA from "react-google-recaptcha";
 import "../styles/RegisterPage.css";
 import InputMask from "react-input-mask";
+import { useAuth } from "../utils/authContext";
+import { useUser } from "../utils/userContext";
+import {postUserAuth, getJwtUser,} from "../utils/userSession";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 const siteKey = process.env.REACT_APP_RECAPTCHA_SITE_KEY;
@@ -23,6 +26,9 @@ const RegisterPage = () => {
     const [smsLoading, setSmsLoading] = useState(false);
 
     const navigate = useNavigate();
+
+    const { login } = useAuth();
+    const { setCurrentUser } = useUser();
 
     const platform = useMemo(() => {
         const params = new URLSearchParams(window.location.search);
@@ -110,17 +116,34 @@ const RegisterPage = () => {
         }
 
         try {
-            const response = await axios.post(`${apiUrl}/api/auth/register`, {
+            const sessionData = await postUserAuth(
+                "register",
+                {
+                    username,
+                    phone,
+                    password,
+                    smsCode,
+                }
+            );
+
+            await login(sessionData);
+
+            const tokenUser = getJwtUser(
+                sessionData.token
+            );
+
+            setCurrentUser({
+                id: tokenUser?.id,
                 username,
                 phone,
-                password,
-                smsCode,
+                role: tokenUser?.role || "user",
             });
 
-            const { token } = response.data;
-            localStorage.setItem("authToken", token);
             alert("Пользователь успешно создан");
-            navigate("/profile");
+
+            navigate("/profile", {
+                replace: true,
+            });
         } catch (err) {
             console.error("Ошибка регистрации:", err.response?.data || err);
 

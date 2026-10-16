@@ -3,20 +3,21 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import Modal from "react-modal";
 import { useAuth } from "./utils/authContext";
-import {
-    initPushNotifications,
-    consumePendingPushNavigation,
-} from "./utils/pushNotifications";
+import {initPushNotifications, consumePendingPushNavigation,} from "./utils/pushNotifications";
 import PullToRefresh from "./components/PullToRefresh";
 import { socket, connectSocket } from "./socketClient";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { runAppVersionMigration } from "./utils/appVersionMigration";
-
 import { AuthProvider } from "./utils/authContext";
 import { UserProvider } from './utils/userContext';
 import { ModalProvider } from './components/modalContext';
-
+import { App as CapacitorApp } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
+import { ensureUserAccessToken } from "./utils/userSession";
+import {resyncPushRegistration,} from "./utils/pushNotifications";
+import { disconnectSocket } from "./socketClient";
+import "./utils/axiosInstance";
 import "./styles/global.css";
 
 Modal.setAppElement('#root');
@@ -40,6 +41,46 @@ const ServiceInfoPage = lazy(() => import('./pages/ServiceInfoPage'));
 const InfoPage = lazy(() => import('./pages/InfoPage'));
 const SupportChatPage = React.lazy(() => import("./pages/SupportChatPage"));
 
+function AuthBootGate({ children }) {
+    const {
+        loading,
+        authError,
+        restore,
+    } = useAuth();
+
+    if (loading) {
+        return (
+            <div className="app-loading">
+                Восстанавливаем сессию CargoCamp...
+            </div>
+        );
+    }
+
+    if (authError) {
+        return (
+            <div
+                className="app-loading"
+                style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 16,
+                    alignItems: "center",
+                    padding: 24,
+                    textAlign: "center",
+                }}
+            >
+                <p>{authError}</p>
+
+                <button onClick={restore}>
+                    Повторить подключение
+                </button>
+            </div>
+        );
+    }
+
+    return children;
+}
+
 function SocketBootstrap() {
     const { user } = useAuth();
 
@@ -47,6 +88,10 @@ function SocketBootstrap() {
         if (!user?.id) return;
 
         connectSocket(user.id);
+
+        return () => {
+            disconnectSocket();
+        };
     }, [user?.id]);
 
     return null;
@@ -57,26 +102,108 @@ function PushBootstrap() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        const token = localStorage.getItem("authToken");
-
-        if (!token) {
+        if (!user?.id) {
             return;
         }
 
-        /*
-          Если пользователь уже есть — инициализируем пуши нормально.
-          Если user ещё не успел загрузиться, pending push всё равно можно попробовать обработать,
-          потому что userId можно достать из JWT внутри pushNotifications.js.
-        */
-
-        if (user?.id) {
-            initPushNotifications({ navigate, userId: user.id }).catch((e) => {
-                console.error("initPushNotifications error:", e);
-            });
-        }
+        initPushNotifications({
+            navigate,
+            userId: user.id,
+        }).catch((error) => {
+            console.error(
+                "Ошибка запуска push:",
+                error
+            );
+        });
 
         consumePendingPushNavigation(navigate);
     }, [user?.id, navigate]);
+
+    return null;
+}
+
+function SessionLifecycle() {
+    const { user, restore } = useAuth();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        if (!user?.id) return;
+
+        let active = true;
+
+        const onResume = async () => {
+            if (!active) return;
+
+            try {
+                await ensureUserAccessToken();
+
+                await initPushNotifications({
+                    navigate,
+                    userId: user.id,
+                });
+
+                await resyncPushRegistration(
+                    user.id
+                );
+            } catch (error) {
+                const status =
+                    error.response?.status;
+
+                if (
+                    status === 401 ||
+                    status === 403
+                ) {
+                    await restore();
+                } else {
+                    console.warn(
+                        "Сессия будет проверена повторно:",
+                        error.message
+                    );
+                }
+            }
+        };
+
+        const onVisibilityChange = () => {
+            if (!document.hidden) {
+                onResume();
+            }
+        };
+
+        document.addEventListener(
+            "visibilitychange",
+            onVisibilityChange
+        );
+
+        let nativeListener = null;
+
+        if (Capacitor.isNativePlatform()) {
+            CapacitorApp.addListener(
+                "appStateChange",
+                ({ isActive }) => {
+                    if (isActive) {
+                        onResume();
+                    }
+                }
+            ).then((handle) => {
+                if (active) {
+                    nativeListener = handle;
+                } else {
+                    handle.remove();
+                }
+            });
+        }
+
+        return () => {
+            active = false;
+
+            document.removeEventListener(
+                "visibilitychange",
+                onVisibilityChange
+            );
+
+            nativeListener?.remove();
+        };
+    }, [user?.id, restore, navigate]);
 
     return null;
 }
@@ -386,7 +513,9 @@ function App() {
 
     return (
         <AuthProvider>
+            <AuthBootGate>
             <ModalProvider>
+                <SessionLifecycle />
                 <SocketBootstrap />
                 <PushBootstrap />
                 <PullToRefresh />
@@ -432,6 +561,7 @@ function App() {
                     </Suspense>
                 </UserProvider>
             </ModalProvider>
+            </AuthBootGate>
         </AuthProvider>
 
     );

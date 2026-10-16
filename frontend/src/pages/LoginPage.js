@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../utils/authContext";
 import { useUser } from "../utils/userContext";
 import "../styles/LoginPage.css";
+import { postUserAuth } from "../utils/userSession";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -55,18 +56,23 @@ const LoginPage = () => {
         return "web";
     }, []);
 
-    const finishLogin = (token, user) => {
-        localStorage.setItem("authToken", token);
-        login(token);
-        setCurrentUser(user);
+    const finishLogin = async (sessionData) => {
+        const { user } = sessionData;
 
-        if (user.role === "banned") {
+        if (user?.role === "banned") {
             setError("Ваш аккаунт заблокирован.");
-            localStorage.removeItem("authToken");
             return;
         }
 
-        navigate("/profile");
+        // AuthContext сохранит access-токен,
+        // а для iOS/Android — защищённый refresh-токен.
+        await login(sessionData);
+
+        setCurrentUser(user);
+
+        navigate("/profile", {
+            replace: true,
+        });
     };
 
     const guardPhone = () => {
@@ -90,9 +96,15 @@ const LoginPage = () => {
         setBusy(true);
         try {
             // можно отправлять phone как digits, сервер всё равно нормализует
-            const response = await axios.post(`${apiUrl}/api/auth/login`, { phone: phoneDigits, password });
-            const { token, user } = response.data;
-            finishLogin(token, user);
+            const sessionData = await postUserAuth(
+                "login",
+                {
+                    phone: phoneDigits,
+                    password,
+                }
+            );
+
+            await finishLogin(sessionData);
         } catch (err) {
             setError(err.response?.data?.message || "Ошибка авторизации");
         } finally {
@@ -135,12 +147,15 @@ const LoginPage = () => {
 
         setBusy(true);
         try {
-            const response = await axios.post(`${apiUrl}/api/auth/login-sms`, {
-                phone: phoneDigits,
-                smsCode: smsCode.trim(),
-            });
-            const { token, user } = response.data;
-            finishLogin(token, user);
+            const sessionData = await postUserAuth(
+                "login-sms",
+                {
+                    phone: phoneDigits,
+                    smsCode: smsCode.trim(),
+                }
+            );
+
+            await finishLogin(sessionData);
         } catch (err) {
             setError(err.response?.data?.message || "Ошибка входа по SMS");
         } finally {

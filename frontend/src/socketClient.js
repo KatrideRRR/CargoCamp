@@ -1,6 +1,8 @@
 import { io } from "socket.io-client";
 
-const socketUrl = process.env.REACT_APP_SOCKET_URL || process.env.REACT_APP_API_URL;
+const socketUrl =
+    process.env.REACT_APP_SOCKET_URL ||
+    process.env.REACT_APP_API_URL;
 
 export const socket = io(socketUrl, {
     autoConnect: false,
@@ -17,14 +19,32 @@ let currentSocketUserId = null;
 function registerCurrentUser() {
     if (!currentSocketUserId) return;
 
-    socket.emit("register", currentSocketUserId);
-    socket.emit("subscribeToNotifications", currentSocketUserId);
+    socket.emit(
+        "register",
+        currentSocketUserId
+    );
+
+    socket.emit(
+        "subscribeToNotifications",
+        currentSocketUserId
+    );
 }
 
 export function connectSocket(userId) {
     if (!userId) return;
 
-    currentSocketUserId = String(userId);
+    const nextUserId = String(userId);
+
+    // При смене аккаунта отключаем прежнее
+    // соединение вместе с его комнатами.
+    if (
+        currentSocketUserId &&
+        currentSocketUserId !== nextUserId
+    ) {
+        socket.disconnect();
+    }
+
+    currentSocketUserId = nextUserId;
 
     if (!socket.connected) {
         socket.connect();
@@ -33,5 +53,12 @@ export function connectSocket(userId) {
     }
 }
 
+export function disconnectSocket() {
+    currentSocketUserId = null;
+
+    if (socket.connected) {
+        socket.disconnect();
+    }
+}
+
 socket.on("connect", registerCurrentUser);
-socket.on("reconnect", registerCurrentUser);

@@ -1,75 +1,142 @@
-import React, { createContext, useContext, useEffect, useState, useMemo } from "react";
-import { jwtDecode } from "jwt-decode";
+import React, {createContext, useContext, useEffect, useState, useMemo, useCallback,} from "react";
+import {getJwtUser, startUserSession, ensureUserAccessToken, clearUserSessionLocal, endUserSession,} from "./userSession";
+import { disconnectSocket } from "../socketClient";
+import {unregisterCurrentPushToken, resetPushRegistration,} from "./pushNotifications";
 
 export const AuthContext = createContext();
-
-function getUserFromToken(token) {
-    try {
-        if (!token) return null;
-
-        const decoded = jwtDecode(token);
-
-        if (!decoded?.exp || decoded.exp * 1000 <= Date.now()) {
-            localStorage.removeItem("authToken");
-            localStorage.removeItem("refreshToken");
-            localStorage.removeItem("user");
-            localStorage.removeItem("currentUser");
-
-            return null;
-        }
-
-        return {
-            id: decoded.id || "",
-            role: decoded.role || "",
-            name: decoded.name || "",
-        };
-    } catch {
-        localStorage.removeItem("authToken");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("user");
-        localStorage.removeItem("currentUser");
-
-        return null;
-    }
-}
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [authError, setAuthError] = useState(null);
 
-    useEffect(() => {
-        const token = localStorage.getItem("authToken");
-        const tokenUser = getUserFromToken(token);
+    const restore = useCallback(async () => {
+        setLoading(true);
+        setAuthError(null);
 
-        setUser(tokenUser);
-        setLoading(false);
+        try {
+            const token =
+                await ensureUserAccessToken();
+
+            setUser(getJwtUser(token));
+        } catch (error) {
+            const status = error.response?.status;
+
+            if (status === 401 || status === 403) {
+                await clearUserSessionLocal();
+                setUser(null);
+            } else {
+                // Сетевая ошибка — не удаляем сессию.
+                setAuthError(
+                    "Не удалось подключиться к серверу CargoCamp."
+                );
+            }
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
-    const login = (token) => {
-        localStorage.setItem("authToken", token);
+    useEffect(() => {
+        restore();
 
-        const tokenUser = getUserFromToken(token);
-        setUser(tokenUser);
-    };
+        const syncFromStorage = () => {
+            const token =
+                localStorage.getItem("authToken");
 
-    const logout = () => {
-        localStorage.removeItem("authToken");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("user");
-        localStorage.removeItem("currentUser");
-
-        setUser(null);
-    };
-
-    const value = useMemo(() => {
-        return {
-            isAuthenticated: Boolean(user),
-            user: user || {},
-            login,
-            logout,
-            loading,
+            setUser(getJwtUser(token));
         };
-    }, [user, loading]);
+
+        const onLogout = () => {
+            setUser(null);
+        };
+
+        window.addEventListener(
+            "cargocamp:auth-changed",
+            syncFromStorage
+        );
+
+        window.addEventListener(
+            "auth:logout",
+            onLogout
+        );
+
+        window.addEventListener(
+            "storage",
+            syncFromStorage
+        );
+
+        return () => {
+            window.removeEventListener(
+                "cargocamp:auth-changed",
+                syncFromStorage
+            );
+
+            window.removeEventListener(
+                "auth:logout",
+                onLogout
+            );
+
+            window.removeEventListener(
+                "storage",
+                syncFromStorage
+            );
+        };
+    }, [restore]);
+
+    const login = useCallback(async (sessionData) => {
+        const token =
+            await startUserSession(sessionData);
+
+        setUser(getJwtUser(token));
+        setAuthError(null);
+
+        return token;
+    }, []);
+
+    const logout = useCallback(async () => {
+        try {
+            // Сначала отвязываем Firebase-токен,
+            // пока действительна авторизация.
+            try {
+                await unregisterCurrentPushToken();
+            } catch (error) {
+                console.warn(
+                    "Не удалось отвязать push:",
+                    error.message
+                );
+            }
+
+            await endUserSession();
+        } catch (error) {
+            console.warn(
+                "Серверный выход не подтверждён:",
+                error.message
+            );
+        } finally {
+            resetPushRegistration();
+            disconnectSocket();
+
+            setUser(null);
+            setAuthError(null);
+        }
+    }, []);
+
+    const value = useMemo(() => ({
+        isAuthenticated: Boolean(user),
+        user: user || {},
+        login,
+        logout,
+        loading,
+        authError,
+        restore,
+    }), [
+        user,
+        login,
+        logout,
+        loading,
+        authError,
+        restore,
+    ]);
 
     return (
         <AuthContext.Provider value={value}>

@@ -6,7 +6,7 @@ import axiosInstance from "./axiosInstance";
 let pushInitialized = false;
 let pushInitializing = false;
 let pushInitializedUserId = null;
-let lastSavedPushToken = null;
+let lastSavedPushKey = null;
 
 function getPushPlatform() {
     const p = Capacitor.getPlatform();
@@ -92,18 +92,20 @@ function parseJwtPayload(token) {
 }
 
 function getCurrentUserId() {
-    const userRaw = localStorage.getItem("user");
-
-    try {
-        const user = userRaw ? JSON.parse(userRaw) : null;
-        if (user?.id) return String(user.id);
-    } catch {}
-
     const token = getAuthToken();
-    const payload = parseJwtPayload(token);
 
-    if (payload?.id) return String(payload.id);
-    if (payload?.userId) return String(payload.userId);
+    const payload =
+        parseJwtPayload(token);
+
+    // Главный источник — JWT, а не сохранённый
+    // объект предыдущего пользователя.
+    if (payload?.id) {
+        return String(payload.id);
+    }
+
+    if (payload?.userId) {
+        return String(payload.userId);
+    }
 
     return null;
 }
@@ -556,29 +558,57 @@ function getOrCreatePushDeviceId() {
     return deviceId;
 }
 
-async function savePushTokenToBackend(pushToken) {
+async function savePushTokenToBackend(
+    pushToken,
+    userId = null,
+    { force = false } = {}
+) {
     if (!pushToken) {
         console.warn("Push token empty");
         return;
     }
 
-    if (lastSavedPushToken === pushToken) {
-        console.log("Push token already saved in this session, skip");
+    const currentUserId = String(
+        userId || getCurrentUserId() || ""
+    );
+
+    if (!currentUserId) {
+        console.warn(
+            "Нельзя зарегистрировать push без пользователя"
+        );
         return;
     }
 
-    const platform = getPushPlatform();
+    const registrationKey =
+        `${currentUserId}:${pushToken}`;
 
-    const res = await axiosInstance.post("/push/register", {
-        token: pushToken,
-        platform,
+    if (
+        !force &&
+        lastSavedPushKey === registrationKey
+    ) {
+        return;
+    }
+
+    const response = await axiosInstance.post(
+        "/push/register",
+        {
+            token: pushToken,
+            platform: getPushPlatform(),
             deviceId: getOrCreatePushDeviceId(),
-        appVersion: process.env.REACT_APP_VERSION || null,
-    });
+            appVersion:
+                process.env.REACT_APP_VERSION || null,
+        }
+    );
 
-    lastSavedPushToken = pushToken;
+    lastSavedPushKey = registrationKey;
 
-    console.log("Push token saved:", res.data);
+    console.log(
+        "Push registration updated:",
+        {
+            userId: currentUserId,
+            success: response.data?.success,
+        }
+    );
 }
 
 export async function initPushNotifications({ navigate, userId } = {}) {
@@ -653,7 +683,10 @@ export async function initPushNotifications({ navigate, userId } = {}) {
                     tokenStart: event?.token?.slice(0, 25),
                 });
 
-                await savePushTokenToBackend(event.token);
+                await savePushTokenToBackend(
+                    event.token,
+                    getCurrentUserId()
+                );
             } catch (e) {
                 console.error(
                     "FirebaseMessaging tokenReceived save error:",
@@ -729,7 +762,10 @@ export async function initPushNotifications({ navigate, userId } = {}) {
             tokenStart: tokenResult?.token?.slice(0, 25),
         });
 
-        await savePushTokenToBackend(tokenResult.token);
+        await savePushTokenToBackend(
+            tokenResult.token,
+            normalizedUserId
+        );
 
         pushInitialized = true;
         pushInitializedUserId = normalizedUserId;
@@ -740,4 +776,65 @@ export async function initPushNotifications({ navigate, userId } = {}) {
     } finally {
         pushInitializing = false;
     }
+}
+
+export async function resyncPushRegistration(userId) {
+    if (!Capacitor.isNativePlatform()) {
+        return;
+    }
+
+    if (!userId) return;
+
+    const authToken =
+        localStorage.getItem("authToken");
+
+    if (!authToken) return;
+
+    const permissions =
+        await FirebaseMessaging.checkPermissions();
+
+    if (permissions.receive !== "granted") {
+        return;
+    }
+
+    const result =
+        await FirebaseMessaging.getToken();
+
+    if (!result?.token) {
+        return;
+    }
+
+    // Принудительно подтверждаем привязку
+    // устройства к текущему пользователю.
+    await savePushTokenToBackend(
+        result.token,
+        userId,
+        { force: true }
+    );
+}
+
+export async function unregisterCurrentPushToken() {
+    if (!Capacitor.isNativePlatform()) {
+        return;
+    }
+
+    const result =
+        await FirebaseMessaging.getToken();
+
+    if (result?.token) {
+        await axiosInstance.post(
+            "/push/unregister",
+            {
+                token: result.token,
+            }
+        );
+    }
+
+    resetPushRegistration();
+}
+
+export function resetPushRegistration() {
+    pushInitialized = false;
+    pushInitializedUserId = null;
+    lastSavedPushKey = null;
 }

@@ -1,11 +1,23 @@
 import axios from "axios";
-import { Capacitor, CapacitorHttp } from "@capacitor/core";
+
+import {
+    Capacitor,
+    CapacitorHttp,
+} from "@capacitor/core";
+
+import {
+    ensureUserAccessToken,
+    refreshUserSession,
+    clearUserSessionLocal,
+    isAccessTokenValid,
+} from "./userSession";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 const baseURL = `${apiUrl}/api`;
 
 const isNativeIOS =
-    Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
+    Capacitor.isNativePlatform() &&
+    Capacitor.getPlatform() === "ios";
 
 const axiosInstance = axios.create({
     baseURL,
@@ -16,72 +28,118 @@ const axiosInstance = axios.create({
     },
 });
 
-function buildFullUrl(config = {}) {
+function resolveRequestUrl(config = {}) {
     const url = String(config.url || "");
 
-    if (url.startsWith("http://") || url.startsWith("https://")) {
-        return url;
+    const base = String(
+        config.baseURL || ""
+    ).replace(/\/$/, "");
+
+    const fullUrl = /^https?:\/\//i.test(url)
+        ? url
+        : base
+            ? `${base}/${url.replace(/^\//, "")}`
+            : url;
+
+    return new URL(
+        fullUrl,
+        window.location.href
+    );
+}
+
+function isProtectedApiRequest(config = {}) {
+    let url;
+
+    try {
+        url = resolveRequestUrl(config);
+    } catch {
+        return false;
     }
 
-    const cleanBase = String(config.baseURL || baseURL).replace(/\/$/, "");
-    const cleanUrl = url.startsWith("/") ? url : `/${url}`;
+    const expectedOrigin =
+        new URL(apiUrl).origin;
 
-    return `${cleanBase}${cleanUrl}`;
+    if (url.origin !== expectedOrigin) {
+        return false;
+    }
+
+    const path = url.pathname;
+    const method = String(
+        config.method || "get"
+    ).toLowerCase();
+
+    if (!path.startsWith("/api/")) {
+        return false;
+    }
+
+    // Публичные запросы не требуют JWT.
+    if (
+        method === "get" &&
+        (
+            path.startsWith("/api/category") ||
+            path === "/api/orders/all" ||
+            path === "/api/express/express-orders/available"
+        )
+    ) {
+        return false;
+    }
+
+    // Не перехватываем вход, регистрацию,
+    // SMS и сам механизм обновления сессии.
+    if (
+        /^\/api\/auth\/(login|login-sms|register|send-sms|recover-password)(\/|$)/.test(path) ||
+        path.startsWith("/api/auth/password-reset/") ||
+        path.startsWith("/api/auth/session/")
+    ) {
+        return false;
+    }
+
+    return true;
 }
 
-function getToken() {
-    return localStorage.getItem("authToken");
+function setAuthorization(config, token) {
+    config.headers = config.headers || {};
+
+    if (typeof config.headers.set === "function") {
+        config.headers.set(
+            "Authorization",
+            `Bearer ${token}`
+        );
+    } else {
+        config.headers.Authorization =
+            `Bearer ${token}`;
+    }
 }
 
-function isPublicGetRequest(config = {}) {
-    const publicGetRoutes = [
-        "/category",
-        "/orders/all",
-        "/express/express-orders/available",
-    ];
-
-    const method = String(config.method || "get").toLowerCase();
-    const url = String(config.url || "");
-
-    if (method !== "get") return false;
-
-    return publicGetRoutes.some((route) => {
-        return url === route || url.startsWith(`${route}?`) || url.startsWith(`${route}/`);
-    });
-}
+// ----------------------------------------
+// Сохраняем существующий нативный HTTP для iOS
+// ----------------------------------------
 
 async function nativeIOSRequest(config = {}) {
-    const method = String(config.method || "get").toUpperCase();
-    const fullUrl = buildFullUrl(config);
-    const token = getToken();
-    const publicGet = isPublicGetRequest(config);
+    const method = String(
+        config.method || "get"
+    ).toUpperCase();
+
+    const fullUrl =
+        resolveRequestUrl(config).toString();
+
+    const rawHeaders =
+        typeof config.headers?.toJSON === "function"
+            ? config.headers.toJSON()
+            : { ...(config.headers || {}) };
 
     const headers = {
         Accept: "application/json",
-        ...(config.headers || {}),
+        ...rawHeaders,
     };
 
-    delete headers.common;
-    delete headers.get;
-    delete headers.post;
-    delete headers.put;
-    delete headers.patch;
-    delete headers.delete;
-
-    if (token && !publicGet) {
-        headers.Authorization = `Bearer ${token}`;
+    if (
+        ["POST", "PUT", "PATCH"].includes(method) &&
+        !headers["Content-Type"]
+    ) {
+        headers["Content-Type"] =
+            "application/json";
     }
-
-    if (["POST", "PUT", "PATCH"].includes(method)) {
-        headers["Content-Type"] = "application/json";
-    }
-
-    console.log("NATIVE IOS API REQUEST:", {
-        method,
-        url: fullUrl,
-        hasToken: Boolean(token && !publicGet),
-        publicGet,
-    });
 
     const response = await CapacitorHttp.request({
         method,
@@ -93,11 +151,6 @@ async function nativeIOSRequest(config = {}) {
         readTimeout: 30000,
     });
 
-    console.log("NATIVE IOS API RESPONSE:", {
-        status: response.status,
-        url: fullUrl,
-    });
-
     const axiosLikeResponse = {
         data: response.data,
         status: response.status,
@@ -107,169 +160,153 @@ async function nativeIOSRequest(config = {}) {
         request: null,
     };
 
-    if (response.status >= 200 && response.status < 300) {
+    if (
+        response.status >= 200 &&
+        response.status < 300
+    ) {
         return axiosLikeResponse;
     }
 
-    const error = new Error(`Request failed with status code ${response.status}`);
+    const error = new Error(
+        `Request failed with status ${response.status}`
+    );
+
     error.response = axiosLikeResponse;
     error.config = config;
+
     throw error;
 }
 
-axiosInstance.interceptors.request.use(
-    async (config) => {
-        if (isNativeIOS) {
-            config.adapter = async () => nativeIOSRequest(config);
-            return config;
+// ----------------------------------------
+// Общие перехватчики авторизации
+// ----------------------------------------
+
+function attachUserAuthInterceptors(client) {
+    client.interceptors.request.use(
+        async (config) => {
+            if (!isProtectedApiRequest(config)) {
+                return config;
+            }
+
+            try {
+                const token =
+                    await ensureUserAccessToken();
+
+                if (token) {
+                    setAuthorization(config, token);
+                }
+
+                return config;
+            } catch (error) {
+                const status =
+                    error.response?.status;
+
+                if (
+                    status === 401 ||
+                    status === 403
+                ) {
+                    await clearUserSessionLocal();
+                }
+
+                return Promise.reject(error);
+            }
         }
+    );
 
-        const token = getToken();
-        const publicGet = isPublicGetRequest(config);
+    client.interceptors.response.use(
+        (response) => response,
 
-        if (token && !publicGet) {
-            config.headers.Authorization = `Bearer ${token}`;
+        async (error) => {
+            const config = error.config;
+
+            if (
+                error.response?.status !== 401 ||
+                !config ||
+                config._cargoAuthRetry ||
+                !isProtectedApiRequest(config)
+            ) {
+                return Promise.reject(error);
+            }
+
+            config._cargoAuthRetry = true;
+
+            const authorization =
+                typeof config.headers?.get === "function"
+                    ? config.headers.get("Authorization")
+                    : config.headers?.Authorization;
+
+            const staleToken =
+                String(authorization || "")
+                    .replace(/^Bearer\s+/i, "");
+
+            try {
+                const newToken =
+                    await refreshUserSession(
+                        staleToken
+                    );
+
+                setAuthorization(
+                    config,
+                    newToken
+                );
+
+                return client.request(config);
+            } catch (refreshError) {
+                const status =
+                    refreshError.response?.status;
+
+                if (
+                    status === 401 ||
+                    status === 403
+                ) {
+                    const latestToken =
+                        localStorage.getItem(
+                            "authToken"
+                        );
+
+                    // Если другая вкладка успела
+                    // обновить JWT, не удаляем его.
+                    if (
+                        latestToken &&
+                        latestToken !== staleToken &&
+                        isAccessTokenValid(latestToken)
+                    ) {
+                        setAuthorization(
+                            config,
+                            latestToken
+                        );
+
+                        return client.request(config);
+                    }
+
+                    await clearUserSessionLocal();
+                }
+
+                return Promise.reject(
+                    refreshError
+                );
+            }
+        }
+    );
+}
+
+// Важно: регистрируем нативный адаптер до
+// общего auth-interceptor.
+axiosInstance.interceptors.request.use(
+    (config) => {
+        if (isNativeIOS) {
+            config.adapter = () =>
+                nativeIOSRequest(config);
         }
 
         return config;
-    },
-    (error) => Promise.reject(error)
-);
-
-axiosInstance.interceptors.response.use(
-    (response) => {
-        console.log("API RESPONSE:", {
-            status: response.status,
-            url: response.config?.url,
-            method: response.config?.method,
-        });
-
-        return response;
-    },
-    async (error) => {
-        console.error("API ERROR:", {
-            message: error.message,
-            code: error.code,
-            status: error.response?.status,
-            data: error.response?.data,
-            baseURL: error.config?.baseURL,
-            url: error.config?.url,
-            method: error.config?.method,
-        });
-
-        const originalRequest = error.config;
-        const status = error?.response?.status;
-
-        if (!originalRequest) {
-            return Promise.reject(error);
-        }
-
-        if (status === 401 && !originalRequest._retry) {
-            originalRequest._retry = true;
-
-            try {
-                const refreshToken = localStorage.getItem("refreshToken");
-
-                if (!refreshToken) {
-                    clearAuthAndRedirect();
-                    return Promise.reject(error);
-                }
-
-                const refreshResponse = isNativeIOS
-                    ? await CapacitorHttp.post({
-                        url: `${baseURL}/token`,
-                        headers: {
-                            Accept: "application/json",
-                            "Content-Type": "application/json",
-                        },
-                        data: {
-                            token: refreshToken,
-                        },
-                        connectTimeout: 30000,
-                        readTimeout: 30000,
-                    })
-                    : await axios.post(`${baseURL}/token`, {
-                        token: refreshToken,
-                    });
-
-                const newAccessToken =
-                    refreshResponse.data?.accessToken;
-
-                if (!newAccessToken) {
-                    clearAuthAndRedirect();
-                    return Promise.reject(error);
-                }
-
-                localStorage.setItem("authToken", newAccessToken);
-
-                axiosInstance.defaults.headers.Authorization = `Bearer ${newAccessToken}`;
-                originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-
-                return axiosInstance(originalRequest);
-            } catch (refreshError) {
-                console.error("❌ Ошибка обновления токена:", refreshError);
-                clearAuthAndRedirect();
-                return Promise.reject(refreshError);
-            }
-        }
-
-        return Promise.reject(error);
     }
 );
 
-const clearAuthAndRedirect = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("user");
-    localStorage.removeItem("currentUser");
+// Наш axiosInstance
+attachUserAuthInterceptors(axiosInstance);
 
-    window.dispatchEvent(new Event("auth:logout"));
-
-    const currentPath = window.location.pathname;
-
-    // При просроченной или недействительной авторизации
-    // возвращаем пользователя на стартовую страницу,
-    // а не принудительно отправляем на логин.
-    if (currentPath !== "/") {
-        window.location.replace("/");
-    }
-};
-
-const refreshAccessToken = async () => {
-    try {
-        const refreshToken = localStorage.getItem("refreshToken");
-
-        if (!refreshToken) return;
-
-        const response = isNativeIOS
-            ? await CapacitorHttp.post({
-                url: `${baseURL}/token`,
-                headers: {
-                    Accept: "application/json",
-                    "Content-Type": "application/json",
-                },
-                data: {
-                    token: refreshToken,
-                },
-                connectTimeout: 30000,
-                readTimeout: 30000,
-            })
-            : await axios.post(`${baseURL}/token`, {
-                token: refreshToken,
-            });
-
-        const newAccessToken = response.data?.accessToken;
-
-        if (!newAccessToken) return;
-
-        localStorage.setItem("authToken", newAccessToken);
-        axiosInstance.defaults.headers.Authorization = `Bearer ${newAccessToken}`;
-
-    } catch (error) {
-        console.error("⚠️ Ошибка обновления токена в фоне:", error);
-    }
-};
-
-setInterval(refreshAccessToken, 10 * 60 * 1000);
+// Обычный axios, используемый другими страницами
+attachUserAuthInterceptors(axios);
 
 export default axiosInstance;

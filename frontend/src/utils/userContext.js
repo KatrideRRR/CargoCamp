@@ -23,6 +23,24 @@ export const UserProvider = ({ children }) => {
         }
     }, [currentUser]);
 
+    useEffect(() => {
+        const clearCurrentUser = () => {
+            setCurrentUser(null);
+        };
+
+        window.addEventListener(
+            "auth:logout",
+            clearCurrentUser
+        );
+
+        return () => {
+            window.removeEventListener(
+                "auth:logout",
+                clearCurrentUser
+            );
+        };
+    }, []);
+
     const value = useMemo(() => {
         return {
             currentUser,
