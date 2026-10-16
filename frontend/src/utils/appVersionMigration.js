@@ -3,9 +3,6 @@ const APP_VERSION = process.env.REACT_APP_VERSION || "dev";
 const VERSION_KEY = "cargocamp_app_version";
 
 const KEYS_TO_CLEAR_ON_UPDATE = [
-    "authToken",
-    "user",
-
     "pendingReviewFromPush",
     "removedOrders",
 

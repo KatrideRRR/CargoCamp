@@ -12,6 +12,8 @@ const fs = require('fs');
 const SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
 const { notifyUser } = require("../services/notificationService");
 const {sendAdminNotification, adminUserUrl, adminUsersUrl,} = require("../services/adminNotificationService");
+const {createAuthSession, refreshAuthSession, revokeAuthSession,} = require("../services/authSessionService");
+const {getSessionClient, getUserRefreshToken, buildUserSessionResponse, clearUserRefreshCookie,} = require("../utils/userSessionTransport");
 
 const avatarsDir = path.join(__dirname, "..", "uploads", "avatars");
 const uploadsRoot = path.join(__dirname, '..', 'uploads');
@@ -130,8 +132,7 @@ const uploadAvatar = multer({
 });
 
 const generateTemporaryPassword = () => {
-    return Math.random().toString(36).slice(-8);
-};
+    return Math.random().toString(36).slice(-8);};
 
 const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -420,16 +421,13 @@ router.post('/register', async (req, res) => {
     const entry = smsCodes.get(phoneKey); // {code, expiresAt} | undefined
     const codeSaved = String(entry?.code || "").trim();
 
-    // ✅ проверка что код есть
     if (!entry) return res.status(400).json({ message: "Неверный код" });
 
-    // ✅ TTL
     if (Date.now() > entry.expiresAt) {
         smsCodes.delete(phoneKey);
         return res.status(400).json({ message: "Код истёк. Запросите новый." });
     }
 
-    // ✅ сравнение
     if (codeSaved !== codeFromUser) {
         entry.attempts = Number(entry.attempts || 0) + 1;
 
@@ -469,13 +467,149 @@ router.post('/register', async (req, res) => {
         smsCodes.delete(phoneKey);
 
         // Генерация токена
-        const token = jwt.sign({ id: newUser.id, phone: newUser.phone }, process.env.JWT_SECRET, { expiresIn: "7d" });
+        const client = getSessionClient(req);
 
-        return res.status(201).json({ message: "Пользователь зарегистрирован", token });
+        let authResponse;
+
+        if (client) {
+            const session = await createAuthSession(
+                newUser,
+                "user"
+            );
+
+            authResponse = buildUserSessionResponse(
+                res,
+                client,
+                session
+            );
+        } else {
+            authResponse = {
+                token: jwt.sign(
+                    {
+                        id: newUser.id,
+                        phone: newUser.phone,
+                    },
+                    process.env.JWT_SECRET,
+                    {
+                        expiresIn: "7d",
+                    }
+                ),
+            };
+        }
+
+        return res.status(201).json({
+            message: "Пользователь зарегистрирован",
+            ...authResponse,
+        });
+
+    } catch (e) {
+        console.error("Register error:", e);
+
+        return res.status(e.status || 500).json({
+            message: e.status
+                ? e.message
+                : "Server error",
+        });
+    }
+});
+
+router.post("/session/refresh", async (req, res) => {
+    try {
+        const client = getSessionClient(req);
+
+        if (!client) {
+            return res.status(400).json({
+                message: "Не указан тип клиента",
+            });
+        }
+
+        const refreshToken =
+            getUserRefreshToken(req, client);
+
+        if (!refreshToken) {
+            return res.status(401).json({
+                message: "Сессия отсутствует",
+            });
+        }
+
+        const session = await refreshAuthSession(
+            refreshToken,
+            "user"
+        );
+
+        const response = buildUserSessionResponse(
+            res,
+            client,
+            session
+        );
+
+        return res.json({
+            success: true,
+            ...response,
+        });
 
     } catch (error) {
-        console.error("Ошибка регистрации:", error);
-        return res.status(500).json({ message: "Ошибка сервера" });
+        if ([401, 403].includes(error.status)) {
+            clearUserRefreshCookie(res);
+        }
+
+        if (!error.status) {
+            console.error(
+                "User session refresh error:",
+                error
+            );
+        }
+
+        return res.status(error.status || 500).json({
+            success: false,
+            message: error.status
+                ? error.message
+                : "Ошибка обновления сессии",
+        });
+    }
+});
+
+router.post("/session/logout", async (req, res) => {
+    try {
+        const client = getSessionClient(req);
+
+        if (!client) {
+            return res.status(400).json({
+                message: "Не указан тип клиента",
+            });
+        }
+
+        const refreshToken =
+            getUserRefreshToken(req, client);
+
+        await revokeAuthSession(
+            refreshToken,
+            "user"
+        );
+
+        if (client === "web") {
+            clearUserRefreshCookie(res);
+        }
+
+        return res.json({
+            success: true,
+            message: "Сессия завершена",
+        });
+
+    } catch (error) {
+        if (!error.status) {
+            console.error(
+                "User session logout error:",
+                error
+            );
+        }
+
+        return res.status(error.status || 500).json({
+            success: false,
+            message: error.status
+                ? error.message
+                : "Не удалось завершить сессию",
+        });
     }
 });
 
@@ -492,12 +626,57 @@ router.post("/login", async (req, res) => {
 
         if (user.role === "banned") return res.status(403).json({ message: "Ваш аккаунт заблокирован" });
 
-        const token = jwt.sign({ id: user.id, phone: user.phone }, process.env.JWT_SECRET, { expiresIn: "7d" });
+        const client = getSessionClient(req);
 
-        res.json({ token, user: { id: user.id, username: user.username, phone: user.phone, rating: user.rating || 5 } });
+        let authResponse;
+
+        if (client) {
+            // Новая авторизация с долгосрочной сессией.
+            const session = await createAuthSession(
+                user,
+                "user"
+            );
+
+            authResponse = buildUserSessionResponse(
+                res,
+                client,
+                session
+            );
+        } else {
+            // Совместимость со старыми мобильными версиями.
+            authResponse = {
+                token: jwt.sign(
+                    {
+                        id: user.id,
+                        phone: user.phone,
+                    },
+                    process.env.JWT_SECRET,
+                    {
+                        expiresIn: "7d",
+                    }
+                ),
+            };
+        }
+
+        return res.json({
+            ...authResponse,
+
+            user: {
+                id: user.id,
+                username: user.username,
+                phone: user.phone,
+                role: user.role,
+                rating: user.rating || 5,
+            },
+        });
     } catch (e) {
         console.error("Login error:", e);
-        res.status(500).json({ message: "Server error" });
+
+        return res.status(e.status || 500).json({
+            message: e.status
+                ? e.message
+                : "Server error",
+        });
     }
 });
 
@@ -525,7 +704,6 @@ router.post("/login-sms", async (req, res) => {
 
         smsCodes.delete(phoneKey);
 
-        // ⚠️ ВАЖНО: искать пользователя тоже по нормализованному телефону
         const user = await User.findOne({ where: { phone: phoneKey } });
         if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -533,15 +711,55 @@ router.post("/login-sms", async (req, res) => {
             return res.status(403).json({ message: "Ваш аккаунт заблокирован" });
         }
 
-        const token = jwt.sign({ id: user.id, phone: user.phone }, process.env.JWT_SECRET, { expiresIn: "7d" });
+        const client = getSessionClient(req);
 
-        res.json({
-            token,
-            user: { id: user.id, username: user.username, phone: user.phone, rating: user.rating || 5 },
+        let authResponse;
+
+        if (client) {
+            const session = await createAuthSession(
+                user,
+                "user"
+            );
+
+            authResponse = buildUserSessionResponse(
+                res,
+                client,
+                session
+            );
+        } else {
+            authResponse = {
+                token: jwt.sign(
+                    {
+                        id: user.id,
+                        phone: user.phone,
+                    },
+                    process.env.JWT_SECRET,
+                    {
+                        expiresIn: "7d",
+                    }
+                ),
+            };
+        }
+
+        return res.json({
+            ...authResponse,
+
+            user: {
+                id: user.id,
+                username: user.username,
+                phone: user.phone,
+                role: user.role,
+                rating: user.rating || 5,
+            },
         });
-    } catch (error) {
-        console.error("Login SMS error:", error);
-        res.status(500).json({ message: "Server error" });
+    } catch (e) {
+        console.error("Login sms error:", e);
+
+        return res.status(e.status || 500).json({
+            message: e.status
+                ? e.message
+                : "Server error",
+        });
     }
 });
 

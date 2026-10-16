@@ -20,6 +20,7 @@
     "axios": "^1.7.9",
     "bcryptjs": "^2.4.3",
     "browser-image-compression": "^2.0.2",
+    "capacitor-secure-storage-plugin": "^0.13.0",
     "cra-template": "1.2.0",
     "firebase": "^12.15.0",
     "framer-motion": "^12.6.3",
