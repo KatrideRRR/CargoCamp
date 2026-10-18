@@ -35,8 +35,10 @@ const allowedOrigins = require("./config/allowedOrigins");
 const tbankPaymentsRoutes = require("./routes/tbankPayments");
 const pushTokensRoutes = require("./routes/pushTokens");
 const supportRoutes = require("./routes/support");
+const benefitsRoutes = require("./routes/benefits");
 const adminSupportRoutes = require("./routes/adminSupport");
 const {notifySystemError} = require("./services/adminNotificationService");
+const adminBenefitsRoutes = require("./routes/adminBenefits");
 
 const db = require("./models");
 const sequelize = require("./config/database");
@@ -78,19 +80,6 @@ app.use(logActionMiddleware);
 app.use((req, res, next) => {
     req.logAction = typeof logAction === "function" ? logAction : async () => {};
     next();
-});
-
-db.sequelize.sync().catch((err) => {
-    console.error(
-        "Database sync error:",
-        err
-    );
-
-    void notifySystemError({
-        title: "🚨 Ошибка синхронизации базы данных",
-        error: err,
-        extra: "db.sequelize.sync()",
-    });
 });
 
 const corsOptions = {
@@ -161,6 +150,8 @@ app.use("/api/tbank-payments", tbankPaymentsRoutes);
 app.use("/api/push", pushTokensRoutes);
 app.use("/api/support", supportRoutes);
 app.use("/api/admin/support", adminSupportRoutes);
+app.use("/api/benefits", benefitsRoutes);
+app.use("/api/admin/benefits", adminBenefitsRoutes);
 
 app.post("/api/token", (req, res) => {
     const { token } = req.body;

@@ -4,23 +4,21 @@ module.exports = (sequelize) => {
     class User extends Model {
         static associate(models) {
             User.hasMany(models.Order, { foreignKey: 'userId', as: 'orders' });
-            User.hasMany(models.ExpressSavedAddress, {
-                foreignKey: "userId",
-                as: "expressSavedAddresses",
-                onDelete: "CASCADE",
-            });
+            User.hasMany(models.ExpressSavedAddress, {foreignKey: "userId", as: "expressSavedAddresses", onDelete: "CASCADE",});
             User.hasMany(models.ExpressOrder, { foreignKey: "creatorId", as: "expressCreatedOrders" });
             User.hasMany(models.ExpressOrder, { foreignKey: "executorId", as: "expressTakenOrders" });
-
-            User.hasMany(models.SupportMessage, {
-                foreignKey: "userId",
-                as: "supportMessages",
-            });
-
-            User.hasMany(models.SupportMessage, {
-                foreignKey: "senderId",
-                as: "sentSupportMessages",
-            });
+            User.hasMany(models.SupportMessage, {foreignKey: "userId", as: "supportMessages",});
+            User.hasMany(models.SupportMessage, {foreignKey: "senderId", as: "sentSupportMessages",});
+            User.hasMany(models.IdentityVerification, {foreignKey: "userId", as: "identityVerifications",});
+            User.hasMany(models.IdentityVerification, {foreignKey: "reviewedBy", as: "reviewedIdentityVerifications",});
+            User.hasMany(models.VerificationDocument, {foreignKey: "userId", as: "verificationDocuments",});
+            User.hasMany(models.ContractSignature, {foreignKey: "userId", as: "contractSignatures",});
+            User.hasMany(models.ContractEvent, {foreignKey: "actorUserId", as: "contractEvents",});
+            User.hasMany(models.ElectronicSignatureAgreement, {foreignKey: "userId", as: "electronicSignatureAgreements",});
+            User.hasMany(models.SignatureChallenge, {foreignKey: "userId", as: "signatureChallenges",});
+            User.hasMany(models.UserBenefitVerification, {foreignKey: "userId", as: "benefitVerifications",});
+            User.hasMany(models.UserBenefitVerification, {foreignKey: "reviewedBy", as: "reviewedBenefitVerifications",});
+            User.hasMany(models.BenefitVerificationDocument, {foreignKey: "userId", as: "benefitDocuments",});
         }
     }
     User.init(

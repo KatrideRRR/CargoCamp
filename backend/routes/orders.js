@@ -19,32 +19,11 @@ const uploadCustomerAfter = buildOrderPhotoUploader("customer_after");
 const { sendNotifications } = require("../socket");
 const { calculateRecommendedPrice } = require("../services/recommendedPriceService");
 
-/* ===============================
-   Папки uploads
-================================ */
-
-const {
-    uploadsRoot,
-    ordersRoot,
-    tempRoot,
-    contractsRoot,
-    ensureDirectory,
-} = require("../config/storagePaths");
-
-const uploadDocumentRoot =
-    path.resolve(__dirname, "..", "upload-document");
-
+const {uploadsRoot, ordersRoot, tempRoot, contractsRoot, ensureDirectory,} = require("../config/storagePaths");
+const uploadDocumentRoot = path.resolve(__dirname, "..", "upload-document");
 ensureDirectory(uploadDocumentRoot);
 
-/* ===============================
-   MULTER для создания заказа
-   (временная папка)
-================================ */
-
-const tempStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, tempRoot);
-    },
+const tempStorage = multer.diskStorage({destination: (req, file, cb) => {cb(null, tempRoot);},
 
     filename: (req, file, cb) => {
         const ext = path.extname(file.originalname) || ".jpg";
@@ -54,10 +33,6 @@ const tempStorage = multer.diskStorage({
 });
 
 const upload = multer({ storage: tempStorage });
-
-/* ===============================
-   MULTER для фото заказа
-================================ */
 
 function buildOrderPhotoUploader(type) {
 
@@ -294,12 +269,7 @@ function isValidLatLngObject(value) {
     return true;
 }
 
-function calculateStraightDistanceKm(
-    startLat,
-    startLng,
-    endLat,
-    endLng
-) {
+function calculateStraightDistanceKm(startLat, startLng, endLat, endLng) {
     const lat1 = Number(startLat);
     const lng1 = Number(startLng);
     const lat2 = Number(endLat);
@@ -3793,6 +3763,204 @@ module.exports = (io) => {
             });
         }
     });
+
+    router.get("/:id/contract-file", authenticateToken, async (req, res) => {
+            try {
+                const orderId = Number(req.params.id);
+                const userId = Number(req.user.id);
+
+                if (
+                    !Number.isSafeInteger(orderId) ||
+                    orderId <= 0
+                ) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Некорректный номер заказа",
+                    });
+                }
+
+                const order = await Order.findByPk(
+                    orderId,
+                    {
+                        attributes: [
+                            "id",
+                            "creatorId",
+                            "executorId",
+                            "contractPath",
+                        ],
+                    }
+                );
+
+                if (!order) {
+                    return res.status(404).json({
+                        success: false,
+                        message: "Договор не найден",
+                    });
+                }
+
+                const isCreator =
+                    Number(order.creatorId) === userId;
+
+                const isExecutor =
+                    Number(order.executorId) === userId;
+
+                /*
+                 * Не раскрываем наличие договора
+                 * постороннему пользователю.
+                 */
+                if (!isCreator && !isExecutor) {
+                    return res.status(404).json({
+                        success: false,
+                        message: "Договор не найден",
+                    });
+                }
+
+                if (!order.contractPath) {
+                    return res.status(404).json({
+                        success: false,
+                        message: "Документ ещё не сформирован",
+                    });
+                }
+
+                /*
+                 * Используем только имя, построенное
+                 * из проверенного ID заказа.
+                 *
+                 * Нельзя принимать произвольный
+                 * путь к файлу из URL.
+                 */
+                const fileName =
+                    `contract_${order.id}.pdf`;
+
+                const storedFileName = path.posix.basename(
+                    String(order.contractPath)
+                        .replace(/\\/g, "/")
+                );
+
+                if (storedFileName !== fileName) {
+                    return res.status(404).json({
+                        success: false,
+                        message: "Договор не найден",
+                    });
+                }
+
+                const absoluteFilePath = path.join(
+                    contractsRoot,
+                    fileName
+                );
+
+                let fileStats;
+
+                try {
+                    fileStats = await fs.promises.stat(
+                        absoluteFilePath
+                    );
+                } catch (error) {
+                    if (error.code === "ENOENT") {
+                        return res.status(404).json({
+                            success: false,
+                            message: "Файл договора не найден",
+                        });
+                    }
+
+                    throw error;
+                }
+
+                if (!fileStats.isFile()) {
+                    return res.status(404).json({
+                        success: false,
+                        message: "Файл договора не найден",
+                    });
+                }
+
+                /*
+                 * Юридические документы
+                 * не должны кэшироваться
+                 * общедоступными прокси.
+                 */
+                res.setHeader(
+                    "Cache-Control",
+                    "private, no-store, max-age=0"
+                );
+
+                res.setHeader(
+                    "X-Content-Type-Options",
+                    "nosniff"
+                );
+
+                res.setHeader(
+                    "Content-Type",
+                    "application/pdf"
+                );
+
+                /*
+                 * Фиксируем факт обращения
+                 * к документу в ActionLog.
+                 */
+                try {
+                    await req.logAction?.({
+                        req,
+                        actorUserId: userId,
+                        actorRole: "user",
+                        actionType: "contract_downloaded",
+                        entityType: "order",
+                        entityId: order.id,
+                        orderId: order.id,
+                        meta: {
+                            documentType: "legacy_contract",
+                            fileName,
+                        },
+                    });
+                } catch (logError) {
+                    console.error(
+                        "Не удалось записать скачивание договора:",
+                        logError
+                    );
+                }
+
+                /*
+                 * Express самостоятельно передаст
+                 * файл клиенту.
+                 */
+                return res.download(
+                    absoluteFilePath,
+                    fileName,
+                    (error) => {
+                        if (!error) {
+                            return;
+                        }
+
+                        console.error(
+                            "Ошибка передачи договора:",
+                            error
+                        );
+
+                        if (!res.headersSent) {
+                            return res.status(500).json({
+                                success: false,
+                                message:
+                                    "Не удалось скачать договор",
+                            });
+                        }
+                    }
+                );
+
+            } catch (error) {
+                console.error(
+                    "Ошибка доступа к договору:",
+                    error
+                );
+
+                if (res.headersSent) {
+                    return;
+                }
+
+                return res.status(500).json({
+                    success: false,
+                    message: "Ошибка сервера",
+                });
+            }
+        });
 
     return router;
 };

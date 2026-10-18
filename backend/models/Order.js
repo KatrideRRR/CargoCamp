@@ -3,17 +3,14 @@ const { Model, DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
     class Order extends Model {
         static associate(models) {
-
             Order.belongsTo(models.User, { foreignKey: 'userId', as: 'users' });
             Order.belongsTo(models.Category, { foreignKey: 'categoryId', as: 'category' });
             Order.belongsTo(models.Subcategory, { foreignKey: 'subcategoryId', as: 'subcategory' });
             Order.belongsTo(models.User, { as: 'creator', foreignKey: 'creatorId' });
             Order.belongsTo(models.User, { as: 'executor', foreignKey: 'executorId' });
             Order.belongsTo(models.Service, { foreignKey: 'serviceId', as: 'service' });
-            Order.hasMany(models.Dispute, {
-                foreignKey: "orderId",
-                as: "disputes"
-            });
+            Order.hasMany(models.Dispute, {foreignKey: "orderId", as: "disputes"});
+            Order.hasMany(models.Contract, {foreignKey: "orderId", as: "contracts",});
         }
     }
 

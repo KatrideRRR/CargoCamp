@@ -32,12 +32,23 @@ db.ActionLog = require("./ActionLog")(sequelize, DataTypes);
 db.Dispute = require("./Dispute")(sequelize, DataTypes);
 db.PushToken = require("./PushToken")(sequelize, DataTypes);
 db.SupportMessage = require("./SupportMessage")(sequelize, DataTypes);
+// ✅ Identity / Verification
+db.IdentityVerification = require("./IdentityVerification")(sequelize, DataTypes);
+db.VerificationDocument = require("./VerificationDocument")(sequelize, DataTypes);
+// ✅ Legal / Contracts
+db.Contract = require("./Contract")(sequelize, DataTypes);
+db.ContractSignature = require("./ContractSignature")(sequelize, DataTypes);
+db.ContractEvent = require("./ContractEvent")(sequelize, DataTypes);
 // ✅ Express (такси/курьер)
 db.ExpressOrder = require("./ExpressOrder")(sequelize, DataTypes);
 db.ExpressSavedAddress = require("./ExpressSavedAddress")(sequelize, DataTypes);
-
 db.ServiceSearchAlias = require("./ServiceSearchAlias")(sequelize, DataTypes);
-
+// Electronic Signature Foundation
+db.ElectronicSignatureAgreement = require("./ElectronicSignatureAgreement")(sequelize, DataTypes);
+db.SignatureChallenge = require("./SignatureChallenge")(sequelize, DataTypes);
+// Social Benefits Foundation
+db.UserBenefitVerification = require("./UserBenefitVerification")(sequelize, DataTypes);
+db.BenefitVerificationDocument = require("./BenefitVerificationDocument")(sequelize, DataTypes);
 // ✅ Ассоциации
 Object.values(db).forEach((model) => {
     if (model && typeof model.associate === "function") {
