@@ -1,5 +1,8 @@
 const express = require("express");
 
+const jwt = require("jsonwebtoken");
+const { AuthSession } = require("../models");
+
 const { sequelize, User, UserBenefitVerification,
     BenefitVerificationDocument, ActionLog } = require("../models");
 
@@ -16,9 +19,69 @@ const router = express.Router();
 
 router.use(authMiddleware, adminMiddleware);
 
+/*
+ * Для документов льгот обязательна
+ * действующая административная сессия.
+ *
+ * Старые JWT без sid/scope сюда не допускаем.
+ */
+router.use(async (req, res, next) => {
+    try {
+        const authorization =
+            req.headers.authorization || "";
+
+        const token = authorization.startsWith("Bearer ")
+            ? authorization.slice(7)
+            : null;
+
+        if (!token) {
+            return res.sendStatus(401);
+        }
+
+        const decoded = jwt.verify(
+            token,
+            process.env.JWT_SECRET
+        );
+
+        if (
+            decoded.scope !== "admin" ||
+            !decoded.sid ||
+            Number(decoded.id) !== Number(req.user.id)
+        ) {
+            return res.status(401).json({
+                message: "Требуется административная сессия",
+            });
+        }
+
+        const session = await AuthSession.findByPk(
+            decoded.sid
+        );
+
+        const now = Date.now();
+
+        if (
+            !session ||
+            session.scope !== "admin" ||
+            Number(session.userId) !== Number(req.user.id) ||
+            session.revokedAt ||
+            new Date(session.expiresAt).getTime() <= now ||
+            new Date(session.absoluteExpiresAt).getTime() <= now
+        ) {
+            return res.status(401).json({
+                message: "Административная сессия недействительна",
+            });
+        }
+
+        next();
+    } catch (error) {
+        return res.status(401).json({
+            message: "Не удалось проверить административную сессию",
+        });
+    }
+});
+
 function validId(value) {
-    return /^\d+$/.test(String(value || ""));
-}
+    return /^\d+$/.test(String(value || ""));}
 
 /*
  * GET /api/admin/benefits/pending
@@ -96,9 +159,7 @@ router.get("/pending", async (req, res) => {
  * Документ может открыть только администратор.
  * Файл расшифровывается сервером.
  */
-router.get(
-    "/:id/document/:documentId",
-    async (req, res) => {
+router.get("/:id/document/:documentId", async (req, res) => {
         try {
             if (
                 !validId(req.params.id) ||
@@ -225,8 +286,7 @@ router.get(
                     "Не удалось получить документ",
             });
         }
-    }
-);
+    });
 
 /*
  * POST /api/admin/benefits/:id/decision
