@@ -3,21 +3,18 @@ services:
     build: ./backend
     container_name: cargo_camp_backend
     restart: always
-    network_mode: "host"   # вот ключевое изменение
+    network_mode: "host"
     env_file:
       - ./backend/.env
     environment:
-      DB_HOST: 81.163.27.147
-      DB_USER: cargocamp            # поменяй на своего пользователя
-      DB_PASSWORD: root        # поменяй на пароль
-      DB_NAME: cargo_camp
-
       CONTRACTS_DIR: /data/contracts
+      PRIVATE_DOCUMENTS_DIR: /data/private-documents
 
     volumes:
       - ./uploads:/app/uploads
       - /var/lib/cargocamp/contracts:/data/contracts
       - /root/cargocamp-secrets/firebase-service-account.json:/app/secrets/firebase-service-account.json:ro
+      - /var/lib/cargocamp/private-documents:/data/private-documents
     command: ["npm", "start"]
 
   frontend:
