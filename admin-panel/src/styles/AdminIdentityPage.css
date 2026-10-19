@@ -1,0 +1,418 @@
+.admin-identity-page {
+    min-height: 100vh;
+    padding: 32px 20px;
+    background: #f5f7fb;
+    color: #182235;
+    font-family: "Inter", "Segoe UI", Arial, sans-serif;
+}
+
+.admin-identity-page *,
+.admin-identity-page *::before,
+.admin-identity-page *::after {
+    box-sizing: border-box;
+}
+
+.admin-identity-container {
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+    min-width: 0;
+}
+
+/* Заголовок */
+
+.admin-identity-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+.admin-identity-header h1 {
+    margin: 12px 0 8px;
+    font-size: 30px;
+    font-weight: 750;
+    color: #111827;
+}
+
+.admin-identity-header p {
+    margin: 0;
+    color: #667085;
+    line-height: 1.5;
+}
+
+.admin-identity-back {
+    color: #2563eb;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.admin-identity-back:hover {
+    text-decoration: underline;
+}
+
+.admin-identity-refresh,
+.admin-identity-open {
+    padding: 12px 18px;
+    border: 1px solid #d0d7e2;
+    border-radius: 12px;
+    background: white;
+    color: #175cd3;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.admin-identity-refresh:hover,
+.admin-identity-open:hover {
+    background: #eff6ff;
+}
+
+/* Сводка */
+
+.admin-identity-summary {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 24px;
+    margin-bottom: 24px;
+    background: white;
+    border: 1px solid #e5eaf1;
+    border-radius: 18px;
+}
+
+.admin-identity-counter {
+    font-size: 42px;
+    font-weight: 800;
+    color: #175cd3;
+}
+
+.admin-identity-summary strong {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.admin-identity-summary p {
+    margin: 0;
+    color: #667085;
+    font-size: 13px;
+}
+
+/* Карточки заявок */
+
+.admin-identity-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+}
+
+.admin-identity-card {
+    min-width: 0;
+    padding: 24px;
+    background: white;
+    border: 1px solid #e5eaf1;
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.admin-identity-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.admin-identity-card-info {
+    min-width: 0;
+}
+
+.admin-identity-card h2 {
+    margin: 14px 0;
+    color: #111827;
+    font-size: 21px;
+}
+
+.admin-identity-badge {
+    display: inline-flex;
+    padding: 7px 12px;
+    border-radius: 9px;
+    background: #fff7ed;
+    color: #9a3412;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.admin-identity-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    color: #667085;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.admin-identity-details {
+    margin-top: 24px;
+    padding-top: 22px;
+    border-top: 1px solid #e5eaf1;
+}
+
+.admin-identity-details h3 {
+    margin: 0 0 10px;
+    color: #182235;
+    font-size: 17px;
+}
+
+.admin-identity-help {
+    margin: 0 0 18px;
+    color: #667085;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+/* Документы */
+
+.admin-identity-documents {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.admin-identity-document {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-width: 0;
+    padding: 15px;
+    border: 1px solid #e2e8f0;
+    border-radius: 13px;
+    background: #f8fafc;
+}
+
+.admin-identity-document > div {
+    min-width: 0;
+}
+
+.admin-identity-document strong,
+.admin-identity-document small {
+    display: block;
+    overflow-wrap: anywhere;
+}
+
+.admin-identity-document strong {
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+
+.admin-identity-document small {
+    margin-top: 3px;
+    color: #64748b;
+    font-size: 12px;
+}
+
+.admin-identity-document button {
+    flex-shrink: 0;
+    padding: 10px 16px;
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* Форма принятия решения */
+
+.admin-identity-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 18px 0;
+    padding: 14px;
+    border-radius: 12px;
+    background: #f1f5f9;
+    color: #334155;
+    font-size: 13px;
+    line-height: 1.5;
+    cursor: pointer;
+}
+
+.admin-identity-check input {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin: 1px 0 0;
+    accent-color: #2563eb;
+}
+
+.admin-identity-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 15px;
+}
+
+.admin-identity-form label {
+    display: block;
+    min-width: 0;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.admin-identity-form input,
+.admin-identity-form textarea {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    margin-top: 8px;
+    padding: 12px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 11px;
+    background: white;
+    color: #0f172a;
+    font: inherit;
+}
+
+.admin-identity-form input:focus,
+.admin-identity-form textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.admin-identity-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 22px;
+}
+
+.admin-identity-actions button {
+    min-height: 45px;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 11px;
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.admin-identity-approve {
+    background: #175cd3;
+}
+
+.admin-identity-reject {
+    background: #b42318;
+}
+
+.admin-identity-actions button:disabled,
+.admin-identity-document button:disabled,
+.admin-identity-refresh:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Уведомления */
+
+.admin-identity-error,
+.admin-identity-success,
+.admin-identity-warning {
+    margin-bottom: 16px;
+    padding: 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.admin-identity-error,
+.admin-identity-warning {
+    background: #fff5f4;
+    border: 1px solid #fda29b;
+    color: #b42318;
+}
+
+.admin-identity-success {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #047857;
+}
+
+.admin-identity-privacy {
+    margin-top: 20px;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.admin-identity-empty {
+    padding: 50px 20px;
+    border: 1px solid #e5eaf1;
+    border-radius: 18px;
+    background: white;
+    text-align: center;
+}
+
+.admin-identity-empty-icon {
+    display: block;
+    margin-bottom: 12px;
+    color: #16a34a;
+    font-size: 40px;
+}
+
+.admin-identity-empty h2 {
+    margin: 0 0 10px;
+    font-size: 20px;
+}
+
+.admin-identity-empty p {
+    color: #667085;
+}
+
+/* Мобильные устройства */
+
+@media (max-width: 640px) {
+    .admin-identity-page {
+        padding: 20px 12px;
+    }
+
+    .admin-identity-header,
+    .admin-identity-card-top {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .admin-identity-header h1 {
+        font-size: 24px;
+    }
+
+    .admin-identity-card {
+        padding: 18px;
+    }
+
+    .admin-identity-summary {
+        padding: 18px;
+    }
+
+    .admin-identity-document {
+        flex-wrap: wrap;
+    }
+
+    .admin-identity-document button {
+        width: 100%;
+    }
+
+    .admin-identity-actions {
+        flex-direction: column;
+    }
+
+    .admin-identity-actions button {
+        width: 100%;
+    }
+
+    .admin-identity-refresh {
+        width: 100%;
+    }
+}

@@ -15,6 +15,7 @@ import AdminUserDocumentsPage from "./pages/AdminUserDocumentsPage";
 import AdminExpressOrderDetailsPage from "./pages/AdminExpressOrderDetailsPage";
 import AdminSupportPage from "./pages/AdminSupportPage";
 import AdminBenefitsPage from "./pages/AdminBenefitsPage";
+import AdminIdentityPage from "./pages/AdminIdentityPage";
 
 function App() {
     return (
@@ -152,6 +153,15 @@ function App() {
                     element={
                         <PrivateRoute>
                             <AdminBenefitsPage />
+                        </PrivateRoute>
+                    }
+                />
+
+                <Route
+                    path="/identity"
+                    element={
+                        <PrivateRoute>
+                            <AdminIdentityPage />
                         </PrivateRoute>
                     }
                 />
