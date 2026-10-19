@@ -6,15 +6,9 @@ import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrent
 import { useAuth } from "../utils/authContext";
 import axios from "axios";
 import axiosInstance from "../utils/axiosInstance";
-import {
-    FaHeadset,
-    FaLightbulb,
-    FaTrophy,
-    FaPaperPlane,
-} from "react-icons/fa";
-
+import {FaHeadset, FaLightbulb, FaTrophy, FaPaperPlane,} from "react-icons/fa";
 import "../styles/ProfilePage.css";
-
+import UserBenefitsSection from "../components/UserBenefitsSection";
 import AgreementModal from "../components/AgreementModal";
 import YandexMapModal from "../components/YandexMapModal";
 import PaymentProviderSelect from "../components/PaymentProviderSelect";
@@ -250,10 +244,11 @@ const ProfilePage = () => {
     const verificationText = useMemo(() => {
         if (!profile) return "";
 
-        if (profile.userStatus === "pensioner") return "Пенсионер";
-        if (profile.userStatus === "verified") return "Пройдена";
+        if (profile.userStatus === "verified") {
+            return "Проверена (прежний статус)";
+        }
 
-        return "Не пройдена";
+        return "Не подтверждена";
     }, [profile]);
 
     const sortedCategories = useMemo(() => {
@@ -1869,9 +1864,7 @@ const ProfilePage = () => {
                         className={`verification-summary-status ${
                             profile?.userStatus === "verified"
                                 ? "verified"
-                                : profile?.userStatus === "pensioner"
-                                    ? "verified"
-                                    : "empty"
+                                : "empty"
                         }`}
                     >
                         {verificationText}
@@ -2375,6 +2368,13 @@ const ProfilePage = () => {
                     </div>
                 </div>
 
+            </div>
+
+            <UserBenefitsSection
+                userId={profile?.id}
+                legacyUserStatus={profile?.userStatus}
+            />
+
                 <div className="profile-card glass">
                     <div className="card-head">
                         <div>
@@ -2609,7 +2609,6 @@ const ProfilePage = () => {
                         Выйти
                     </button>
                 </div>
-            </div>
 
             {showSuggestionModal && (
                 <div
