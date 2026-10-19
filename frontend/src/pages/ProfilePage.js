@@ -2368,8 +2368,6 @@ const ProfilePage = () => {
                     </div>
                 </div>
 
-            </div>
-
             <UserBenefitsSection
                 userId={profile?.id}
                 legacyUserStatus={profile?.userStatus}
@@ -2609,6 +2607,7 @@ const ProfilePage = () => {
                         Выйти
                     </button>
                 </div>
+            </div>
 
             {showSuggestionModal && (
                 <div
