@@ -39,6 +39,8 @@ const benefitsRoutes = require("./routes/benefits");
 const adminSupportRoutes = require("./routes/adminSupport");
 const {notifySystemError} = require("./services/adminNotificationService");
 const adminBenefitsRoutes = require("./routes/adminBenefits");
+const identityRoutes = require("./routes/identity");
+const adminIdentityRoutes = require("./routes/adminIdentity");
 
 const db = require("./models");
 const sequelize = require("./config/database");
@@ -143,6 +145,8 @@ app.use("/api/disputes", disputeRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messagesRoutes);
 app.use("/api/category", categoryRouter);
+app.use("/api/identity", identityRoutes);
+app.use("/api/admin/identity", adminIdentityRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/payments", payments);
 app.use("/api/express", expressOrdersRoutes);
