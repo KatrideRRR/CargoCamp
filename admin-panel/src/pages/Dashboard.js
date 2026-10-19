@@ -11,6 +11,7 @@ function Dashboard() {
                 <nav className="dashboard-nav">
                     <ul>
                         <li><Link to="/users">Пользователи</Link></li>
+                        <li><Link to="/benefits">Проверка льгот</Link></li>
                         <li><Link to="/orders">Заказы</Link></li>
                         <li><Link to="/support">Поддержка</Link></li>
                     </ul>

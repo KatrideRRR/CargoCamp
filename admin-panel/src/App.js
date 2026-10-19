@@ -1,11 +1,5 @@
 import React from "react";
-import {
-    BrowserRouter as Router,
-    Routes,
-    Route,
-    Navigate,
-} from "react-router-dom";
-
+import {BrowserRouter as Router, Routes, Route, Navigate,} from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import Dashboard from "./pages/Dashboard";
 import UsersPage from "./pages/UsersPage";
@@ -20,6 +14,7 @@ import AdminCreateOrderPage from "./pages/AdminCreateOrderPage";
 import AdminUserDocumentsPage from "./pages/AdminUserDocumentsPage";
 import AdminExpressOrderDetailsPage from "./pages/AdminExpressOrderDetailsPage";
 import AdminSupportPage from "./pages/AdminSupportPage";
+import AdminBenefitsPage from "./pages/AdminBenefitsPage";
 
 function App() {
     return (
@@ -148,6 +143,15 @@ function App() {
                     element={
                         <PrivateRoute>
                             <AdminUserDocumentsPage />
+                        </PrivateRoute>
+                    }
+                />
+
+                <Route
+                    path="/benefits"
+                    element={
+                        <PrivateRoute>
+                            <AdminBenefitsPage />
                         </PrivateRoute>
                     }
                 />
