@@ -305,3 +305,84 @@
 .profile-page .cc-benefits-heading > div {
     min-width: 0;
 }
+
+/* =========================================
+   Льготы внутри общей карточки профиля
+   ========================================= */
+
+.profile-page .cc-benefits--embedded {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+
+    padding: 14px;
+
+    box-sizing: border-box;
+    overflow: hidden;
+
+    border-radius: 20px;
+}
+
+.profile-page .cc-benefits--embedded .cc-benefits-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.profile-page .cc-benefits--embedded .card-title {
+    font-size: 14px;
+    line-height: 1.3;
+}
+
+.profile-page .cc-benefits--embedded .card-subtitle {
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.profile-page .cc-benefits--embedded .cc-benefits-toggle {
+    width: auto;
+    min-width: 84px;
+
+    margin-left: auto;
+    padding: 9px 12px;
+
+    flex: 0 0 auto;
+    font-size: 12px;
+}
+
+.profile-page .cc-benefits--embedded .cc-benefits-summary {
+    margin-top: 8px;
+    gap: 6px;
+}
+
+.profile-page .cc-benefits--embedded .cc-benefits-summary span {
+    padding: 6px 9px;
+    font-size: 11px;
+}
+
+.profile-page .cc-benefits--embedded .cc-benefits-list {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.profile-page .cc-benefits--embedded .cc-benefit-item {
+    width: 100%;
+    min-width: 0;
+}
+
+@media (max-width: 420px) {
+    .profile-page .cc-benefits--embedded {
+        padding: 12px;
+    }
+
+    .profile-page .cc-benefits--embedded .cc-benefits-toggle {
+        padding: 8px 10px;
+    }
+}

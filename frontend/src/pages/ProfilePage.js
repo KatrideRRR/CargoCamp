@@ -1800,15 +1800,220 @@ const ProfilePage = () => {
                     </div>
                 </div>
 
+                <div className="profile-card glass">
+                    <div className="card-head">
+                        <div>
+                            <h2 className="card-title">Профессии</h2>
+                            <p className="card-subtitle">
+                                По ним будут фильтроваться заказы
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="cat-grid">
+                        {sortedCategories.map((c) => {
+                            const active = categoryPick.includes(c.id);
+
+                            return (
+                                <button
+                                    key={c.id}
+                                    type="button"
+                                    className={`cat-pill ${active ? "active" : ""}`}
+                                    onClick={() => {
+                                        setCategoryPick((prev) =>
+                                            prev.includes(c.id)
+                                                ? prev.filter((x) => x !== c.id)
+                                                : [...prev, c.id]
+                                        );
+                                    }}
+                                >
+                                    {c.name}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="grid-2 profile-mt-12">
+                        <button
+                            className="btn btn-primary"
+                            disabled={catSaving}
+                            onClick={savePreferredCategories}
+                        >
+                            {catSaving ? "Сохранение..." : "Сохранить"}
+                        </button>
+
+                        <button
+                            className="btn btn-ghost"
+                            type="button"
+                            onClick={() => setCategoryPick([])}
+                            disabled={catSaving}
+                        >
+                            Сбросить
+                        </button>
+                    </div>
+                </div>
+
+                <div className="profile-card profile-location-card glass">
+                    <div className="card-head">
+                        <div>
+                            <h2 className="card-title">Местоположение</h2>
+                            <p className="card-subtitle">
+                                Сохраняется для автоподстановки в заказах и
+                                фильтрации
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="loc-row">
+                        <div className="loc-input-wrap">
+                            <input
+                                className="loc-input"
+                                value={locationDraft}
+                                onChange={(e) => {
+                                    const v = e.target.value;
+
+                                    setLocationDraft(v);
+                                    setPickedCoords(null);
+                                    setAddressQuery(v);
+                                }}
+                                placeholder="Введите район / улицу / адрес"
+                                autoComplete="off"
+                            />
+
+                            {addressSuggestions.length > 0 && (
+                                <ul className="loc-suggestions">
+                                    {addressSuggestions.map((s, i) => (
+                                        <li
+                                            key={`${s.label}-${i}`}
+                                            onClick={() => {
+                                                setLocationDraft(s.label);
+                                                setPickedCoords({
+                                                    lat: s.lat,
+                                                    lng: s.lng,
+                                                });
+                                                setAddressSuggestions([]);
+                                                setAddressQuery("");
+                                            }}
+                                        >
+                                            {s.label}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+
+                        <button
+                            className="btn btn-primary"
+                            disabled={locLoading}
+                            onClick={() =>
+                                saveLocation({
+                                    address: locationDraft,
+                                    lat: pickedCoords?.lat || null,
+                                    lng: pickedCoords?.lng || null,
+                                    source: "manual",
+                                })
+                            }
+                        >
+                            Сохранить
+                        </button>
+                    </div>
+
+                    <div className="grid-2 profile-mt-10">
+                        <button
+                            className="btn btn-ghost"
+                            disabled={locLoading}
+                            onClick={detectGps}
+                        >
+                            Определить по GPS
+                        </button>
+
+                        <button
+                            className="btn btn-ghost"
+                            onClick={() => setShowMapModal(true)}
+                        >
+                            Выбрать на карте
+                        </button>
+                    </div>
+
+                    {gpsCandidate && (
+                        <div className="gps-confirm">
+                            <div className="gps-title">
+                                Мы определили координаты. Верно?
+                            </div>
+
+                            <div className="gps-sub">
+                                {gpsCandidate.address}
+                            </div>
+
+                            <div className="gps-actions">
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={() =>
+                                        saveLocation({
+                                            address:
+                                                locationDraft ||
+                                                gpsCandidate.address,
+                                            lat: gpsCandidate.lat,
+                                            lng: gpsCandidate.lng,
+                                            source: "gps",
+                                        }).then(() => setGpsCandidate(null))
+                                    }
+                                >
+                                    Да, сохранить
+                                </button>
+
+                                <button
+                                    className="btn btn-ghost"
+                                    onClick={() => setGpsCandidate(null)}
+                                >
+                                    Нет, введу вручную
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    <YandexMapModal
+                        isOpen={showMapModal}
+                        onClose={() => setShowMapModal(false)}
+                        initialLat={profile?.locationLat}
+                        initialLng={profile?.locationLng}
+                        showOrders={false}
+                        onPick={(picked) => {
+                            setLocationDraft(picked.address);
+                            setAddressSuggestions([]);
+                            setAddressQuery("");
+
+                            saveLocation({
+                                address: picked.address,
+                                lat: picked.lat,
+                                lng: picked.lng,
+                                source: "map",
+                            });
+
+                            setShowMapModal(false);
+                        }}
+                    />
+
+                    {profile?.locationSource && (
+                        <div className="loc-meta">
+                            <span className="identity-pill">
+                                Источник: {profile.locationSource}
+                            </span>
+                        </div>
+                    )}
+
+                    {locError && <div className="loc-error">{locError}</div>}
+                </div>
+
                 <div className="profile-card glass profile-verification-card">
                     <div className="card-head">
                         <div>
                             <h2 className="card-title">
-                                Верификация
+                                🛡️ Подтверждения и льготы
                             </h2>
 
                             <p className="card-subtitle">
-                                Подтверждение личности и данных для работы в такси
+                                Личность, автомобиль и социальные статусы
                             </p>
                         </div>
 
@@ -2365,217 +2570,15 @@ const ProfilePage = () => {
                                 </div>
                             )}
                         </div>
+
+                        {/* Социальные льготы */}
+                        <UserBenefitsSection
+                            userId={profile?.id}
+                            legacyUserStatus={profile?.userStatus}
+                            embedded
+                        />
+
                     </div>
-                </div>
-
-            <UserBenefitsSection
-                userId={profile?.id}
-                legacyUserStatus={profile?.userStatus}
-            />
-
-                <div className="profile-card glass">
-                    <div className="card-head">
-                        <div>
-                            <h2 className="card-title">Профессии</h2>
-                            <p className="card-subtitle">
-                                По ним будут фильтроваться заказы
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="cat-grid">
-                        {sortedCategories.map((c) => {
-                            const active = categoryPick.includes(c.id);
-
-                            return (
-                                <button
-                                    key={c.id}
-                                    type="button"
-                                    className={`cat-pill ${active ? "active" : ""}`}
-                                    onClick={() => {
-                                        setCategoryPick((prev) =>
-                                            prev.includes(c.id)
-                                                ? prev.filter((x) => x !== c.id)
-                                                : [...prev, c.id]
-                                        );
-                                    }}
-                                >
-                                    {c.name}
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    <div className="grid-2 profile-mt-12">
-                        <button
-                            className="btn btn-primary"
-                            disabled={catSaving}
-                            onClick={savePreferredCategories}
-                        >
-                            {catSaving ? "Сохранение..." : "Сохранить"}
-                        </button>
-
-                        <button
-                            className="btn btn-ghost"
-                            type="button"
-                            onClick={() => setCategoryPick([])}
-                            disabled={catSaving}
-                        >
-                            Сбросить
-                        </button>
-                    </div>
-                </div>
-
-                <div className="profile-card profile-location-card glass">
-                    <div className="card-head">
-                        <div>
-                            <h2 className="card-title">Местоположение</h2>
-                            <p className="card-subtitle">
-                                Сохраняется для автоподстановки в заказах и
-                                фильтрации
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="loc-row">
-                        <div className="loc-input-wrap">
-                            <input
-                                className="loc-input"
-                                value={locationDraft}
-                                onChange={(e) => {
-                                    const v = e.target.value;
-
-                                    setLocationDraft(v);
-                                    setPickedCoords(null);
-                                    setAddressQuery(v);
-                                }}
-                                placeholder="Введите район / улицу / адрес"
-                                autoComplete="off"
-                            />
-
-                            {addressSuggestions.length > 0 && (
-                                <ul className="loc-suggestions">
-                                    {addressSuggestions.map((s, i) => (
-                                        <li
-                                            key={`${s.label}-${i}`}
-                                            onClick={() => {
-                                                setLocationDraft(s.label);
-                                                setPickedCoords({
-                                                    lat: s.lat,
-                                                    lng: s.lng,
-                                                });
-                                                setAddressSuggestions([]);
-                                                setAddressQuery("");
-                                            }}
-                                        >
-                                            {s.label}
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-
-                        <button
-                            className="btn btn-primary"
-                            disabled={locLoading}
-                            onClick={() =>
-                                saveLocation({
-                                    address: locationDraft,
-                                    lat: pickedCoords?.lat || null,
-                                    lng: pickedCoords?.lng || null,
-                                    source: "manual",
-                                })
-                            }
-                        >
-                            Сохранить
-                        </button>
-                    </div>
-
-                    <div className="grid-2 profile-mt-10">
-                        <button
-                            className="btn btn-ghost"
-                            disabled={locLoading}
-                            onClick={detectGps}
-                        >
-                            Определить по GPS
-                        </button>
-
-                        <button
-                            className="btn btn-ghost"
-                            onClick={() => setShowMapModal(true)}
-                        >
-                            Выбрать на карте
-                        </button>
-                    </div>
-
-                    {gpsCandidate && (
-                        <div className="gps-confirm">
-                            <div className="gps-title">
-                                Мы определили координаты. Верно?
-                            </div>
-
-                            <div className="gps-sub">
-                                {gpsCandidate.address}
-                            </div>
-
-                            <div className="gps-actions">
-                                <button
-                                    className="btn btn-primary"
-                                    onClick={() =>
-                                        saveLocation({
-                                            address:
-                                                locationDraft ||
-                                                gpsCandidate.address,
-                                            lat: gpsCandidate.lat,
-                                            lng: gpsCandidate.lng,
-                                            source: "gps",
-                                        }).then(() => setGpsCandidate(null))
-                                    }
-                                >
-                                    Да, сохранить
-                                </button>
-
-                                <button
-                                    className="btn btn-ghost"
-                                    onClick={() => setGpsCandidate(null)}
-                                >
-                                    Нет, введу вручную
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    <YandexMapModal
-                        isOpen={showMapModal}
-                        onClose={() => setShowMapModal(false)}
-                        initialLat={profile?.locationLat}
-                        initialLng={profile?.locationLng}
-                        showOrders={false}
-                        onPick={(picked) => {
-                            setLocationDraft(picked.address);
-                            setAddressSuggestions([]);
-                            setAddressQuery("");
-
-                            saveLocation({
-                                address: picked.address,
-                                lat: picked.lat,
-                                lng: picked.lng,
-                                source: "map",
-                            });
-
-                            setShowMapModal(false);
-                        }}
-                    />
-
-                    {profile?.locationSource && (
-                        <div className="loc-meta">
-                            <span className="identity-pill">
-                                Источник: {profile.locationSource}
-                            </span>
-                        </div>
-                    )}
-
-                    {locError && <div className="loc-error">{locError}</div>}
                 </div>
 
                 <div className="profile-actions glass">

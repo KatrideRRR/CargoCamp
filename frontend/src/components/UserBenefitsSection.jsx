@@ -134,6 +134,7 @@ function validateFile(file) {
 function UserBenefitsSection({
                                  userId,
                                  legacyUserStatus,
+                                 embedded = false,
                              }) {
     const [benefits, setBenefits] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -311,15 +312,23 @@ function UserBenefitsSection({
     ).length;
 
     return (
-        <section className="profile-card glass cc-benefits">
+        <section
+            className={
+                embedded
+                    ? "verification-panel cc-benefits cc-benefits--embedded"
+                    : "profile-card glass cc-benefits"
+            }
+        >
             <div className="card-head cc-benefits-heading">
                 <div>
                     <h2 className="card-title">
-                        Мои льготы
+                        {embedded
+                            ? "🎖️ Социальные льготы"
+                            : "Мои льготы"}
                     </h2>
 
                     <p className="card-subtitle">
-                        Социальные программы CargoCamp
+                        Пенсионеры, инвалидность, многодетные семьи
                     </p>
                 </div>
 
