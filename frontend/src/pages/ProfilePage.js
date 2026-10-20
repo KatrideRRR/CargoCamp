@@ -9,6 +9,7 @@ import axiosInstance from "../utils/axiosInstance";
 import {FaHeadset, FaLightbulb, FaTrophy, FaPaperPlane,} from "react-icons/fa";
 import "../styles/ProfilePage.css";
 import UserBenefitsSection from "../components/UserBenefitsSection";
+import UserIdentityVerification from "../components/UserIdentityVerification";
 import AgreementModal from "../components/AgreementModal";
 import YandexMapModal from "../components/YandexMapModal";
 import PaymentProviderSelect from "../components/PaymentProviderSelect";
@@ -199,9 +200,6 @@ const ProfilePage = () => {
     const [vehiclePhotoUploading, setVehiclePhotoUploading] =
         useState(false);
 
-    const [identityVerificationOpen, setIdentityVerificationOpen] =
-        useState(false);
-
     const [vehicleVerificationOpen, setVehicleVerificationOpen] =
         useState(false);
 
@@ -241,16 +239,6 @@ const ProfilePage = () => {
         return "Обычный аккаунт";
     }, [profile]);
 
-    const verificationText = useMemo(() => {
-        if (!profile) return "";
-
-        if (profile.userStatus === "verified") {
-            return "Проверена (прежний статус)";
-        }
-
-        return "Не подтверждена";
-    }, [profile]);
-
     const sortedCategories = useMemo(() => {
         return [...categories].sort((a, b) => {
             const ap = a.id === 12 || a.id === 13 ? 0 : 1;
@@ -261,10 +249,6 @@ const ProfilePage = () => {
             return String(a.name).localeCompare(String(b.name), "ru");
         });
     }, [categories]);
-
-    const visibleDocuments = Array.isArray(profile?.documentPhotos)
-        ? profile.documentPhotos.slice(0, 6)
-        : [];
 
     const isCardBound = CARD_BIND_SCREENSHOT_MODE
         ? demoCardBound
@@ -855,38 +839,6 @@ const ProfilePage = () => {
             );
         } finally {
             setAvatarUploading(false);
-        }
-    };
-
-    const handleAutoUpload = async (files) => {
-        const token = localStorage.getItem("authToken");
-
-        if (!token) {
-            toast.error("Вы не авторизованы");
-            return;
-        }
-
-        if (!files || !files.length) return;
-
-        const formData = new FormData();
-
-        for (let file of files) {
-            formData.append("documents", file);
-        }
-
-        try {
-            await axios.post(`${apiUrl}/api/auth/upload-documents`, formData, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "multipart/form-data",
-                },
-            });
-
-            toast.success("Документы успешно загружены");
-            await fetchProfileData();
-        } catch (error) {
-            console.error("Ошибка загрузки документов:", error);
-            toast.error("Ошибка загрузки документов");
         }
     };
 
@@ -2108,207 +2060,13 @@ const ProfilePage = () => {
                     <div className="verification-sections">
 
                         {/* =========================
-            ЛИЧНЫЕ ДОКУМЕНТЫ
-        ========================= */}
+    ПОДТВЕРЖДЕНИЕ ЛИЧНОСТИ
+========================= */}
 
-                        <div className="verification-panel">
-                            <button
-                                type="button"
-                                className="verification-panel-head"
-                                onClick={() =>
-                                    setIdentityVerificationOpen(
-                                        (prev) => !prev
-                                    )
-                                }
-                                aria-expanded={
-                                    identityVerificationOpen
-                                }
-                            >
-                                <div className="verification-panel-head-main">
-                                    <div className="verification-panel-icon">
-                                        👤
-                                    </div>
-
-                                    <div className="verification-panel-heading">
-                                        <div className="verification-panel-title">
-                                            Подтверждение личности
-                                        </div>
-
-                                        <div className="verification-panel-subtitle">
-                                            Паспорт или другой документ,
-                                            удостоверяющий личность
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="verification-panel-head-side">
-                    <span
-                        className={`verification-summary-status ${
-                            profile?.userStatus === "verified"
-                                ? "verified"
-                                : "empty"
-                        }`}
-                    >
-                        {verificationText}
-                    </span>
-
-                                    <span
-                                        className={`verification-chevron ${
-                                            identityVerificationOpen
-                                                ? "open"
-                                                : ""
-                                        }`}
-                                    >
-                        ›
-                    </span>
-                                </div>
-                            </button>
-
-                            {identityVerificationOpen && (
-                                <div className="verification-panel-content">
-                                    <div className="verification-info-box">
-                                        <strong>
-                                            Верификация пользователя
-                                        </strong>
-
-                                        <span>
-                            Загрузите документ, удостоверяющий
-                            личность. Проверка выполняется
-                            администратором вручную.
-                        </span>
-                                    </div>
-
-                                    <label className="upload-glass">
-                                        <input
-                                            type="file"
-                                            multiple
-                                            accept="image/*,.pdf"
-                                            onChange={(e) =>
-                                                handleAutoUpload(
-                                                    e.target.files
-                                                )
-                                            }
-                                            style={{
-                                                display: "none",
-                                            }}
-                                        />
-
-                                        <span>
-                            Загрузить документы
-                        </span>
-                                    </label>
-
-                                    {Array.isArray(
-                                        profile?.documentPhotos
-                                    ) &&
-                                    profile.documentPhotos.length >
-                                    0 ? (
-                                        <div className="docs-block">
-                                            <div className="docs-head">
-                                                <div className="docs-title">
-                                                    Загруженные документы
-                                                </div>
-
-                                                <div className="docs-count">
-                                                    {
-                                                        profile
-                                                            .documentPhotos
-                                                            .length
-                                                    }{" "}
-                                                    шт.
-                                                </div>
-                                            </div>
-
-                                            <div className="docs-grid">
-                                                {visibleDocuments.map(
-                                                    (p, idx) => {
-                                                        const isPdf =
-                                                            String(p)
-                                                                .toLowerCase()
-                                                                .endsWith(
-                                                                    ".pdf"
-                                                                );
-
-                                                        const url =
-                                                            p.startsWith(
-                                                                "http"
-                                                            )
-                                                                ? p
-                                                                : `${apiUrl}${p}`;
-
-                                                        return (
-                                                            <a
-                                                                key={`${p}-${idx}`}
-                                                                className="doc-tile"
-                                                                href={url}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                title="Открыть"
-                                                            >
-                                                                {isPdf ? (
-                                                                    <div className="doc-pdf">
-                                                                        <div className="doc-pdf-badge">
-                                                                            PDF
-                                                                        </div>
-
-                                                                        <div className="doc-name">
-                                                                            Документ{" "}
-                                                                            {idx +
-                                                                                1}
-                                                                        </div>
-                                                                    </div>
-                                                                ) : (
-                                                                    <>
-                                                                        <img
-                                                                            className="doc-img"
-                                                                            src={
-                                                                                url
-                                                                            }
-                                                                            alt={`Документ ${
-                                                                                idx +
-                                                                                1
-                                                                            }`}
-                                                                            loading="lazy"
-                                                                        />
-
-                                                                        <div className="doc-name">
-                                                                            Фото{" "}
-                                                                            {idx +
-                                                                                1}
-                                                                        </div>
-                                                                    </>
-                                                                )}
-                                                            </a>
-                                                        );
-                                                    }
-                                                )}
-                                            </div>
-
-                                            {profile.documentPhotos
-                                                    .length >
-                                                visibleDocuments.length && (
-                                                    <div className="docs-empty">
-                                                        Показаны первые{" "}
-                                                        {
-                                                            visibleDocuments.length
-                                                        }{" "}
-                                                        из{" "}
-                                                        {
-                                                            profile
-                                                                .documentPhotos
-                                                                .length
-                                                        }
-                                                    </div>
-                                                )}
-                                        </div>
-                                    ) : (
-                                        <div className="verification-empty-text">
-                                            Документы ещё не загружены
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
+                        <UserIdentityVerification
+                            userId={profile?.id}
+                            legacyUserStatus={profile?.userStatus}
+                        />
 
                         {/* =========================
             АВТОМОБИЛЬ
@@ -2818,33 +2576,43 @@ const ProfilePage = () => {
 
                         <div className="modal-content">
                             <p>
-                                Верификация необходима для повышения доверия к
-                                вам как к пользователю платформы. Мы просим
-                                загрузить скан паспорта или другого документа,
-                                удостоверяющего личность, чтобы подтвердить,
-                                что вы — реальный человек.
+                                <strong>Подтверждение личности</strong> —
+                                добровольная проверка документов пользователя.
+                                Она нужна для повышения доверия и будущих
+                                подтверждённых сделок CargoCamp.
                             </p>
 
                             <p>
-                                <strong>Для пенсионеров:</strong> если вы
-                                подтвердите пенсионный статус, исполнители будут
-                                видеть отметку и получать{" "}
-                                <strong>скидку на комиссию</strong>.
+                                <strong>Автомобиль для такси</strong> —
+                                отдельная проверка данных автомобиля,
+                                необходимая для работы в такси.
                             </p>
 
                             <p>
-                                🔒 Все документы обрабатываются вручную и
-                                хранятся в зашифрованном виде.
+                                <strong>Социальные льготы</strong> —
+                                подтверждение пенсионного статуса,
+                                инвалидности или статуса многодетной семьи.
+                                Льготы применяются согласно действующим
+                                правилам CargoCamp.
                             </p>
 
-                            <p className="warning">
-                                ⚠️ Попытка загрузки поддельных документов
-                                приведет к ограничению или блокировке аккаунта.
+                            <p>
+                                Новые документы для подтверждения личности
+                                и льгот передаются на ручную проверку
+                                через защищённое хранилище.
+                            </p>
+
+                            <p>
+                                Прохождение этих проверок не обязательно
+                                для создания обычных заказов.
                             </p>
 
                             <button
+                                type="button"
                                 className="btn btn-ghost"
-                                onClick={() => setShowVerificationModal(false)}
+                                onClick={() =>
+                                    setShowVerificationModal(false)
+                                }
                             >
                                 Закрыть
                             </button>

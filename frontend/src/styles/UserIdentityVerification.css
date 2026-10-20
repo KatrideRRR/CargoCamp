@@ -1,0 +1,424 @@
+
+/* =========================================
+   CargoCamp — Identity Verification
+   ========================================= */
+
+.profile-page .cc-identity {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.profile-page .cc-identity *,
+.profile-page .cc-identity *::before,
+.profile-page .cc-identity *::after {
+    box-sizing: border-box;
+}
+
+.profile-page .cc-identity
+.verification-panel-head-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.profile-page .cc-identity
+.verification-panel-heading {
+    min-width: 0;
+}
+
+.profile-page .cc-identity
+.verification-panel-head-side {
+    flex-shrink: 0;
+}
+
+.profile-page .cc-identity
+.verification-summary-status {
+    max-width: 132px;
+    text-align: center;
+    line-height: 1.25;
+}
+
+.profile-page .cc-identity
+.verification-summary-status.pending {
+    color: #92400e;
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+}
+
+.profile-page .cc-identity
+.verification-summary-status.rejected {
+    color: #b91c1c;
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+}
+
+.cc-identity-content {
+    min-width: 0;
+}
+
+.cc-identity-status-detail {
+    margin: 14px 0;
+    padding: 13px 14px;
+
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 15px;
+}
+
+.cc-identity-status-detail strong {
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.cc-identity-status-detail p {
+    margin: 7px 0 0;
+
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.cc-identity-status-detail
+.cc-identity-reason {
+    padding: 10px 12px;
+
+    background: #fef2f2;
+    color: #b91c1c;
+    border-radius: 10px;
+
+    overflow-wrap: anywhere;
+}
+
+/* Messages */
+
+.cc-identity-error,
+.cc-identity-success,
+.cc-identity-legacy {
+    margin: 12px 0;
+    padding: 12px 14px;
+
+    border-radius: 12px;
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.cc-identity-error {
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+}
+
+.cc-identity-success {
+    background: #ecfdf5;
+    color: #047857;
+    border: 1px solid #a7f3d0;
+}
+
+.cc-identity-legacy {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+}
+
+/* Application form */
+
+.cc-identity-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+
+    margin-top: 16px;
+    padding-top: 16px;
+
+    border-top: 1px solid #e2e8f0;
+}
+
+.cc-identity-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    min-width: 0;
+
+    color: #334155;
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.cc-identity-field select {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 46px;
+
+    padding: 11px 12px;
+
+    color: #0f172a;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 13px;
+
+    font: inherit;
+    font-weight: 600;
+}
+
+.cc-identity-field select:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.2);
+    border-color: #2563eb;
+}
+
+/* File picker */
+
+.cc-identity-upload {
+    position: relative;
+
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+
+    min-width: 0;
+    width: 100%;
+}
+
+.cc-identity-field-title {
+    color: #334155;
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.profile-page .cc-identity
+input.cc-identity-file-input[type="file"] {
+    position: absolute;
+    width: 1px;
+    min-width: 0;
+    max-width: 1px;
+    height: 1px;
+
+    padding: 0;
+    margin: -1px;
+
+    border: 0;
+    overflow: hidden;
+
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.cc-identity-file-picker {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+
+    min-height: 44px;
+    padding: 10px 17px;
+
+    max-width: 100%;
+
+    background: linear-gradient(
+            180deg,
+            #ffffff 0%,
+            #eff6ff 100%
+    );
+
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+    border-radius: 13px;
+
+    font-size: 13px;
+    font-weight: 750;
+
+    cursor: pointer;
+    user-select: none;
+
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.07);
+}
+
+.cc-identity-file-picker:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+}
+
+.cc-identity-file-input:focus-visible
++ .cc-identity-file-picker {
+    outline: 3px solid rgba(37, 99, 235, 0.3);
+    outline-offset: 3px;
+}
+
+.cc-identity-file-picker.is-disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.cc-identity-upload > small {
+    color: #94a3b8;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* Selected documents */
+
+.cc-identity-files {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+
+    width: 100%;
+    min-width: 0;
+}
+
+.cc-identity-file-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+
+    min-width: 0;
+    padding: 10px 12px;
+
+    background: #eff6ff;
+    border: 1px solid #dbeafe;
+    border-radius: 11px;
+}
+
+.cc-identity-file-row span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+
+    color: #1e40af;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.cc-identity-file-row button {
+    flex: 0 0 auto;
+
+    padding: 7px 10px;
+
+    color: #b91c1c;
+    background: #ffffff;
+    border: 1px solid #fecaca;
+    border-radius: 9px;
+
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* Confirmation */
+
+.cc-identity-confirm {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+
+    padding: 12px 13px;
+
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+
+    cursor: pointer;
+}
+
+.cc-identity-confirm input {
+    flex: 0 0 auto;
+
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+
+    accent-color: #2563eb;
+}
+
+.cc-identity-confirm span {
+    color: #475569;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+/* Buttons */
+
+.cc-identity-submit {
+    width: 100%;
+    min-height: 46px;
+
+    padding: 12px 16px;
+
+    background: #2563eb;
+    border: 1px solid #1d4ed8;
+    border-radius: 13px;
+
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 750;
+
+    cursor: pointer;
+}
+
+.cc-identity-submit:hover:not(:disabled) {
+    background: #1d4ed8;
+}
+
+.cc-identity-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.cc-identity-refresh {
+    display: block;
+
+    margin-top: 14px;
+    padding: 9px 12px;
+
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+.cc-identity-refresh:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.cc-identity-note {
+    margin: 14px 0 0;
+
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+/* Mobile */
+
+@media (max-width: 420px) {
+    .profile-page .cc-identity
+    .verification-summary-status {
+        max-width: 110px;
+        font-size: 10px;
+    }
+
+    .cc-identity-file-row {
+        flex-wrap: wrap;
+    }
+
+    .cc-identity-file-picker {
+        width: 100%;
+    }
+}
