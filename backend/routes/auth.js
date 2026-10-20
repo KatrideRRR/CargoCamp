@@ -14,52 +14,76 @@ const { notifyUser } = require("../services/notificationService");
 const {sendAdminNotification, adminUserUrl, adminUsersUrl,} = require("../services/adminNotificationService");
 const {createAuthSession, refreshAuthSession, revokeAuthSession,} = require("../services/authSessionService");
 const {getSessionClient, getUserRefreshToken, buildUserSessionResponse, clearUserRefreshCookie,} = require("../utils/userSessionTransport");
-
+const crypto = require("crypto");
+const {uploadsRoot: publicUploadsRoot,} = require("../config/storagePaths");
 const avatarsDir = path.join(__dirname, "..", "uploads", "avatars");
-const uploadsRoot = path.join(__dirname, '..', 'uploads');
-const uploadDocumentsRoot = path.join(uploadsRoot, 'upload-document');
 
-function ensureDir(dirPath) {
-    if (!fs.existsSync(dirPath)) {
-        fs.mkdirSync(dirPath, { recursive: true });
-    }
-}
+function ensureDir(dirPath) {if (!fs.existsSync(dirPath)) {fs.mkdirSync(dirPath, { recursive: true });}}
 
-ensureDir(uploadsRoot);
-ensureDir(uploadDocumentsRoot);
+const vehiclePhotosDir = path.join(publicUploadsRoot, "vehicles");
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        try {
-            ensureDir(uploadDocumentsRoot);
-            cb(null, uploadDocumentsRoot);
-        } catch (error) {
-            cb(error);
-        }
-    },
+ensureDir(vehiclePhotosDir);
 
-    filename: async (req, file, cb) => {
-        try {
-            const userId = req.user.id;
-            const ext = path.extname(file.originalname) || '.jpg';
+const MAX_VEHICLE_PHOTO_SIZE = 5 * 1024 * 1024;
 
-            const user = await User.findByPk(userId);
-            const imageCount = Array.isArray(user?.documentPhotos) ? user.documentPhotos.length : 0;
-            const newFileName = `${userId}_${imageCount + 1}${ext}`;
+const vehiclePhotoUpload = multer({
+    storage: multer.memoryStorage(),
 
-            cb(null, newFileName);
-        } catch (error) {
-            cb(error);
-        }
-    }
-});
-
-const upload = multer({
-    storage,
     limits: {
-        fileSize: 10 * 1024 * 1024,
+        fileSize: MAX_VEHICLE_PHOTO_SIZE,
+        files: 1,
+    },
+}).single("vehiclePhoto");
+
+function detectVehiclePhotoFormat(buffer) {
+    if (
+        !Buffer.isBuffer(buffer) ||
+        buffer.length < 12
+    ) {
+        return null;
     }
-});
+
+    // JPEG
+    if (
+        buffer[0] === 0xff &&
+        buffer[1] === 0xd8 &&
+        buffer[2] === 0xff
+    ) {
+        return {
+            extension: ".jpg",
+            mimeType: "image/jpeg",
+        };
+    }
+
+    // PNG
+    const pngSignature = Buffer.from(
+        "89504e470d0a1a0a",
+        "hex"
+    );
+
+    if (
+        buffer.subarray(0, 8)
+            .equals(pngSignature)
+    ) {
+        return {
+            extension: ".png",
+            mimeType: "image/png",
+        };
+    }
+
+    // WebP
+    if (
+        buffer.toString("ascii", 0, 4) === "RIFF" &&
+        buffer.toString("ascii", 8, 12) === "WEBP"
+    ) {
+        return {
+            extension: ".webp",
+            mimeType: "image/webp",
+        };
+    }
+
+    return null;
+}
 
 if (!fs.existsSync(avatarsDir)) {
     fs.mkdirSync(avatarsDir, { recursive: true });
@@ -335,78 +359,14 @@ router.post("/password-reset/confirm", async (req, res) => {
     return res.json({ message: "Пароль успешно изменён" });
 });
 
-router.post("/upload-documents", authenticateToken, upload.array("documents", 5), async (req, res) => {
-        try {
-            const userId = req.user.id;
-
-            const fileNames = (req.files || []).map(
-                (file) => file.filename
-            );
-
-            const user = await User.findByPk(userId);
-
-            if (!user) {
-                return res.status(404).json({
-                    message: "Пользователь не найден",
-                });
-            }
-
-            const existingPhotos =
-                Array.isArray(user.documentPhotos)
-                    ? user.documentPhotos
-                    : [];
-
-            const updatedPhotos = [
-                ...existingPhotos,
-                ...fileNames,
-            ];
-
-            user.documentPhotos = updatedPhotos;
-
-            await user.save();
-
-            void sendAdminNotification({
-                topic: "verification",
-
-                title: "🪪 Загружены документы на проверку",
-
-                message: [
-                    `Пользователь ID: ${user.id}`,
-
-                    user.username
-                        ? `Имя: ${user.username}`
-                        : null,
-
-                    user.phone
-                        ? `Телефон: ${user.phone}`
-                        : null,
-
-                    "",
-                    `Загружено новых файлов: ${fileNames.length}`,
-                    `Всего документов: ${updatedPhotos.length}`,
-                ]
-                    .filter(Boolean)
-                    .join("\n"),
-
-                buttonText: "Открыть пользователей",
-                buttonUrl: adminUsersUrl(),
-            });
-
-            return res.status(200).json({
-                message:
-                    "Документы загружены успешно",
-                files: updatedPhotos,
-            });
-        } catch (error) {
-            console.error(
-                "Ошибка при загрузке документов:",
-                error
-            );
-
-            return res.status(500).json({
-                message: "Ошибка сервера",
-            });
-        }
+router.post("/upload-documents", authenticateToken, (req, res) => {
+        return res.status(410).json({
+            success: false,
+            message:
+                "Старая загрузка документов отключена. " +
+                "Обновите приложение и используйте " +
+                "новый раздел подтверждения личности.",
+        });
     });
 
 router.post('/register', async (req, res) => {
@@ -892,14 +852,48 @@ router.put('/profile', authenticateToken, async (req, res) => {
     }
 });
 
-router.get('/:id', async (req, res) => {
-    const userId = req.params.id;
+router.get("/:id", async (req, res) => {
     try {
-        const user = await User.findByPk(userId); // Sequelize пример
-        if (!user) return res.status(404).json({ message: 'Пользователь не найден' });
-        res.json(user);
-    } catch (err) {
-        res.status(500).json({ message: 'Ошибка сервера', error: err.message });
+        const userId = Number(req.params.id);
+
+        if (
+            !Number.isSafeInteger(userId) ||
+            userId <= 0
+        ) {
+            return res.status(400).json({
+                message: "Некорректный ID пользователя",
+            });
+        }
+
+        const user = await User.findByPk(userId, {
+            attributes: [
+                "id",
+                "username",
+                "rating",
+                "ratingCount",
+                "avatar",
+                "userStatus",
+                "createdAt",
+            ],
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: "Пользователь не найден",
+            });
+        }
+
+        return res.json(user);
+
+    } catch (error) {
+        console.error(
+            "Ошибка получения публичного профиля:",
+            error
+        );
+
+        return res.status(500).json({
+            message: "Не удалось получить профиль",
+        });
     }
 });
 
@@ -1580,14 +1574,49 @@ router.post("/vehicle/me", authenticateToken, async (req, res) => {
         }
     });
 
-router.post("/vehicle/photo", authenticateToken, upload.single("vehiclePhoto"), async (req, res) => {
+router.post("/vehicle/photo", authenticateToken, (req, res, next) => {
+        vehiclePhotoUpload(req, res, (error) => {
+            if (!error) {
+                return next();
+            }
+
+            if (
+                error instanceof multer.MulterError &&
+                error.code === "LIMIT_FILE_SIZE"
+            ) {
+                return res.status(413).json({
+                    success: false,
+                    message:
+                        "Фото автомобиля должно быть не больше 5 МБ",
+                });
+            }
+
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Не удалось загрузить фотографию автомобиля",
+            });
+        });
+    }, async (req, res) => {let newFilePath = null;
         try {
-            const userId = req.user.id;
+            const userId = Number(req.user.id);
 
             if (!req.file) {
                 return res.status(400).json({
                     success: false,
                     message: "Выберите фотографию автомобиля",
+                });
+            }
+
+            const format = detectVehiclePhotoFormat(
+                req.file.buffer
+            );
+
+            if (!format) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Поддерживаются фотографии JPG, PNG и WebP",
                 });
             }
 
@@ -1600,28 +1629,58 @@ router.post("/vehicle/photo", authenticateToken, upload.single("vehiclePhoto"), 
                 });
             }
 
-            /*
-             * Здесь путь подстрой под то,
-             * как у тебя multer сохраняет файлы.
-             */
-            const vehiclePhotoPath =
-                `/uploads/upload-document/${req.file.filename}`;
+            const fileName =
+                `${userId}-${crypto.randomUUID()}${format.extension}`;
 
-            user.vehiclePhoto =
-                vehiclePhotoPath;
+            newFilePath = path.join(
+                vehiclePhotosDir,
+                fileName
+            );
 
+            await fs.promises.writeFile(
+                newFilePath,
+                req.file.buffer,
+                {
+                    flag: "wx",
+                    mode: 0o600,
+                }
+            );
+
+            const publicPath =
+                `/uploads/vehicles/${fileName}`;
+
+            user.vehiclePhoto = publicPath;
+
+            // Новое фото требует повторной проверки.
+            user.vehicleVerificationStatus = "pending";
+            user.vehicleVerificationNote = null;
 
             await user.save();
 
             return res.json({
                 success: true,
-                message: "Фото автомобиля загружено",
-                vehiclePhoto:
-                user.vehiclePhoto,
+                message:
+                    "Фото автомобиля загружено и отправлено на проверку",
+                vehiclePhoto: user.vehiclePhoto,
                 vehicleVerificationStatus:
                 user.vehicleVerificationStatus,
             });
+
         } catch (error) {
+            if (newFilePath) {
+                try {
+                    await fs.promises.rm(
+                        newFilePath,
+                        { force: true }
+                    );
+                } catch (cleanupError) {
+                    console.error(
+                        "Ошибка очистки фотографии:",
+                        cleanupError
+                    );
+                }
+            }
+
             console.error(
                 "Ошибка загрузки фото автомобиля:",
                 error
@@ -1630,7 +1689,7 @@ router.post("/vehicle/photo", authenticateToken, upload.single("vehiclePhoto"), 
             return res.status(500).json({
                 success: false,
                 message:
-                    "Не удалось загрузить фото автомобиля",
+                    "Не удалось сохранить фотографию автомобиля",
             });
         }
     });

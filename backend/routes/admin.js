@@ -136,24 +136,14 @@ router.put('/users/:id/verify',authMiddleware, adminMiddleware, async (req, res)
     }
 });
 
-router.get('/user-documents/:userId', authMiddleware, adminMiddleware, async (req, res) => {
-    try {
-        const { userId } = req.params;
-
-        const user = await User.findByPk(userId, {
-            attributes: ['id', 'documentPhotos'],
+router.get("/user-documents/:userId", authMiddleware, adminMiddleware, (req, res) => {
+        return res.status(410).json({
+            success: false,
+            message:
+                "Старый просмотр документов отключён. " +
+                "Используйте раздел проверки личности.",
         });
-
-        if (!user) {
-            return res.status(404).json({ message: 'Пользователь не найден' });
-        }
-
-        res.status(200).json({ documents: user.documentPhotos || [] });
-    } catch (error) {
-        console.error('Ошибка при получении документов пользователя:', error);
-        res.status(500).json({ message: 'Ошибка сервера' });
-    }
-});
+    });
 
 router.post("/create-order", authMiddleware, adminMiddleware, async (req, res) => {
         const transaction =

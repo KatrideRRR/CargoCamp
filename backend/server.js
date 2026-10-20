@@ -105,11 +105,110 @@ app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
 app.use(bodyParser.json());
-app.use(
-    "/uploads",
-    express.static(uploadsRoot)
-);
+app.use("/uploads/upload-document", async (req, res, next) => {
+        try {
+            if (
+                req.method !== "GET" &&
+                req.method !== "HEAD"
+            ) {
+                return res.sendStatus(405);
+            }
 
+            const fileName = String(
+                req.path || ""
+            ).replace(/^\/+/, "");
+
+            // Только один обычный файл.
+            // Поддиректории и произвольные имена запрещены.
+            if (
+                fileName.includes("/") ||
+                !/^\d+_\d+\.(jpg|jpeg|png|webp)$/i.test(
+                    fileName
+                )
+            ) {
+                return res.sendStatus(404);
+            }
+
+            const publicPath =
+                `/uploads/upload-document/${fileName}`;
+
+            const vehicleOwner =
+                await db.User.findOne({
+                    where: {
+                        vehiclePhoto: publicPath,
+                    },
+
+                    attributes: [
+                        "id",
+                        "documentPhotos",
+                    ],
+                });
+
+            // Не является действующим фото автомобиля.
+            if (!vehicleOwner) {
+                return res.sendStatus(404);
+            }
+
+            const legacyDocuments =
+                Array.isArray(
+                    vehicleOwner.documentPhotos
+                )
+                    ? vehicleOwner.documentPhotos
+                    : [];
+
+            /*
+             * Если файл одновременно указан
+             * как старый паспортный документ,
+             * запрещаем его выдачу.
+             *
+             * Это возможно из-за совпадений
+             * имён в прежнем механизме загрузки.
+             */
+            const isIdentityDocument =
+                legacyDocuments.some((entry) => {
+                    const savedName = String(
+                        entry || ""
+                    );
+
+                    return (
+                        savedName === fileName ||
+                        savedName === publicPath ||
+                        savedName.endsWith(
+                            `/${fileName}`
+                        )
+                    );
+                });
+
+            if (isIdentityDocument) {
+                return res.sendStatus(404);
+            }
+
+            res.setHeader(
+                "X-Content-Type-Options",
+                "nosniff"
+            );
+
+            return next();
+
+        } catch (error) {
+            console.error(
+                "Ошибка проверки публичного файла:",
+                error
+            );
+
+            return res.sendStatus(500);
+        }
+    });
+app.use("/uploads", express.static(uploadsRoot, {
+        dotfiles: "deny",
+
+        setHeaders: (res) => {
+            res.setHeader(
+                "X-Content-Type-Options",
+                "nosniff"
+            );
+        },
+    }));
 app.use("/contracts", express.static(contractsRoot, {
         fallthrough: false,
         setHeaders: (res, filePath) => {
