@@ -15,10 +15,26 @@ const cors = require("cors");
 const http = require("http");
 const jwt = require("jsonwebtoken");
 
-const {
-    uploadsRoot,
-    contractsRoot,
-} = require("./config/storagePaths");
+const {uploadsRoot, contractsRoot,} = require("./config/storagePaths");
+const publicUploadsPath = fs.realpathSync(uploadsRoot);
+const privateContractsPath = fs.realpathSync(contractsRoot);
+const relativeContractsPath = path.relative(publicUploadsPath, privateContractsPath);
+
+const contractsInsideUploads =
+    relativeContractsPath === "" ||
+    (
+        relativeContractsPath !== ".." &&
+        !relativeContractsPath.startsWith(
+            `..${path.sep}`
+        ) &&
+        !path.isAbsolute(relativeContractsPath)
+    );
+
+if (contractsInsideUploads) {
+    throw new Error(
+        "SECURITY: CONTRACTS_DIR не должен находиться внутри UPLOADS_DIR"
+    );
+}
 
 const makeActionLogger = require("./utils/actionLogger");
 const { initializeSocket } = require("./socket");
@@ -209,25 +225,19 @@ app.use("/uploads", express.static(uploadsRoot, {
             );
         },
     }));
-app.use("/contracts", express.static(contractsRoot, {
-        fallthrough: false,
-        setHeaders: (res, filePath) => {
-            if (
-                path.extname(filePath)
-                    .toLowerCase() === ".pdf"
-            ) {
-                res.setHeader(
-                    "Content-Type",
-                    "application/pdf"
-                );
+app.use("/contracts", (req, res) => {
+    res.setHeader(
+        "Cache-Control",
+        "no-store, no-cache, must-revalidate"
+    );
 
-                res.setHeader(
-                    "Content-Disposition",
-                    "inline"
-                );
-            }
-        },
-    }));
+    res.setHeader(
+        "X-Content-Type-Options",
+        "nosniff"
+    );
+
+    return res.sendStatus(404);
+});
 
 console.log(
     "Uploads directory:",

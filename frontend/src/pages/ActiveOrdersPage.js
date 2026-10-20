@@ -15,6 +15,7 @@ import ExpressOrderCard from "../components/ExpressOrderCard";
 import { ModalContext } from "../components/modalContext";
 import { openOrderRoute } from "../utils/orderNavigation";
 import OrderWorkTimer from "../components/OrderWorkTimer";
+import {downloadLegacyContract,} from "../utils/downloadLegacyContract";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -280,23 +281,6 @@ const calculateHourlyCompletionPrice = ({
             ),
     };
 };
-
-function getContractUrl(contractPath) {
-    if (!contractPath) {
-        return null;
-    }
-
-    if (/^https?:\/\//i.test(contractPath)) {
-        return contractPath;
-    }
-
-    const normalizedPath =
-        String(contractPath).startsWith("/")
-            ? String(contractPath)
-            : `/${contractPath}`;
-
-    return `${apiUrl}${normalizedPath}`;
-}
 
 const REGULAR_DISPUTE_REASONS = [
     {
@@ -1615,8 +1599,8 @@ const ActiveOrdersPage = () => {
                                         const creator = creatorsInfo[order.creatorId] || {};
                                         const executor = executorsInfo[order.executorId] || {};
 
-                                        const contractUrl =
-                                            getContractUrl(order.contractPath);
+                                        const hasContract =
+                                            Boolean(order.contractPath);
 
                                         return (
                                             <li key={order.id} className="order-card">
@@ -1902,15 +1886,24 @@ const ActiveOrdersPage = () => {
                                                             order={order}
                                                         />
 
-                                                        {contractUrl && (
+                                                        {hasContract && (
                                                             <div className="contract-download-row">
-                                                                <a
-                                                                    href={contractUrl}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
+                                                                <button
+                                                                    type="button"
                                                                     className="contract-download-button"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
+                                                                    onClick={async (event) => {
+                                                                        event.stopPropagation();
+
+                                                                        try {
+                                                                            await downloadLegacyContract(
+                                                                                order.id
+                                                                            );
+                                                                        } catch (error) {
+                                                                            window.alert(
+                                                                                error.message ||
+                                                                                "Не удалось скачать договор"
+                                                                            );
+                                                                        }
                                                                     }}
                                                                 >
             <span className="contract-download-icon">
@@ -1924,7 +1917,7 @@ const ActiveOrdersPage = () => {
                                                                     <span className="contract-download-format">
                 PDF
             </span>
-                                                                </a>
+                                                                </button>
                                                             </div>
                                                         )}
 

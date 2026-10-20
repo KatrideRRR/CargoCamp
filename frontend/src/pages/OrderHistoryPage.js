@@ -1,31 +1,12 @@
-import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useState,
-} from "react";
-
+import React, {useCallback, useEffect, useMemo, useState,} from "react";
 import { Capacitor } from "@capacitor/core";
 import { useParams } from "react-router-dom";
-
 import axiosInstance from "../utils/axiosInstance";
 import OrderServiceDetails from "../components/OrderServiceDetails";
-
 import "../styles/OrderHistotyPage.css";
-
-import {
-    FiCheckCircle,
-    FiFileText,
-    FiMapPin,
-    FiNavigation,
-    FiPackage,
-    FiStar,
-} from "react-icons/fi";
-
-import {
-    FaCarSide,
-    FaRegMoneyBillAlt,
-} from "react-icons/fa";
+import {FiCheckCircle, FiFileText, FiMapPin, FiNavigation, FiPackage, FiStar,} from "react-icons/fi";
+import {FaCarSide, FaRegMoneyBillAlt,} from "react-icons/fa";
+import {downloadLegacyContract,} from "../utils/downloadLegacyContract";
 
 const apiUrl =
     process.env.REACT_APP_API_URL ||
@@ -64,27 +45,6 @@ function getCompletedTimestamp(order) {
     return Number.isFinite(timestamp)
         ? timestamp
         : 0;
-}
-
-function getContractUrl(contractPath) {
-    if (!contractPath) {
-        return null;
-    }
-
-    if (
-        /^https?:\/\//i.test(
-            contractPath
-        )
-    ) {
-        return contractPath;
-    }
-
-    const normalizedPath =
-        contractPath.startsWith("/")
-            ? contractPath
-            : `/${contractPath}`;
-
-    return `${apiUrl}${normalizedPath}`;
 }
 
 function getReviewKey(order) {
@@ -656,10 +616,8 @@ const OrderHistoryPage = () => {
                                     description.length >
                                     140;
 
-                                const contractUrl =
-                                    getContractUrl(
-                                        order.contractPath
-                                    );
+                                const hasContract =
+                                    Boolean(order.contractPath);
 
                                 const expressTitle =
                                     order.type ===
@@ -1012,21 +970,28 @@ const OrderHistoryPage = () => {
 
                                         <div className="oh-actions">
                                             {!isExpress &&
-                                                contractUrl && (
-                                                    <a
+                                                hasContract && (
+                                                    <button
+                                                        type="button"
                                                         className="btn btn-ghost"
-                                                        href={
-                                                            contractUrl
-                                                        }
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
+                                                        onClick={async (event) => {
+                                                            event.stopPropagation();
+
+                                                            try {
+                                                                await downloadLegacyContract(
+                                                                    order.id
+                                                                );
+                                                            } catch (error) {
+                                                                window.alert(
+                                                                    error.message ||
+                                                                    "Не удалось скачать договор"
+                                                                );
+                                                            }
+                                                        }}
                                                     >
                                                         <FiFileText />
-
-                                                        Скачать
-                                                        договор
-                                                        (PDF)
-                                                    </a>
+                                                        Скачать договор (PDF)
+                                                    </button>
                                                 )}
 
                                             {canReview(
