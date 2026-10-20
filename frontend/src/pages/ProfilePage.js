@@ -1691,113 +1691,190 @@ const ProfilePage = () => {
                     )}
                 </div>
 
-                <div className="profile-card glass">
-                    <div className="card-head">
+                {/* =========================================
+    ОПЛАТА И PREMIUM
+========================================= */}
+
+                <div className="profile-card glass profile-finance-card">
+
+                    <div className="card-head profile-finance-header">
                         <div>
-                            <h2 className="card-title">Платежи</h2>
+                            <h2 className="card-title">
+                                💳 Оплата и Premium
+                            </h2>
+
                             <p className="card-subtitle">
-                                Карта, комиссия и задолженность
+                                Банковская карта, платежи и подписка
                             </p>
                         </div>
                     </div>
 
-                    {isCardBound ? (
-                        <div className="card-row">
-                            <div className="card-row-text">
-                                <div className="card-strong">Карта привязана</div>
-                                <div className="card-muted">
-                                    {cardTypeView} •••• {cardLastFourView}
+                    {/* =========================
+        БАНКОВСКАЯ КАРТА
+    ========================= */}
+
+                    <div className="profile-finance-section">
+
+                        <div className="profile-finance-section-head">
+                            <div className="profile-finance-section-icon">
+                                💳
+                            </div>
+
+                            <div className="profile-finance-section-heading">
+                                <div className="profile-finance-section-title">
+                                    Банковская карта
+                                </div>
+
+                                <div className="profile-finance-section-subtitle">
+                                    Для удобной оплаты услуг CargoCamp
                                 </div>
                             </div>
+
+                            <span
+                                className={`profile-finance-badge ${
+                                    isCardBound ? "active" : ""
+                                }`}
+                            >
+                {isCardBound
+                    ? "Привязана"
+                    : "Не привязана"}
+            </span>
+                        </div>
+
+                        {isCardBound ? (
+                            <div className="card-row profile-finance-card-row">
+                                <div className="card-row-text">
+                                    <div className="card-strong">
+                                        {cardTypeView || "Банковская карта"}
+                                    </div>
+
+                                    <div className="card-muted">
+                                        •••• {cardLastFourView}
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    className="btn btn-ghost-danger"
+                                    onClick={() =>
+                                        setShowUnbindConfirm(true)
+                                    }
+                                >
+                                    Отвязать
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                type="button"
+                                className="btn btn-primary profile-finance-bind-button"
+                                onClick={
+                                    CARD_BIND_SCREENSHOT_MODE
+                                        ? handleBindCard
+                                        : () => setShowAgreement(true)
+                                }
+                            >
+                                + Привязать карту
+                            </button>
+                        )}
+
+                        {CARD_BIND_SCREENSHOT_MODE && (
+                            <div className="card-demo-note">
+                                Демо-режим для скриншотов:
+                                привязка и отвязка карты
+                                выполняются без реального
+                                запроса в ЮKassa.
+                            </div>
+                        )}
+
+                        {/* Задолженность по комиссии */}
+
+                        {hasDebt && (
+                            <div className="alert alert-danger profile-finance-debt">
+                                <div>
+                                    <div className="alert-title">
+                                        Задолженность по комиссии
+                                    </div>
+
+                                    <div className="alert-text">
+                                        {(debtAmount / 100).toFixed(2)} ₽
+                                    </div>
+                                </div>
+
+                                <div className="debt-provider-wrap">
+                                    <PaymentProviderSelect
+                                        title="Способ погашения"
+                                        selectedProvider={selectedDebtProvider}
+                                        onSelect={setSelectedDebtProvider}
+                                        disabled={loading}
+                                    />
+                                </div>
+
+                                <button
+                                    type="button"
+                                    className="btn btn-danger"
+                                    onClick={handlePayDebt}
+                                >
+                                    Оплатить задолженность
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* =========================
+        PREMIUM
+    ========================= */}
+
+                    <div className="profile-finance-section profile-finance-premium">
+
+                        <div className="profile-finance-section-head">
+                            <div className="profile-finance-section-icon premium">
+                                ✨
+                            </div>
+
+                            <div className="profile-finance-section-heading">
+                                <div className="profile-finance-section-title">
+                                    CargoCamp Premium
+                                </div>
+
+                                <div className="profile-finance-section-subtitle">
+                                    {subscriptionLabel}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="profile-finance-premium-description">
+                            Premium для исполнителей —
+                            работа без комиссии по условиям подписки.
+                        </div>
+
+                        <div className="premium-provider-block">
+                            <PaymentProviderSelect
+                                title="Способ оплаты Premium"
+                                selectedProvider={selectedPremiumProvider}
+                                onSelect={setSelectedPremiumProvider}
+                                disabled={loading}
+                            />
+                        </div>
+
+                        <div className="grid-2 profile-finance-premium-actions">
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => handleBuyPremium("7d")}
+                            >
+                                Купить на 7 дней
+                            </button>
 
                             <button
-                                className="btn btn-ghost-danger"
-                                onClick={() => setShowUnbindConfirm(true)}
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => handleBuyPremium("30d")}
                             >
-                                Удалить
+                                Купить на 30 дней
                             </button>
                         </div>
-                    ) : (
-                        <button
-                            className="btn btn-primary"
-                            onClick={
-                                CARD_BIND_SCREENSHOT_MODE
-                                    ? handleBindCard
-                                    : () => setShowAgreement(true)
-                            }
-                        >
-                            Привязать карту
-                        </button>
-                    )}
-
-                    {CARD_BIND_SCREENSHOT_MODE && (
-                        <div className="card-demo-note">
-                            Демо-режим для скриншотов: интерфейс
-                            привязки/отвязки показывается без реального запроса
-                            в ЮKassa.
-                        </div>
-                    )}
-
-                    {hasDebt && (
-                        <div className="alert alert-danger">
-                            <div>
-                                <div className="alert-title">
-                                    Задолженность по комиссии
-                                </div>
-                                <div className="alert-text">
-                                    {(debtAmount / 100).toFixed(2)} ₽
-                                </div>
-                            </div>
-
-                            <div className="debt-provider-wrap">
-                                <PaymentProviderSelect
-                                    selectedProvider={selectedDebtProvider}
-                                    onSelect={setSelectedDebtProvider}
-                                    disabled={loading}
-                                />
-                            </div>
-
-                            <button
-                                className="btn btn-danger"
-                                onClick={handlePayDebt}
-                            >
-                                Оплатить
-                            </button>
-                        </div>
-                    )}
-                </div>
-
-                <div className="profile-card glass">
-                    <div className="card-head">
-                        <div>
-                            <h2 className="card-title">Premium</h2>
-                            <p className="card-subtitle">{subscriptionLabel}</p>
-                        </div>
                     </div>
 
-                    <div className="premium-provider-block">
-                        <PaymentProviderSelect
-                            selectedProvider={selectedPremiumProvider}
-                            onSelect={setSelectedPremiumProvider}
-                            disabled={loading}
-                        />
-                    </div>
-
-                    <div className="grid-2">
-                        <button
-                            className="btn btn-primary"
-                            onClick={() => handleBuyPremium("7d")}
-                        >
-                            Купить на 7 дней
-                        </button>
-
-                        <button
-                            className="btn btn-primary"
-                            onClick={() => handleBuyPremium("30d")}
-                        >
-                            Купить на 30 дней
-                        </button>
-                    </div>
                 </div>
 
                 <div className="profile-card glass">

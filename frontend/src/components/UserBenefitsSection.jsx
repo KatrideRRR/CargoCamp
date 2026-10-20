@@ -319,45 +319,77 @@ function UserBenefitsSection({
                     : "profile-card glass cc-benefits"
             }
         >
-            <div className="card-head cc-benefits-heading">
-                <div>
-                    <h2 className="card-title">
-                        {embedded
-                            ? "🎖️ Социальные льготы"
-                            : "Мои льготы"}
-                    </h2>
+            <button
+                type="button"
+                className="verification-panel-head cc-benefits-heading"
+                aria-expanded={opened}
+                onClick={() => setOpened((prev) => !prev)}
+            >
+    <span className="verification-panel-head-main">
+        <span
+            className="verification-panel-icon"
+            aria-hidden="true"
+        >
+            🎖️
+        </span>
 
-                    <p className="card-subtitle">
-                        Пенсионеры, инвалидность, многодетные семьи
-                    </p>
-                </div>
+        <span className="verification-panel-heading">
+            <span className="verification-panel-title">
+                Социальные льготы
+            </span>
 
-                <button
-                    type="button"
-                    className="cc-benefits-toggle"
-                    aria-expanded={opened}
-                    onClick={() =>
-                        setOpened((previous) => !previous)
-                    }
-                >
-                    {opened ? "Свернуть" : "Открыть"}
-                </button>
-            </div>
+            <span className="verification-panel-subtitle">
+                Пенсионеры, инвалидность, многодетные семьи
+            </span>
+        </span>
+    </span>
 
-            <div className="cc-benefits-summary">
-                <span>
-                    Подтверждено:{" "}
-                    <strong>{confirmedCount}</strong>
-                </span>
+                <span className="verification-panel-head-side">
+        <span
+            className={`cc-benefits-header-status ${
+                confirmedCount > 0
+                    ? "is-verified"
+                    : pendingCount > 0
+                        ? "is-pending"
+                        : ""
+            }`}
+        >
+            {loading
+                ? "Загрузка..."
+                : error && benefits.length === 0
+                    ? "Ошибка загрузки"
+                    : confirmedCount > 0
+                        ? `Подтверждено: ${confirmedCount}`
+                        : pendingCount > 0
+                            ? `На проверке: ${pendingCount}`
+                            : "Нет льгот"}
+        </span>
 
-                <span>
-                    На проверке:{" "}
-                    <strong>{pendingCount}</strong>
-                </span>
-            </div>
+        <span
+            className={`verification-chevron ${
+                opened ? "open" : ""
+            }`}
+            aria-hidden="true"
+        >
+            ›
+        </span>
+    </span>
+            </button>
 
             {opened && (
-                <>
+                <div className="verification-panel-content cc-benefits-content">
+                    <div className="cc-benefits-summary">
+            <span>
+                Подтверждено:{" "}
+                <strong>{confirmedCount}</strong>
+            </span>
+
+                        <span>
+                На проверке:{" "}
+                            <strong>{pendingCount}</strong>
+            </span>
+                    </div>
+
                     <p className="cc-benefits-intro">
                         Вы можете подтвердить право на
                         льготы. Проверка добровольная и
@@ -489,26 +521,16 @@ function UserBenefitsSection({
 
                                         {canApply && (
                                             <div className="cc-benefit-upload">
-                                                <label
-                                                    htmlFor={
-                                                        `cc-benefit-file-${program.code}`
-                                                    }
-                                                    className="cc-benefit-file-label"
-                                                >
+                                                <div className="cc-benefit-file-label">
                                                     Подтверждающий документ
-                                                </label>
+                                                </div>
 
                                                 <input
-                                                    id={
-                                                        `cc-benefit-file-${program.code}`
-                                                    }
+                                                    id={`cc-benefit-file-${program.code}`}
+                                                    className="cc-benefit-file-input"
                                                     type="file"
                                                     accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                                                    disabled={
-                                                        Boolean(
-                                                            uploadingCode
-                                                        )
-                                                    }
+                                                    disabled={Boolean(uploadingCode)}
                                                     onChange={(event) => {
                                                         handleSelectFile(
                                                             program.code,
@@ -518,6 +540,17 @@ function UserBenefitsSection({
                                                         event.target.value = "";
                                                     }}
                                                 />
+
+                                                <label
+                                                    htmlFor={`cc-benefit-file-${program.code}`}
+                                                    className={`cc-benefit-file-picker ${
+                                                        uploadingCode ? "is-disabled" : ""
+                                                    }`}
+                                                >
+                                                    <span aria-hidden="true">📎</span>
+
+                                                    Выбрать файл
+                                                </label>
 
                                                 <small className="cc-benefit-file-hint">
                                                     PDF, JPG или PNG,
@@ -577,7 +610,7 @@ function UserBenefitsSection({
                             Обновить статусы
                         </button>
                     </div>
-                </>
+                </div>
             )}
         </section>
     );
