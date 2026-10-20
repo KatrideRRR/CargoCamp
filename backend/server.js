@@ -57,6 +57,7 @@ const {notifySystemError} = require("./services/adminNotificationService");
 const adminBenefitsRoutes = require("./routes/adminBenefits");
 const identityRoutes = require("./routes/identity");
 const adminIdentityRoutes = require("./routes/adminIdentity");
+const verifiedContractsRoutes = require("./routes/verifiedContracts");
 
 const db = require("./models");
 const sequelize = require("./config/database");
@@ -249,6 +250,7 @@ console.log(
     contractsRoot
 );
 
+app.use("/api/contracts", verifiedContractsRoutes);
 app.use("/api/orders", orderRoutes(io));
 app.use("/api/disputes", disputeRoutes);
 app.use("/api/auth", authRoutes);

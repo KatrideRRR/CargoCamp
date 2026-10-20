@@ -11,6 +11,7 @@ const path = require("path");
 const multer = require("multer");
 const { Order, User, Category, Subcategory, ExpressOrder } = require('../models');
 const generateContractPDF = require('../utils/generateContractPDF');
+const {createVerifiedAssignmentIfEligible,} = require("../services/verifiedContractService");
 const yooKassa = require('../config/yookassaClient');
 const uploadExecutorBefore = buildOrderPhotoUploader("executor_before");
 const uploadExecutorAfter = buildOrderPhotoUploader("executor_after");
@@ -2584,6 +2585,64 @@ module.exports = (io) => {
                 console.error(
                     "❌ Ошибка генерации PDF договора:",
                     err
+                );
+            }
+
+            /*
+ * CONFIRMED DEAL — VERIFIED ASSIGNMENT v1
+ *
+ * Создаём дополнительный проект договора,
+ * только если обе стороны имеют действующую
+ * IdentityVerification.
+ *
+ * Не подменяем старый contractPath.
+ * Не меняем комиссии или статусы заказа.
+ */
+            try {
+                const result =
+                    await createVerifiedAssignmentIfEligible(
+                        fullOrder
+                    );
+
+                if (result?.created) {
+                    console.log(
+                        "✅ Проект подтверждённого договора создан:",
+                        {
+                            orderId: fullOrder.id,
+                            contractId:
+                                String(result.contract.id),
+                            version:
+                            result.contract.version,
+                        }
+                    );
+                } else if (result?.contract) {
+                    console.log(
+                        "ℹ️ Договор уже существует:",
+                        result.contract.id
+                    );
+                } else {
+                    console.log(
+                        "ℹ️ Обычная сделка без нового договора:",
+                        fullOrder.id
+                    );
+                }
+
+            } catch (error) {
+                /*
+                 * В этой первой версии ошибка
+                 * создания дополнительного PDF
+                 * не отменяет уже согласованный заказ.
+                 *
+                 * При этом ошибку нельзя скрывать:
+                 * нужно исправить её и отдельно
+                 * восстановить документ.
+                 */
+                console.error(
+                    "❌ Не удалось создать проект подтверждённого договора:",
+                    {
+                        orderId: fullOrder.id,
+                        error,
+                    }
                 );
             }
 
