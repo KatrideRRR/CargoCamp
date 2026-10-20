@@ -1,0 +1,288 @@
+
+/* =========================================
+   CargoCamp — Verified Assignment
+   ========================================= */
+
+.cc-verified-assignment {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+
+    margin: 14px 0;
+    padding: 16px;
+
+    box-sizing: border-box;
+
+    border: 1px solid #bfdbfe;
+    border-radius: 18px;
+
+    background: linear-gradient(
+            145deg,
+            #ffffff 0%,
+            #f0f6ff 100%
+    );
+
+    color: #0f172a;
+
+    box-shadow:
+            0 6px 20px rgba(37, 99, 235, 0.06);
+}
+
+.cc-verified-assignment *,
+.cc-verified-assignment *::before,
+.cc-verified-assignment *::after {
+    box-sizing: border-box;
+}
+
+.cc-va-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.cc-va-header-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.cc-va-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 39px;
+    height: 39px;
+    flex: 0 0 39px;
+
+    border-radius: 12px;
+    background: #dbeafe;
+
+    font-size: 19px;
+}
+
+.cc-va-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    min-width: 0;
+}
+
+.cc-va-heading strong {
+    font-size: 13px;
+    font-weight: 850;
+    line-height: 1.4;
+}
+
+.cc-va-heading small {
+    color: #64748b;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.cc-va-status {
+    flex: 0 0 auto;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 27px;
+    padding: 6px 10px;
+
+    border-radius: 999px;
+
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.cc-va-status.draft {
+    color: #92400e;
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+}
+
+.cc-va-status.signed {
+    color: #15803d;
+    background: #dcfce7;
+    border: 1px solid #bbf7d0;
+}
+
+.cc-va-status.pending {
+    color: #1d4ed8;
+    background: #dbeafe;
+    border: 1px solid #bfdbfe;
+}
+
+.cc-va-document {
+    margin-top: 15px;
+    padding: 12px;
+
+    border-radius: 12px;
+    border: 1px solid #dbeafe;
+    background: #ffffff;
+}
+
+.cc-va-document strong {
+    font-size: 13px;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
+.cc-va-document p {
+    margin: 7px 0 0;
+
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.cc-va-details {
+    display: grid;
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+
+    gap: 8px;
+    margin: 12px 0;
+}
+
+.cc-va-details > div {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+
+    min-width: 0;
+    padding: 10px;
+
+    border-radius: 11px;
+    background: rgba(
+            255, 255, 255, 0.75
+    );
+}
+
+.cc-va-details span {
+    color: #94a3b8;
+    font-size: 10px;
+    line-height: 1.35;
+}
+
+.cc-va-details strong {
+    color: #334155;
+    font-size: 11px;
+    font-weight: 750;
+    overflow-wrap: anywhere;
+}
+
+.cc-va-download {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+
+    width: 100%;
+    min-height: 45px;
+    padding: 12px 14px;
+
+    border: 1px solid #2563eb;
+    border-radius: 13px;
+
+    background: #2563eb;
+    color: #ffffff;
+
+    font: inherit;
+    font-size: 13px;
+    font-weight: 800;
+
+    cursor: pointer;
+}
+
+.cc-va-download:hover:not(:disabled) {
+    background: #1d4ed8;
+}
+
+.cc-va-download:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.cc-va-error {
+    margin: 10px 0;
+    padding: 11px;
+
+    border-radius: 11px;
+    border: 1px solid #fecaca;
+
+    background: #fef2f2;
+    color: #b91c1c;
+
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.cc-va-footnote {
+    margin-top: 12px;
+
+    color: #64748b;
+    font-size: 11px;
+    line-height: 1.55;
+}
+
+.cc-verified-contracts-alert {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+
+    margin: 10px 0;
+    padding: 12px;
+
+    border: 1px solid #fde68a;
+    border-radius: 12px;
+
+    background: #fffbeb;
+    color: #92400e;
+
+    font-size: 12px;
+}
+
+.cc-verified-contracts-alert button {
+    padding: 7px 11px;
+
+    border: 1px solid #fcd34d;
+    border-radius: 9px;
+
+    background: white;
+    color: #92400e;
+
+    font-size: 12px;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+@media (max-width: 480px) {
+    .cc-verified-assignment {
+        padding: 12px;
+        border-radius: 15px;
+    }
+
+    .cc-va-details {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+    }
+
+    .cc-va-details > div:last-child {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 350px) {
+    .cc-va-header {
+        flex-wrap: wrap;
+    }
+}

@@ -16,6 +16,8 @@ import { ModalContext } from "../components/modalContext";
 import { openOrderRoute } from "../utils/orderNavigation";
 import OrderWorkTimer from "../components/OrderWorkTimer";
 import {downloadLegacyContract,} from "../utils/downloadLegacyContract";
+import useVerifiedAssignments from "../hooks/useVerifiedAssignments";
+import VerifiedAssignmentCard from "../components/VerifiedAssignmentCard";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -1460,16 +1462,22 @@ const ActiveOrdersPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.id, removedOrders]);
 
-    if (!user || !user.id) return <p>Загрузка...</p>;
-    if (error) return <div className="error-message">{error}</div>;
+    const currentUserId = Number(user?.id);
 
-    const performingOrders = orders.filter((order) => Number(order.executorId) === Number(user.id));
-    const createdOrders = orders.filter((order) => Number(order.creatorId) === Number(user.id));
+    const performingOrders = orders.filter(
+        (order) =>
+            Number(order.executorId) === currentUserId
+    );
+
+    const createdOrders = orders.filter(
+        (order) =>
+            Number(order.creatorId) === currentUserId
+    );
 
 // Экспресс-заказы, которые выполняет текущий пользователь
     const performingExpressOrders = expressOrders.filter((order) => {
         const isExecutor =
-            Number(order.executorId) === Number(user.id);
+            Number(order.executorId) === currentUserId
 
         const hasExecutor =
             Number(order.executorId) > 0;
@@ -1486,7 +1494,7 @@ const ActiveOrdersPage = () => {
 // Экспресс-заказы клиента, которые уже выполняются
     const createdExpressOrders = expressOrders.filter((order) => {
         const isCreator =
-            Number(order.creatorId) === Number(user.id);
+            Number(order.creatorId) === currentUserId
 
         const hasExecutor =
             Number(order.executorId) > 0;
@@ -1517,6 +1525,14 @@ const ActiveOrdersPage = () => {
             ? sortTargetOrderFirst(performingOrders).slice(0, 1)
             : sortTargetOrderFirst(createdOrders);
 
+    const {
+        byOrderId: verifiedAssignments,
+        error: assignmentsError,
+        refresh: refreshAssignments,
+    } = useVerifiedAssignments(
+        visibleRegularOrders
+    );
+
     const visibleExpressOrders =
         activeView === "performing"
             ? (performingOrders.length > 0 ? [] : performingExpressOrders.slice(0, 1))
@@ -1527,12 +1543,47 @@ const ActiveOrdersPage = () => {
 
     const hasAny = hasAnyVisible;
 
+    /*
+     * Все React Hooks уже вызваны.
+     * Теперь можно выполнять ранний return.
+     */
+    if (!user?.id) {
+        return <p>Загрузка...</p>;
+    }
+
+    if (error) {
+        return (
+            <div className="error-message">
+                {error}
+            </div>
+        );
+    }
+
     return (
         <div className={`active-orders active-orders--${platform}`}>
             <div className="pageContainer">
                 <div className="active-orders-page">
                     <div className="active-orders-container">
                         <div className="contentWrapper">
+
+                            {assignmentsError && (
+                                <div
+                                    className="cc-verified-contracts-alert"
+                                    role="alert"
+                                >
+        <span>
+            Не удалось проверить наличие
+            подтверждённых договоров.
+        </span>
+
+                                    <button
+                                        type="button"
+                                        onClick={refreshAssignments}
+                                    >
+                                        Повторить
+                                    </button>
+                                </div>
+                            )}
 
                             <div className="active-orders-topbar">
                                 <div className="active-orders-title-wrap">
@@ -1601,6 +1652,11 @@ const ActiveOrdersPage = () => {
 
                                         const hasContract =
                                             Boolean(order.contractPath);
+
+                                        const verifiedAssignment =
+                                            verifiedAssignments[
+                                                String(order.id)
+                                                ] || null;
 
                                         return (
                                             <li key={order.id} className="order-card">
@@ -1911,8 +1967,10 @@ const ActiveOrdersPage = () => {
             </span>
 
                                                                     <span className="contract-download-text">
-                Скачать договор
-            </span>
+    {verifiedAssignment
+        ? "Скачать обычный договор"
+        : "Скачать договор"}
+</span>
 
                                                                     <span className="contract-download-format">
                 PDF
@@ -1920,6 +1978,10 @@ const ActiveOrdersPage = () => {
                                                                 </button>
                                                             </div>
                                                         )}
+
+                                                        <VerifiedAssignmentCard
+                                                            assignment={verifiedAssignment}
+                                                        />
 
                                                         <div className="photo-protocol-section">
                                                             <h4 className="photo-protocol-title">

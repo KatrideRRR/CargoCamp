@@ -7,6 +7,8 @@ import "../styles/OrderHistotyPage.css";
 import {FiCheckCircle, FiFileText, FiMapPin, FiNavigation, FiPackage, FiStar,} from "react-icons/fi";
 import {FaCarSide, FaRegMoneyBillAlt,} from "react-icons/fa";
 import {downloadLegacyContract,} from "../utils/downloadLegacyContract";
+import useVerifiedAssignments from "../hooks/useVerifiedAssignments";
+import VerifiedAssignmentCard from "../components/VerifiedAssignmentCard";
 
 const apiUrl =
     process.env.REACT_APP_API_URL ||
@@ -401,6 +403,14 @@ const OrderHistoryPage = () => {
             expressOrders,
         ]);
 
+    const {
+        byOrderId: verifiedAssignments,
+        error: assignmentsError,
+        refresh: refreshAssignments,
+    } = useVerifiedAssignments(
+        regularOrders
+    );
+
     const regularCount =
         regularOrders.length;
 
@@ -618,6 +628,13 @@ const OrderHistoryPage = () => {
 
                                 const hasContract =
                                     Boolean(order.contractPath);
+
+                                const verifiedAssignment =
+                                    !isExpress
+                                        ? verifiedAssignments[
+                                        String(order.id)
+                                        ] || null
+                                        : null;
 
                                 const expressTitle =
                                     order.type ===
@@ -961,10 +978,12 @@ const OrderHistoryPage = () => {
                                         </div>
 
                                         {!isExpress && (
-                                            <OrderServiceDetails
-                                                order={
-                                                    order
-                                                }
+                                            <OrderServiceDetails order={order} />
+                                        )}
+
+                                        {!isExpress && (
+                                            <VerifiedAssignmentCard
+                                                assignment={verifiedAssignment}
                                             />
                                         )}
 
@@ -990,7 +1009,10 @@ const OrderHistoryPage = () => {
                                                         }}
                                                     >
                                                         <FiFileText />
-                                                        Скачать договор (PDF)
+
+                                                        {verifiedAssignment
+                                                            ? "Скачать обычный договор (PDF)"
+                                                            : "Скачать договор (PDF)"}
                                                     </button>
                                                 )}
 
@@ -1051,6 +1073,25 @@ const OrderHistoryPage = () => {
                     </div>
                 )}
             </div>
+
+            {assignmentsError && (
+                <div
+                    className="cc-verified-contracts-alert"
+                    role="alert"
+                >
+        <span>
+            Не удалось загрузить сведения
+            о подтверждённых договорах.
+        </span>
+
+                    <button
+                        type="button"
+                        onClick={refreshAssignments}
+                    >
+                        Повторить
+                    </button>
+                </div>
+            )}
 
             {reviewModalOpen &&
                 reviewOrder && (

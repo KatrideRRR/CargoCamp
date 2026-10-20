@@ -1,28 +1,16 @@
-
 const express = require("express");
 const fs = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
-
-const authenticateToken =
-    require("../middlewares/userAuth");
-
-const {
-    Order,
-    Contract,
-    ActionLog,
-} = require("../models");
-
-const {
-    contractsRoot,
-} = require("../config/storagePaths");
-
+const { Op } = require("sequelize");
 const router = express.Router();
 
-const verifiedRoot = path.join(
-    contractsRoot,
-    "verified"
-);
+const authenticateToken = require("../middlewares/userAuth");
+const {Order, Contract, ActionLog,} = require("../models");
+const {contractsRoot,} = require("../config/storagePaths");
+
+
+const verifiedRoot = path.join(contractsRoot, "verified");
 
 function validId(value) {
     return /^[1-9]\d*$/.test(
@@ -30,10 +18,7 @@ function validId(value) {
     );
 }
 
-async function getAccessibleOrder(
-    orderId,
-    userId
-) {
+async function getAccessibleOrder(orderId, userId) {
     const order = await Order.findByPk(
         orderId,
         {
@@ -56,15 +41,160 @@ async function getAccessibleOrder(
     return allowed ? order : null;
 }
 
-/*
- * GET /api/contracts/orders/:orderId/assignment
- *
- * Только заказчик и исполнитель.
- */
-router.get(
-    "/orders/:orderId/assignment",
-    authenticateToken,
-    async (req, res) => {
+router.post("/assignments/summary", authenticateToken, async (req, res) => {
+        try {
+            const rawIds = req.body?.orderIds;
+
+            if (
+                !Array.isArray(rawIds) ||
+                rawIds.length > 100
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Передайте не более 100 номеров заказов",
+                });
+            }
+
+            if (
+                rawIds.some(
+                    (id) =>
+                        !Number.isSafeInteger(id) ||
+                        id <= 0
+                )
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Некорректные номера заказов",
+                });
+            }
+
+            const orderIds = [
+                ...new Set(rawIds),
+            ];
+
+            if (orderIds.length === 0) {
+                return res.json({
+                    success: true,
+                    assignments: [],
+                });
+            }
+
+            const userId = Number(req.user.id);
+
+            /*
+             * Сначала оставляем только заказы,
+             * где текущий пользователь является
+             * заказчиком или исполнителем.
+             */
+            const allowedOrders =
+                await Order.findAll({
+                    where: {
+                        id: {
+                            [Op.in]: orderIds,
+                        },
+
+                        [Op.or]: [
+                            { creatorId: userId },
+                            { executorId: userId },
+                        ],
+                    },
+
+                    attributes: ["id"],
+                });
+
+            const allowedIds = allowedOrders.map(
+                (order) => Number(order.id)
+            );
+
+            if (allowedIds.length === 0) {
+                return res.json({
+                    success: true,
+                    assignments: [],
+                });
+            }
+
+            /*
+             * Читаем только проекты
+             * подтверждённых договоров.
+             *
+             * Не возвращаем:
+             * - storageKey;
+             * - PDF;
+             * - персональные документы;
+             * - снимки паспортной проверки.
+             */
+            const contracts =
+                await Contract.findAll({
+                    where: {
+                        orderId: {
+                            [Op.in]: allowedIds,
+                        },
+
+                        type: "verified_assignment",
+                    },
+
+                    attributes: [
+                        "id",
+                        "orderId",
+                        "version",
+                        "status",
+                        "documentNumber",
+                        "createdAt",
+                        "finalizedAt",
+                        "fullySignedAt",
+                    ],
+
+                    order: [
+                        ["orderId", "ASC"],
+                        ["version", "DESC"],
+                        ["id", "DESC"],
+                    ],
+                });
+
+            /*
+             * Для каждого заказа возвращаем
+             * только последнюю версию.
+             */
+            const latestByOrder = new Map();
+
+            for (const contract of contracts) {
+                const key = String(
+                    contract.orderId
+                );
+
+                if (!latestByOrder.has(key)) {
+                    latestByOrder.set(
+                        key,
+                        contract
+                    );
+                }
+            }
+
+            return res.json({
+                success: true,
+
+                assignments: [
+                    ...latestByOrder.values(),
+                ],
+            });
+
+        } catch (error) {
+            console.error(
+                "Ошибка получения списка договоров:",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                message:
+                    "Не удалось получить список договоров",
+            });
+        }
+    });
+
+router.get("/orders/:orderId/assignment", authenticateToken, async (req, res) => {
         try {
             if (!validId(req.params.orderId)) {
                 return res.status(400).json({
@@ -124,18 +254,9 @@ router.get(
                     "Не удалось получить договор",
             });
         }
-    }
-);
+    });
 
-/*
- * GET /api/contracts/:contractId/file
- *
- * Скачивание только участниками заказа.
- */
-router.get(
-    "/:contractId/file",
-    authenticateToken,
-    async (req, res) => {
+router.get("/:contractId/file", authenticateToken, async (req, res) => {
         try {
             if (!validId(req.params.contractId)) {
                 return res.status(400).json({
@@ -330,7 +451,6 @@ router.get(
                     "Не удалось скачать договор",
             });
         }
-    }
-);
+    });
 
 module.exports = router;
