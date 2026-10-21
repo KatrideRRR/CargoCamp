@@ -9,7 +9,8 @@ const apiUrl = process.env.REACT_APP_API_URL;
 
 export async function downloadVerifiedContract(
     contractId,
-    version = 1
+    version = 1,
+    kind = "assignment"
 ) {
     const id = Number(contractId);
 
@@ -67,8 +68,13 @@ export async function downloadVerifiedContract(
 
             link.href = objectUrl;
 
+            const filenamePrefix =
+                kind === "act"
+                    ? "verified_act"
+                    : "verified_contract";
+
             link.download =
-                `verified_contract_${id}_v${version}.pdf`;
+                `${filenamePrefix}_${id}_v${version}.pdf`;
 
             document.body.appendChild(link);
             link.click();

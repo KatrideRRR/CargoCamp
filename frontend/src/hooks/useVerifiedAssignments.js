@@ -1,4 +1,3 @@
-
 import {
     useCallback,
     useEffect,
@@ -9,32 +8,21 @@ import axiosInstance from "../utils/axiosInstance";
 
 const BATCH_SIZE = 100;
 
-export default function useVerifiedAssignments(
-    orders
-) {
-    const [revision, setRevision] =
-        useState(0);
+export default function useVerifiedAssignments(orders) {
+    const [revision, setRevision] = useState(0);
 
     const [result, setResult] = useState({
         key: "",
         byOrderId: {},
+        actsByOrderId: {},
         loading: false,
         error: "",
     });
 
-    /*
-     * Стабильный ключ.
-     *
-     * Даже если React создаёт новый массив
-     * заказов при каждом рендере,
-     * запрос не повторяется без изменения ID.
-     */
     const idsKey = [
         ...new Set(
             (Array.isArray(orders) ? orders : [])
-                .map((order) =>
-                    Number(order?.id)
-                )
+                .map((order) => Number(order?.id))
                 .filter(
                     (id) =>
                         Number.isSafeInteger(id) &&
@@ -46,7 +34,7 @@ export default function useVerifiedAssignments(
         .join(",");
 
     const refresh = useCallback(() => {
-        setRevision((current) => current + 1);
+        setRevision((prev) => prev + 1);
     }, []);
 
     useEffect(() => {
@@ -56,6 +44,7 @@ export default function useVerifiedAssignments(
             setResult({
                 key: "",
                 byOrderId: {},
+                actsByOrderId: {},
                 loading: false,
                 error: "",
             });
@@ -63,28 +52,21 @@ export default function useVerifiedAssignments(
             return;
         }
 
-        const ids = idsKey
-            .split(",")
-            .map(Number);
+        const ids = idsKey.split(",").map(Number);
 
         async function load() {
             setResult({
                 key: idsKey,
                 byOrderId: {},
+                actsByOrderId: {},
                 loading: true,
                 error: "",
             });
 
             try {
                 const byOrderId = {};
+                const actsByOrderId = {};
 
-                /*
-                 * Загружаем по 100 заказов.
-                 *
-                 * Последовательные запросы
-                 * не создают лишнюю нагрузку
-                 * при большой истории.
-                 */
                 for (
                     let offset = 0;
                     offset < ids.length;
@@ -98,9 +80,7 @@ export default function useVerifiedAssignments(
                     const response =
                         await axiosInstance.post(
                             "/contracts/assignments/summary",
-                            {
-                                orderIds: batch,
-                            }
+                            {orderIds: batch}
                         );
 
                     if (
@@ -122,6 +102,22 @@ export default function useVerifiedAssignments(
                             String(contract.orderId)
                             ] = contract;
                     }
+
+                    /*
+                     * Совместимость со старым backend:
+                     * до выкладки новой версии
+                     * поле acts может отсутствовать.
+                     */
+                    const acts =
+                        Array.isArray(response.data.acts)
+                            ? response.data.acts
+                            : [];
+
+                    for (const act of acts) {
+                        actsByOrderId[
+                            String(act.orderId)
+                            ] = act;
+                    }
                 }
 
                 if (cancelled) return;
@@ -129,6 +125,7 @@ export default function useVerifiedAssignments(
                 setResult({
                     key: idsKey,
                     byOrderId,
+                    actsByOrderId,
                     loading: false,
                     error: "",
                 });
@@ -137,17 +134,19 @@ export default function useVerifiedAssignments(
                 if (cancelled) return;
 
                 console.error(
-                    "Verified assignments loading error:",
+                    "Ошибка загрузки документов:",
                     error
                 );
 
                 setResult({
                     key: idsKey,
                     byOrderId: {},
+                    actsByOrderId: {},
                     loading: false,
+
                     error:
                         error.response?.data?.message ||
-                        "Не удалось проверить подтверждённые договоры",
+                        "Не удалось загрузить документы",
                 });
             }
         }
@@ -160,10 +159,6 @@ export default function useVerifiedAssignments(
 
     }, [idsKey, revision]);
 
-    /*
-     * Поддерживаем уже существующее
-     * обновление свайпом в приложении.
-     */
     useEffect(() => {
         window.addEventListener(
             "appPullToRefresh",
@@ -182,6 +177,11 @@ export default function useVerifiedAssignments(
         byOrderId:
             result.key === idsKey
                 ? result.byOrderId
+                : {},
+
+        actsByOrderId:
+            result.key === idsKey
+                ? result.actsByOrderId
                 : {},
 
         loading:

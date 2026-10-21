@@ -12,6 +12,7 @@ const multer = require("multer");
 const { Order, User, Category, Subcategory, ExpressOrder } = require('../models');
 const generateContractPDF = require('../utils/generateContractPDF');
 const {createVerifiedAssignmentIfEligible,} = require("../services/verifiedContractService");
+const {createVerifiedCompletionActIfEligible,} = require("../services/verifiedCompletionActService");
 const yooKassa = require('../config/yookassaClient');
 const uploadExecutorBefore = buildOrderPhotoUploader("executor_before");
 const uploadExecutorAfter = buildOrderPhotoUploader("executor_after");
@@ -23,16 +24,13 @@ const { calculateRecommendedPrice } = require("../services/recommendedPriceServi
 const {uploadsRoot, ordersRoot, tempRoot, contractsRoot, ensureDirectory,} = require("../config/storagePaths");
 const uploadDocumentRoot = path.resolve(__dirname, "..", "upload-document");
 ensureDirectory(uploadDocumentRoot);
-
 const tempStorage = multer.diskStorage({destination: (req, file, cb) => {cb(null, tempRoot);},
-
     filename: (req, file, cb) => {
         const ext = path.extname(file.originalname) || ".jpg";
         const random = Math.round(Math.random() * 1e9);
         cb(null, `temp_${Date.now()}_${random}${ext}`);
     },
 });
-
 const upload = multer({ storage: tempStorage });
 
 function buildOrderPhotoUploader(type) {
@@ -3158,6 +3156,52 @@ module.exports = (io) => {
                     console.error("Ошибка генерации договора:", pdfError);
                 }
             }
+
+
+            /*
+             * Проверенная сделка:
+             * отдельный проект акта о завершении заказа.
+             *
+             * Не заменяет старый PDF.
+             * Не подписывается автоматически.
+             * Не утверждает отсутствие претензий.
+             */
+            if (fullyCompleted) {
+                try {
+                    const result =
+                        await createVerifiedCompletionActIfEligible(
+                            fullOrder
+                        );
+
+                    if (result?.created) {
+                        console.log(
+                            "✅ Проект акта сформирован:",
+                            {
+                                orderId: fullOrder.id,
+                                actId: String(result.contract.id),
+                                documentHash:
+                                result.contract.documentHash,
+                            }
+                        );
+                    }
+
+                } catch (error) {
+                    /*
+                     * Заказ уже завершён.
+                     * Ошибка дополнительного PDF
+                     * не должна отменять выполнение
+                     * или повторять списание оплаты.
+                     */
+                    console.error(
+                        "❌ Не удалось сформировать акт:",
+                        {
+                            orderId: fullOrder.id,
+                            message: error.message,
+                        }
+                    );
+                }
+            }
+
 
             io.emit("orderUpdated");
             io.emit("activeOrdersUpdated");

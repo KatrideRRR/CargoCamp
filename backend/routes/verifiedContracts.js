@@ -132,12 +132,18 @@ router.post("/assignments/summary", authenticateToken, async (req, res) => {
                             [Op.in]: allowedIds,
                         },
 
-                        type: "verified_assignment",
+                        type: {
+                            [Op.in]: [
+                                "verified_assignment",
+                                "verified_completion_act",
+                            ],
+                        },
                     },
 
                     attributes: [
                         "id",
                         "orderId",
+                        "type",
                         "version",
                         "status",
                         "documentNumber",
@@ -154,20 +160,25 @@ router.post("/assignments/summary", authenticateToken, async (req, res) => {
                     ],
                 });
 
-            /*
-             * Для каждого заказа возвращаем
-             * только последнюю версию.
-             */
-            const latestByOrder = new Map();
+
+            const assignmentsByOrder = new Map();
+            const actsByOrder = new Map();
 
             for (const contract of contracts) {
-                const key = String(
+                const orderKey = String(
                     contract.orderId
                 );
 
-                if (!latestByOrder.has(key)) {
-                    latestByOrder.set(
-                        key,
+                const target =
+                    contract.type === "verified_assignment"
+                        ? assignmentsByOrder
+                        : contract.type === "verified_completion_act"
+                            ? actsByOrder
+                            : null;
+
+                if (target && !target.has(orderKey)) {
+                    target.set(
+                        orderKey,
                         contract
                     );
                 }
@@ -177,9 +188,14 @@ router.post("/assignments/summary", authenticateToken, async (req, res) => {
                 success: true,
 
                 assignments: [
-                    ...latestByOrder.values(),
+                    ...assignmentsByOrder.values(),
+                ],
+
+                acts: [
+                    ...actsByOrder.values(),
                 ],
             });
+
 
         } catch (error) {
             console.error(
@@ -270,7 +286,13 @@ router.get("/:contractId/file", authenticateToken, async (req, res) => {
                 await Contract.findOne({
                     where: {
                         id: req.params.contractId,
-                        type: "verified_assignment",
+
+                        type: {
+                            [Op.in]: [
+                                "verified_assignment",
+                                "verified_completion_act",
+                            ],
+                        },
                     },
                 });
 
@@ -288,14 +310,8 @@ router.get("/:contractId/file", authenticateToken, async (req, res) => {
                 return res.sendStatus(404);
             }
 
-            /*
-             * Хранилище нельзя выбирать
-             * произвольным путём из базы.
-             *
-             * Проверяем точный формат ключа.
-             */
             const prefix =
-                `verified/verified_assignment_` +
+                `verified/${contract.type}_` +
                 `${contract.orderId}_` +
                 `v${contract.version}_`;
 
@@ -426,9 +442,14 @@ router.get("/:contractId/file", authenticateToken, async (req, res) => {
                 "application/pdf"
             );
 
+            const downloadPrefix =
+                contract.type === "verified_completion_act"
+                    ? "verified-act"
+                    : "verified-assignment";
+
             res.setHeader(
                 "Content-Disposition",
-                `attachment; filename="verified-assignment-${order.id}-v${contract.version}.pdf"`
+                `attachment; filename="${downloadPrefix}-${order.id}-v${contract.version}.pdf"`
             );
 
             res.setHeader(

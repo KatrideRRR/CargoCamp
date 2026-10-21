@@ -9,6 +9,7 @@ import {FaCarSide, FaRegMoneyBillAlt,} from "react-icons/fa";
 import {downloadLegacyContract,} from "../utils/downloadLegacyContract";
 import useVerifiedAssignments from "../hooks/useVerifiedAssignments";
 import VerifiedAssignmentCard from "../components/VerifiedAssignmentCard";
+import VerifiedCompletionActCard from "../components/VerifiedCompletionActCard";
 
 const apiUrl =
     process.env.REACT_APP_API_URL ||
@@ -405,6 +406,7 @@ const OrderHistoryPage = () => {
 
     const {
         byOrderId: verifiedAssignments,
+        actsByOrderId: verifiedActs,
         error: assignmentsError,
         refresh: refreshAssignments,
     } = useVerifiedAssignments(
@@ -632,6 +634,13 @@ const OrderHistoryPage = () => {
                                 const verifiedAssignment =
                                     !isExpress
                                         ? verifiedAssignments[
+                                        String(order.id)
+                                        ] || null
+                                        : null;
+
+                                const verifiedAct =
+                                    !isExpress
+                                        ? verifiedActs[
                                         String(order.id)
                                         ] || null
                                         : null;
@@ -985,6 +994,12 @@ const OrderHistoryPage = () => {
                                             <VerifiedAssignmentCard
                                                 assignment={verifiedAssignment}
                                                 onSigned={refreshAssignments}
+                                            />
+                                        )}
+
+                                        {!isExpress && (
+                                            <VerifiedCompletionActCard
+                                                act={verifiedAct}
                                             />
                                         )}
 
