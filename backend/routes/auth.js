@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { User, OrderReview, Order, Category, ExpressOrder } = require('../models');
+const {User, OrderReview, Order, Category, ExpressOrder} = require('../models');
 const authenticateToken = require('../middlewares/userAuth');
 const router = express.Router();
 const multer = require('multer');
@@ -10,15 +10,24 @@ const path = require('path');
 const axios = require("axios");
 const fs = require('fs');
 const SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
-const { notifyUser } = require("../services/notificationService");
+const {notifyUser} = require("../services/notificationService");
 const {sendAdminNotification, adminUserUrl, adminUsersUrl,} = require("../services/adminNotificationService");
 const {createAuthSession, refreshAuthSession, revokeAuthSession,} = require("../services/authSessionService");
-const {getSessionClient, getUserRefreshToken, buildUserSessionResponse, clearUserRefreshCookie,} = require("../utils/userSessionTransport");
+const {
+    getSessionClient,
+    getUserRefreshToken,
+    buildUserSessionResponse,
+    clearUserRefreshCookie,
+} = require("../utils/userSessionTransport");
 const crypto = require("crypto");
 const {uploadsRoot: publicUploadsRoot,} = require("../config/storagePaths");
 const avatarsDir = path.join(__dirname, "..", "uploads", "avatars");
 
-function ensureDir(dirPath) {if (!fs.existsSync(dirPath)) {fs.mkdirSync(dirPath, { recursive: true });}}
+function ensureDir(dirPath) {
+    if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, {recursive: true});
+    }
+}
 
 const vehiclePhotosDir = path.join(publicUploadsRoot, "vehicles");
 
@@ -86,7 +95,7 @@ function detectVehiclePhotoFormat(buffer) {
 }
 
 if (!fs.existsSync(avatarsDir)) {
-    fs.mkdirSync(avatarsDir, { recursive: true });
+    fs.mkdirSync(avatarsDir, {recursive: true});
 }
 
 const avatarStorage = multer.diskStorage({
@@ -137,7 +146,7 @@ const uploadAvatar = multer({
 
     storage: avatarStorage,
 
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    limits: {fileSize: 5 * 1024 * 1024}, // 5MB
 
     fileFilter: (req, file, cb) => {
 
@@ -156,7 +165,8 @@ const uploadAvatar = multer({
 });
 
 const generateTemporaryPassword = () => {
-    return Math.random().toString(36).slice(-8);};
+    return Math.random().toString(36).slice(-8);
+};
 
 const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -177,58 +187,58 @@ function normalizePhone(raw) {
 }
 
 router.post("/upload-avatar", authenticateToken, uploadAvatar.single("avatar"), async (req, res) => {
-        try {
-            if (!req.file) {
-                return res.status(400).json({ message: "Файл не загружен" });
-            }
-
-            const user = await User.findByPk(req.user.id);
-            if (!user) {
-                return res.status(404).json({ message: "Пользователь не найден" });
-            }
-
-            const avatarPath = `/uploads/avatars/${req.file.filename}`;
-
-            user.avatar = avatarPath;
-            await user.save();
-
-            return res.json({
-                success: true,
-                message: "Фото профиля загружено",
-                avatar: avatarPath,
-            });
-        } catch (error) {
-            console.error("Ошибка загрузки аватара:", error);
-            return res.status(500).json({ message: "Ошибка сервера" });
+    try {
+        if (!req.file) {
+            return res.status(400).json({message: "Файл не загружен"});
         }
-    });
+
+        const user = await User.findByPk(req.user.id);
+        if (!user) {
+            return res.status(404).json({message: "Пользователь не найден"});
+        }
+
+        const avatarPath = `/uploads/avatars/${req.file.filename}`;
+
+        user.avatar = avatarPath;
+        await user.save();
+
+        return res.json({
+            success: true,
+            message: "Фото профиля загружено",
+            avatar: avatarPath,
+        });
+    } catch (error) {
+        console.error("Ошибка загрузки аватара:", error);
+        return res.status(500).json({message: "Ошибка сервера"});
+    }
+});
 
 router.post("/send-sms", async (req, res) => {
-    const { phone, captchaToken, purpose = "register" } = req.body;
+    const {phone, captchaToken, purpose = "register"} = req.body;
 
     if (!phone) {
-        return res.status(400).json({ message: "Введите номер телефона" });
+        return res.status(400).json({message: "Введите номер телефона"});
     }
 
     const phoneKey = normalizePhone(phone);
 
     if (!phoneKey || phoneKey.length !== 11 || !phoneKey.startsWith("7")) {
-        return res.status(400).json({ message: "Некорректный номер телефона" });
+        return res.status(400).json({message: "Некорректный номер телефона"});
     }
 
-    const existingUser = await User.findOne({ where: { phone: phoneKey } });
+    const existingUser = await User.findOne({where: {phone: phoneKey}});
 
     if (purpose === "register" && existingUser) {
-        return res.status(400).json({ message: "Телефон уже используется" });
+        return res.status(400).json({message: "Телефон уже используется"});
     }
 
     if ((purpose === "login" || purpose === "password_reset") && !existingUser) {
-        return res.status(404).json({ message: "Пользователь не найден" });
+        return res.status(404).json({message: "Пользователь не найден"});
     }
 
     if (purpose === "register") {
         if (!captchaToken) {
-            return res.status(400).json({ message: "Капча не пройдена" });
+            return res.status(400).json({message: "Капча не пройдена"});
         }
 
         try {
@@ -245,11 +255,11 @@ router.post("/send-sms", async (req, res) => {
             );
 
             if (!captchaResponse.data?.success) {
-                return res.status(400).json({ message: "Ошибка капчи" });
+                return res.status(400).json({message: "Ошибка капчи"});
             }
         } catch (error) {
             console.error("Ошибка проверки reCAPTCHA при отправке SMS:", error?.message);
-            return res.status(500).json({ message: "Ошибка проверки капчи" });
+            return res.status(500).json({message: "Ошибка проверки капчи"});
         }
     }
 
@@ -278,7 +288,7 @@ router.post("/send-sms", async (req, res) => {
     const apiId = process.env.SMS_RU_API_ID;
 
     if (!apiId) {
-        return res.status(500).json({ message: "SMS_RU_API_ID не задан" });
+        return res.status(500).json({message: "SMS_RU_API_ID не задан"});
     }
 
     const code = generateCode();
@@ -327,50 +337,50 @@ router.post("/send-sms", async (req, res) => {
 });
 
 router.post("/password-reset/confirm", async (req, res) => {
-    const { phone, smsCode, newPassword } = req.body;
+    const {phone, smsCode, newPassword} = req.body;
 
     const phoneKey = normalizePhone(phone);
     const codeFromUser = String(smsCode || "").trim();
 
     if (!newPassword || String(newPassword).length < 6) {
-        return res.status(400).json({ message: "Пароль должен быть минимум 6 символов" });
+        return res.status(400).json({message: "Пароль должен быть минимум 6 символов"});
     }
 
     const entry = smsCodes.get(phoneKey);
-    if (!entry) return res.status(400).json({ message: "Код не найден. Запросите новый." });
+    if (!entry) return res.status(400).json({message: "Код не найден. Запросите новый."});
 
     if (Date.now() > entry.expiresAt) {
         smsCodes.delete(phoneKey);
-        return res.status(400).json({ message: "Код истёк. Запросите новый." });
+        return res.status(400).json({message: "Код истёк. Запросите новый."});
     }
 
     if (String(entry.code).trim() !== codeFromUser) {
-        return res.status(400).json({ message: "Неверный код" });
+        return res.status(400).json({message: "Неверный код"});
     }
 
-    const user = await User.findOne({ where: { phone: phoneKey } });
-    if (!user) return res.status(404).json({ message: "Пользователь не найден" });
+    const user = await User.findOne({where: {phone: phoneKey}});
+    if (!user) return res.status(404).json({message: "Пользователь не найден"});
 
     const hashed = await bcrypt.hash(String(newPassword), 10);
-    await user.update({ password: hashed });
+    await user.update({password: hashed});
 
     smsCodes.delete(phoneKey);
 
-    return res.json({ message: "Пароль успешно изменён" });
+    return res.json({message: "Пароль успешно изменён"});
 });
 
 router.post("/upload-documents", authenticateToken, (req, res) => {
-        return res.status(410).json({
-            success: false,
-            message:
-                "Старая загрузка документов отключена. " +
-                "Обновите приложение и используйте " +
-                "новый раздел подтверждения личности.",
-        });
+    return res.status(410).json({
+        success: false,
+        message:
+            "Старая загрузка документов отключена. " +
+            "Обновите приложение и используйте " +
+            "новый раздел подтверждения личности.",
     });
+});
 
 router.post('/register', async (req, res) => {
-    const { username, phone, password, smsCode } = req.body;
+    const {username, phone, password, smsCode} = req.body;
 
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 дней
@@ -381,11 +391,11 @@ router.post('/register', async (req, res) => {
     const entry = smsCodes.get(phoneKey); // {code, expiresAt} | undefined
     const codeSaved = String(entry?.code || "").trim();
 
-    if (!entry) return res.status(400).json({ message: "Неверный код" });
+    if (!entry) return res.status(400).json({message: "Неверный код"});
 
     if (Date.now() > entry.expiresAt) {
         smsCodes.delete(phoneKey);
-        return res.status(400).json({ message: "Код истёк. Запросите новый." });
+        return res.status(400).json({message: "Код истёк. Запросите новый."});
     }
 
     if (codeSaved !== codeFromUser) {
@@ -400,15 +410,15 @@ router.post('/register', async (req, res) => {
 
         smsCodes.set(phoneKey, entry);
 
-        return res.status(400).json({ message: "Неверный код" });
+        return res.status(400).json({message: "Неверный код"});
     }
 
     try {
         // Проверка на существующего пользователя
-        const userExists = await User.findOne({ where: { phone: phoneKey } });
+        const userExists = await User.findOne({where: {phone: phoneKey}});
 
         if (userExists) {
-            return res.status(400).json({ message: "Телефон уже используется" });
+            return res.status(400).json({message: "Телефон уже используется"});
         }
 
         // Хеширование пароля
@@ -574,17 +584,17 @@ router.post("/session/logout", async (req, res) => {
 });
 
 router.post("/login", async (req, res) => {
-    const { phone, password } = req.body;
+    const {phone, password} = req.body;
     try {
         const phoneKey = normalizePhone(phone);
 
-        const user = await User.findOne({ where: { phone: phoneKey } });
-        if (!user) return res.status(404).json({ message: "User not found" });
+        const user = await User.findOne({where: {phone: phoneKey}});
+        if (!user) return res.status(404).json({message: "User not found"});
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
-        if (!isPasswordValid) return res.status(401).json({ message: "Invalid password" });
+        if (!isPasswordValid) return res.status(401).json({message: "Invalid password"});
 
-        if (user.role === "banned") return res.status(403).json({ message: "Ваш аккаунт заблокирован" });
+        if (user.role === "banned") return res.status(403).json({message: "Ваш аккаунт заблокирован"});
 
         const client = getSessionClient(req);
 
@@ -641,34 +651,34 @@ router.post("/login", async (req, res) => {
 });
 
 router.post("/login-sms", async (req, res) => {
-    const { phone, smsCode } = req.body;
+    const {phone, smsCode} = req.body;
 
     try {
-        if (!phone) return res.status(400).json({ message: "Введите номер телефона" });
-        if (!smsCode) return res.status(400).json({ message: "Введите код из SMS" });
+        if (!phone) return res.status(400).json({message: "Введите номер телефона"});
+        if (!smsCode) return res.status(400).json({message: "Введите код из SMS"});
 
         const phoneKey = normalizePhone(phone);
         const codeFromUser = String(smsCode || "").trim();
 
         const entry = smsCodes.get(phoneKey);
-        if (!entry) return res.status(401).json({ message: "Код не найден. Запросите новый." });
+        if (!entry) return res.status(401).json({message: "Код не найден. Запросите новый."});
 
         if (Date.now() > entry.expiresAt) {
             smsCodes.delete(phoneKey);
-            return res.status(401).json({ message: "Код истёк. Запросите новый." });
+            return res.status(401).json({message: "Код истёк. Запросите новый."});
         }
 
         if (String(entry.code).trim() !== codeFromUser) {
-            return res.status(401).json({ message: "Неверный код" });
+            return res.status(401).json({message: "Неверный код"});
         }
 
         smsCodes.delete(phoneKey);
 
-        const user = await User.findOne({ where: { phone: phoneKey } });
-        if (!user) return res.status(404).json({ message: "User not found" });
+        const user = await User.findOne({where: {phone: phoneKey}});
+        if (!user) return res.status(404).json({message: "User not found"});
 
         if (user.role === "banned") {
-            return res.status(403).json({ message: "Ваш аккаунт заблокирован" });
+            return res.status(403).json({message: "Ваш аккаунт заблокирован"});
         }
 
         const client = getSessionClient(req);
@@ -747,7 +757,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
             ],
         });
 
-        if (!user) return res.status(404).json({ message: 'User not found' });
+        if (!user) return res.status(404).json({message: 'User not found'});
 
         // если премиум истёк — сбрасываем
         if (
@@ -780,7 +790,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
             yookassaPaymentMethodId: user.yookassa_payment_method_id,
             cardLastFour: user.cardLastFour,
             cardType: user.cardType,
-            preferredCategoryIds:user.preferredCategoryIds,
+            preferredCategoryIds: user.preferredCategoryIds,
 
             locationAddress: user.locationAddress,
             locationLat: user.locationLat,
@@ -801,18 +811,18 @@ router.get('/profile', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching profile:', error);
-        return res.status(500).json({ message: 'Server error' });
+        return res.status(500).json({message: 'Server error'});
     }
 });
 
 router.put('/profile', authenticateToken, async (req, res) => {
-    const { username, phone } = req.body;
+    const {username, phone} = req.body;
 
     try {
         const user = await User.findByPk(req.user.id);
 
         if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+            return res.status(404).json({message: 'User not found'});
         }
 
         let phoneKey = null;
@@ -821,21 +831,21 @@ router.put('/profile', authenticateToken, async (req, res) => {
             phoneKey = normalizePhone(phone);
 
             if (!phoneKey || phoneKey.length !== 11 || !phoneKey.startsWith("7")) {
-                return res.status(400).json({ message: "Некорректный номер телефона" });
+                return res.status(400).json({message: "Некорректный номер телефона"});
             }
 
             if (phoneKey !== user.phone) {
-                const phoneExists = await User.findOne({ where: { phone: phoneKey } });
-
-                if (phoneExists) {
-                    return res.status(400).json({ message: 'Phone already in use' });
-                }
+                return res.status(403).json({
+                    success: false,
+                    message:
+                        "Изменение номера телефона требует " +
+                        "отдельного SMS-подтверждения. " +
+                        "Сейчас оно недоступно.",
+                });
             }
         }
 
         user.username = username || user.username;
-        user.phone = phoneKey || user.phone;
-
         await user.save();
 
         res.json({
@@ -848,7 +858,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         console.error('Error updating profile:', error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({message: 'Server error'});
     }
 });
 
@@ -904,29 +914,29 @@ router.get('/user/:id', async (req, res) => {
         const user = await User.findByPk(userId, {
             attributes: ['id', 'username', 'phone', 'rating', 'ratingCount', 'role', 'userStatus'],
         });
-        if (!user) return res.status(404).json({ message: 'Пользователь не найден' });
+        if (!user) return res.status(404).json({message: 'Пользователь не найден'});
 
-        const reviewsCount = await OrderReview.count({ where: { toUserId: userId } });
+        const reviewsCount = await OrderReview.count({where: {toUserId: userId}});
 
-        return res.json({ ...user.toJSON(), reviewsCount });
+        return res.json({...user.toJSON(), reviewsCount});
     } catch (err) {
         console.error('GET /auth/user/:id error:', err);
-        return res.status(500).json({ message: 'Ошибка сервера' });
+        return res.status(500).json({message: 'Ошибка сервера'});
     }
 });
 
 router.post("/recover-password", async (req, res) => {
-    const { phone } = req.body;
+    const {phone} = req.body;
 
     if (!phone) {
-        return res.status(400).json({ message: "Введите номер телефона" });
+        return res.status(400).json({message: "Введите номер телефона"});
     }
 
     try {
         const phoneKey = normalizePhone(phone);
-        const user = await User.findOne({ where: { phone: phoneKey } });
+        const user = await User.findOne({where: {phone: phoneKey}});
         if (!user) {
-            return res.status(404).json({ message: "Пользователь не найден" });
+            return res.status(404).json({message: "Пользователь не найден"});
         }
 
         // Генерируем временный пароль
@@ -934,7 +944,7 @@ router.post("/recover-password", async (req, res) => {
         const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
         // Обновляем пароль в базе данных
-        await user.update({ password: hashedPassword });
+        await user.update({password: hashedPassword});
 
         // Отправляем новый пароль через SMS
         const response = await axios.get("https://sms.ru/sms/send", {
@@ -947,29 +957,29 @@ router.post("/recover-password", async (req, res) => {
         });
 
         if (response.data.status === "OK") {
-            return res.json({ message: "Новый пароль отправлен на ваш номер" });
+            return res.json({message: "Новый пароль отправлен на ваш номер"});
         } else {
-            return res.status(500).json({ message: "Ошибка отправки SMS" });
+            return res.status(500).json({message: "Ошибка отправки SMS"});
         }
     } catch (error) {
         console.error("Ошибка восстановления пароля:", error);
-        return res.status(500).json({ message: "Ошибка сервера" });
+        return res.status(500).json({message: "Ошибка сервера"});
     }
 });
 
 router.get("/reviews/user/:userId", async (req, res) => {
     try {
-        const { userId } = req.params;
+        const {userId} = req.params;
 
         const reviews = await OrderReview.findAll({
-            where: { toUserId: userId },
+            where: {toUserId: userId},
             order: [["createdAt", "DESC"]],
         });
 
-        return res.json({ reviews });
+        return res.json({reviews});
     } catch (e) {
         console.error(e);
-        return res.status(500).json({ message: "Ошибка сервера" });
+        return res.status(500).json({message: "Ошибка сервера"});
     }
 });
 
@@ -1327,15 +1337,15 @@ router.get("/reviews/my", authenticateToken, async (req, res) => {
         const fromUserId = req.user.id;
 
         const reviews = await OrderReview.findAll({
-            where: { fromUserId },
+            where: {fromUserId},
             attributes: ["id", "orderId", "toUserId", "rating", "createdAt"],
             order: [["createdAt", "DESC"]],
         });
 
-        return res.json({ reviews });
+        return res.json({reviews});
     } catch (e) {
         console.error(e);
-        return res.status(500).json({ message: "Ошибка сервера" });
+        return res.status(500).json({message: "Ошибка сервера"});
     }
 });
 
@@ -1344,21 +1354,21 @@ router.get("/location/me", authenticateToken, async (req, res) => {
         const user = await User.findByPk(req.user.id, {
             attributes: ["id", "locationAddress", "locationLat", "locationLng", "locationSource", "locationUpdatedAt"],
         });
-        if (!user) return res.status(404).json({ message: "Пользователь не найден" });
-        return res.json({ location: user });
+        if (!user) return res.status(404).json({message: "Пользователь не найден"});
+        return res.json({location: user});
     } catch (e) {
         console.error(e);
-        return res.status(500).json({ message: "Ошибка сервера" });
+        return res.status(500).json({message: "Ошибка сервера"});
     }
 });
 
 router.post("/location/me", authenticateToken, async (req, res) => {
     try {
-        const { address, lat, lng, source } = req.body;
+        const {address, lat, lng, source} = req.body;
 
         const allowed = ["gps", "manual", "map"];
         if (source && !allowed.includes(source)) {
-            return res.status(400).json({ message: "Некорректный source" });
+            return res.status(400).json({message: "Некорректный source"});
         }
 
         // address можно без координат (чисто ручной ввод)
@@ -1366,7 +1376,7 @@ router.post("/location/me", authenticateToken, async (req, res) => {
         const lngNum = lng === null || lng === undefined ? null : Number(lng);
 
         if ((latNum !== null && !Number.isFinite(latNum)) || (lngNum !== null && !Number.isFinite(lngNum))) {
-            return res.status(400).json({ message: "lat/lng должны быть числами" });
+            return res.status(400).json({message: "lat/lng должны быть числами"});
         }
 
         await User.update(
@@ -1377,27 +1387,27 @@ router.post("/location/me", authenticateToken, async (req, res) => {
                 locationSource: source || null,
                 locationUpdatedAt: new Date(),
             },
-            { where: { id: req.user.id } }
+            {where: {id: req.user.id}}
         );
 
         const updated = await User.findByPk(req.user.id, {
             attributes: ["id", "locationAddress", "locationLat", "locationLng", "locationSource", "locationUpdatedAt"],
         });
 
-        return res.json({ success: true, location: updated });
+        return res.json({success: true, location: updated});
     } catch (e) {
         console.error(e);
-        return res.status(500).json({ message: "Ошибка сервера" });
+        return res.status(500).json({message: "Ошибка сервера"});
     }
 });
 
 router.post("/categories/me", authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
-        const { categoryIds } = req.body; // ожидаем массив чисел
+        const {categoryIds} = req.body; // ожидаем массив чисел
 
         if (!Array.isArray(categoryIds)) {
-            return res.status(400).json({ message: "categoryIds должен быть массивом" });
+            return res.status(400).json({message: "categoryIds должен быть массивом"});
         }
 
         // чистим и валидируем
@@ -1406,292 +1416,293 @@ router.post("/categories/me", authenticateToken, async (req, res) => {
             .filter((x) => Number.isFinite(x));
 
         // проверим что такие категории существуют (важно!)
-        const cats = await Category.findAll({ where: { id: cleaned } });
+        const cats = await Category.findAll({where: {id: cleaned}});
         if (cats.length !== cleaned.length) {
-            return res.status(400).json({ message: "Некоторые категории не найдены" });
+            return res.status(400).json({message: "Некоторые категории не найдены"});
         }
 
         await User.update(
-            { preferredCategoryIds: cleaned },
-            { where: { id: userId } }
+            {preferredCategoryIds: cleaned},
+            {where: {id: userId}}
         );
 
         const updated = await User.findByPk(userId);
-        return res.json({ success: true, preferredCategoryIds: updated.preferredCategoryIds });
+        return res.json({success: true, preferredCategoryIds: updated.preferredCategoryIds});
     } catch (e) {
         console.error(e);
-        return res.status(500).json({ message: "Ошибка сервера" });
+        return res.status(500).json({message: "Ошибка сервера"});
     }
 });
 
 router.post("/vehicle/me", authenticateToken, async (req, res) => {
-        try {
-            const userId = req.user.id;
+    try {
+        const userId = req.user.id;
 
-            const {
-                vehicleBrand,
-                vehicleModel,
-                vehicleColor,
-                vehiclePlate,
-                vehicleYear,
-            } = req.body;
+        const {
+            vehicleBrand,
+            vehicleModel,
+            vehicleColor,
+            vehiclePlate,
+            vehicleYear,
+        } = req.body;
 
-            const brand = String(vehicleBrand || "").trim();
-            const model = String(vehicleModel || "").trim();
-            const color = String(vehicleColor || "").trim();
-            const plate = String(vehiclePlate || "").trim().toUpperCase();
-            const yearRaw = String(vehicleYear || "").trim();
+        const brand = String(vehicleBrand || "").trim();
+        const model = String(vehicleModel || "").trim();
+        const color = String(vehicleColor || "").trim();
+        const plate = String(vehiclePlate || "").trim().toUpperCase();
+        const yearRaw = String(vehicleYear || "").trim();
 
-            if (!brand) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Укажите марку автомобиля",
-                });
-            }
-
-            if (!model) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Укажите модель автомобиля",
-                });
-            }
-
-            if (!color) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Укажите цвет автомобиля",
-                });
-            }
-
-            if (!plate) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Укажите государственный номер автомобиля",
-                });
-            }
-
-            let normalizedYear = null;
-
-            if (yearRaw) {
-                normalizedYear = Number(yearRaw);
-
-                const currentYear =
-                    new Date().getFullYear();
-
-                if (
-                    !Number.isInteger(normalizedYear) ||
-                    normalizedYear < 1950 ||
-                    normalizedYear > currentYear + 1
-                ) {
-                    return res.status(400).json({
-                        success: false,
-                        message: "Укажите корректный год автомобиля",
-                    });
-                }
-            }
-
-            const user = await User.findByPk(userId);
-
-            if (!user) {
-                return res.status(404).json({
-                    success: false,
-                    message: "Пользователь не найден",
-                });
-            }
-
-            user.vehicleBrand = brand;
-            user.vehicleModel = model;
-            user.vehicleColor = color;
-            user.vehiclePlate = plate;
-            user.vehicleYear = normalizedYear;
-
-            /*
-             * Любое изменение данных автомобиля
-             * требует новой проверки администратором.
-             */
-            user.vehicleVerificationStatus = "pending";
-            user.vehicleVerificationNote = null;
-
-            await user.save();
-
-            void sendAdminNotification({
-                topic: "vehicles",
-
-                title: "🚗 Автомобиль отправлен на проверку",
-
-                message: [
-                    `Пользователь ID: ${user.id}`,
-                    user.username
-                        ? `Имя: ${user.username}`
-                        : null,
-                    user.phone
-                        ? `Телефон: ${user.phone}`
-                        : null,
-                    "",
-                    `Автомобиль: ${user.vehicleBrand} ${user.vehicleModel}`,
-                    `Цвет: ${user.vehicleColor}`,
-                    `Госномер: ${user.vehiclePlate}`,
-                    user.vehicleYear
-                        ? `Год: ${user.vehicleYear}`
-                        : null,
-                    user.vehiclePhoto
-                        ? "Фото автомобиля: загружено"
-                        : "Фото автомобиля: отсутствует",
-                ]
-                    .filter(Boolean)
-                    .join("\n"),
-
-                buttonText: "Открыть пользователей",
-                buttonUrl: adminUsersUrl(),
-            });
-
-            return res.json({
-                success: true,
-                message: "Данные автомобиля отправлены на проверку",
-                vehicle: {
-                    vehicleBrand: user.vehicleBrand,
-                    vehicleModel: user.vehicleModel,
-                    vehicleColor: user.vehicleColor,
-                    vehiclePlate: user.vehiclePlate,
-                    vehicleYear: user.vehicleYear,
-                    vehiclePhoto: user.vehiclePhoto,
-                    vehicleVerificationStatus:
-                    user.vehicleVerificationStatus,
-                    vehicleVerificationNote:
-                    user.vehicleVerificationNote,
-                },
-            });
-        } catch (error) {
-            console.error(
-                "Ошибка сохранения автомобиля:",
-                error
-            );
-
-            return res.status(500).json({
-                success: false,
-                message: "Не удалось сохранить данные автомобиля",
-            });
-        }
-    });
-
-router.post("/vehicle/photo", authenticateToken, (req, res, next) => {
-        vehiclePhotoUpload(req, res, (error) => {
-            if (!error) {
-                return next();
-            }
-
-            if (
-                error instanceof multer.MulterError &&
-                error.code === "LIMIT_FILE_SIZE"
-            ) {
-                return res.status(413).json({
-                    success: false,
-                    message:
-                        "Фото автомобиля должно быть не больше 5 МБ",
-                });
-            }
-
+        if (!brand) {
             return res.status(400).json({
                 success: false,
-                message:
-                    "Не удалось загрузить фотографию автомобиля",
+                message: "Укажите марку автомобиля",
             });
+        }
+
+        if (!model) {
+            return res.status(400).json({
+                success: false,
+                message: "Укажите модель автомобиля",
+            });
+        }
+
+        if (!color) {
+            return res.status(400).json({
+                success: false,
+                message: "Укажите цвет автомобиля",
+            });
+        }
+
+        if (!plate) {
+            return res.status(400).json({
+                success: false,
+                message: "Укажите государственный номер автомобиля",
+            });
+        }
+
+        let normalizedYear = null;
+
+        if (yearRaw) {
+            normalizedYear = Number(yearRaw);
+
+            const currentYear =
+                new Date().getFullYear();
+
+            if (
+                !Number.isInteger(normalizedYear) ||
+                normalizedYear < 1950 ||
+                normalizedYear > currentYear + 1
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Укажите корректный год автомобиля",
+                });
+            }
+        }
+
+        const user = await User.findByPk(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "Пользователь не найден",
+            });
+        }
+
+        user.vehicleBrand = brand;
+        user.vehicleModel = model;
+        user.vehicleColor = color;
+        user.vehiclePlate = plate;
+        user.vehicleYear = normalizedYear;
+
+        /*
+         * Любое изменение данных автомобиля
+         * требует новой проверки администратором.
+         */
+        user.vehicleVerificationStatus = "pending";
+        user.vehicleVerificationNote = null;
+
+        await user.save();
+
+        void sendAdminNotification({
+            topic: "vehicles",
+
+            title: "🚗 Автомобиль отправлен на проверку",
+
+            message: [
+                `Пользователь ID: ${user.id}`,
+                user.username
+                    ? `Имя: ${user.username}`
+                    : null,
+                user.phone
+                    ? `Телефон: ${user.phone}`
+                    : null,
+                "",
+                `Автомобиль: ${user.vehicleBrand} ${user.vehicleModel}`,
+                `Цвет: ${user.vehicleColor}`,
+                `Госномер: ${user.vehiclePlate}`,
+                user.vehicleYear
+                    ? `Год: ${user.vehicleYear}`
+                    : null,
+                user.vehiclePhoto
+                    ? "Фото автомобиля: загружено"
+                    : "Фото автомобиля: отсутствует",
+            ]
+                .filter(Boolean)
+                .join("\n"),
+
+            buttonText: "Открыть пользователей",
+            buttonUrl: adminUsersUrl(),
         });
-    }, async (req, res) => {let newFilePath = null;
-        try {
-            const userId = Number(req.user.id);
 
-            if (!req.file) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Выберите фотографию автомобиля",
-                });
-            }
-
-            const format = detectVehiclePhotoFormat(
-                req.file.buffer
-            );
-
-            if (!format) {
-                return res.status(400).json({
-                    success: false,
-                    message:
-                        "Поддерживаются фотографии JPG, PNG и WebP",
-                });
-            }
-
-            const user = await User.findByPk(userId);
-
-            if (!user) {
-                return res.status(404).json({
-                    success: false,
-                    message: "Пользователь не найден",
-                });
-            }
-
-            const fileName =
-                `${userId}-${crypto.randomUUID()}${format.extension}`;
-
-            newFilePath = path.join(
-                vehiclePhotosDir,
-                fileName
-            );
-
-            await fs.promises.writeFile(
-                newFilePath,
-                req.file.buffer,
-                {
-                    flag: "wx",
-                    mode: 0o600,
-                }
-            );
-
-            const publicPath =
-                `/uploads/vehicles/${fileName}`;
-
-            user.vehiclePhoto = publicPath;
-
-            // Новое фото требует повторной проверки.
-            user.vehicleVerificationStatus = "pending";
-            user.vehicleVerificationNote = null;
-
-            await user.save();
-
-            return res.json({
-                success: true,
-                message:
-                    "Фото автомобиля загружено и отправлено на проверку",
+        return res.json({
+            success: true,
+            message: "Данные автомобиля отправлены на проверку",
+            vehicle: {
+                vehicleBrand: user.vehicleBrand,
+                vehicleModel: user.vehicleModel,
+                vehicleColor: user.vehicleColor,
+                vehiclePlate: user.vehiclePlate,
+                vehicleYear: user.vehicleYear,
                 vehiclePhoto: user.vehiclePhoto,
                 vehicleVerificationStatus:
                 user.vehicleVerificationStatus,
-            });
+                vehicleVerificationNote:
+                user.vehicleVerificationNote,
+            },
+        });
+    } catch (error) {
+        console.error(
+            "Ошибка сохранения автомобиля:",
+            error
+        );
 
-        } catch (error) {
-            if (newFilePath) {
-                try {
-                    await fs.promises.rm(
-                        newFilePath,
-                        { force: true }
-                    );
-                } catch (cleanupError) {
-                    console.error(
-                        "Ошибка очистки фотографии:",
-                        cleanupError
-                    );
-                }
-            }
+        return res.status(500).json({
+            success: false,
+            message: "Не удалось сохранить данные автомобиля",
+        });
+    }
+});
 
-            console.error(
-                "Ошибка загрузки фото автомобиля:",
-                error
-            );
+router.post("/vehicle/photo", authenticateToken, (req, res, next) => {
+    vehiclePhotoUpload(req, res, (error) => {
+        if (!error) {
+            return next();
+        }
 
-            return res.status(500).json({
+        if (
+            error instanceof multer.MulterError &&
+            error.code === "LIMIT_FILE_SIZE"
+        ) {
+            return res.status(413).json({
                 success: false,
                 message:
-                    "Не удалось сохранить фотографию автомобиля",
+                    "Фото автомобиля должно быть не больше 5 МБ",
             });
         }
+
+        return res.status(400).json({
+            success: false,
+            message:
+                "Не удалось загрузить фотографию автомобиля",
+        });
     });
+}, async (req, res) => {
+    let newFilePath = null;
+    try {
+        const userId = Number(req.user.id);
+
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: "Выберите фотографию автомобиля",
+            });
+        }
+
+        const format = detectVehiclePhotoFormat(
+            req.file.buffer
+        );
+
+        if (!format) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Поддерживаются фотографии JPG, PNG и WebP",
+            });
+        }
+
+        const user = await User.findByPk(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "Пользователь не найден",
+            });
+        }
+
+        const fileName =
+            `${userId}-${crypto.randomUUID()}${format.extension}`;
+
+        newFilePath = path.join(
+            vehiclePhotosDir,
+            fileName
+        );
+
+        await fs.promises.writeFile(
+            newFilePath,
+            req.file.buffer,
+            {
+                flag: "wx",
+                mode: 0o600,
+            }
+        );
+
+        const publicPath =
+            `/uploads/vehicles/${fileName}`;
+
+        user.vehiclePhoto = publicPath;
+
+        // Новое фото требует повторной проверки.
+        user.vehicleVerificationStatus = "pending";
+        user.vehicleVerificationNote = null;
+
+        await user.save();
+
+        return res.json({
+            success: true,
+            message:
+                "Фото автомобиля загружено и отправлено на проверку",
+            vehiclePhoto: user.vehiclePhoto,
+            vehicleVerificationStatus:
+            user.vehicleVerificationStatus,
+        });
+
+    } catch (error) {
+        if (newFilePath) {
+            try {
+                await fs.promises.rm(
+                    newFilePath,
+                    {force: true}
+                );
+            } catch (cleanupError) {
+                console.error(
+                    "Ошибка очистки фотографии:",
+                    cleanupError
+                );
+            }
+        }
+
+        console.error(
+            "Ошибка загрузки фото автомобиля:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message:
+                "Не удалось сохранить фотографию автомобиля",
+        });
+    }
+});
 
 module.exports = router;

@@ -1,0 +1,146 @@
+
+.cc-signing {
+    width: 100%;
+    min-width: 0;
+    margin-top: 12px;
+    border: 1px solid #dbeafe;
+    border-radius: 14px;
+    background: #fff;
+    overflow: hidden;
+}
+
+.cc-signing * {
+    box-sizing: border-box;
+}
+
+.cc-signing-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 13px;
+    gap: 12px;
+    border: none;
+    background: #f8fbff;
+    color: #0f172a;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.cc-signing-toggle > span:first-child {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+
+.cc-signing-toggle strong {
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.cc-signing-toggle small {
+    font-size: 11px;
+    color: #64748b;
+}
+
+.cc-signing-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    padding: 13px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.cc-signing-note,
+.cc-signing-error,
+.cc-signing-success {
+    margin: 0;
+    padding: 11px;
+    border-radius: 11px;
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.cc-signing-note {
+    color: #475569;
+    background: #f8fafc;
+}
+
+.cc-signing-error {
+    color: #b91c1c;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+}
+
+.cc-signing-success {
+    color: #15803d;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+}
+
+.cc-signing-consent {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #334155;
+}
+
+.cc-signing-consent input {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    accent-color: #2563eb;
+}
+
+.cc-signing-code-label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 750;
+    color: #334155;
+}
+
+.cc-signing-code-label input {
+    width: 100%;
+    min-height: 45px;
+    padding: 10px 13px;
+    border: 1px solid #bfdbfe;
+    border-radius: 11px;
+    font: inherit;
+    font-size: 18px;
+    letter-spacing: 0.18em;
+    color: #0f172a;
+}
+
+.cc-signing-content button:not(.cc-signing-refresh) {
+    min-height: 44px;
+    border: 1px solid #2563eb;
+    border-radius: 12px;
+    background: #2563eb;
+    color: #fff;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.cc-signing-content button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.cc-signing-refresh {
+    padding: 9px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: white;
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}

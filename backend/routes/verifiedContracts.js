@@ -141,6 +141,7 @@ router.post("/assignments/summary", authenticateToken, async (req, res) => {
                         "version",
                         "status",
                         "documentNumber",
+                        "documentHash",
                         "createdAt",
                         "finalizedAt",
                         "fullySignedAt",

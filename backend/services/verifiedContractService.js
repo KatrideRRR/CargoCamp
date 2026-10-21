@@ -297,7 +297,7 @@ async function createVerifiedAssignmentIfEligible(order) {
                                 templateCode:
                                     "verified_assignment_default",
 
-                                templateVersion: "1",
+                                templateVersion: "2",
 
                                 storageKey,
                                 documentHash,

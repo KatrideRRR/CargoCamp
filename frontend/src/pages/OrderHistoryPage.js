@@ -984,6 +984,7 @@ const OrderHistoryPage = () => {
                                         {!isExpress && (
                                             <VerifiedAssignmentCard
                                                 assignment={verifiedAssignment}
+                                                onSigned={refreshAssignments}
                                             />
                                         )}
 

@@ -2,6 +2,7 @@ import React, {useState,} from "react";
 import {downloadVerifiedContract,} from "../utils/downloadVerifiedContract";
 import "../styles/VerifiedAssignmentCard.css";
 import SignatureAgreementPanel from "./SignatureAgreementPanel";
+import ContractSigningPanel from "./ContractSigningPanel";
 
 function formatDate(value) {
     if (!value) return "—";
@@ -39,6 +40,16 @@ function getDocumentStatus(contract) {
         };
     }
 
+    if (contract.status === "partially_signed") {
+        return {
+            label: "Одна подпись",
+            className: "pending",
+            description:
+                "Одна сторона подписала договор. " +
+                "Ожидается подтверждение второй стороны.",
+        };
+    }
+
     if (contract.status === "draft") {
         return {
             label: "Проект",
@@ -62,6 +73,7 @@ function getDocumentStatus(contract) {
 
 export default function VerifiedAssignmentCard({
                                                    assignment,
+                                                   onSigned,
                                                }) {
     const [downloading, setDownloading] =
         useState(false);
@@ -199,11 +211,22 @@ export default function VerifiedAssignmentCard({
 
                 {downloading
                     ? "Скачиваем..."
-                    : "Скачать проект договора (PDF)"}
+                    : status.className === "signed"
+                        ? "Скачать договор (PDF)"
+                        : "Скачать проект договора (PDF)"}
             </button>
 
-            {assignment.status === "draft" && (
-                <SignatureAgreementPanel />
+            {["draft", "partially_signed"].includes(
+                assignment.status
+            ) && (
+                <>
+                    <SignatureAgreementPanel />
+
+                    <ContractSigningPanel
+                        assignment={assignment}
+                        onSigned={onSigned}
+                    />
+                </>
             )}
 
             <div className="cc-va-footnote">

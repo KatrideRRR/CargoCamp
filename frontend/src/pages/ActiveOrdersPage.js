@@ -1981,6 +1981,7 @@ const ActiveOrdersPage = () => {
 
                                                         <VerifiedAssignmentCard
                                                             assignment={verifiedAssignment}
+                                                            onSigned={refreshAssignments}
                                                         />
 
                                                         <div className="photo-protocol-section">
