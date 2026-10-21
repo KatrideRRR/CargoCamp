@@ -1,14 +1,7 @@
-
-import React, {
-    useState,
-} from "react";
-
-import {
-    downloadVerifiedContract,
-} from "../utils/downloadVerifiedContract";
-
+import React, {useState,} from "react";
+import {downloadVerifiedContract,} from "../utils/downloadVerifiedContract";
 import "../styles/VerifiedAssignmentCard.css";
-
+import SignatureAgreementPanel from "./SignatureAgreementPanel";
 
 function formatDate(value) {
     if (!value) return "—";
@@ -208,6 +201,10 @@ export default function VerifiedAssignmentCard({
                     ? "Скачиваем..."
                     : "Скачать проект договора (PDF)"}
             </button>
+
+            {assignment.status === "draft" && (
+                <SignatureAgreementPanel />
+            )}
 
             <div className="cc-va-footnote">
                 Документ хранится отдельно от обычного
