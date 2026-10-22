@@ -22,6 +22,7 @@ db.sequelize = sequelize;
 db.User = require("./User")(sequelize, DataTypes);
 db.AuthSession = require("./AuthSession")(sequelize, DataTypes);
 db.Order = require("./Order")(sequelize, DataTypes);
+db.OrderSafeDeal = require("./OrderSafeDeal")(sequelize, DataTypes);
 db.Message = require("./Message")(sequelize, DataTypes);
 db.Category = require("./Category")(sequelize, DataTypes);
 db.Subcategory = require("./Subcategory")(sequelize, DataTypes);

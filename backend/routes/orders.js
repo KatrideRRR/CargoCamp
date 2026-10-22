@@ -21,7 +21,7 @@ const uploadCustomerAfter = buildOrderPhotoUploader("customer_after");
 const { sendNotifications } = require("../socket");
 const { calculateRecommendedPrice } = require("../services/recommendedPriceService");
 const { collectOrderPhotoAnnex,} = require("../services/orderPhotoAnnexService");
-const {getGuaranteeEligibility,} = require("../services/guaranteeEligibilityService");
+const {getGuaranteeEligibility, hasVerifiedIdentity,} = require("../services/guaranteeEligibilityService");
 
 const {uploadsRoot, ordersRoot, tempRoot, contractsRoot, ensureDirectory,} = require("../config/storagePaths");
 const uploadDocumentRoot = path.resolve(__dirname, "..", "upload-document");

@@ -10,6 +10,9 @@ const { sendOrderPush } = require("../utils/orderPushService");
 const {sendAdminNotification, adminUsersUrl, adminOrderUrl} = require("../services/adminNotificationService");
 const {sendBusinessCashPayment, sendBusinessCashRefund,} = require("../services/businessCashService");
 const {getGuaranteeEligibility,} = require("../services/guaranteeEligibilityService");
+const {OrderSafeDeal,} = require("../models");
+const {getDeal, getPayment,} = require("../services/yooSafeDealClient");
+const {verifySafeDealFunding,} = require("../services/safeDealFundingVerifier");
 
 function notifyPaymentProblem({provider, type, title, message, userId = null, orderId = null,}) {
     const buttonUrl =
@@ -863,6 +866,147 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
         });
     }
 });
+
+router.get("/guarantee/status/:orderId", authenticateToken, async (req, res) => {
+        try {
+            const orderId =
+                Number(req.params.orderId);
+
+            const userId =
+                Number(req.user.id);
+
+            if (
+                !Number.isSafeInteger(orderId) ||
+                orderId <= 0
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Некорректный заказ",
+                });
+            }
+
+            const order =
+                await Order.findByPk(orderId);
+
+            if (
+                !order ||
+                (
+                    Number(order.creatorId) !== userId &&
+                    Number(order.executorId) !== userId
+                )
+            ) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Заказ не найден",
+                });
+            }
+
+            res.setHeader(
+                "Cache-Control",
+                "no-store"
+            );
+
+            if (
+                order.paymentType !== "guarantee"
+            ) {
+                return res.json({
+                    success: true,
+                    paymentType: order.paymentType,
+                    funded: false,
+                    status: "not_applicable",
+                });
+            }
+
+            const record =
+                await OrderSafeDeal.findOne({
+                    where: { orderId },
+                });
+
+            if (!record) {
+                return res.json({
+                    success: true,
+                    funded: false,
+                    status: "not_started",
+                });
+            }
+
+            /*
+             * До создания настоящего Safe Deal
+             * не делаем никаких предположений
+             * о наличии денег.
+             */
+            if (
+                !record.providerDealId ||
+                !record.providerPaymentId
+            ) {
+                return res.json({
+                    success: true,
+                    funded: false,
+                    status: record.status,
+                });
+            }
+
+            /*
+             * Пока sandbox выключен,
+             * не опрашиваем боевого провайдера.
+             */
+            if (
+                process.env.CARGOCAMP_SAFE_DEAL_MODE !==
+                "sandbox"
+            ) {
+                return res.json({
+                    success: true,
+                    funded: false,
+                    status: "verification_unavailable",
+                });
+            }
+
+            const [providerDeal, payment] =
+                await Promise.all([
+                    getDeal(record.providerDealId),
+                    getPayment(record.providerPaymentId),
+                ]);
+
+            const verification =
+                verifySafeDealFunding({
+                    localDeal: record,
+                    providerDeal,
+                    payment,
+                });
+
+            return res.json({
+                success: true,
+
+                funded: verification.funded,
+
+                status: verification.funded
+                    ? "funded"
+                    : "not_confirmed",
+
+                confirmedAmountKopecks:
+                verification.confirmedAmountKopecks,
+
+                expiresAt:
+                verification.expiresAt,
+
+                checkedAt:
+                    new Date().toISOString(),
+            });
+
+        } catch (error) {
+            console.error(
+                "Safe Deal status error:",
+                error.message
+            );
+
+            return res.status(502).json({
+                success: false,
+                funded: false,
+                message:
+                    "Не удалось проверить обеспечение заказа",
+            });
+        }
+    });
 
 router.get("/guarantee/capabilities", authenticateToken, async (req, res) => {
         try {
