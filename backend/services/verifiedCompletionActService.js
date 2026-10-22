@@ -4,6 +4,10 @@ const path = require("path");
 const crypto = require("crypto");
 
 const {
+    collectOrderPhotoAnnex,
+} = require("./orderPhotoAnnexService");
+
+const {
     sequelize,
     Contract,
     ContractEvent,
@@ -205,9 +209,19 @@ async function createVerifiedCompletionActIfEligible(order) {
         assignment
     );
 
+    const photoAnnex =
+        await collectOrderPhotoAnnex(
+            order,
+            "completion"
+        );
+
+    snapshot.photoManifest =
+        photoAnnex.manifest;
+
     const pdfBuffer =
         await generateVerifiedCompletionActPDF(
-            snapshot
+            snapshot,
+            photoAnnex
         );
 
     if (
@@ -277,7 +291,7 @@ async function createVerifiedCompletionActIfEligible(order) {
                         templateCode:
                             "verified_completion_act_default",
 
-                        templateVersion: "1",
+                        templateVersion: "3",
 
                         storageKey,
                         documentHash,

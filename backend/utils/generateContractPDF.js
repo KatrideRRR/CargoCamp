@@ -1,12 +1,29 @@
 const fs = require("fs");
 const path = require("path");
 const puppeteer = require("puppeteer");
+const renderPhotoAnnex = require("./renderPhotoAnnex");
 
-/**
- * Генерация HTML-договора
- */
+function escapeHtml(value) {
+    return String(value ?? "—")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 function generateHTML(data) {
+
     return `
+
+${escapeHtml(data.description)}
+${escapeHtml(data.address)}
+${escapeHtml(data.customerName)}
+${escapeHtml(data.performerName)}
+${escapeHtml(data.category)}
+${escapeHtml(data.subcategory)}
+${escapeHtml(data.paymentType)}
+
     <html lang="ru">
     <head>
       <meta charset="UTF-8" />
@@ -113,14 +130,12 @@ function generateHTML(data) {
           `
             : ""
     }
+      ${renderPhotoAnnex(data.photoAnnex)}
     </body>
     </html>
   `;
 }
 
-/**
- * Генерация PDF-договора
- */
 async function generateContractPDF(data, savePath) {
     let browser;
 

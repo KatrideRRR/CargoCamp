@@ -564,6 +564,8 @@ router.post("/:actId/remediation/review", async (req, res) => {
                         initialState.decisionEvent
                             .metadata.comment,
 
+                        order: ctxBefore.order,
+
                         correctionEvent:
                         initialState.lastEvent,
 
@@ -683,7 +685,7 @@ router.post("/:actId/remediation/review", async (req, res) => {
                                     templateCode:
                                         "verified_completion_act_default",
 
-                                    templateVersion: "2",
+                                    templateVersion: "3",
 
                                     storageKey:
                                     prepared.storageKey,

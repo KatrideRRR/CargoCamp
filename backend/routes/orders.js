@@ -20,6 +20,7 @@ const uploadCustomerBefore = buildOrderPhotoUploader("customer_before");
 const uploadCustomerAfter = buildOrderPhotoUploader("customer_after");
 const { sendNotifications } = require("../socket");
 const { calculateRecommendedPrice } = require("../services/recommendedPriceService");
+const { collectOrderPhotoAnnex,} = require("../services/orderPhotoAnnexService");
 
 const {uploadsRoot, ordersRoot, tempRoot, contractsRoot, ensureDirectory,} = require("../config/storagePaths");
 const uploadDocumentRoot = path.resolve(__dirname, "..", "upload-document");
@@ -91,11 +92,7 @@ function buildOrderPhotoUploader(type) {
 
 }
 
-const geocoder = NodeGeocoder({
-    provider: 'yandex',
-    apiKey: process.env.YANDEX_API_KEY,
-    lang: 'ru-RU'
-});
+const geocoder = NodeGeocoder({provider: 'yandex', apiKey: process.env.YANDEX_API_KEY, lang: 'ru-RU'});
 
 function safeJsonArray(value) {
     if (!value) return [];
@@ -2570,8 +2567,17 @@ module.exports = (io) => {
                 );
 
             try {
+                const photoAnnex =
+                    await collectOrderPhotoAnnex(
+                        fullOrder,
+                        "assignment"
+                    );
+
                 await generateContractPDF(
-                    contractData,
+                    {
+                        ...contractData,
+                        photoAnnex,
+                    },
                     filePath
                 );
 
@@ -3143,8 +3149,17 @@ module.exports = (io) => {
                             contractFileName
                         );
 
+                    const photoAnnex =
+                        await collectOrderPhotoAnnex(
+                            fullOrder,
+                            "completion"
+                        );
+
                     await generateContractPDF(
-                        data,
+                        {
+                            ...data,
+                            photoAnnex,
+                        },
                         physicalContractPath
                     );
 

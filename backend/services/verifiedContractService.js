@@ -1,9 +1,11 @@
-
 const fs = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
 
-const { Op } = require("sequelize");
+const {
+    collectOrderPhotoAnnex,
+} = require("./orderPhotoAnnexService");
+const {Op} = require("sequelize");
 
 const {
     sequelize,
@@ -39,7 +41,7 @@ async function findActiveVerification(userId, now) {
             },
 
             [Op.or]: [
-                { expiresAt: null },
+                {expiresAt: null},
                 {
                     expiresAt: {
                         [Op.gt]: now,
@@ -220,6 +222,15 @@ async function createVerifiedAssignmentIfEligible(order) {
         now
     );
 
+    const photoAnnex =
+        await collectOrderPhotoAnnex(
+            order,
+            "assignment"
+        );
+
+    snapshot.photoManifest =
+        photoAnnex.manifest;
+
     await fs.mkdir(verifiedRoot, {
         recursive: true,
         mode: 0o700,
@@ -246,7 +257,8 @@ async function createVerifiedAssignmentIfEligible(order) {
     try {
         const pdfBuffer =
             await generateVerifiedAssignmentPDF(
-                snapshot
+                snapshot,
+                photoAnnex
             );
 
         if (
@@ -297,7 +309,7 @@ async function createVerifiedAssignmentIfEligible(order) {
                                 templateCode:
                                     "verified_assignment_default",
 
-                                templateVersion: "2",
+                                templateVersion: "3",
 
                                 storageKey,
                                 documentHash,
@@ -312,7 +324,7 @@ async function createVerifiedAssignmentIfEligible(order) {
                                         "not_signed",
                                 },
                             },
-                            { transaction }
+                            {transaction}
                         );
 
                     await ContractEvent.create(
@@ -343,7 +355,7 @@ async function createVerifiedAssignmentIfEligible(order) {
                                     ),
                             },
                         },
-                        { transaction }
+                        {transaction}
                     );
 
                     return created;

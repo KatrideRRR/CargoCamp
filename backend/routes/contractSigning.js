@@ -277,7 +277,11 @@ async function prerequisites(ctx, userId, transaction) {
 
 function requireUnsigned(contract) {
 
-    if (String(contract.templateVersion) !== "2") {
+    if (
+        !["2", "3"].includes(
+            String(contract.templateVersion)
+        )
+    ) {
         throw fail(
             409,
             "Для этого договора требуется новая версия документа"
@@ -398,7 +402,9 @@ router.get("/:contractId/status", async (req, res) => {
                 accepted &&
                 identitiesValid &&
                 Boolean(phone) &&
-                String(ctx.contract.templateVersion) === "2" &&
+                ["2", "3"].includes(
+                    String(ctx.contract.templateVersion)
+                ) &&
                 ["draft", "partially_signed"].includes(
                     ctx.contract.status
                 ) &&

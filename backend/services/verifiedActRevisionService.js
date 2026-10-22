@@ -2,6 +2,9 @@
 const fs = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
+const {
+    collectOrderPhotoAnnex,
+} = require("./orderPhotoAnnexService");
 
 const {
     contractsRoot,
@@ -16,6 +19,7 @@ const verifiedRoot = path.join(
 );
 
 async function prepareVerifiedActV2({
+                                        order,
                                         originalAct,
                                         originalRemarks,
                                         correctionEvent,
@@ -61,6 +65,9 @@ async function prepareVerifiedActV2({
         generatedAt:
             reviewedAt.toISOString(),
 
+        photoManifest:
+        photoAnnex.manifest,
+
         remediation: {
             previousActId:
                 String(originalAct.id),
@@ -92,9 +99,16 @@ async function prepareVerifiedActV2({
         },
     };
 
+    const photoAnnex =
+        await collectOrderPhotoAnnex(
+            order,
+            "completion"
+        );
+
     const pdfBuffer =
         await generateVerifiedCompletionActPDF(
-            snapshot
+            snapshot,
+            photoAnnex
         );
 
     if (

@@ -1,6 +1,9 @@
 
 const puppeteer = require("puppeteer");
 
+const renderPhotoAnnex =
+    require("./renderPhotoAnnex");
+
 function escapeHtml(value) {
     return String(value ?? "—")
         .replace(/&/g, "&amp;")
@@ -22,7 +25,7 @@ function formatDate(value) {
         });
 }
 
-function renderHtml(snapshot) {
+function renderHtml(snapshot, photoAnnex) {
     const terms = snapshot.terms;
     const customer = snapshot.customer;
     const executor = snapshot.executor;
@@ -162,6 +165,8 @@ ${row("Способ оплаты", terms.paymentType)}
     определяется по записям CargoCamp.
 </div>
 
+${renderPhotoAnnex(photoAnnex)}
+
 <div class="footer">
     Документ CargoCamp.
     Версия неизменяема после сохранения.
@@ -172,7 +177,16 @@ ${row("Способ оплаты", terms.paymentType)}
 </html>`;
 }
 
-async function generateVerifiedAssignmentPDF(snapshot) {
+async function generateVerifiedAssignmentPDF(
+    snapshot,
+    photoAnnex = null
+) {
+
+    await page.setContent(
+        renderHtml(snapshot, photoAnnex),
+        { waitUntil: "load" }
+    );
+
     let browser;
 
     try {

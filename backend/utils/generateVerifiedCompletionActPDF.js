@@ -1,6 +1,9 @@
 
 const puppeteer = require("puppeteer");
 
+const renderPhotoAnnex =
+    require("./renderPhotoAnnex");
+
 function escapeHtml(value) {
     return String(value ?? "—")
         .replace(/&/g, "&amp;")
@@ -29,7 +32,7 @@ function formatDate(value) {
     });
 }
 
-function renderHtml(data) {
+function renderHtml(data, photoAnnex) {
     const row = (label, value) => `
         <div class="row">
             <strong>${escapeHtml(label)}</strong>
@@ -208,6 +211,8 @@ ${row(
     самостоятельной процедурой.
 </div>
 
+${renderPhotoAnnex(photoAnnex)}
+
 <div class="footer">
     Сформировано системой CargoCamp.
     После сохранения PDF не изменяется.
@@ -218,7 +223,10 @@ ${row(
 </html>`;
 }
 
-async function generateVerifiedCompletionActPDF(data) {
+async function generateVerifiedCompletionActPDF(
+    data,
+    photoAnnex = null
+) {
     let browser;
 
     try {
@@ -234,7 +242,7 @@ async function generateVerifiedCompletionActPDF(data) {
         const page = await browser.newPage();
 
         await page.setContent(
-            renderHtml(data),
+            renderHtml(data, photoAnnex),
             { waitUntil: "load" }
         );
 
