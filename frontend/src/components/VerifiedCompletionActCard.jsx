@@ -1,11 +1,7 @@
-
-import React, { useState } from "react";
-
-import {
-    downloadVerifiedContract,
-} from "../utils/downloadVerifiedContract";
-
+import React, {useState} from "react";
+import {downloadVerifiedContract,} from "../utils/downloadVerifiedContract";
 import "../styles/VerifiedAssignmentCard.css";
+import ActAcceptancePanel from "./ActAcceptancePanel";
 
 function formatDate(value) {
     if (!value) return "—";
@@ -151,10 +147,13 @@ export default function VerifiedCompletionActCard({
                     : "Скачать акт (PDF)"}
             </button>
 
+            <ActAcceptancePanel act={act} />
+
             <p className="cc-va-footnote">
-                Отдельное подписание акта будет
-                доступно после внедрения процедуры
-                приёмки и фиксации возражений.
+                Решение о приёмке фиксируется отдельно
+                от подписания акта. PDF остаётся
+                неизменным. Электронное подписание
+                акта пока недоступно.
             </p>
         </section>
     );

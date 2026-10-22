@@ -60,6 +60,7 @@ const adminIdentityRoutes = require("./routes/adminIdentity");
 const verifiedContractsRoutes = require("./routes/verifiedContracts");
 const signatureAgreementRoutes = require("./routes/signatureAgreement");
 const contractSigningRoutes = require("./routes/contractSigning");
+const actAcceptanceRoutes = require("./routes/actAcceptance");
 
 const db = require("./models");
 const sequelize = require("./config/database");
@@ -252,6 +253,7 @@ console.log(
     contractsRoot
 );
 
+app.use("/api/contracts/acts", actAcceptanceRoutes);
 app.use("/api/contracts/signing", contractSigningRoutes);
 app.use("/api/contracts/e-sign", signatureAgreementRoutes);
 app.use("/api/contracts", verifiedContractsRoutes);

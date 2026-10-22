@@ -1,0 +1,196 @@
+
+.cc-act-acceptance {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+    margin-top: 14px;
+    padding: 14px;
+    box-sizing: border-box;
+    background: #ffffff;
+    border: 1px solid #dbeafe;
+    border-radius: 14px;
+}
+
+.cc-act-acceptance * {
+    box-sizing: border-box;
+}
+
+.cc-act-acceptance h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 850;
+    color: #0f172a;
+}
+
+.cc-act-acceptance p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+.cc-act-acceptance form {
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+}
+
+.cc-act-acceptance-note {
+    padding: 11px;
+    border-radius: 10px;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 12px;
+}
+
+.cc-act-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cc-act-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 11px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.cc-act-option:has(input:checked) {
+    background: #eff6ff;
+    border-color: #93c5fd;
+}
+
+.cc-act-option input,
+.cc-act-confirm input {
+    flex-shrink: 0;
+    width: 17px;
+    height: 17px;
+    margin-top: 2px;
+    accent-color: #2563eb;
+}
+
+.cc-act-option span,
+.cc-act-confirm span {
+    min-width: 0;
+    color: #334155;
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.cc-act-comment {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.cc-act-comment span {
+    color: #334155;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.cc-act-comment textarea {
+    width: 100%;
+    min-height: 105px;
+    padding: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 11px;
+    background: white;
+    color: #0f172a;
+    font: inherit;
+    font-size: 13px;
+    resize: vertical;
+}
+
+.cc-act-comment textarea:focus {
+    outline: 2px solid #93c5fd;
+    outline-offset: 1px;
+}
+
+.cc-act-comment small {
+    align-self: flex-end;
+    color: #94a3b8;
+    font-size: 11px;
+}
+
+.cc-act-confirm {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.cc-act-acceptance button[type="submit"] {
+    min-height: 44px;
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #2563eb;
+    border-radius: 11px;
+    background: #2563eb;
+    color: white;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.cc-act-acceptance button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.cc-act-acceptance-error,
+.cc-act-acceptance-success {
+    padding: 11px;
+    border-radius: 10px;
+    font-size: 12px;
+}
+
+.cc-act-acceptance-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+}
+
+.cc-act-acceptance-success {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #15803d;
+}
+
+.cc-act-acceptance-result {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 13px;
+    border: 1px solid #bfdbfe;
+    border-radius: 12px;
+    background: #eff6ff;
+}
+
+.cc-act-acceptance-result strong {
+    font-size: 13px;
+    color: #1e40af;
+}
+
+.cc-act-acceptance-result p {
+    font-size: 12px;
+    color: #334155;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.cc-act-acceptance-result small {
+    font-size: 11px;
+    color: #64748b;
+}
+
+@media (max-width: 480px) {
+    .cc-act-acceptance {
+        padding: 11px;
+    }
+}
