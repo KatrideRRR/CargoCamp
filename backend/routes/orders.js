@@ -21,6 +21,7 @@ const uploadCustomerAfter = buildOrderPhotoUploader("customer_after");
 const { sendNotifications } = require("../socket");
 const { calculateRecommendedPrice } = require("../services/recommendedPriceService");
 const { collectOrderPhotoAnnex,} = require("../services/orderPhotoAnnexService");
+const {getGuaranteeEligibility,} = require("../services/guaranteeEligibilityService");
 
 const {uploadsRoot, ordersRoot, tempRoot, contractsRoot, ensureDirectory,} = require("../config/storagePaths");
 const uploadDocumentRoot = path.resolve(__dirname, "..", "upload-document");
@@ -1301,6 +1302,29 @@ module.exports = (io) => {
                 return res.status(400).json({ message: "Некорректный paymentType" });
             }
 
+            if (paymentType === "guarantee") {
+                const eligibility =
+                    await getGuaranteeEligibility(userId);
+
+                if (!eligibility.verified) {
+                    return res.status(403).json({
+                        message:
+                            "Гарантийная сделка доступна " +
+                            "только после подтверждения личности.",
+                    });
+                }
+
+                if (!eligibility.operational) {
+                    return res.status(503).json({
+                        message:
+                            "Гарантийная оплата ещё подключается. " +
+                            "Пока выберите оплату напрямую исполнителю.",
+                    });
+                }
+            }
+
+
+
             if (!coordinatesStr || !latlng) {
                 return res.status(400).json({
                     message: "Координаты заказа обязательны. Выберите адрес из подсказки, по GPS или на карте.",
@@ -2341,6 +2365,21 @@ module.exports = (io) => {
                 return res.status(409).json({
                     message: "Этот исполнитель уже занят другим заказом",
                 });
+            }
+
+            if (order.paymentType === "guarantee") {
+                const verifiedExecutor =
+                    await hasVerifiedIdentity(
+                        normalizedExecutorId
+                    );
+
+                if (!verifiedExecutor) {
+                    return res.status(403).json({
+                        message:
+                            "Для гарантийной сделки исполнитель " +
+                            "должен подтвердить личность.",
+                    });
+                }
             }
 
             // Назначаем исполнителя

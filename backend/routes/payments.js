@@ -9,6 +9,7 @@ const yooKassa = require('../config/yookassaClient');
 const { sendOrderPush } = require("../utils/orderPushService");
 const {sendAdminNotification, adminUsersUrl, adminOrderUrl} = require("../services/adminNotificationService");
 const {sendBusinessCashPayment, sendBusinessCashRefund,} = require("../services/businessCashService");
+const {getGuaranteeEligibility,} = require("../services/guaranteeEligibilityService");
 
 function notifyPaymentProblem({provider, type, title, message, userId = null, orderId = null,}) {
     const buttonUrl =
@@ -863,7 +864,48 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
     }
 });
 
+router.get("/guarantee/capabilities", authenticateToken, async (req, res) => {
+        try {
+            const eligibility =
+                await getGuaranteeEligibility(
+                    req.user.id
+                );
+
+            res.setHeader(
+                "Cache-Control",
+                "private, no-store"
+            );
+
+            return res.json({
+                success: true,
+                ...eligibility,
+            });
+
+        } catch (error) {
+            console.error(
+                "Guarantee capability error:",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                available: false,
+                message:
+                    "Не удалось проверить доступность гарантии",
+            });
+        }
+    });
+
 router.post('/guarantee/create', authenticateToken, async (req, res) => {
+
+    return res.status(503).json({
+        success: false,
+        code: "LEGACY_GUARANTEE_DISABLED",
+        error:
+            "Старый механизм холдирования отключён. " +
+            "Ожидается интеграция YooKassa Safe Deal.",
+    });
+
     try {
         const userId = req.user.id;
         const { orderId } = req.body;

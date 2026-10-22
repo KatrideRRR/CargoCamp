@@ -1,16 +1,16 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {useEffect, useMemo, useRef, useState} from "react";
 import axios from "axios";
 import DatePicker from "react-datepicker";
-import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrentLocation";
+import {getCurrentLocation, getLocationErrorMessage} from "../utils/getCurrentLocation";
 import "react-datepicker/dist/react-datepicker.css";
-import { useNavigate } from "react-router-dom";
+import {useNavigate} from "react-router-dom";
 import "../styles/CreateOrderPage.css";
 import imageCompression from "browser-image-compression";
-import PromotionOptions, { PROMOTION_PRICES } from "../components/PromotionOptions";
+import PromotionOptions, {PROMOTION_PRICES} from "../components/PromotionOptions";
 import YandexMapModal from "../components/YandexMapModal";
 import PaymentProviderSelect from "../components/PaymentProviderSelect";
-import DynamicServiceFields, { isDynamicFieldVisible } from "../components/DynamicServiceFields";
-import { calculateRecommendedPrice } from "../utils/calculateRecommendedPrice";
+import DynamicServiceFields, {isDynamicFieldVisible} from "../components/DynamicServiceFields";
+import {calculateRecommendedPrice} from "../utils/calculateRecommendedPrice";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -117,7 +117,7 @@ function calculateStraightDistanceKm(
     );
 }
 
-async function geocodeAddressYandex({ address, apiKey }) {
+async function geocodeAddressYandex({address, apiKey}) {
     if (!apiKey) throw new Error("No Yandex API key");
 
     const q = String(address || "").trim();
@@ -160,7 +160,7 @@ async function geocodeAddressYandex({ address, apiKey }) {
 }
 
 // reverse geocode через Yandex Geocoder: geocode=lng,lat
-async function reverseGeocodeYandex({ lat, lng, apiKey }) {
+async function reverseGeocodeYandex({lat, lng, apiKey}) {
     if (!apiKey) throw new Error("No Yandex API key");
     const url = `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}&geocode=${lng},${lat}&format=json&results=1&kind=house`;
     const r = await fetch(url);
@@ -217,11 +217,20 @@ function CreateOrderPage() {
     const [addressOpen, setAddressOpen] = useState(false);
     const [timeOpen, setTimeOpen] = useState(false);
 
-    const [promotion, setPromotion] = useState({ highlight: false, recommended: false, push: false });
+    const [promotion, setPromotion] = useState({highlight: false, recommended: false, push: false});
     const [selectedProvider, setSelectedProvider] = useState("yookassa");
 
-    // ✅ один источник правды
-    const [paymentType] = useState("cash"); // всегда наличные (пока не добавим гарантию/рассрочку)
+    const [paymentType, setPaymentType] =
+        useState("cash");
+
+    const [
+        guaranteeEligibility,
+        setGuaranteeEligibility,
+    ] = useState({
+        verified: false,
+        available: false,
+        operational: false,
+    });
 
     // address
     const [profile, setProfile] = useState(null);
@@ -653,6 +662,51 @@ function CreateOrderPage() {
         }));
     }, []);
 
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const checkGuarantee = async () => {
+            const token =
+                localStorage.getItem("authToken");
+
+            if (!token) return;
+
+            try {
+                const response = await axios.get(
+                    `${apiUrl}/api/payments/guarantee/capabilities`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
+                );
+
+                if (!cancelled) {
+                    setGuaranteeEligibility(
+                        response.data
+                    );
+                }
+
+            } catch (error) {
+                if (!cancelled) {
+                    setGuaranteeEligibility({
+                        verified: false,
+                        available: false,
+                        operational: false,
+                    });
+                }
+            }
+        };
+
+        checkGuarantee();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+
     // preload location
     useEffect(() => {
         const token = localStorage.getItem("authToken");
@@ -661,7 +715,7 @@ function CreateOrderPage() {
         (async () => {
             try {
                 const res = await axios.get(`${apiUrl}/api/auth/location/me`, {
-                    headers: { Authorization: `Bearer ${token}` },
+                    headers: {Authorization: `Bearer ${token}`},
                 });
 
                 const loc = res.data?.location;
@@ -674,7 +728,7 @@ function CreateOrderPage() {
                 const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
 
                 if (loc.locationAddress && !looksLikeCoordsString(loc.locationAddress)) {
-                    setFormData((p) => ({ ...p, address: loc.locationAddress }));
+                    setFormData((p) => ({...p, address: loc.locationAddress}));
 
                     if (hasCoords) {
                         setMarkerPosition([lat, lng]);
@@ -690,7 +744,7 @@ function CreateOrderPage() {
                     });
 
                     if (resolved) {
-                        setFormData((p) => ({ ...p, address: resolved.address }));
+                        setFormData((p) => ({...p, address: resolved.address}));
                         setMarkerPosition([resolved.lat, resolved.lng]);
                         setAddrResolving(false);
                         return;
@@ -706,8 +760,8 @@ function CreateOrderPage() {
                     setAddrResolving(true);
                     setAddrResolveError(null);
 
-                    const addr = await reverseGeocodeYandex({ lat, lng, apiKey: YM_KEY });
-                    if (addr) setFormData((p) => ({ ...p, address: addr }));
+                    const addr = await reverseGeocodeYandex({lat, lng, apiKey: YM_KEY});
+                    if (addr) setFormData((p) => ({...p, address: addr}));
                     else setAddrResolveError("Не удалось распознать адрес. Введите вручную или выберите на карте.");
 
                     setAddrResolving(false);
@@ -972,7 +1026,7 @@ function CreateOrderPage() {
     const handleAddressChange = (e) => {
         const address = e.target.value;
 
-        setFormData((p) => ({ ...p, address }));
+        setFormData((p) => ({...p, address}));
         setAddressMode("custom");
 
         // Пользователь начал менять адрес вручную — старые координаты больше нельзя считать точными
@@ -1001,7 +1055,7 @@ function CreateOrderPage() {
                     `&geocode=${encodeURIComponent(q)}` +
                     `&format=json&results=10&kind=house`;
 
-                const r = await fetch(url, { signal: ctrl.signal });
+                const r = await fetch(url, {signal: ctrl.signal});
                 const data = await r.json();
 
                 const suggestions = parseYandexGeocoderSuggestions(data);
@@ -1020,7 +1074,7 @@ function CreateOrderPage() {
 
     const handleAddressSelect = (s) => {
         // s = {label,address,lat,lon}
-        setFormData((p) => ({ ...p, address: s.address }));
+        setFormData((p) => ({...p, address: s.address}));
         setAddressSuggestions([]);
         setAddressMode("custom");
         setMarkerPosition([s.lat, s.lon]);
@@ -1068,7 +1122,7 @@ function CreateOrderPage() {
         const textarea = e.target;
         textarea.style.height = "auto";
         textarea.style.height = `${textarea.scrollHeight}px`;
-        setFormData((p) => ({ ...p, description: textarea.value }));
+        setFormData((p) => ({...p, description: textarea.value}));
     };
 
     useEffect(() => {
@@ -1191,7 +1245,7 @@ function CreateOrderPage() {
 
         try {
             const response = await axios.post(`${apiUrl}/api/orders/`, data, {
-                headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
+                headers: {Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data"},
             });
 
             const orderId = response.data.id;
@@ -1204,7 +1258,7 @@ function CreateOrderPage() {
 
                 const payResp = await axios.post(
                     `${apiUrl}${endpoint}`,
-                    { orderId },
+                    {orderId},
                     {
                         headers: {
                             Authorization: `Bearer ${token}`,
@@ -1307,363 +1361,377 @@ function CreateOrderPage() {
 
             <div className="create-page">
                 <div className="create-shell">
-                {/* Header */}
-                <div className="glass header-card">
-                    <div className="header-top">
-                        <div className="headerTopRow">
-                            <div className="header-titles">
-                                <div className="header-title">Создать заказ</div>
-                                <div className="header-sub">Адрес и время подставятся автоматически</div>
-                            </div>
-
-                            {/* компактный чип времени справа */}
-                            <div className="timeChip" role="group" aria-label="Время выполнения">
-                                <div className="timeChipText">
-                                    <div className="timeChipLabel">Время</div>
-                                    <div className="timeChipValue">{isAsap ? "Срочно" : "Ко времени"}</div>
+                    {/* Header */}
+                    <div className="glass header-card">
+                        <div className="header-top">
+                            <div className="headerTopRow">
+                                <div className="header-titles">
+                                    <div className="header-title">Создать заказ</div>
+                                    <div className="header-sub">Адрес и время подставятся автоматически</div>
                                 </div>
 
-                                <button
-                                    type="button"
-                                    className={`toggle mini ${isAsap ? "on" : ""}`}
-                                    onClick={toggleAsap}
-                                    aria-label="Срочно / ко времени"
-                                    title="Срочно / ко времени"
-                                >
-                                    <span className="toggleKnob" />
-                                </button>
-                            </div>
-                        </div>
-                        {/* ✅ 2 независимые мини-карточки в 2 колонки */}
+                                {/* компактный чип времени справа */}
+                                <div className="timeChip" role="group" aria-label="Время выполнения">
+                                    <div className="timeChipText">
+                                        <div className="timeChipLabel">Время</div>
+                                        <div className="timeChipValue">{isAsap ? "Срочно" : "Ко времени"}</div>
+                                    </div>
 
-                        {/* RIGHT: Time mini card */}
-                        {!isAsap && (
-                            <div className={`miniCard ${timeOpen ? "open" : ""}`}>
-                                {timeOpen && (
-                                    <div className="miniDrop">
-                                        <div className="glass field">
-                                            <div className="label">Ко времени</div>
-                                            <DatePicker
-                                                selected={formData.workTime}
-                                                onChange={(date) => setFormData((p) => ({ ...p, workTime: date }))}
-                                                showTimeSelect
-                                                timeFormat="HH:mm"
-                                                timeIntervals={15}
-                                                dateFormat="Pp"
-                                                placeholderText="Выберите дату и время"
-                                                minDate={new Date()}
-                                                minTime={getMinTime(formData.workTime)}
-                                                maxTime={new Date(0, 0, 0, 23, 59, 59)}
-                                                className="control"
-                                                portalId="date-picker-portal"
-                                            />
+                                    <button
+                                        type="button"
+                                        className={`toggle mini ${isAsap ? "on" : ""}`}
+                                        onClick={toggleAsap}
+                                        aria-label="Срочно / ко времени"
+                                        title="Срочно / ко времени"
+                                    >
+                                        <span className="toggleKnob"/>
+                                    </button>
+                                </div>
+                            </div>
+                            {/* ✅ 2 независимые мини-карточки в 2 колонки */}
+
+                            {/* RIGHT: Time mini card */}
+                            {!isAsap && (
+                                <div className={`miniCard ${timeOpen ? "open" : ""}`}>
+                                    {timeOpen && (
+                                        <div className="miniDrop">
+                                            <div className="glass field">
+                                                <div className="label">Ко времени</div>
+                                                <DatePicker
+                                                    selected={formData.workTime}
+                                                    onChange={(date) => setFormData((p) => ({...p, workTime: date}))}
+                                                    showTimeSelect
+                                                    timeFormat="HH:mm"
+                                                    timeIntervals={15}
+                                                    dateFormat="Pp"
+                                                    placeholderText="Выберите дату и время"
+                                                    minDate={new Date()}
+                                                    minTime={getMinTime(formData.workTime)}
+                                                    maxTime={new Date(0, 0, 0, 23, 59, 59)}
+                                                    className="control"
+                                                    portalId="date-picker-portal"
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                                    )}
+                                </div>
+                            )}
 
-                        <div className="headerMiniGrid">
-                            {/* LEFT: Address mini card */}
-                            <div className={`miniCard ${addressOpen ? "open" : ""}`}>
-                                <button
-                                    type="button"
-                                    className="miniCardBtn"
-                                    onClick={() => {
-                                        setAddressOpen((p) => !p);
-                                        setTimeOpen(false); // чтобы не было ощущения “вложенности”
-                                    }}
-                                >
-                                    <div className="miniTop">
-                                        <span className="miniLabel">Адрес</span>
-                                        <span className="miniChevron">{addressOpen ? "⌃" : "⌄"}</span>
-                                    </div>
-
-                                    <div className={`miniValue ${formData.address ? "" : "danger"}`}>
-                                        {formData.address ? "Указан" : "Не указан"}
-                                    </div>
-
-                                    {/* мелким — реальный адрес (если есть), иначе подсказка */}
-                                    <div className="miniSub">
-                                        {addrResolving
-                                            ? "Определяем…"
-                                            : formData.address
-                                                ? formData.address
-                                                : "Нажмите, чтобы указать"}
-                                    </div>
-                                </button>
-
-                                {/* раскрытие адреса — только под address */}
-                                {addressOpen && (
-                                    <div className="miniDrop">
-                                        <div className="glass field">
-                                            <div className="label">Адрес</div>
-                                            <input
-                                                className="control"
-                                                type="text"
-                                                placeholder="Введите адрес"
-                                                value={formData.address}
-                                                onChange={handleAddressChange}
-                                            />
-
-                                            {addrResolveError && <div className="inline-error">{addrResolveError}</div>}
-
-                                            {addressSuggestions.length > 0 && (
-                                                <ul className="suggestions">
-                                                    {addressSuggestions.map((s, i) => (
-                                                        <li key={`${s.label}-${i}`} onClick={() => handleAddressSelect(s)}>
-                                                            {s.label}
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            )}
+                            <div className="headerMiniGrid">
+                                {/* LEFT: Address mini card */}
+                                <div className={`miniCard ${addressOpen ? "open" : ""}`}>
+                                    <button
+                                        type="button"
+                                        className="miniCardBtn"
+                                        onClick={() => {
+                                            setAddressOpen((p) => !p);
+                                            setTimeOpen(false); // чтобы не было ощущения “вложенности”
+                                        }}
+                                    >
+                                        <div className="miniTop">
+                                            <span className="miniLabel">Адрес</span>
+                                            <span className="miniChevron">{addressOpen ? "⌃" : "⌄"}</span>
                                         </div>
 
-                                        <div className="address-row" style={{ marginTop: 10, paddingTop: 10 }}>
-                                            <div className="muted-strong">Адрес из профиля?</div>
+                                        <div className={`miniValue ${formData.address ? "" : "danger"}`}>
+                                            {formData.address ? "Указан" : "Не указан"}
+                                        </div>
 
-                                            <div className="chip-row">
-                                                <button
-                                                    type="button"
-                                                    className={`chip-btn ${addressMode === "profile" ? "active" : ""}`}
-                                                    onClick={async () => {
-                                                        setAddressMode("profile");
-                                                        setAddrResolveError(null);
+                                        {/* мелким — реальный адрес (если есть), иначе подсказка */}
+                                        <div className="miniSub">
+                                            {addrResolving
+                                                ? "Определяем…"
+                                                : formData.address
+                                                    ? formData.address
+                                                    : "Нажмите, чтобы указать"}
+                                        </div>
+                                    </button>
 
-                                                        const addr = profile?.locationAddress;
-                                                        const lat = Number(profile?.locationLat);
-                                                        const lng = Number(profile?.locationLng);
-                                                        const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+                                    {/* раскрытие адреса — только под address */}
+                                    {addressOpen && (
+                                        <div className="miniDrop">
+                                            <div className="glass field">
+                                                <div className="label">Адрес</div>
+                                                <input
+                                                    className="control"
+                                                    type="text"
+                                                    placeholder="Введите адрес"
+                                                    value={formData.address}
+                                                    onChange={handleAddressChange}
+                                                />
 
-                                                        if (addr && !looksLikeCoordsString(addr)) {
-                                                            setFormData((p) => ({ ...p, address: addr }));
+                                                {addrResolveError &&
+                                                    <div className="inline-error">{addrResolveError}</div>}
+
+                                                {addressSuggestions.length > 0 && (
+                                                    <ul className="suggestions">
+                                                        {addressSuggestions.map((s, i) => (
+                                                            <li key={`${s.label}-${i}`}
+                                                                onClick={() => handleAddressSelect(s)}>
+                                                                {s.label}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </div>
+
+                                            <div className="address-row" style={{marginTop: 10, paddingTop: 10}}>
+                                                <div className="muted-strong">Адрес из профиля?</div>
+
+                                                <div className="chip-row">
+                                                    <button
+                                                        type="button"
+                                                        className={`chip-btn ${addressMode === "profile" ? "active" : ""}`}
+                                                        onClick={async () => {
+                                                            setAddressMode("profile");
+                                                            setAddrResolveError(null);
+
+                                                            const addr = profile?.locationAddress;
+                                                            const lat = Number(profile?.locationLat);
+                                                            const lng = Number(profile?.locationLng);
+                                                            const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+
+                                                            if (addr && !looksLikeCoordsString(addr)) {
+                                                                setFormData((p) => ({...p, address: addr}));
+
+                                                                if (hasCoords) {
+                                                                    setMarkerPosition([lat, lng]);
+                                                                    return;
+                                                                }
+
+                                                                setAddrResolving(true);
+
+                                                                const resolved = await geocodeAddressYandex({
+                                                                    address: addr,
+                                                                    apiKey: YM_KEY,
+                                                                });
+
+                                                                setAddrResolving(false);
+
+                                                                if (resolved) {
+                                                                    setFormData((p) => ({
+                                                                        ...p,
+                                                                        address: resolved.address
+                                                                    }));
+                                                                    setMarkerPosition([resolved.lat, resolved.lng]);
+                                                                    return;
+                                                                }
+
+                                                                setAddrResolveError("Адрес из профиля есть, но координаты не найдены. Выберите адрес из подсказки, GPS или на карте.");
+                                                                return;
+                                                            }
 
                                                             if (hasCoords) {
                                                                 setMarkerPosition([lat, lng]);
+                                                                setAddrResolving(true);
+                                                                const resolved = await reverseGeocodeYandex({
+                                                                    lat,
+                                                                    lng,
+                                                                    apiKey: YM_KEY
+                                                                });
+                                                                setAddrResolving(false);
+
+                                                                if (resolved) setFormData((p) => ({
+                                                                    ...p,
+                                                                    address: resolved
+                                                                }));
+                                                                else setAddrResolveError("В профиле нет распознанного адреса. Введите вручную или выберите на карте.");
                                                                 return;
                                                             }
 
-                                                            setAddrResolving(true);
-
-                                                            const resolved = await geocodeAddressYandex({
-                                                                address: addr,
-                                                                apiKey: YM_KEY,
-                                                            });
-
-                                                            setAddrResolving(false);
-
-                                                            if (resolved) {
-                                                                setFormData((p) => ({ ...p, address: resolved.address }));
-                                                                setMarkerPosition([resolved.lat, resolved.lng]);
-                                                                return;
-                                                            }
-
-                                                            setAddrResolveError("Адрес из профиля есть, но координаты не найдены. Выберите адрес из подсказки, GPS или на карте.");
-                                                            return;
-                                                        }
-
-                                                        if (hasCoords) {
-                                                            setMarkerPosition([lat, lng]);
-                                                            setAddrResolving(true);
-                                                            const resolved = await reverseGeocodeYandex({ lat, lng, apiKey: YM_KEY });
-                                                            setAddrResolving(false);
-
-                                                            if (resolved) setFormData((p) => ({ ...p, address: resolved }));
-                                                            else setAddrResolveError("В профиле нет распознанного адреса. Введите вручную или выберите на карте.");
-                                                            return;
-                                                        }
-
-                                                        setAddrResolveError("В профиле нет адреса. Введите вручную или выберите на карте.");
-                                                    }}
-                                                >
-                                                    Да
-                                                </button>
-
-                                                <button
-                                                    type="button"
-                                                    className={`chip-btn ${addressMode === "custom" ? "active" : ""}`}
-                                                    onClick={() => setAddressMode("custom")}
-                                                >
-                                                    Нет
-                                                </button>
-                                            </div>
-
-                                            {addressMode === "custom" && (
-                                                <div className="grid2" style={{ marginTop: 10 }}>
-                                                    <button type="button" className="action-btn subtle" onClick={() => setShowMapModal(true)}>
-                                                        На карте
+                                                            setAddrResolveError("В профиле нет адреса. Введите вручную или выберите на карте.");
+                                                        }}
+                                                    >
+                                                        Да
                                                     </button>
-                                                    <button type="button" className="action-btn subtle" onClick={detectGps} disabled={addrResolving}>
-                                                        GPS
+
+                                                    <button
+                                                        type="button"
+                                                        className={`chip-btn ${addressMode === "custom" ? "active" : ""}`}
+                                                        onClick={() => setAddressMode("custom")}
+                                                    >
+                                                        Нет
                                                     </button>
                                                 </div>
-                                            )}
-                                        </div>
 
-                                        <YandexMapModal
-                                            isOpen={showMapModal}
-                                            onClose={() => setShowMapModal(false)}
-                                            initialLat={markerPosition?.[0]}
-                                            initialLng={markerPosition?.[1]}
-                                            onPick={(picked) => {
-                                                setFormData((p) => ({ ...p, address: picked.address }));
-                                                setMarkerPosition([picked.lat, picked.lng]);
-                                                setAddressMode("custom");
-                                                setShowMapModal(false);
-                                            }}
-                                        />
-                                    </div>
+                                                {addressMode === "custom" && (
+                                                    <div className="grid2" style={{marginTop: 10}}>
+                                                        <button type="button" className="action-btn subtle"
+                                                                onClick={() => setShowMapModal(true)}>
+                                                            На карте
+                                                        </button>
+                                                        <button type="button" className="action-btn subtle"
+                                                                onClick={detectGps} disabled={addrResolving}>
+                                                            GPS
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <YandexMapModal
+                                                isOpen={showMapModal}
+                                                onClose={() => setShowMapModal(false)}
+                                                initialLat={markerPosition?.[0]}
+                                                initialLng={markerPosition?.[1]}
+                                                onPick={(picked) => {
+                                                    setFormData((p) => ({...p, address: picked.address}));
+                                                    setMarkerPosition([picked.lat, picked.lng]);
+                                                    setAddressMode("custom");
+                                                    setShowMapModal(false);
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+
+                            </div>
+                        </div>
+                    </div>
+
+                    {error && (
+                        <div className="glass alert-card alert-danger">
+                            <div className="alert-title">Ошибка</div>
+                            <div className="alert-text">{error}</div>
+                        </div>
+                    )}
+
+                    {/* Service search */}
+                    <div className="glass section-card">
+                        <div className="section-head">
+                            <div>
+                                <div className="section-title">Что нужно сделать?</div>
+                                <div className="section-sub">
+                                    Начните вводить название работы — мы предложим подходящую услугу
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            className="glass field serviceSearchField"
+                            ref={serviceSearchBoxRef}
+                        >
+                            <div className="label">Услуга</div>
+
+                            <div className="serviceSearchControlWrap">
+                                <input
+                                    className={`control serviceSearchControl ${
+                                        selectedService ? "selected" : ""
+                                    }`}
+                                    type="text"
+                                    value={serviceQuery}
+                                    onChange={handleServiceQueryChange}
+                                    onFocus={() => {
+                                        if (
+                                            serviceQuery.trim().length >= 2 &&
+                                            !selectedService
+                                        ) {
+                                            setServiceSearchOpen(true);
+                                        }
+                                    }}
+                                    placeholder="Например: перевезти диван, починить кран"
+                                    autoComplete="off"
+                                    spellCheck="true"
+                                    aria-label="Поиск услуги"
+                                    aria-expanded={serviceSearchOpen}
+                                />
+
+                                {serviceSearching && (
+                                    <span
+                                        className="serviceSearchSpinner"
+                                        aria-label="Поиск"
+                                    />
+                                )}
+
+                                {!serviceSearching && serviceQuery && (
+                                    <button
+                                        type="button"
+                                        className="serviceSearchClear"
+                                        onClick={handleServiceClear}
+                                        aria-label="Очистить выбранную услугу"
+                                        title="Очистить"
+                                    >
+                                        ×
+                                    </button>
                                 )}
                             </div>
 
+                            {selectedService && (
+                                <div className="selectedServiceCard">
+                                    <div className="selectedServiceTop">
+                                        <div className="selectedServiceCheck">✓</div>
 
-                        </div>
-                    </div>
-                </div>
+                                        <div className="selectedServiceContent">
+                                            <div className="selectedServiceName">
+                                                {selectedService.subcategoryName ||
+                                                    selectedService.categoryName}
+                                            </div>
 
-                {error && (
-                    <div className="glass alert-card alert-danger">
-                        <div className="alert-title">Ошибка</div>
-                        <div className="alert-text">{error}</div>
-                    </div>
-                )}
+                                            {selectedService.subcategoryName && (
+                                                <div className="selectedServiceCategory">
+                                                    Категория: {selectedService.categoryName}
+                                                </div>
+                                            )}
 
-                {/* Service search */}
-                <div className="glass section-card">
-                    <div className="section-head">
-                        <div>
-                            <div className="section-title">Что нужно сделать?</div>
-                            <div className="section-sub">
-                                Начните вводить название работы — мы предложим подходящую услугу
-                            </div>
-                        </div>
-                    </div>
+                                            {!selectedService.subcategoryName && (
+                                                <div className="selectedServiceCategory">
+                                                    Выбрана общая категория
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
 
-                    <div
-                        className="glass field serviceSearchField"
-                        ref={serviceSearchBoxRef}
-                    >
-                        <div className="label">Услуга</div>
-
-                        <div className="serviceSearchControlWrap">
-                            <input
-                                className={`control serviceSearchControl ${
-                                    selectedService ? "selected" : ""
-                                }`}
-                                type="text"
-                                value={serviceQuery}
-                                onChange={handleServiceQueryChange}
-                                onFocus={() => {
-                                    if (
-                                        serviceQuery.trim().length >= 2 &&
-                                        !selectedService
-                                    ) {
-                                        setServiceSearchOpen(true);
-                                    }
-                                }}
-                                placeholder="Например: перевезти диван, починить кран"
-                                autoComplete="off"
-                                spellCheck="true"
-                                aria-label="Поиск услуги"
-                                aria-expanded={serviceSearchOpen}
-                            />
-
-                            {serviceSearching && (
-                                <span
-                                    className="serviceSearchSpinner"
-                                    aria-label="Поиск"
-                                />
+                                    <button
+                                        type="button"
+                                        className="selectedServiceChange"
+                                        onClick={() => {
+                                            clearSelectedService();
+                                            setServiceQuery("");
+                                            setServiceSuggestions([]);
+                                            setServiceSearchOpen(false);
+                                        }}
+                                    >
+                                        Изменить
+                                    </button>
+                                </div>
                             )}
 
-                            {!serviceSearching && serviceQuery && (
-                                <button
-                                    type="button"
-                                    className="serviceSearchClear"
-                                    onClick={handleServiceClear}
-                                    aria-label="Очистить выбранную услугу"
-                                    title="Очистить"
-                                >
-                                    ×
-                                </button>
-                            )}
-                        </div>
-
-                        {selectedService && (
-                            <div className="selectedServiceCard">
-                                <div className="selectedServiceTop">
-                                    <div className="selectedServiceCheck">✓</div>
-
-                                    <div className="selectedServiceContent">
-                                        <div className="selectedServiceName">
-                                            {selectedService.subcategoryName ||
-                                                selectedService.categoryName}
+                            {!selectedService &&
+                                serviceSearchOpen &&
+                                serviceQuery.trim().length >= 2 && (
+                                    <div className="serviceSuggestionPanel">
+                                        <div className="serviceSuggestionTitle">
+                                            {serviceSearching
+                                                ? "Ищем подходящую услугу…"
+                                                : serviceSuggestions.length > 0
+                                                    ? "Возможно, вы имели в виду"
+                                                    : "Подходящая услуга не найдена"}
                                         </div>
 
-                                        {selectedService.subcategoryName && (
-                                            <div className="selectedServiceCategory">
-                                                Категория: {selectedService.categoryName}
-                                            </div>
-                                        )}
+                                        {!serviceSearching &&
+                                            serviceSuggestions.length > 0 && (
+                                                <div className="serviceSuggestionList">
+                                                    {serviceSuggestions.map((option) => {
+                                                        const resultKey = option.subcategoryId
+                                                            ? `subcategory-${option.subcategoryId}`
+                                                            : `category-${option.categoryId}`;
 
-                                        {!selectedService.subcategoryName && (
-                                            <div className="selectedServiceCategory">
-                                                Выбрана общая категория
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    className="selectedServiceChange"
-                                    onClick={() => {
-                                        clearSelectedService();
-                                        setServiceQuery("");
-                                        setServiceSuggestions([]);
-                                        setServiceSearchOpen(false);
-                                    }}
-                                >
-                                    Изменить
-                                </button>
-                            </div>
-                        )}
-
-                        {!selectedService &&
-                            serviceSearchOpen &&
-                            serviceQuery.trim().length >= 2 && (
-                                <div className="serviceSuggestionPanel">
-                                    <div className="serviceSuggestionTitle">
-                                        {serviceSearching
-                                            ? "Ищем подходящую услугу…"
-                                            : serviceSuggestions.length > 0
-                                                ? "Возможно, вы имели в виду"
-                                                : "Подходящая услуга не найдена"}
-                                    </div>
-
-                                    {!serviceSearching &&
-                                        serviceSuggestions.length > 0 && (
-                                            <div className="serviceSuggestionList">
-                                                {serviceSuggestions.map((option) => {
-                                                    const resultKey = option.subcategoryId
-                                                        ? `subcategory-${option.subcategoryId}`
-                                                        : `category-${option.categoryId}`;
-
-                                                    return (
-                                                        <button
-                                                            key={resultKey}
-                                                            type="button"
-                                                            className="serviceSuggestionItem"
-                                                            onMouseDown={(event) => {
-                                                                /*
-                                                                 * Не даём input потерять фокус раньше,
-                                                                 * чем отработает выбор результата.
-                                                                 */
-                                                                event.preventDefault();
-                                                            }}
-                                                            onClick={() =>
-                                                                handleServiceSelect(option)
-                                                            }
-                                                        >
+                                                        return (
+                                                            <button
+                                                                key={resultKey}
+                                                                type="button"
+                                                                className="serviceSuggestionItem"
+                                                                onMouseDown={(event) => {
+                                                                    /*
+                                                                     * Не даём input потерять фокус раньше,
+                                                                     * чем отработает выбор результата.
+                                                                     */
+                                                                    event.preventDefault();
+                                                                }}
+                                                                onClick={() =>
+                                                                    handleServiceSelect(option)
+                                                                }
+                                                            >
                                             <span className="serviceSuggestionMain">
                                                 <span className="serviceSuggestionName">
                                                     {option.subcategoryName ||
@@ -1677,417 +1745,502 @@ function CreateOrderPage() {
                                                 </span>
                                             </span>
 
-                                                            <span
-                                                                className={`serviceSuggestionType ${
-                                                                    option.subcategoryId
-                                                                        ? "subcategory"
-                                                                        : "category"
-                                                                }`}
-                                                            >
+                                                                <span
+                                                                    className={`serviceSuggestionType ${
+                                                                        option.subcategoryId
+                                                                            ? "subcategory"
+                                                                            : "category"
+                                                                    }`}
+                                                                >
                                                 {option.subcategoryId
                                                     ? "Услуга"
                                                     : "Категория"}
                                             </span>
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
 
-                                    {!serviceSearching &&
-                                        serviceSuggestions.length === 0 && (
-                                            <div className="serviceSuggestionEmpty">
-                                                Попробуйте написать другими словами, например:
-                                                «нужен грузчик» или «починить розетку».
-                                            </div>
-                                        )}
+                                        {!serviceSearching &&
+                                            serviceSuggestions.length === 0 && (
+                                                <div className="serviceSuggestionEmpty">
+                                                    Попробуйте написать другими словами, например:
+                                                    «нужен грузчик» или «починить розетку».
+                                                </div>
+                                            )}
+                                    </div>
+                                )}
+
+                            {!selectedService && !serviceSearchOpen && (
+                                <div className="hint">
+                                    Выберите один из предложенных вариантов. Подкатегории
+                                    показываются в первую очередь.
                                 </div>
                             )}
-
-                        {!selectedService && !serviceSearchOpen && (
-                            <div className="hint">
-                                Выберите один из предложенных вариантов. Подкатегории
-                                показываются в первую очередь.
-                            </div>
-                        )}
+                        </div>
                     </div>
-                </div>
 
-                {selectedService?.formConfig?.fields?.length > 0 && (
+                    {selectedService?.formConfig?.fields?.length > 0 && (
+                        <div className="glass section-card">
+                            <div className="section-head">
+                                <div>
+                                    <div className="section-title">
+                                        Детали заказа
+                                    </div>
+
+                                    <div className="section-sub">
+                                        Уточните параметры, чтобы исполнители
+                                        точнее оценили работу
+                                    </div>
+                                </div>
+                            </div>
+
+                            <DynamicServiceFields
+                                config={selectedService.formConfig}
+                                value={serviceDetails}
+                                onChange={setServiceDetails}
+                                yandexApiKey={YM_KEY}
+                            />
+
+                            {Number.isFinite(
+                                Number(
+                                    serviceDetails
+                                        ?.estimatedRoadDistanceKm
+                                )
+                            ) && (
+                                <div className="distanceEstimateCard">
+                                    <div>
+                                        <div className="distanceEstimateLabel">
+                                            Ориентировочное расстояние
+                                        </div>
+
+                                        <div className="distanceEstimateHint">
+                                            Рассчитано приблизительно между
+                                            выбранными точками с учётом
+                                            коэффициента дорожного маршрута.
+                                        </div>
+                                    </div>
+
+                                    <div className="distanceEstimateValue">
+                                        ≈{" "}
+                                        {Number(
+                                            serviceDetails
+                                                .estimatedRoadDistanceKm
+                                        ).toFixed(1)}{" "}
+                                        км
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Description */}
+                    <div className="glass section-card">
+
+
+                        <div className="glass field">
+
+
+                            <label className="upload inline">
+                                <input type="file" multiple accept="image/*" onChange={handleImageChange}
+                                       style={{display: "none"}}/>
+                                <span>📎 Прикрепить фото</span>
+                            </label>
+
+                            {images.length > 0 ? (
+                                <div className="docsGrid" style={{marginTop: 12}}>
+                                    {images.map((img, i) => (
+                                        <div className="glass doc" key={i}>
+                                            <img className="docImg" src={URL.createObjectURL(img)}
+                                                 alt={`Preview ${i + 1}`}/>
+                                            <div className="docName">Фото {i + 1}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : null}
+
+                        </div>
+                    </div>
+
+                    {/* Payment + promotion */}
                     <div className="glass section-card">
                         <div className="section-head">
                             <div>
-                                <div className="section-title">
-                                    Детали заказа
-                                </div>
-
-                                <div className="section-sub">
-                                    Уточните параметры, чтобы исполнители
-                                    точнее оценили работу
-                                </div>
+                                <div className="section-title">Оплата и продвижение</div>
+                                <div className="section-sub">Сумма за работу + способ оплаты + опции продвижения</div>
                             </div>
                         </div>
 
-                        <DynamicServiceFields
-                            config={selectedService.formConfig}
-                            value={serviceDetails}
-                            onChange={setServiceDetails}
-                            yandexApiKey={YM_KEY}
-                        />
+                        <div className="glass field">
 
-                        {Number.isFinite(
-                            Number(
-                                serviceDetails
-                                    ?.estimatedRoadDistanceKm
-                            )
-                        ) && (
-                            <div className="distanceEstimateCard">
-                                <div>
-                                    <div className="distanceEstimateLabel">
-                                        Ориентировочное расстояние
-                                    </div>
+                            {recommendedPrice && (
+                                <div className="recommendedPriceCard">
+                                    <div className="recommendedPriceContent">
+                                        <div className="recommendedPriceTitle">
+                                            {isHourlyCargo
+                                                ? `Ориентировочная стоимость за ${
+                                                    recommendedPrice.billedHours || 1
+                                                } ч`
+                                                : "Рекомендуемый бюджет"}
+                                        </div>
 
-                                    <div className="distanceEstimateHint">
-                                        Рассчитано приблизительно между
-                                        выбранными точками с учётом
-                                        коэффициента дорожного маршрута.
-                                    </div>
-                                </div>
+                                        <div className="recommendedPriceRange">
+                                            {recommendedPrice.minPrice
+                                                .toLocaleString("ru-RU")}{" "}
+                                            –{" "}
+                                            {recommendedPrice.maxPrice
+                                                .toLocaleString("ru-RU")}{" "}
+                                            ₽
+                                        </div>
 
-                                <div className="distanceEstimateValue">
-                                    ≈{" "}
-                                    {Number(
-                                        serviceDetails
-                                            .estimatedRoadDistanceKm
-                                    ).toFixed(1)}{" "}
-                                    км
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Description */}
-                <div className="glass section-card">
-
-
-                    <div className="glass field">
-
-
-                        <label className="upload inline">
-                            <input type="file" multiple accept="image/*" onChange={handleImageChange} style={{ display: "none" }} />
-                            <span>📎 Прикрепить фото</span>
-                        </label>
-
-                        {images.length > 0 ? (
-                            <div className="docsGrid" style={{ marginTop: 12 }}>
-                                {images.map((img, i) => (
-                                    <div className="glass doc" key={i}>
-                                        <img className="docImg" src={URL.createObjectURL(img)} alt={`Preview ${i + 1}`} />
-                                        <div className="docName">Фото {i + 1}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : null}
-
-                    </div>
-                </div>
-
-                {/* Payment + promotion */}
-                <div className="glass section-card">
-                    <div className="section-head">
-                        <div>
-                            <div className="section-title">Оплата и продвижение</div>
-                            <div className="section-sub">Сумма за работу + способ оплаты + опции продвижения</div>
-                        </div>
-                    </div>
-
-                    <div className="glass field">
-
-                        {recommendedPrice && (
-                            <div className="recommendedPriceCard">
-                                <div className="recommendedPriceContent">
-                                    <div className="recommendedPriceTitle">
-                                        {isHourlyCargo
-                                            ? `Ориентировочная стоимость за ${
-                                                recommendedPrice.billedHours || 1
-                                            } ч`
-                                            : "Рекомендуемый бюджет"}
-                                    </div>
-
-                                    <div className="recommendedPriceRange">
-                                        {recommendedPrice.minPrice
-                                            .toLocaleString("ru-RU")}{" "}
-                                        –{" "}
-                                        {recommendedPrice.maxPrice
-                                            .toLocaleString("ru-RU")}{" "}
-                                        ₽
-                                    </div>
-
-                                    {isHourlyCargo && (
-                                        <div className="cargoHourlySummary">
-                                            {Number.isFinite(
-                                                Number(
-                                                    recommendedPrice.firstHourPrice
-                                                )
-                                            ) && (
-                                                <div className="cargoHourlySummaryRow">
+                                        {isHourlyCargo && (
+                                            <div className="cargoHourlySummary">
+                                                {Number.isFinite(
+                                                    Number(
+                                                        recommendedPrice.firstHourPrice
+                                                    )
+                                                ) && (
+                                                    <div className="cargoHourlySummaryRow">
                 <span>
                     Первый час
                 </span>
 
-                                                    <strong>
-                                                        {Number(
-                                                            recommendedPrice.firstHourPrice
-                                                        ).toLocaleString(
-                                                            "ru-RU"
-                                                        )}{" "}
-                                                        ₽
-                                                    </strong>
-                                                </div>
-                                            )}
+                                                        <strong>
+                                                            {Number(
+                                                                recommendedPrice.firstHourPrice
+                                                            ).toLocaleString(
+                                                                "ru-RU"
+                                                            )}{" "}
+                                                            ₽
+                                                        </strong>
+                                                    </div>
+                                                )}
 
-                                            {Number.isFinite(
-                                                Number(
-                                                    recommendedPrice.nextHourPrice
-                                                )
-                                            ) && (
-                                                <div className="cargoHourlySummaryRow">
+                                                {Number.isFinite(
+                                                    Number(
+                                                        recommendedPrice.nextHourPrice
+                                                    )
+                                                ) && (
+                                                    <div className="cargoHourlySummaryRow">
                 <span>
                     Каждый следующий час
                 </span>
 
-                                                    <strong>
-                                                        {Number(
-                                                            recommendedPrice.nextHourPrice
-                                                        ).toLocaleString(
-                                                            "ru-RU"
-                                                        )}{" "}
-                                                        ₽/ч
-                                                    </strong>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {Array.isArray(
-                                            recommendedPrice.breakdown
-                                        ) &&
-                                        recommendedPrice.breakdown.length > 0 && (
-                                            <div className="recommendedPriceBreakdown">
-                                                {recommendedPrice.breakdown.map(
-                                                    (item) => (
-                                                        <div
-                                                            key={item.key}
-                                                            className="recommendedPriceBreakdownRow"
-                                                        >
-                        <span>
-                            {item.label}
-                        </span>
-
-                                                            <strong>
-                                                                {Math.round(
-                                                                    Number(item.amount)
-                                                                ).toLocaleString(
-                                                                    "ru-RU"
-                                                                )}{" "}
-                                                                ₽
-                                                            </strong>
-                                                        </div>
-                                                    )
+                                                        <strong>
+                                                            {Number(
+                                                                recommendedPrice.nextHourPrice
+                                                            ).toLocaleString(
+                                                                "ru-RU"
+                                                            )}{" "}
+                                                            ₽/ч
+                                                        </strong>
+                                                    </div>
                                                 )}
                                             </div>
                                         )}
 
-                                    <div className="recommendedPriceHint">
-                                        {isHourlyCargo ? (
-                                            <>
-                                                В первый час включены вызов машины,
-                                                работа машины, выбранные грузчики и
-                                                доплата за этажи без лифта. В каждый
-                                                следующий час оплачиваются машина и
-                                                грузчики. Итоговое время согласовывается
-                                                с исполнителем.
-                                            </>
-                                        ) : isIntercityCargo ? (
-                                            <>
-                                                Расчёт выполнен по приблизительному
-                                                расстоянию, подаче машины, выбранным
-                                                грузчикам и этажам. Итоговая стоимость
-                                                маршрута согласовывается с исполнителем.
-                                            </>
-                                        ) : (
-                                            <>
-                                                Ориентировочная сумма рассчитана по
-                                                указанным параметрам. Итоговая стоимость
-                                                согласовывается с исполнителем.
-                                            </>
-                                        )}
+                                        {Array.isArray(
+                                                recommendedPrice.breakdown
+                                            ) &&
+                                            recommendedPrice.breakdown.length > 0 && (
+                                                <div className="recommendedPriceBreakdown">
+                                                    {recommendedPrice.breakdown.map(
+                                                        (item) => (
+                                                            <div
+                                                                key={item.key}
+                                                                className="recommendedPriceBreakdownRow"
+                                                            >
+                        <span>
+                            {item.label}
+                        </span>
+
+                                                                <strong>
+                                                                    {Math.round(
+                                                                        Number(item.amount)
+                                                                    ).toLocaleString(
+                                                                        "ru-RU"
+                                                                    )}{" "}
+                                                                    ₽
+                                                                </strong>
+                                                            </div>
+                                                        )
+                                                    )}
+                                                </div>
+                                            )}
+
+                                        <div className="recommendedPriceHint">
+                                            {isHourlyCargo ? (
+                                                <>
+                                                    В первый час включены вызов машины,
+                                                    работа машины, выбранные грузчики и
+                                                    доплата за этажи без лифта. В каждый
+                                                    следующий час оплачиваются машина и
+                                                    грузчики. Итоговое время согласовывается
+                                                    с исполнителем.
+                                                </>
+                                            ) : isIntercityCargo ? (
+                                                <>
+                                                    Расчёт выполнен по приблизительному
+                                                    расстоянию, подаче машины, выбранным
+                                                    грузчикам и этажам. Итоговая стоимость
+                                                    маршрута согласовывается с исполнителем.
+                                                </>
+                                            ) : (
+                                                <>
+                                                    Ориентировочная сумма рассчитана по
+                                                    указанным параметрам. Итоговая стоимость
+                                                    согласовывается с исполнителем.
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
 
-                                <button
-                                    type="button"
-                                    className="recommendedPriceApply"
-                                    onClick={() => {
-                                        setFormData((previous) => ({
-                                            ...previous,
-                                            proposedSum:
-                                                String(
-                                                    recommendedPrice
-                                                        .recommendedPrice
-                                                ),
-                                        }));
-                                    }}
-                                >
-                                    Указать эту сумму
-                                </button>
+                                    <button
+                                        type="button"
+                                        className="recommendedPriceApply"
+                                        onClick={() => {
+                                            setFormData((previous) => ({
+                                                ...previous,
+                                                proposedSum:
+                                                    String(
+                                                        recommendedPrice
+                                                            .recommendedPrice
+                                                    ),
+                                            }));
+                                        }}
+                                    >
+                                        Указать эту сумму
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="label">
+                                {isHourlyCargo
+                                    ? "Ориентировочная сумма"
+                                    : isIntercityCargo
+                                        ? "Ориентировочная сумма за перевозку"
+                                        : "Сумма за работу"}
                             </div>
-                        )}
 
-                        <div className="label">
-                            {isHourlyCargo
-                                ? "Ориентировочная сумма"
-                                : isIntercityCargo
-                                    ? "Ориентировочная сумма за перевозку"
-                                    : "Сумма за работу"}
-                        </div>
+                            <input
+                                className="control"
+                                type="number"
+                                min="1"
+                                max="300000"
+                                step="1"
+                                inputMode="numeric"
+                                placeholder="Например 1500"
+                                value={formData.proposedSum}
+                                onChange={(e) => {
+                                    const value = e.target.value;
 
-                        <input
-                            className="control"
-                            type="number"
-                            min="1"
-                            max="300000"
-                            step="1"
-                            inputMode="numeric"
-                            placeholder="Например 1500"
-                            value={formData.proposedSum}
-                            onChange={(e) => {
-                                const value = e.target.value;
+                                    if (value === "") {
+                                        setFormData((p) => ({...p, proposedSum: ""}));
+                                        return;
+                                    }
 
-                                if (value === "") {
-                                    setFormData((p) => ({ ...p, proposedSum: "" }));
-                                    return;
-                                }
+                                    const n = Number(value);
 
-                                const n = Number(value);
+                                    if (!Number.isFinite(n)) return;
 
-                                if (!Number.isFinite(n)) return;
+                                    if (n > 300000) {
+                                        setFormData((p) => ({...p, proposedSum: "300000"}));
+                                        return;
+                                    }
 
-                                if (n > 300000) {
-                                    setFormData((p) => ({ ...p, proposedSum: "300000" }));
-                                    return;
-                                }
+                                    if (n < 0) {
+                                        setFormData((p) => ({...p, proposedSum: ""}));
+                                        return;
+                                    }
 
-                                if (n < 0) {
-                                    setFormData((p) => ({ ...p, proposedSum: "" }));
-                                    return;
-                                }
+                                    setFormData((p) => ({...p, proposedSum: value}));
+                                }}
+                                required
+                            />
 
-                                setFormData((p) => ({ ...p, proposedSum: value }));
-                            }}
-                            required
-                        />
+                            {isHourlyCargo && (
+                                <div className="cargoHourlyNotice">
+                                    <div className="cargoHourlyNoticeIcon">
+                                        ⏱
+                                    </div>
 
-                        {isHourlyCargo && (
-                            <div className="cargoHourlyNotice">
-                                <div className="cargoHourlyNoticeIcon">
-                                    ⏱
-                                </div>
+                                    <div>
+                                        <strong>
+                                            Перевозка оплачивается по времени
+                                        </strong>
 
-                                <div>
-                                    <strong>
-                                        Перевозка оплачивается по времени
-                                    </strong>
-
-                                    <span>
+                                        <span>
     Указанная сумма рассчитана за{" "}
-                                        {recommendedPrice?.billedHours ||
-                                            Number(serviceDetails?.estimatedHours) ||
-                                            1}{" "}
-                                        ч. Если работа займёт больше времени,
+                                            {recommendedPrice?.billedHours ||
+                                                Number(serviceDetails?.estimatedHours) ||
+                                                1}{" "}
+                                            ч. Если работа займёт больше времени,
     дополнительные часы оплачиваются по
     согласованной ставке. Вызов машины
     повторно не начисляется.
 </span>
+                                    </div>
                                 </div>
+                            )}
+
+                            <div className="hint">
+
+                                {isHourlyCargo ? (
+
+                                    <>
+                                        Фактическая стоимость зависит от реального
+                                        времени выполнения и согласовывается с
+                                        исполнителем.
+                                    </>
+
+                                ) : isWasteRemoval ? (
+
+                                    <>
+
+                                        Стоимость рассчитана по типу и объёму
+
+                                        мусора, необходимости погрузки и этажу.
+
+                                        Итоговая сумма согласовывается с
+
+                                        исполнителем.
+
+                                    </>
+
+                                ) : (
+
+                                    <>
+
+                                        Эту сумму вы оплачиваете исполнителю.
+
+                                        Сейчас оплачивается только продвижение.
+
+                                    </>
+
+                                )}
+
+                            </div>
+                        </div>
+
+
+                        <div className="glass field">
+                            <strong>Способ оплаты заказа</strong>
+
+                            <label
+                                style={{
+                                    display: "flex",
+                                    alignItems: "flex-start",
+                                    gap: 10,
+                                    marginTop: 12,
+                                }}
+                            >
+                                <input
+                                    type="radio"
+                                    name="paymentType"
+                                    value="cash"
+                                    checked={paymentType === "cash"}
+                                    onChange={() =>
+                                        setPaymentType("cash")
+                                    }
+                                />
+
+                                <span>
+            <strong>Оплата напрямую исполнителю</strong>
+
+            <small style={{ display: "block" }}>
+                По договорённости между участниками.
+            </small>
+        </span>
+                            </label>
+
+                            <label
+                                style={{
+                                    display: "flex",
+                                    alignItems: "flex-start",
+                                    gap: 10,
+                                    marginTop: 12,
+                                    opacity:
+                                        guaranteeEligibility.available
+                                            ? 1
+                                            : 0.6,
+                                }}
+                            >
+                                <input
+                                    type="radio"
+                                    name="paymentType"
+                                    value="guarantee"
+                                    checked={paymentType === "guarantee"}
+                                    disabled={
+                                        !guaranteeEligibility.available
+                                    }
+                                    onChange={() =>
+                                        setPaymentType("guarantee")
+                                    }
+                                />
+
+                                <span>
+            <strong>Гарантийная сделка</strong>
+
+            <small style={{ display: "block" }}>
+                Деньги резервируются у платёжного
+                партнёра до выполнения условий сделки.
+            </small>
+        </span>
+                            </label>
+
+                            {!guaranteeEligibility.verified && (
+                                <small>
+                                    Для гарантии потребуется подтверждение
+                                    личности заказчика.
+                                </small>
+                            )}
+
+                            {!guaranteeEligibility.operational && (
+                                <small>
+                                    Гарантийные расчёты находятся
+                                    на этапе подключения.
+                                </small>
+                            )}
+                        </div>
+
+
+                        <div className="glass promoBox">
+                            <PromotionOptions value={promotion} onChange={setPromotion}/>
+                        </div>
+
+                        {promotionTotal > 0 && (
+                            <div className="glass field" style={{marginTop: 10}}>
+                                <PaymentProviderSelect
+                                    selectedProvider={selectedProvider}
+                                    onSelect={setSelectedProvider}
+                                    disabled={isSubmitting}
+                                />
                             </div>
                         )}
 
-                        <div className="hint">
-
-                            {isHourlyCargo ? (
-
-                                <>
-                                    Фактическая стоимость зависит от реального
-                                    времени выполнения и согласовывается с
-                                    исполнителем.
-                                </>
-
-                            ) : isWasteRemoval ? (
-
-                                <>
-
-                                    Стоимость рассчитана по типу и объёму
-
-                                    мусора, необходимости погрузки и этажу.
-
-                                    Итоговая сумма согласовывается с
-
-                                    исполнителем.
-
-                                </>
-
-                            ) : (
-
-                                <>
-
-                                    Эту сумму вы оплачиваете исполнителю.
-
-                                    Сейчас оплачивается только продвижение.
-
-                                </>
-
-                            )}
-
+                        <div className="glass total">
+                            <div>
+                                <div className="totalTitle">К оплате сейчас</div>
+                                <div className="totalSub">Оплачивается только продвижение</div>
+                            </div>
+                            <div className="totalAmount">{promotionTotal} ₽</div>
                         </div>
+
+                        <div className="muted">💡 Если продвижение не выбрано — оплата сейчас = 0 ₽.</div>
                     </div>
 
-                    <div className="glass promoBox">
-                        <PromotionOptions value={promotion} onChange={setPromotion} />
+                    {/* actions */}
+                    <div className="glass bottomActions">
+                        <button type="button" className="action-btn subtle" onClick={() => navigate(-1)}>
+                            Назад
+                        </button>
+
+                        <button type="submit" disabled={isSubmitting} className="action-btn primary"
+                                onClick={handleSubmit}>
+                            {isSubmitting ? "Создание…" : "Создать заказ"}
+                        </button>
                     </div>
-
-                    {promotionTotal > 0 && (
-                        <div className="glass field" style={{ marginTop: 10 }}>
-                            <PaymentProviderSelect
-                                selectedProvider={selectedProvider}
-                                onSelect={setSelectedProvider}
-                                disabled={isSubmitting}
-                            />
-                        </div>
-                    )}
-
-                    <div className="glass total">
-                        <div>
-                            <div className="totalTitle">К оплате сейчас</div>
-                            <div className="totalSub">Оплачивается только продвижение</div>
-                        </div>
-                        <div className="totalAmount">{promotionTotal} ₽</div>
-                    </div>
-
-                    <div className="muted">💡 Если продвижение не выбрано — оплата сейчас = 0 ₽.</div>
-                </div>
-
-                {/* actions */}
-                <div className="glass bottomActions">
-                    <button type="button" className="action-btn subtle" onClick={() => navigate(-1)}>
-                        Назад
-                    </button>
-
-                    <button type="submit" disabled={isSubmitting} className="action-btn primary" onClick={handleSubmit}>
-                        {isSubmitting ? "Создание…" : "Создать заказ"}
-                    </button>
-                </div>
                 </div>
             </div>
         </>
