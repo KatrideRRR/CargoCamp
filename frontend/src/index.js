@@ -423,6 +423,33 @@ function App() {
             toast.info(`${title}${body ? `: ${body}` : ""}`, {
                 autoClose: 6000,
                 onClick: () => {
+
+                    if (
+                        [
+                            "act_remarks_received",
+                            "act_remediation_submitted",
+                            "act_remediation_rejected",
+                            "act_revision_created",
+                        ].includes(type)
+                    ) {
+                        const recipientId =
+                            latest.userId ||
+                            latestData.userId;
+
+                        if (recipientId) {
+                            const params = new URLSearchParams({
+                                orderId: String(orderId || ""),
+                                reason: String(type),
+                            });
+
+                            navigate(
+                                `/orders-history/${recipientId}?${params}`
+                            );
+                        }
+
+                        return;
+                    }
+
                     if (type === "new_message" && orderId) {
                         navigate(`/messages/${orderType}/${orderId}`);
                         return;

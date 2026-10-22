@@ -196,6 +196,36 @@ function navigateFromPush(rawData, navigate, options = {}) {
         });
         return;
     }
+
+    const contractWorkflowTypes = new Set([
+        "act_remarks_received",
+        "act_remediation_submitted",
+        "act_remediation_rejected",
+        "act_revision_created",
+    ]);
+
+    if (
+        contractWorkflowTypes.has(type) &&
+        orderId
+    ) {
+        const targetUserId =
+            currentUserId || data.userId;
+
+        if (targetUserId) {
+            const params = new URLSearchParams({
+                orderId: String(orderId),
+                reason: String(type),
+            });
+
+            navigate(
+                `/orders-history/${targetUserId}?${params}`,
+                { replace: true }
+            );
+
+            return;
+        }
+    }
+
     if (type === "new_message" && orderId) {
         navigate(`/messages/${orderType}/${orderId}`, { replace: true });
         return;

@@ -1,22 +1,10 @@
-
 const express = require("express");
 const crypto = require("crypto");
-const { Op } = require("sequelize");
-
-const authenticateToken =
-    require("../middlewares/userAuth");
-
-const {
-    sequelize,
-    Order,
-    Contract,
-    ContractEvent,
-    Dispute,
-} = require("../models");
-
-const {
-    assertVerifiedPdfIntegrity,
-} = require("../services/verifiedPdfIntegrity");
+const {Op} = require("sequelize");
+const {notifyContractWorkflow,} = require("../services/contractWorkflowNotificationService");
+const authenticateToken = require("../middlewares/userAuth");
+const {sequelize, Order, Contract, ContractEvent, Dispute,} = require("../models");
+const {assertVerifiedPdfIntegrity,} = require("../services/verifiedPdfIntegrity");
 
 const router = express.Router();
 
@@ -35,15 +23,12 @@ const ACTIVE_DISPUTE_STATUSES = [
 
 router.use(authenticateToken);
 
-router.use((req, res, next) => {
-    res.setHeader("Cache-Control", "no-store");
-    next();
-});
+router.use((req, res, next) => {res.setHeader("Cache-Control", "no-store");next();});
 
 function fail(status, message) {
     return Object.assign(
         new Error(message),
-        { httpStatus: status }
+        {httpStatus: status}
     );
 }
 
@@ -90,12 +75,7 @@ function serializeDecision(event) {
     };
 }
 
-async function getContext(
-    actId,
-    userId,
-    transaction = null,
-    lock = false
-) {
+async function getContext(actId, userId, transaction = null, lock = false) {
     if (!/^[1-9]\d*$/.test(String(actId))) {
         throw fail(400, "Некорректный ID акта");
     }
@@ -107,7 +87,7 @@ async function getContext(
         },
         transaction,
         ...(lock
-            ? { lock: transaction.LOCK.UPDATE }
+            ? {lock: transaction.LOCK.UPDATE}
             : {}),
     });
 
@@ -117,7 +97,7 @@ async function getContext(
 
     const order = await Order.findByPk(
         act.orderId,
-        { transaction }
+        {transaction}
     );
 
     if (!order) {
@@ -182,9 +162,7 @@ function canDecide(ctx, hasDecision) {
 /*
  * GET /api/contracts/acts/:actId/acceptance
  */
-router.get(
-    "/:actId/acceptance",
-    async (req, res) => {
+router.get("/:actId/acceptance", async (req, res) => {
         try {
             const ctx = await getContext(
                 req.params.actId,
@@ -220,22 +198,9 @@ router.get(
         } catch (error) {
             return respondError(res, error);
         }
-    }
-);
+    });
 
-/*
- * POST /api/contracts/acts/:actId/acceptance
- *
- * {
- *   decision: "accepted" | "remarks" | "dispute",
- *   comment: "",
- *   documentHash: "...",
- *   disputeId: null
- * }
- */
-router.post(
-    "/:actId/acceptance",
-    async (req, res) => {
+router.post("/:actId/acceptance", async (req, res) => {
         try {
             const userId = Number(req.user.id);
 
@@ -477,7 +442,7 @@ router.post(
                                         "cargocamp_order_history",
                                 },
                             },
-                            { transaction }
+                            {transaction}
                         );
 
                     return {
@@ -487,6 +452,20 @@ router.post(
                 }
             );
 
+            if (
+                result.created &&
+                decision === "remarks"
+            ) {
+                await notifyContractWorkflow({
+                    event: "act_remarks_received",
+
+                    userId: ctxBefore.order.executorId,
+                    orderId: ctxBefore.order.id,
+                    actId: ctxBefore.act.id,
+                    version: ctxBefore.act.version,
+                });
+            }
+
             return res.json({
                 success: true,
                 ...result,
@@ -495,7 +474,6 @@ router.post(
         } catch (error) {
             return respondError(res, error);
         }
-    }
-);
+    });
 
 module.exports = router;

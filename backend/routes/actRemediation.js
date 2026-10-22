@@ -1,26 +1,11 @@
-
 const express = require("express");
 const { Op } = require("sequelize");
 const crypto = require("crypto");
-
-const authenticateToken =
-    require("../middlewares/userAuth");
-
-const {
-    sequelize,
-    Order,
-    Contract,
-    ContractEvent,
-    Dispute,
-} = require("../models");
-
-const {
-    assertVerifiedPdfIntegrity,
-} = require("../services/verifiedPdfIntegrity");
-
-const {
-    prepareVerifiedActV2,
-} = require("../services/verifiedActRevisionService");
+const authenticateToken = require("../middlewares/userAuth");
+const {sequelize, Order, Contract, ContractEvent, Dispute,} = require("../models");
+const {assertVerifiedPdfIntegrity,} = require("../services/verifiedPdfIntegrity");
+const {prepareVerifiedActV2,} = require("../services/verifiedActRevisionService");
+const {notifyContractWorkflow,} = require("../services/contractWorkflowNotificationService");
 
 const router = express.Router();
 
@@ -39,10 +24,7 @@ const ACTIVE_DISPUTE_STATUSES = [
 
 router.use(authenticateToken);
 
-router.use((req, res, next) => {
-    res.setHeader("Cache-Control", "no-store");
-    next();
-});
+router.use((req, res, next) => {res.setHeader("Cache-Control", "no-store");next();});
 
 function fail(status, message) {
     return Object.assign(
@@ -109,12 +91,7 @@ function normalizeComment(value, required = true) {
     return comment;
 }
 
-async function context(
-    actId,
-    userId,
-    transaction = null,
-    lock = false
-) {
+async function context(actId, userId, transaction = null, lock = false) {
     if (!/^[1-9]\d*$/.test(String(actId))) {
         throw fail(400, "Некорректный номер акта");
     }
@@ -318,12 +295,7 @@ function publicState(ctx, state) {
     };
 }
 
-/*
- * GET /api/contracts/acts/:actId/remediation
- */
-router.get(
-    "/:actId/remediation",
-    async (req, res) => {
+router.get("/:actId/remediation", async (req, res) => {
         try {
             const ctx = await context(
                 req.params.actId,
@@ -339,19 +311,9 @@ router.get(
         } catch (error) {
             return sendError(res, error);
         }
-    }
-);
+    });
 
-/*
- * Исполнитель сообщил об исправлениях.
- *
- * POST /api/contracts/acts/:actId/remediation/submit
- *
- * { comment, documentHash }
- */
-router.post(
-    "/:actId/remediation/submit",
-    async (req, res) => {
+router.post("/:actId/remediation/submit", async (req, res) => {
         try {
             const userId = Number(req.user.id);
 
@@ -458,6 +420,48 @@ router.post(
                     }
                 );
 
+            try {
+            if (result.created) {
+                const completedAct = await Contract.findByPk(
+                    req.params.actId,
+                    {
+                        attributes: [
+                            "id",
+                            "orderId",
+                            "version",
+                        ],
+                    }
+                );
+
+                if (completedAct) {
+                    const recipientOrder = await Order.findByPk(
+                        completedAct.orderId,
+                        {
+                            attributes: [
+                                "id",
+                                "creatorId",
+                            ],
+                        }
+                    );
+
+                    if (recipientOrder) {
+                        await notifyContractWorkflow({
+                            event: "act_remediation_submitted",
+
+                            userId: recipientOrder.creatorId,
+                            orderId: recipientOrder.id,
+                            actId: completedAct.id,
+                            version: completedAct.version,
+                        });
+                    }
+                }
+            }} catch (notificationError) {
+                console.error(
+                    "Post-commit contract notification failed:",
+                    notificationError
+                );
+            }
+
             return res.json({
                 success: true,
                 ...result,
@@ -466,24 +470,9 @@ router.post(
         } catch (error) {
             return sendError(res, error);
         }
-    }
-);
+    });
 
-/*
- * Заказчик проверяет результат.
- *
- * POST /api/contracts/acts/:actId/remediation/review
- *
- * {
- *   approved: boolean,
- *   comment: string,
- *   documentHash: string,
- *   confirmed: true
- * }
- */
-router.post(
-    "/:actId/remediation/review",
-    async (req, res) => {
+router.post("/:actId/remediation/review", async (req, res) => {
         let prepared = null;
         let created = false;
 
@@ -793,6 +782,37 @@ router.post(
 
             created = approved && result.created;
 
+            if (result.created) {
+                const recipientOrder = await Order.findByPk(
+                    ctxBefore.order.id,
+                    {
+                        attributes: [
+                            "id",
+                            "executorId",
+                        ],
+                    }
+                );
+
+                if (recipientOrder) {
+                    await notifyContractWorkflow({
+                        event: approved
+                            ? "act_revision_created"
+                            : "act_remediation_rejected",
+
+                        userId: recipientOrder.executorId,
+                        orderId: recipientOrder.id,
+
+                        actId: approved
+                            ? result.revisedAct.id
+                            : ctxBefore.act.id,
+
+                        version: approved
+                            ? 2
+                            : ctxBefore.act.version,
+                    });
+                }
+            }
+
             return res.json({
                 success: true,
                 ...result,
@@ -817,7 +837,6 @@ router.post(
                 );
             }
         }
-    }
-);
+    });
 
 module.exports = router;
