@@ -36,7 +36,7 @@ function labelForDecision(value) {
     )?.label || "Решение сохранено";
 }
 
-export default function ActAcceptancePanel({ act }) {
+export default function ActAcceptancePanel({ act, onDecisionSaved,}) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -268,6 +268,10 @@ export default function ActAcceptancePanel({ act }) {
             setSuccess(
                 "Ваше решение сохранено в истории акта."
             );
+
+            if (onDecisionSaved) {
+                onDecisionSaved();
+            }
 
         } catch (requestError) {
             setError(

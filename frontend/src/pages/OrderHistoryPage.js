@@ -1000,6 +1000,7 @@ const OrderHistoryPage = () => {
                                         {!isExpress && (
                                             <VerifiedCompletionActCard
                                                 act={verifiedAct}
+                                                onRevision={refreshAssignments}
                                             />
                                         )}
 

@@ -61,6 +61,7 @@ const verifiedContractsRoutes = require("./routes/verifiedContracts");
 const signatureAgreementRoutes = require("./routes/signatureAgreement");
 const contractSigningRoutes = require("./routes/contractSigning");
 const actAcceptanceRoutes = require("./routes/actAcceptance");
+const actRemediationRoutes = require("./routes/actRemediation");
 
 const db = require("./models");
 const sequelize = require("./config/database");
@@ -243,16 +244,10 @@ app.use("/contracts", (req, res) => {
     return res.sendStatus(404);
 });
 
-console.log(
-    "Uploads directory:",
-    uploadsRoot
-);
+console.log("Uploads directory:", uploadsRoot);
+console.log("Contracts directory:", contractsRoot);
 
-console.log(
-    "Contracts directory:",
-    contractsRoot
-);
-
+app.use("/api/contracts/acts", actRemediationRoutes);
 app.use("/api/contracts/acts", actAcceptanceRoutes);
 app.use("/api/contracts/signing", contractSigningRoutes);
 app.use("/api/contracts/e-sign", signatureAgreementRoutes);

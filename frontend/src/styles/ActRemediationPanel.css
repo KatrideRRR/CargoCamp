@@ -1,0 +1,123 @@
+
+.cc-remediation {
+    width: 100%;
+    min-width: 0;
+    margin-top: 14px;
+    padding: 14px;
+    border: 1px solid #bfdbfe;
+    border-radius: 14px;
+    background: #fff;
+    box-sizing: border-box;
+}
+
+.cc-remediation * {
+    box-sizing: border-box;
+}
+
+.cc-remediation h4 {
+    margin: 0 0 12px;
+    color: #0f172a;
+    font-size: 14px;
+}
+
+.cc-remediation form,
+.cc-remediation form > label {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cc-remediation form {
+    margin-top: 12px;
+}
+
+.cc-remediation label {
+    font-size: 12px;
+    color: #334155;
+    line-height: 1.5;
+}
+
+.cc-remediation textarea {
+    width: 100%;
+    min-height: 90px;
+    padding: 11px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    font: inherit;
+    resize: vertical;
+}
+
+.cc-remediation-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cc-remediation-options label,
+.cc-remediation-confirm {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-start;
+    gap: 9px;
+}
+
+.cc-remediation input[type="radio"],
+.cc-remediation input[type="checkbox"] {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    accent-color: #2563eb;
+}
+
+.cc-remediation button[type="submit"] {
+    min-height: 44px;
+    padding: 11px;
+    border: 0;
+    border-radius: 11px;
+    background: #2563eb;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.cc-remediation button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.cc-remediation-note,
+.cc-remediation-warning,
+.cc-remediation-error,
+.cc-remediation-success {
+    margin: 10px 0;
+    padding: 11px;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+
+.cc-remediation-note {
+    background: #f8fafc;
+    color: #334155;
+}
+
+.cc-remediation-note p {
+    margin: 5px 0 0;
+    white-space: pre-wrap;
+}
+
+.cc-remediation-warning {
+    background: #fffbeb;
+    color: #92400e;
+}
+
+.cc-remediation-error {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.cc-remediation-success {
+    background: #f0fdf4;
+    color: #15803d;
+}

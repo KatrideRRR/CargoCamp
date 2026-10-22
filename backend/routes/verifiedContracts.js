@@ -143,6 +143,7 @@ router.post("/assignments/summary", authenticateToken, async (req, res) => {
                     attributes: [
                         "id",
                         "orderId",
+                        "parentContractId",
                         "type",
                         "version",
                         "status",

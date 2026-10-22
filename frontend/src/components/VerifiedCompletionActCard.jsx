@@ -2,6 +2,7 @@ import React, {useState} from "react";
 import {downloadVerifiedContract,} from "../utils/downloadVerifiedContract";
 import "../styles/VerifiedAssignmentCard.css";
 import ActAcceptancePanel from "./ActAcceptancePanel";
+import ActRemediationPanel from "./ActRemediationPanel";
 
 function formatDate(value) {
     if (!value) return "—";
@@ -15,11 +16,20 @@ function formatDate(value) {
 
 export default function VerifiedCompletionActCard({
                                                       act,
+                                                      onRevision,
                                                   }) {
     const [downloading, setDownloading] =
         useState(false);
 
+    const [downloadingPrevious, setDownloadingPrevious] =
+        useState(false);
+
+    const [reviewRevision, setReviewRevision] =
+        useState(0);
+
     const [error, setError] = useState("");
+
+    // Далее оставь существующий код компонента.
 
     if (!act) return null;
 
@@ -50,6 +60,32 @@ export default function VerifiedCompletionActCard({
 
         } finally {
             setDownloading(false);
+        }
+    };
+
+    const handlePreviousDownload = async (event) => {
+        event.stopPropagation();
+
+        if (downloadingPrevious) return;
+
+        try {
+            setDownloadingPrevious(true);
+            setError("");
+
+            await downloadVerifiedContract(
+                act.parentContractId,
+                Number(act.version) - 1,
+                "act"
+            );
+
+        } catch (downloadError) {
+            setError(
+                downloadError.message ||
+                "Не удалось скачать предыдущий акт"
+            );
+
+        } finally {
+            setDownloadingPrevious(false);
         }
     };
 
@@ -147,7 +183,39 @@ export default function VerifiedCompletionActCard({
                     : "Скачать акт (PDF)"}
             </button>
 
-            <ActAcceptancePanel act={act} />
+            {Number(act.version) > 1 &&
+                act.parentContractId && (
+                    <button
+                        type="button"
+                        className="cc-va-download"
+                        disabled={downloadingPrevious}
+                        onClick={handlePreviousDownload}
+                        style={{
+                            marginTop: 8,
+                            background: "#ffffff",
+                            color: "#2563eb",
+                        }}
+                    >
+                        {downloadingPrevious
+                            ? "Скачиваем предыдущий акт..."
+                            : "Скачать предыдущую версию акта"}
+                    </button>
+                )}
+
+            <ActAcceptancePanel
+                act={act}
+                onDecisionSaved={() => {
+                    setReviewRevision((value) => value + 1);
+                }}
+            />
+
+            {Number(act.version) === 1 && (
+                <ActRemediationPanel
+                    act={act}
+                    refreshKey={reviewRevision}
+                    onRevised={onRevision}
+                />
+            )}
 
             <p className="cc-va-footnote">
                 Решение о приёмке фиксируется отдельно

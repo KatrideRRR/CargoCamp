@@ -150,6 +150,48 @@ ${row("Завершение заказа", formatDate(data.completedAt))}
 ${row("Отметка заказчика", "Завершение подтверждено в приложении")}
 ${row("Отметка исполнителя", "Завершение подтверждено в приложении")}
 
+${data.remediation ? `
+<h2>5. Устранение ранее заявленных замечаний</h2>
+
+${row(
+        "Предыдущий акт",
+        data.remediation.previousDocumentNumber
+    )}
+
+${row(
+        "Первоначальные замечания заказчика",
+        data.remediation.originalRemarks
+    )}
+
+${row(
+        "Сообщение исполнителя об исправлениях",
+        data.remediation.executorComment
+    )}
+
+${row(
+        "Исполнитель сообщил об исправлениях",
+        formatDate(data.remediation.submittedAt)
+    )}
+
+${row(
+        "Заказчик проверил исправления",
+        formatDate(data.remediation.reviewedAt)
+    )}
+
+${row(
+        "Комментарий заказчика",
+        data.remediation.reviewComment || "Не указан"
+    )}
+
+<div class="notice">
+    Заказчик подтвердил, что ознакомился
+    с сообщением исполнителя об исправлениях.
+    Это подтверждение само по себе не является
+    окончательной приёмкой работ без замечаний
+    и не заменяет подписание настоящего акта.
+</div>
+` : ""}
+
 <div class="warning">
     <strong>Важное пояснение.</strong>
 
