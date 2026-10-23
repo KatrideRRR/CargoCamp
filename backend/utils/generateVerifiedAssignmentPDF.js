@@ -181,12 +181,6 @@ async function generateVerifiedAssignmentPDF(
     snapshot,
     photoAnnex = null
 ) {
-
-    await page.setContent(
-        renderHtml(snapshot, photoAnnex),
-        { waitUntil: "load" }
-    );
-
     let browser;
 
     try {
@@ -202,7 +196,7 @@ async function generateVerifiedAssignmentPDF(
         const page = await browser.newPage();
 
         await page.setContent(
-            renderHtml(snapshot),
+            renderHtml(snapshot, photoAnnex),
             { waitUntil: "load" }
         );
 
@@ -218,7 +212,6 @@ async function generateVerifiedAssignmentPDF(
         });
 
         return Buffer.from(pdf);
-
     } finally {
         if (browser) {
             await browser.close();
