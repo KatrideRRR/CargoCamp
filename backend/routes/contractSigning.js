@@ -400,6 +400,7 @@ router.get("/:contractId/status", async (req, res) => {
                 accepted &&
                 identitiesValid &&
                 Boolean(phone) &&
+                !mySigned &&
                 ["2", "3"].includes(
                     String(ctx.contract.templateVersion)
                 ) &&
