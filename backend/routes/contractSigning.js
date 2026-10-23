@@ -21,6 +21,8 @@ const {
     IdentityVerification,
     ElectronicSignatureAgreement,
     ActionLog,
+    Dispute,
+
 } = require("../models");
 
 const {
@@ -172,9 +174,12 @@ async function getContext(id, userId, transaction, lock) {
 
     if (
         !contract ||
-        contract.type !== "verified_assignment"
+        ![
+            "verified_assignment",
+            "verified_completion_act",
+        ].includes(contract.type)
     ) {
-        throw fail(404, "Договор не найден");
+        throw fail(404, "Документ не найден");
     }
 
     const order = await Order.findByPk(
@@ -205,6 +210,176 @@ async function getContext(id, userId, transaction, lock) {
                 : "executor",
     };
 }
+
+
+async function assertDocumentReadyForSigning(
+    ctx,
+    transaction = null
+) {
+    const { contract, order } = ctx;
+
+    if (
+        contract.type ===
+        "verified_assignment"
+    ) {
+        /*
+         * Нельзя впервые оформлять договор
+         * как подписанный до работы,
+         * когда работа уже началась.
+         */
+        if (
+            order.workStartedAt ||
+            order.status === "completed"
+        ) {
+            throw fail(
+                409,
+                "Договор-задание нужно подписать до начала работы"
+            );
+        }
+
+        return;
+    }
+
+    if (
+        contract.type !==
+        "verified_completion_act"
+    ) {
+        throw fail(
+            409,
+            "Тип документа не поддерживается"
+        );
+    }
+
+    if (order.status !== "completed") {
+        throw fail(
+            409,
+            "Акт можно подписать после завершения заказа"
+        );
+    }
+
+    const latestAct =
+        await Contract.findOne({
+            where: {
+                orderId: order.id,
+                type:
+                    "verified_completion_act",
+            },
+
+            order: [
+                ["version", "DESC"],
+                ["id", "DESC"],
+            ],
+
+            transaction,
+        });
+
+    if (
+        !latestAct ||
+        String(latestAct.id) !==
+        String(contract.id) ||
+        contract.supersededAt
+    ) {
+        throw fail(
+            409,
+            "Для заказа существует более новая версия акта"
+        );
+    }
+
+    /*
+     * В подтверждённой сделке акт должен
+     * быть связан с ранее подписанным
+     * договором-заданием.
+     */
+    const assignment =
+        await Contract.findOne({
+            where: {
+                orderId: order.id,
+                type: "verified_assignment",
+            },
+
+            order: [
+                ["version", "DESC"],
+                ["id", "DESC"],
+            ],
+
+            transaction,
+        });
+
+    if (
+        !assignment ||
+        assignment.status !==
+        "fully_signed" ||
+        !assignment.fullySignedAt
+    ) {
+        throw fail(
+            409,
+            "Перед подписанием акта требуется подписанный договор-задание"
+        );
+    }
+
+    /*
+     * Отметка order.completed — не то же
+     * самое, что приёмка без замечаний.
+     */
+    const decision =
+        await ContractEvent.findOne({
+            where: {
+                contractId: contract.id,
+                eventType:
+                    "act_customer_decision",
+            },
+
+            order: [
+                ["id", "DESC"],
+            ],
+
+            transaction,
+        });
+
+    if (
+        !decision ||
+        decision.metadata?.decision !==
+        "accepted" ||
+        Number(decision.actorUserId) !==
+        Number(order.creatorId) ||
+        !safeHashEqual(
+            decision.metadata?.documentHash,
+            contract.documentHash
+        )
+    ) {
+        throw fail(
+            409,
+            "Заказчик ещё не принял эту версию акта без замечаний"
+        );
+    }
+
+    const dispute =
+        await Dispute.findOne({
+            where: {
+                orderId: order.id,
+                orderType: "regular",
+
+                status: {
+                    [Op.in]: [
+                        "open",
+                        "in_review",
+                        "waiting_creator",
+                        "waiting_executor",
+                    ],
+                },
+            },
+
+            transaction,
+        });
+
+    if (dispute) {
+        throw fail(
+            409,
+            "Подписание акта заблокировано из-за открытого спора"
+        );
+    }
+}
+
 
 async function activeIdentity(
     userId,
@@ -308,6 +483,20 @@ router.get("/:contractId/status", async (req, res) => {
             userId
         );
 
+        let blockedReason = null;
+
+        try {
+            await assertDocumentReadyForSigning(
+                ctx
+            );
+        } catch (error) {
+            if (error.httpStatus === 409) {
+                blockedReason = error.message;
+            } else {
+                throw error;
+            }
+        }
+
         const signatures = await ContractSignature.findAll({
             where: { contractId: ctx.contract.id },
             attributes: ["userId", "signedAt"],
@@ -393,6 +582,7 @@ router.get("/:contractId/status", async (req, res) => {
             identitiesValid,
             mySigned,
             otherSigned,
+            blockedReason,
             contractStatus: ctx.contract.status,
             maskedPhone: phone ? maskPhone(phone) : null,
             canSign:
@@ -400,6 +590,7 @@ router.get("/:contractId/status", async (req, res) => {
                 accepted &&
                 identitiesValid &&
                 Boolean(phone) &&
+                !blockedReason &&
                 !mySigned &&
                 ["2", "3"].includes(
                     String(ctx.contract.templateVersion)
@@ -451,6 +642,10 @@ router.post("/:contractId/request-code", async (req, res) => {
 
         requireUnsigned(existingCtx.contract);
 
+        await assertDocumentReadyForSigning(
+            existingCtx
+        );
+
         if (
             !safeHashEqual(
                 req.body?.documentHash,
@@ -493,6 +688,11 @@ router.post("/:contractId/request-code", async (req, res) => {
                 );
 
                 requireUnsigned(ctx.contract);
+
+                await assertDocumentReadyForSigning(
+                    ctx,
+                    transaction
+                );
 
                 if (
                     !safeHashEqual(
@@ -719,6 +919,10 @@ router.post("/:contractId/confirm-code", async (req, res) => {
 
         requireUnsigned(ctxBefore.contract);
 
+        await assertDocumentReadyForSigning(
+            existingCtx
+        );
+
         if (
             !safeHashEqual(
                 req.body?.documentHash,
@@ -742,6 +946,11 @@ router.post("/:contractId/confirm-code", async (req, res) => {
                 );
 
                 requireUnsigned(ctx.contract);
+
+                await assertDocumentReadyForSigning(
+                    ctx,
+                    transaction
+                );
 
                 const challenge =
                     await SignatureChallenge.findOne({

@@ -16,6 +16,14 @@ export default function ContractSigningPanel({
     const [confirmed, setConfirmed] = useState(false);
     const [code, setCode] = useState("");
 
+    const isAct =
+        assignment.type ===
+        "verified_completion_act";
+
+    const documentTitle = isAct
+        ? "акта"
+        : "договора";
+
     const base =
         `/contracts/signing/${assignment.id}`;
 
@@ -224,6 +232,13 @@ export default function ContractSigningPanel({
                                                     намерен подписать
                                                     именно этот документ.
                                                 </span>
+
+                                                {state.blockedReason &&
+                                                    !state.mySigned && (
+                                                        <p className="cc-signing-note">
+                                                            {state.blockedReason}
+                                                        </p>
+                                                    )}
                                             </label>
 
                                             <button

@@ -289,6 +289,35 @@ async function buildContractEvidence(contractId) {
 
     const warnings = [];
 
+    if (
+        contract.type === "verified_completion_act" &&
+        signatures.length > 0
+    ) {
+        const acceptance = [...events]
+            .reverse()
+            .find(
+                (event) =>
+                    event.eventType ===
+                    "act_customer_decision"
+            );
+
+        if (
+            !acceptance ||
+            acceptance.metadata?.decision !==
+            "accepted" ||
+            Number(acceptance.actorUserId) !==
+            Number(order.creatorId) ||
+            !sameHash(
+                acceptance.metadata?.documentHash,
+                contract.documentHash
+            )
+        ) {
+            warnings.push(
+                "Подписи акта не связаны с подтверждённой приёмкой этой версии заказчиком."
+            );
+        }
+    }
+
     for (const agreement of agreements) {
         const archive =
             archivedAgreementMap.get(

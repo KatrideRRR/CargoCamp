@@ -193,6 +193,8 @@ router.get("/:actId/acceptance", async (req, res) => {
                     Boolean(activeDispute),
 
                 decision: serializeDecision(event),
+                canRequestCorrections:
+                    Number(ctx.act.version) === 1,
             });
 
         } catch (error) {
@@ -207,6 +209,16 @@ router.post("/:actId/acceptance", async (req, res) => {
             const decision = String(
                 req.body?.decision || ""
             );
+
+            if (
+                decision === "remarks" &&
+                Number(ctxBefore.act.version) > 1
+            ) {
+                throw fail(
+                    409,
+                    "Повторная процедура исправлений для этого акта недоступна. При несогласии откройте спор."
+                );
+            }
 
             const comment = String(
                 req.body?.comment || ""
@@ -258,6 +270,16 @@ router.post("/:actId/acceptance", async (req, res) => {
                 req.params.actId,
                 userId
             );
+
+            if (
+                decision === "remarks" &&
+                Number(ctxBefore.act.version) > 1
+            ) {
+                throw fail(
+                    409,
+                    "Повторная процедура исправлений для этого акта недоступна. При несогласии откройте спор."
+                );
+            }
 
             if (!ctxBefore.isCustomer) {
                 throw fail(

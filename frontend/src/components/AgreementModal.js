@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, {useEffect, useState} from "react";
 import "../styles/AgreementModal.css";
 
-const AgreementModal = ({ isOpen, onClose, onAgree }) => {
+const AgreementModal = ({isOpen, onClose, onAgree}) => {
     const [checked, setChecked] = useState(false);
 
     useEffect(() => {

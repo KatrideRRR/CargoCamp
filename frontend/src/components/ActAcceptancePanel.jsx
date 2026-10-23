@@ -16,6 +16,7 @@ const ACTIVE_DISPUTE_STATUSES = new Set([
 ]);
 
 const OPTIONS = [
+
     {
         value: "accepted",
         label: "Работы приняты без замечаний",
@@ -29,6 +30,7 @@ const OPTIONS = [
         label: "Не согласен с результатом — открыть спор",
     },
 ];
+
 
 function labelForDecision(value) {
     return OPTIONS.find(
@@ -371,6 +373,12 @@ export default function ActAcceptancePanel({ act, onDecisionSaved,}) {
                         </p>
 
                         <div className="cc-act-options">
+                            (option) =>
+                            option.value !== "remarks" ||
+                            data?.canRequestCorrections
+                            ).map((option) => (
+
+
                             {OPTIONS.map((option) => (
                                 <label
                                     key={option.value}

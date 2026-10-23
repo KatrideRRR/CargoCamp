@@ -55,10 +55,17 @@ async function prepareVerifiedActV2({
         );
     }
 
+    const photoAnnex =
+        await collectOrderPhotoAnnex(
+            order,
+            "completion"
+        );
+
     const snapshot = {
         ...originalSnapshot,
 
         version: 2,
+
         documentNumber:
             `CC-ACT-${originalAct.orderId}-V2`,
 
@@ -69,6 +76,7 @@ async function prepareVerifiedActV2({
         photoAnnex.manifest,
 
         remediation: {
+
             previousActId:
                 String(originalAct.id),
 
@@ -98,12 +106,6 @@ async function prepareVerifiedActV2({
             reviewComment,
         },
     };
-
-    const photoAnnex =
-        await collectOrderPhotoAnnex(
-            order,
-            "completion"
-        );
 
     const pdfBuffer =
         await generateVerifiedCompletionActPDF(

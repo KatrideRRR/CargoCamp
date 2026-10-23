@@ -3,6 +3,11 @@ import {downloadVerifiedContract,} from "../utils/downloadVerifiedContract";
 import "../styles/VerifiedAssignmentCard.css";
 import ActAcceptancePanel from "./ActAcceptancePanel";
 import ActRemediationPanel from "./ActRemediationPanel";
+import SignatureAgreementPanel
+    from "./SignatureAgreementPanel";
+
+import ContractSigningPanel
+    from "./ContractSigningPanel";
 
 function formatDate(value) {
     if (!value) return "—";
@@ -209,6 +214,21 @@ export default function VerifiedCompletionActCard({
                 }}
             />
 
+            <SignatureAgreementPanel />
+
+            <ContractSigningPanel
+                assignment={act}
+                onSigned={() => {
+                    setReviewRevision(
+                        (value) => value + 1
+                    );
+
+                    if (onRevision) {
+                        onRevision();
+                    }
+                }}
+            />
+
             {Number(act.version) === 1 && (
                 <ActRemediationPanel
                     act={act}
@@ -220,8 +240,7 @@ export default function VerifiedCompletionActCard({
             <p className="cc-va-footnote">
                 Решение о приёмке фиксируется отдельно
                 от подписания акта. PDF остаётся
-                неизменным. Электронное подписание
-                акта пока недоступно.
+                неизменным. Приёмка работ и электронное подписание акта — разные действия. Для подписания обе стороны отдельно подтверждают соответствующую версию PDF через SMS. До включения сервиса документ остаётся проектом.
             </p>
         </section>
     );
