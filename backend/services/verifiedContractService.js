@@ -1,17 +1,18 @@
 const fs = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
+const {
+    getCurrentVerifiedIdentity,
+} = require("./identityStatusService");
 
 const {
     collectOrderPhotoAnnex,
 } = require("./orderPhotoAnnexService");
-const {Op} = require("sequelize");
 
 const {
     sequelize,
     Contract,
     ContractEvent,
-    IdentityVerification,
 } = require("../models");
 
 const {
@@ -29,32 +30,14 @@ const verifiedRoot = path.join(
     "verified"
 );
 
-async function findActiveVerification(userId, now) {
-    return IdentityVerification.findOne({
-        where: {
-            userId,
-            countryCode: "RU",
-            status: "verified",
-
-            verifiedAt: {
-                [Op.lte]: now,
-            },
-
-            [Op.or]: [
-                {expiresAt: null},
-                {
-                    expiresAt: {
-                        [Op.gt]: now,
-                    },
-                },
-            ],
-        },
-
-        order: [
-            ["verifiedAt", "DESC"],
-            ["id", "DESC"],
-        ],
-    });
+async function findActiveVerification(
+    userId,
+    now
+) {
+    return getCurrentVerifiedIdentity(
+        userId,
+        { now }
+    );
 }
 
 function identitySnapshot(record, userId) {

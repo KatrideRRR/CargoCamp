@@ -4,7 +4,9 @@ const { Op } = require("sequelize");
 
 const authenticateToken =
     require("../middlewares/userAuth");
-
+const {
+    getCurrentIdentityVerification,
+} = require("../services/identityStatusService");
 const {
     sequelize,
     User,
@@ -40,34 +42,6 @@ function httpError(status, message) {
     const error = new Error(message);
     error.httpStatus = status;
     return error;
-}
-
-function getIdentityStatus(record, now = new Date()) {
-    if (!record) {
-        return "not_requested";
-    }
-
-    if (
-        record.status === "verified" &&
-        record.expiresAt &&
-        new Date(record.expiresAt) <= now
-    ) {
-        return "expired";
-    }
-
-    return record.status;
-}
-
-function isActiveVerification(record, now) {
-    return (
-        record.status === "verified" &&
-        record.verifiedAt &&
-        new Date(record.verifiedAt) <= now &&
-        (
-            !record.expiresAt ||
-            new Date(record.expiresAt) > now
-        )
-    );
 }
 
 /*
@@ -114,14 +88,14 @@ router.get(
 
             const now = new Date();
 
-            const active =
-                verifications.find((record) =>
-                    isActiveVerification(record, now)
+
+            const result =
+                await getCurrentIdentityVerification(
+                    userId
                 );
 
-            const latest = verifications[0] || null;
-
-            const verification = active || latest;
+            const verification = result.record;
+            const status = result.status;
 
             if (!verification) {
                 return res.json({
@@ -133,21 +107,14 @@ router.get(
                 });
             }
 
-            const status =
-                active
-                    ? "verified"
-                    : getIdentityStatus(
-                        verification,
-                        now
-                    );
-
             return res.json({
                 success: true,
 
                 verification: {
                     id: verification.id,
+
                     status,
-                    verified: status === "verified",
+                    verified: result.verified,
 
                     assuranceLevel:
                     verification.assuranceLevel,
@@ -162,7 +129,7 @@ router.get(
                     verification.createdAt,
 
                     rejectionReason:
-                        status === "rejected"
+                        ["rejected", "revoked"].includes(status)
                             ? verification.rejectionReason
                             : null,
                 },
@@ -277,51 +244,26 @@ router.post(
                             );
                         }
 
-                        const pending =
-                            await IdentityVerification.findOne({
-                                where: {
-                                    userId,
-                                    countryCode: "RU",
-                                    status: "pending",
-                                },
-                                transaction,
-                            });
 
-                        if (pending) {
+                        const now = new Date();
+
+                        const current =
+                            await getCurrentIdentityVerification(
+                                userId,
+                                {
+                                    transaction,
+                                    now,
+                                }
+                            );
+
+                        if (current.status === "pending") {
                             throw httpError(
                                 409,
                                 "Заявка уже находится на проверке"
                             );
                         }
 
-                        const now = new Date();
-
-                        const active =
-                            await IdentityVerification.findOne({
-                                where: {
-                                    userId,
-                                    countryCode: "RU",
-                                    status: "verified",
-
-                                    verifiedAt: {
-                                        [Op.lte]: now,
-                                    },
-
-                                    [Op.or]: [
-                                        {
-                                            expiresAt: null,
-                                        },
-                                        {
-                                            expiresAt: {
-                                                [Op.gt]: now,
-                                            },
-                                        },
-                                    ],
-                                },
-                                transaction,
-                            });
-
-                        if (active) {
+                        if (current.verified) {
                             throw httpError(
                                 409,
                                 "Личность уже подтверждена"

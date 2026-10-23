@@ -6,6 +6,10 @@ const authenticateToken =
     require("../middlewares/userAuth");
 
 const {
+    getCurrentVerifiedIdentity,
+} = require("../services/identityStatusService");
+
+const {
     sequelize,
     IdentityVerification,
     ElectronicSignatureAgreement,
@@ -66,44 +70,7 @@ function sameHash(first, second) {
 }
 
 async function getCurrentVerification(userId) {
-    /*
-     * Консервативная проверка:
-     * последняя заявка должна иметь
-     * действующий статус verified.
-     *
-     * Более старое одобрение не разрешает
-     * принимать соглашение при последующем
-     * отказе или отзыве проверки.
-     */
-    const record =
-        await IdentityVerification.findOne({
-            where: {
-                userId,
-                countryCode: "RU",
-            },
-
-            order: [
-                ["createdAt", "DESC"],
-                ["id", "DESC"],
-            ],
-        });
-
-    const now = new Date();
-
-    if (
-        !record ||
-        record.status !== "verified" ||
-        !record.verifiedAt ||
-        new Date(record.verifiedAt) > now ||
-        (
-            record.expiresAt &&
-            new Date(record.expiresAt) <= now
-        )
-    ) {
-        return null;
-    }
-
-    return record;
+    return getCurrentVerifiedIdentity(userId);
 }
 
 async function findAgreement(userId, policy) {

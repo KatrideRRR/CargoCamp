@@ -28,6 +28,7 @@ const CAN_APPLY = new Set([
     "rejected",
     "expired",
     "revoked",
+    "invalid",
 ]);
 
 const STATUS = {
@@ -66,6 +67,14 @@ const STATUS = {
         className: "rejected",
         description:
             "Подтверждение отозвано. Можно обратиться в поддержку.",
+    },
+    invalid: {
+        title: "Требуется повторная проверка",
+        className: "rejected",
+        description:
+            "Сведения о предыдущей проверке " +
+            "неполные или недействительны. " +
+            "Необходимо повторно подтвердить личность.",
     },
 };
 

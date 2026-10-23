@@ -11,6 +11,10 @@ const {
 } = require("../models");
 
 const {
+    getCurrentIdentityVerification,
+} = require("../services/identityStatusService");
+
+const {
     authMiddleware,
     adminMiddleware,
 } = require("../middlewares/adminAuth");
@@ -741,5 +745,243 @@ router.post(
         }
     }
 );
+
+
+/*
+ * POST /api/admin/identity/:id/revoke
+ *
+ * body: { reason: "..." }
+ *
+ * Все общие проверки прав администратора
+ * и действующей admin-сессии
+ * уже применяются через router.use().
+ */
+router.post(
+    "/:id/revoke",
+    async (req, res) => {
+        try {
+            if (!validId(req.params.id)) {
+                throw httpError(
+                    400,
+                    "Некорректный ID проверки"
+                );
+            }
+
+            if (
+                typeof req.body?.reason !== "string"
+            ) {
+                throw httpError(
+                    400,
+                    "Укажите причину отзыва"
+                );
+            }
+
+            const reason =
+                req.body.reason.trim();
+
+            if (
+                reason.length < 10 ||
+                reason.length > 500
+            ) {
+                throw httpError(
+                    400,
+                    "Причина должна содержать от 10 до 500 символов"
+                );
+            }
+
+            const result =
+                await sequelize.transaction(
+                    async (transaction) => {
+                        const candidate =
+                            await IdentityVerification.findByPk(
+                                req.params.id,
+                                { transaction }
+                            );
+
+                        if (!candidate) {
+                            throw httpError(
+                                404,
+                                "Проверка не найдена"
+                            );
+                        }
+
+                        /*
+                         * Блокируем пользователя, как
+                         * в маршруте подачи заявки.
+                         * Это сериализует конкурирующие
+                         * изменения проверки личности.
+                         */
+                        const user =
+                            await User.findByPk(
+                                candidate.userId,
+                                {
+                                    transaction,
+                                    lock:
+                                    transaction.LOCK.UPDATE,
+                                }
+                            );
+
+                        if (!user) {
+                            throw httpError(
+                                404,
+                                "Пользователь не найден"
+                            );
+                        }
+
+                        const current =
+                            await getCurrentIdentityVerification(
+                                candidate.userId,
+                                { transaction }
+                            );
+
+                        if (
+                            !current.verified ||
+                            String(current.record.id) !==
+                            String(candidate.id)
+                        ) {
+                            throw httpError(
+                                409,
+                                "Эта проверка уже не является действующей"
+                            );
+                        }
+
+                        const verification =
+                            await IdentityVerification.findByPk(
+                                candidate.id,
+                                {
+                                    transaction,
+                                    lock:
+                                    transaction.LOCK.UPDATE,
+                                }
+                            );
+
+                        if (
+                            verification.status !==
+                            "verified"
+                        ) {
+                            throw httpError(
+                                409,
+                                "Проверка уже отозвана или изменена"
+                            );
+                        }
+
+                        const revokedAt =
+                            new Date();
+
+                        const previousMetadata =
+                            verification.metadata &&
+                            typeof verification.metadata === "object" &&
+                            !Array.isArray(
+                                verification.metadata
+                            )
+                                ? verification.metadata
+                                : {};
+
+                        verification.status =
+                            "revoked";
+
+                        verification.rejectionReason =
+                            reason;
+
+                        verification.metadata = {
+                            ...previousMetadata,
+
+                            revocation: {
+                                revokedAt:
+                                    revokedAt.toISOString(),
+
+                                revokedBy:
+                                    Number(req.user.id),
+
+                                reason,
+                            },
+                        };
+
+                        /*
+                         * verifiedAt и expiresAt
+                         * не стираем: это история
+                         * изначально выданного
+                         * подтверждения личности.
+                         */
+                        await verification.save({
+                            transaction,
+                        });
+
+                        await ActionLog.create(
+                            {
+                                actorUserId:
+                                req.user.id,
+
+                                actorRole: "admin",
+
+                                actionType:
+                                    "identity_verification_revoked",
+
+                                entityType: "user",
+
+                                entityId:
+                                verification.userId,
+
+                                meta: {
+                                    verificationId:
+                                        String(
+                                            verification.id
+                                        ),
+
+                                    revokedAt:
+                                        revokedAt.toISOString(),
+
+                                    reason,
+                                },
+                            },
+                            { transaction }
+                        );
+
+                        return {
+                            id: verification.id,
+                            userId:
+                            verification.userId,
+
+                            status:
+                            verification.status,
+
+                            revokedAt,
+                        };
+                    }
+                );
+
+            return res.json({
+                success: true,
+
+                message:
+                    "Подтверждение личности отозвано",
+
+                verification: result,
+            });
+
+        } catch (error) {
+            if (error.httpStatus) {
+                return res
+                    .status(error.httpStatus)
+                    .json({
+                        success: false,
+                        message: error.message,
+                    });
+            }
+
+            console.error(
+                "Identity revocation error:",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                message:
+                    "Не удалось отозвать проверку",
+            });
+        }
+    }
+);
+
 
 module.exports = router;

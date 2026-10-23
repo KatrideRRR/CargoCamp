@@ -3,53 +3,21 @@ const {
     IdentityVerification,
 } = require("../models");
 
+const {
+    getCurrentVerifiedIdentity,
+} = require("./identityStatusService");
+
 /*
  * Не использовать старый userStatus === "verified".
  * Проверяем реальную IdentityVerification.
  */
 async function hasVerifiedIdentity(userId) {
-    const id = Number(userId);
+    const verification =
+        await getCurrentVerifiedIdentity(
+            userId
+        );
 
-    if (!Number.isSafeInteger(id) || id <= 0) {
-        return false;
-    }
-
-    const latest =
-        await IdentityVerification.findOne({
-            where: {
-                userId: id,
-                countryCode: "RU",
-            },
-
-            order: [
-                ["createdAt", "DESC"],
-                ["id", "DESC"],
-            ],
-        });
-
-    if (!latest) return false;
-
-    const now = Date.now();
-    const verifiedAt = latest.verifiedAt
-        ? new Date(latest.verifiedAt).getTime()
-        : NaN;
-
-    const expiresAt = latest.expiresAt
-        ? new Date(latest.expiresAt).getTime()
-        : null;
-
-    return (
-        latest.status === "verified" &&
-        Number.isFinite(verifiedAt) &&
-        verifiedAt <= now &&
-        (
-            expiresAt === null ||
-            (
-                Number.isFinite(expiresAt) &&
-                expiresAt > now
-            )
-        )
-    );
+    return Boolean(verification);
 }
 
 /*

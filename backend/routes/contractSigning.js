@@ -7,6 +7,10 @@ const authenticateToken =
     require("../middlewares/userAuth");
 
 const {
+    getCurrentVerifiedIdentity,
+} = require("../services/identityStatusService");
+
+const {
     sequelize,
     User,
     Order,
@@ -196,35 +200,14 @@ async function getContext(id, userId, transaction, lock) {
     };
 }
 
-async function activeIdentity(userId, transaction) {
-    const record = await IdentityVerification.findOne({
-        where: {
-            userId,
-            countryCode: "RU",
-        },
-        order: [
-            ["createdAt", "DESC"],
-            ["id", "DESC"],
-        ],
-        transaction,
-    });
-
-    const now = new Date();
-
-    if (
-        !record ||
-        record.status !== "verified" ||
-        !record.verifiedAt ||
-        new Date(record.verifiedAt) > now ||
-        (
-            record.expiresAt &&
-            new Date(record.expiresAt) <= now
-        )
-    ) {
-        return null;
-    }
-
-    return record;
+async function activeIdentity(
+    userId,
+    transaction
+) {
+    return getCurrentVerifiedIdentity(
+        userId,
+        { transaction }
+    );
 }
 
 async function prerequisites(ctx, userId, transaction) {
