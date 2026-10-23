@@ -920,7 +920,7 @@ router.post("/:contractId/confirm-code", async (req, res) => {
         requireUnsigned(ctxBefore.contract);
 
         await assertDocumentReadyForSigning(
-            existingCtx
+            ctxBefore
         );
 
         if (

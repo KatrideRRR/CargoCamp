@@ -210,16 +210,6 @@ router.post("/:actId/acceptance", async (req, res) => {
                 req.body?.decision || ""
             );
 
-            if (
-                decision === "remarks" &&
-                Number(ctxBefore.act.version) > 1
-            ) {
-                throw fail(
-                    409,
-                    "Повторная процедура исправлений для этого акта недоступна. При несогласии откройте спор."
-                );
-            }
-
             const comment = String(
                 req.body?.comment || ""
             ).trim();

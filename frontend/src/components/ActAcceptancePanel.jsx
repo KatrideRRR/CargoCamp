@@ -373,13 +373,11 @@ export default function ActAcceptancePanel({ act, onDecisionSaved,}) {
                         </p>
 
                         <div className="cc-act-options">
-                            (option) =>
-                            option.value !== "remarks" ||
-                            data?.canRequestCorrections
+                            {OPTIONS.filter(
+                                (option) =>
+                                    option.value !== "remarks" ||
+                                    data?.canRequestCorrections
                             ).map((option) => (
-
-
-                            {OPTIONS.map((option) => (
                                 <label
                                     key={option.value}
                                     className="cc-act-option"
@@ -389,21 +387,16 @@ export default function ActAcceptancePanel({ act, onDecisionSaved,}) {
                                         name={`act-${actId}`}
                                         value={option.value}
                                         checked={
-                                            selection ===
-                                            option.value
+                                            selection === option.value
                                         }
                                         disabled={saving}
                                         onChange={() => {
-                                            setSelection(
-                                                option.value
-                                            );
+                                            setSelection(option.value);
                                             setConfirmed(false);
                                         }}
                                     />
 
-                                    <span>
-                                        {option.label}
-                                    </span>
+                                    <span>{option.label}</span>
                                 </label>
                             ))}
                         </div>
