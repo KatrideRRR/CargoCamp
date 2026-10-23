@@ -246,6 +246,24 @@ async function loadState(ctx, transaction = null) {
     };
 }
 
+function requireCurrentRound(state, expectedRound, submitting = false) {
+    const currentRound =
+        submitting && state.status === "awaiting_customer"
+            ? expectedRound + 1
+            : expectedRound;
+
+    if (
+        !Number.isSafeInteger(expectedRound) ||
+        expectedRound < 0 ||
+        state.round !== currentRound
+    ) {
+        throw fail(
+            409,
+            "Состояние исправлений изменилось. Обновите страницу."
+        );
+    }
+}
+
 function publicState(ctx, state) {
     return {
         success: true,
@@ -353,6 +371,8 @@ router.post("/:actId/remediation/submit", async (req, res) => {
                                 ctx,
                                 transaction
                             );
+
+                        requireCurrentRound(state, req.body?.expectedRound, true);
 
                         if (
                             state.status ===
@@ -522,6 +542,8 @@ router.post("/:actId/remediation/review", async (req, res) => {
             const initialState =
                 await loadState(ctxBefore);
 
+            requireCurrentRound(initialState, req.body?.expectedRound);
+
             if (initialState.revision && approved) {
                 return res.json({
                     success: true,
@@ -589,6 +611,8 @@ router.post("/:actId/remediation/review", async (req, res) => {
                                 ctx,
                                 transaction
                             );
+
+                        requireCurrentRound(state, req.body?.expectedRound);
 
                         if (
                             approved &&

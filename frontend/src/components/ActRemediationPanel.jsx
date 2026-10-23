@@ -98,6 +98,10 @@ export default function ActRemediationPanel({
 
     }, [actId, refreshKey]);
 
+    useEffect(() => {
+        setConfirmed(false);
+    }, [actId, data?.round, data?.status]);
+
     if (!act) return null;
 
     if (
@@ -108,10 +112,10 @@ export default function ActRemediationPanel({
     }
 
     const canSend =
-        data?.canSubmit && !busy;
+        data?.canSubmit && !busy && !loading;
 
     const canReview =
-        data?.canReview && !busy;
+        data?.canReview && !busy && !loading;
 
     async function submitCorrections(event) {
         event.preventDefault();
@@ -134,6 +138,7 @@ export default function ActRemediationPanel({
                     comment: comment.trim(),
                     documentHash:
                     act.documentHash,
+                    expectedRound: data.round,
                 }
             );
 
@@ -186,6 +191,7 @@ export default function ActRemediationPanel({
 
                         documentHash:
                         act.documentHash,
+                        expectedRound: data.round,
                     }
                 );
 
