@@ -23,6 +23,12 @@ const {
     ActionLog,
 } = require("../models");
 
+const {
+    requireArchivedSignaturePolicy,
+} = require(
+    "../services/signaturePolicyArchiveService"
+);
+
 const { getSignaturePolicy } =
     require("../config/signaturePolicy");
 
@@ -213,6 +219,11 @@ async function activeIdentity(
 async function prerequisites(ctx, userId, transaction) {
     const policy = getSignaturePolicy();
 
+    await requireArchivedSignaturePolicy(
+        policy,
+        { transaction }
+    );
+
     const [customerIdentity, executorIdentity, agreement] =
         await Promise.all([
             activeIdentity(ctx.order.creatorId, transaction),
@@ -324,6 +335,10 @@ router.get("/:contractId/status", async (req, res) => {
         }
 
         const policy = getSignaturePolicy();
+
+        await requireArchivedSignaturePolicy(
+            policy
+        );
 
         const agreement =
             await ElectronicSignatureAgreement.findOne({

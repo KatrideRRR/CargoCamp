@@ -46,6 +46,7 @@ db.ExpressSavedAddress = require("./ExpressSavedAddress")(sequelize, DataTypes);
 db.ServiceSearchAlias = require("./ServiceSearchAlias")(sequelize, DataTypes);
 // Electronic Signature Foundation
 db.ElectronicSignatureAgreement = require("./ElectronicSignatureAgreement")(sequelize, DataTypes);
+db.SignaturePolicyRevision = require("./SignaturePolicyRevision")(sequelize, DataTypes);
 db.SignatureChallenge = require("./SignatureChallenge")(sequelize, DataTypes);
 // Social Benefits Foundation
 db.UserBenefitVerification = require("./UserBenefitVerification")(sequelize, DataTypes);

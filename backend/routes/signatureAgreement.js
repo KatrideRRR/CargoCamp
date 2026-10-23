@@ -6,6 +6,13 @@ const authenticateToken =
     require("../middlewares/userAuth");
 
 const {
+    requireArchivedSignaturePolicy,
+    inspectArchivedAgreement,
+} = require(
+    "../services/signaturePolicyArchiveService"
+);
+
+const {
     getCurrentVerifiedIdentity,
 } = require("../services/identityStatusService");
 
@@ -95,6 +102,11 @@ router.get("/agreement", async (req, res) => {
         const userId = Number(req.user.id);
         const policy = getSignaturePolicy();
 
+        const archived =
+            await requireArchivedSignaturePolicy(
+                policy
+            );
+
         const [verification, agreement] =
             await Promise.all([
                 getCurrentVerification(userId),
@@ -111,7 +123,18 @@ router.get("/agreement", async (req, res) => {
         return res.json({
             success: true,
 
-            policy,
+            policy: {
+                ...policy,
+
+                text: archived.policyText,
+                sha256: archived.policySha256,
+
+                archiveId:
+                    String(archived.id),
+
+                archivedAt:
+                archived.archivedAt,
+            },
 
             identityVerified:
                 Boolean(verification),
@@ -182,6 +205,10 @@ router.post("/agreement", async (req, res) => {
             );
         }
 
+        await requireArchivedSignaturePolicy(
+            policy
+        );
+
         const verification =
             await getCurrentVerification(userId);
 
@@ -211,6 +238,11 @@ router.post("/agreement", async (req, res) => {
         const result =
             await sequelize.transaction(
                 async (transaction) => {
+                    const archived =
+                        await requireArchivedSignaturePolicy(
+                            policy,
+                            { transaction }
+                        );
                     const [agreement, created] =
                         await ElectronicSignatureAgreement
                             .findOrCreate({
@@ -242,6 +274,11 @@ router.post("/agreement", async (req, res) => {
                                             String(
                                                 verification.id
                                             ),
+                                        policyArchiveId:
+                                            String(archived.id),
+
+                                        policySha256:
+                                        archived.policySha256,
                                     },
                                 },
 
@@ -264,6 +301,19 @@ router.post("/agreement", async (req, res) => {
                             "Конфликт редакции соглашения"
                         );
                     }
+                    const savedArchiveId =
+                        agreement.evidence?.policyArchiveId;
+
+                    if (
+                        savedArchiveId &&
+                        String(savedArchiveId) !==
+                        String(archived.id)
+                    ) {
+                        throw getError(
+                            409,
+                            "Соглашение связано с другой архивной редакцией"
+                        );
+                    }
 
                     if (created) {
                         await ActionLog.create(
@@ -283,6 +333,8 @@ router.post("/agreement", async (req, res) => {
                                 meta: {
                                     agreementId:
                                         String(agreement.id),
+                                    policyArchiveId:
+                                        String(archived.id),
 
                                     policyCode:
                                     policy.code,
@@ -330,5 +382,85 @@ router.post("/agreement", async (req, res) => {
         return errorResponse(res, error);
     }
 });
+
+
+/*
+ * GET /api/contracts/e-sign/my-agreements
+ *
+ * Пользователь видит только собственные
+ * согласия и полный текст соответствующих
+ * архивных редакций.
+ */
+router.get(
+    "/my-agreements",
+    async (req, res) => {
+        try {
+            const userId =
+                Number(req.user.id);
+
+            const agreements =
+                await ElectronicSignatureAgreement
+                    .findAll({
+                        where: { userId },
+
+                        order: [
+                            ["acceptedAt", "DESC"],
+                            ["id", "DESC"],
+                        ],
+
+                        limit: 100,
+                    });
+
+            const result = [];
+
+            for (const agreement of agreements) {
+                const archive =
+                    await inspectArchivedAgreement(
+                        agreement
+                    );
+
+                result.push({
+                    id: String(agreement.id),
+
+                    acceptedAt:
+                    agreement.acceptedAt,
+
+                    jurisdiction:
+                    agreement.jurisdiction,
+
+                    policyCode:
+                    agreement.policyCode,
+
+                    version:
+                    agreement.policyVersion,
+
+                    sha256:
+                    agreement.policySha256,
+
+                    archiveVerified:
+                    archive.valid,
+
+                    archiveId:
+                    archive.archiveId,
+
+                    policyText:
+                    archive.text,
+                });
+            }
+
+            return res.json({
+                success: true,
+                agreements: result,
+            });
+
+        } catch (error) {
+            return errorResponse(
+                res,
+                error
+            );
+        }
+    }
+);
+
 
 module.exports = router;

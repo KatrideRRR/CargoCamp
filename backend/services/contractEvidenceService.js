@@ -13,6 +13,10 @@ const {
 } = require("../models");
 
 const {
+    inspectArchivedAgreement,
+} = require("./signaturePolicyArchiveService");
+
+const {
     assertVerifiedPdfIntegrity,
 } = require("./verifiedPdfIntegrity");
 
@@ -232,6 +236,22 @@ async function buildContractEvidence(contractId) {
         ])
     );
 
+
+    const archivedAgreementMap = new Map();
+
+    for (const agreement of agreements) {
+        const inspection =
+            await inspectArchivedAgreement(
+                agreement
+            );
+
+        archivedAgreementMap.set(
+            String(agreement.id),
+            inspection
+        );
+    }
+
+
     const creatorId = Number(order.creatorId);
     const executorId = Number(order.executorId);
 
@@ -268,6 +288,19 @@ async function buildContractEvidence(contractId) {
         Boolean(contract.fullySignedAt);
 
     const warnings = [];
+
+    for (const agreement of agreements) {
+        const archive =
+            archivedAgreementMap.get(
+                String(agreement.id)
+            );
+
+        if (!archive?.valid) {
+            warnings.push(
+                `Соглашение №${agreement.id}: архивный текст правил ПЭП отсутствует или не прошёл SHA-256.`
+            );
+        }
+    }
 
     if (
         databaseFullySigned !== bothRecorded
@@ -503,6 +536,54 @@ async function buildContractEvidence(contractId) {
             })
         ),
 
+
+        policyArchives: agreements.map(
+            (agreement) => {
+                const archive =
+                    archivedAgreementMap.get(
+                        String(agreement.id)
+                    );
+
+                return {
+                    agreementId:
+                        String(agreement.id),
+
+                    userId:
+                    agreement.userId,
+
+                    acceptedAt:
+                    agreement.acceptedAt,
+
+                    jurisdiction:
+                    agreement.jurisdiction,
+
+                    policyCode:
+                    agreement.policyCode,
+
+                    version:
+                    agreement.policyVersion,
+
+                    sha256:
+                    agreement.policySha256,
+
+                    archiveId:
+                        archive?.archiveId || null,
+
+                    integrityVerified:
+                        Boolean(archive?.valid),
+
+                    /*
+                     * Полный текст архивной
+                     * редакции, а не текст
+                     * текущей конфигурации.
+                     */
+                    fullText:
+                        archive?.valid
+                            ? archive.text
+                            : null,
+                };
+            }
+        ),
         signatureSummary: {
             creatorSigned,
             executorSigned,

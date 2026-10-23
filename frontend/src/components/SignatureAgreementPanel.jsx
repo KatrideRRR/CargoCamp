@@ -29,6 +29,18 @@ export default function SignatureAgreementPanel() {
     const [error, setError] = useState("");
     const [confirmed, setConfirmed] = useState(false);
 
+    const [historyOpen, setHistoryOpen] =
+        useState(false);
+
+    const [historyLoading, setHistoryLoading] =
+        useState(false);
+
+    const [historyError, setHistoryError] =
+        useState("");
+
+    const [history, setHistory] =
+        useState([]);
+
     useEffect(() => {
         if (!opened) return;
 
@@ -130,6 +142,43 @@ export default function SignatureAgreementPanel() {
         }
     };
 
+
+    const toggleHistory = async () => {
+        if (historyOpen) {
+            setHistoryOpen(false);
+            return;
+        }
+
+        setHistoryOpen(true);
+        setHistoryLoading(true);
+        setHistoryError("");
+
+        try {
+            const response =
+                await axiosInstance.get(
+                    "/contracts/e-sign/my-agreements"
+                );
+
+            setHistory(
+                Array.isArray(
+                    response.data?.agreements
+                )
+                    ? response.data.agreements
+                    : []
+            );
+
+        } catch (error) {
+            setHistoryError(
+                error.response?.data?.message ||
+                "Не удалось загрузить архив соглашений"
+            );
+
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
+
     return (
         <div className="cc-signature-agreement">
             <button
@@ -214,6 +263,74 @@ export default function SignatureAgreementPanel() {
                             <div className="cc-sa-policy-text">
                                 {data.policy.text}
                             </div>
+
+
+                            <div className="cc-sa-history">
+                                <button
+                                    type="button"
+                                    onClick={toggleHistory}
+                                    aria-expanded={historyOpen}
+                                >
+                                    {historyOpen
+                                        ? "Скрыть принятые редакции"
+                                        : "Мои принятые редакции"}
+                                </button>
+
+                                {historyOpen && (
+                                    <div>
+                                        {historyLoading && (
+                                            <p>Загружаем архив…</p>
+                                        )}
+
+                                        {historyError && (
+                                            <p role="alert">
+                                                {historyError}
+                                            </p>
+                                        )}
+
+                                        {!historyLoading &&
+                                            !historyError &&
+                                            history.length === 0 && (
+                                                <p>
+                                                    Вы ещё не принимали
+                                                    правила электронной подписи.
+                                                </p>
+                                            )}
+
+                                        {history.map((item) => (
+                                            <details key={item.id}>
+                                                <summary>
+                                                    Редакция {item.version}
+                                                    {" · "}
+                                                    {formatDate(item.acceptedAt)}
+                                                </summary>
+
+                                                <p>
+                                                    SHA-256: {item.sha256}
+                                                </p>
+
+                                                {item.archiveVerified ? (
+                                                    <div
+                                                        className="cc-sa-policy-text"
+                                                        style={{
+                                                            whiteSpace: "pre-wrap",
+                                                        }}
+                                                    >
+                                                        {item.policyText}
+                                                    </div>
+                                                ) : (
+                                                    <p role="alert">
+                                                        Архивная редакция
+                                                        не прошла проверку
+                                                        целостности.
+                                                    </p>
+                                                )}
+                                            </details>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
 
                             {!data.policy.enabled && (
                                 <p className="cc-sa-notice">
