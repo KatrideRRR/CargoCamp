@@ -753,7 +753,10 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
              */
             if (payment.status === "succeeded") {
                 await order.update({
-                    status: "pending",
+                    status:
+                        order.paymentType === "guarantee"
+                            ? order.status
+                            : "pending",
                     is_highlighted: !!pr.highlight,
                     is_recommended: !!pr.recommended,
                     is_push_notified: !!pr.push,
@@ -930,6 +933,19 @@ router.get("/guarantee/status/:orderId", authenticateToken, async (req, res) => 
                 });
             }
 
+            if (
+                record.status !== "funded" ||
+                !record.fundedAt ||
+                Number(record.fundedAmountKopecks) !==
+                Number(record.expectedAmountKopecks)
+            ) {
+                return res.json({
+                    success: true,
+                    funded: false,
+                    status: "reconciliation_pending",
+                });
+            }
+
             /*
              * До создания настоящего Safe Deal
              * не делаем никаких предположений
@@ -974,17 +990,22 @@ router.get("/guarantee/status/:orderId", authenticateToken, async (req, res) => 
                     payment,
                 });
 
+            const funded =
+                verification.funded &&
+                providerDeal?.test === true &&
+                payment?.test === true;
+
             return res.json({
                 success: true,
 
-                funded: verification.funded,
-
-                status: verification.funded
+                funded,
+                status: funded
                     ? "funded"
                     : "not_confirmed",
 
-                confirmedAmountKopecks:
-                verification.confirmedAmountKopecks,
+                confirmedAmountKopecks: funded
+                    ? verification.confirmedAmountKopecks
+                    : 0,
 
                 expiresAt:
                 verification.expiresAt,
@@ -1637,7 +1658,10 @@ router.post("/yookassa/webhook", async (req, res) => {
             const shouldSendPush = !!pr.push && !order.promotionPaidAt;
 
             await order.update({
-                status: "pending",
+                status:
+                    order.paymentType === "guarantee"
+                        ? order.status
+                        : "pending",
                 is_highlighted: !!pr.highlight,
                 is_recommended: !!pr.recommended,
                 is_push_notified: !!pr.push,

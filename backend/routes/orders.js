@@ -993,7 +993,10 @@ module.exports = (io) => {
                 return enabled && PROMOTION_PRICES[key] ? sum + PROMOTION_PRICES[key] : sum;
             }, 0);
 
-            const status = promotionTotal > 0 ? "pending_payment" : "pending";
+            let status =
+                promotionTotal > 0
+                    ? "pending_payment"
+                    : "pending";
 
             // --- normalize and validate category/subcategory ids ---
 
@@ -1303,6 +1306,7 @@ module.exports = (io) => {
             }
 
             if (paymentType === "guarantee") {
+                status = "pending_payment";
                 const eligibility =
                     await getGuaranteeEligibility(userId);
 
@@ -1817,6 +1821,9 @@ module.exports = (io) => {
                 status: "pending",
                 creatorHidden: false,
                 adminDeleted: false,
+                paymentType: {
+                    [Op.ne]: "guarantee",
+                },
             };
 
             if (categoryId) {
@@ -2367,20 +2374,45 @@ module.exports = (io) => {
                 });
             }
 
-            if (order.paymentType === "guarantee") {
-                const verifiedExecutor =
-                    await hasVerifiedIdentity(
-                        normalizedExecutorId
-                    );
 
-                if (!verifiedExecutor) {
+            if (order.paymentType === "guarantee") {
+                const [
+                    verifiedCustomer,
+                    verifiedExecutor,
+                ] = await Promise.all([
+                    hasVerifiedIdentity(order.creatorId),
+                    hasVerifiedIdentity(normalizedExecutorId),
+                ]);
+
+                if (
+                    !verifiedCustomer ||
+                    !verifiedExecutor
+                ) {
                     return res.status(403).json({
                         message:
-                            "Для гарантийной сделки исполнитель " +
-                            "должен подтвердить личность.",
+                            "Обе стороны гарантийной сделки " +
+                            "должны иметь действующую проверку личности.",
+                    });
+                }
+
+                try {
+                    await assertSafeDealFunded(order, {
+                        requiredAmountKopecks:
+                            Math.round(approvedSum * 100),
+                    });
+
+                } catch (error) {
+                    return res.status(
+                        error.httpStatus || 503
+                    ).json({
+                        message:
+                            error.httpStatus
+                                ? error.message
+                                : "Не удалось проверить гарантийную оплату",
                     });
                 }
             }
+
 
             // Назначаем исполнителя
             order.executorId = normalizedExecutorId;
@@ -3624,6 +3656,26 @@ module.exports = (io) => {
                         message:
                             "Исполнитель ещё не выбран",
                     });
+                }
+
+
+                if (order.paymentType === "guarantee") {
+                    try {
+                        await assertSafeDealFunded(order, {
+                            requiredAmountKopecks:
+                                Number(order.finalPriceKopecks),
+                        });
+
+                    } catch (error) {
+                        return res.status(
+                            error.httpStatus || 503
+                        ).json({
+                            message:
+                                error.httpStatus
+                                    ? error.message
+                                    : "Не удалось проверить гарантийную оплату",
+                        });
+                    }
                 }
 
                 if (
