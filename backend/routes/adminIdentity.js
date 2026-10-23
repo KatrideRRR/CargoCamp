@@ -8,7 +8,21 @@ const {
     IdentityVerification,
     VerificationDocument,
     ActionLog,
+    Order,
+    Contract,
+    ContractSignature,
+    ContractEvent,
+    SignatureChallenge,
+    ElectronicSignatureAgreement,
 } = require("../models");
+
+const {
+    assertVerifiedPdfIntegrity,
+} = require("../services/verifiedPdfIntegrity");
+
+const {
+    buildContractEvidence,
+} = require("../services/contractEvidenceService");
 
 const {
     getCurrentIdentityVerification,
@@ -1362,6 +1376,210 @@ router.post(
                 success: false,
                 message:
                     "Не удалось отозвать проверку",
+            });
+        }
+    }
+);
+
+
+/*
+ * GET /api/admin/identity/orders/:orderId/contracts
+ *
+ * Административный список документов заказа.
+ * PDF и паспортные файлы здесь не передаются.
+ */
+router.get(
+    "/orders/:orderId/contracts",
+    async (req, res) => {
+        try {
+            if (!validId(req.params.orderId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Некорректный ID заказа",
+                });
+            }
+
+            const order = await Order.findByPk(
+                req.params.orderId,
+                {
+                    attributes: [
+                        "id",
+                        "creatorId",
+                        "executorId",
+                        "status",
+                    ],
+                }
+            );
+
+            if (!order) {
+                return res.sendStatus(404);
+            }
+
+            const documents = await Contract.findAll({
+                where: {
+                    orderId: order.id,
+                    type: {
+                        [Op.in]: [
+                            "verified_assignment",
+                            "verified_completion_act",
+                        ],
+                    },
+                },
+
+                attributes: [
+                    "id",
+                    "orderId",
+                    "parentContractId",
+                    "type",
+                    "version",
+                    "status",
+                    "documentNumber",
+                    "documentHash",
+                    "createdAt",
+                    "fullySignedAt",
+                    "supersededAt",
+                ],
+
+                order: [
+                    ["createdAt", "ASC"],
+                    ["id", "ASC"],
+                ],
+
+                limit: 100,
+            });
+
+            return res.json({
+                success: true,
+                order,
+                documents,
+            });
+
+        } catch (error) {
+            console.error(
+                "Admin contract list error:",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                message:
+                    "Не удалось загрузить документы заказа",
+            });
+        }
+    }
+);
+
+
+/*
+ * GET /api/admin/identity/contracts/:contractId/evidence
+ *
+ * Защищённая выгрузка JSON.
+ * Все проверки административной сессии
+ * выполняются выше через router.use().
+ */
+router.get(
+    "/contracts/:contractId/evidence",
+    async (req, res) => {
+        try {
+            if (!validId(req.params.contractId)) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Некорректный ID документа",
+                });
+            }
+
+            const result =
+                await buildContractEvidence(
+                    req.params.contractId
+                );
+
+            /*
+             * Журналируем факт выгрузки
+             * ДО передачи файла пользователю.
+             */
+            await ActionLog.create({
+                actorUserId: req.user.id,
+                actorRole: "admin",
+
+                actionType:
+                    "verified_contract_evidence_exported",
+
+                entityType: "order",
+                entityId: result.order.id,
+                orderId: result.order.id,
+
+                severity: "info",
+
+                meta: {
+                    contractId:
+                        String(result.contract.id),
+
+                    documentHash:
+                    result.contract.documentHash,
+
+                    exportedAt:
+                    result.evidence.generatedAt,
+
+                    format: "json",
+                },
+            });
+
+            const filename =
+                `cargocamp-evidence-` +
+                `order-${result.order.id}-` +
+                `document-${result.contract.id}.json`;
+
+            res.setHeader(
+                "Cache-Control",
+                "private, no-store"
+            );
+
+            res.setHeader(
+                "Pragma",
+                "no-cache"
+            );
+
+            res.setHeader(
+                "X-Content-Type-Options",
+                "nosniff"
+            );
+
+            res.setHeader(
+                "Content-Disposition",
+                `attachment; filename="${filename}"`
+            );
+
+            return res
+                .status(200)
+                .type("application/json")
+                .send(
+                    JSON.stringify(
+                        result.evidence,
+                        null,
+                        2
+                    )
+                );
+
+        } catch (error) {
+            if (error.httpStatus) {
+                return res.status(
+                    error.httpStatus
+                ).json({
+                    success: false,
+                    message: error.message,
+                });
+            }
+
+            console.error(
+                "Contract evidence export error:",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                message:
+                    "Не удалось сформировать отчёт",
             });
         }
     }

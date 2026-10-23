@@ -1,0 +1,125 @@
+
+.cc-contract-evidence {
+    margin-bottom: 26px;
+    padding: 24px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    color: #0f172a;
+}
+
+.cc-contract-evidence * {
+    box-sizing: border-box;
+}
+
+.cc-contract-evidence-heading h2 {
+    margin: 0 0 8px;
+    font-size: 21px;
+}
+
+.cc-contract-evidence-heading p,
+.cc-contract-evidence-note {
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.6;
+}
+
+.cc-contract-evidence-search {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 17px 0;
+}
+
+.cc-contract-evidence-search input {
+    min-width: 0;
+    flex: 1 1 190px;
+    min-height: 43px;
+    padding: 11px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    font: inherit;
+}
+
+.cc-contract-evidence button {
+    min-height: 43px;
+    padding: 10px 15px;
+    border: 1px solid #2563eb;
+    border-radius: 10px;
+    background: #2563eb;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.cc-contract-evidence button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.cc-contract-evidence-order {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 13px;
+    background: #f8fafc;
+    border-radius: 11px;
+    font-size: 13px;
+}
+
+.cc-contract-evidence-order span {
+    color: #64748b;
+}
+
+.cc-contract-evidence-card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    padding: 16px 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.cc-contract-evidence-card > div {
+    min-width: 0;
+    flex: 1 1 230px;
+}
+
+.cc-contract-evidence-card strong,
+.cc-contract-evidence-card small {
+    display: block;
+}
+
+.cc-contract-evidence-card p {
+    margin: 7px 0;
+    font-size: 13px;
+    color: #475569;
+}
+
+.cc-contract-evidence-card small {
+    margin-top: 5px;
+    color: #64748b;
+    font-size: 11px;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.cc-contract-evidence-error {
+    padding: 12px;
+    background: #fef2f2;
+    border-radius: 10px;
+    color: #b91c1c;
+    font-size: 13px;
+}
+
+@media (max-width: 600px) {
+    .cc-contract-evidence {
+        padding: 14px;
+    }
+
+    .cc-contract-evidence-card button {
+        width: 100%;
+    }
+}

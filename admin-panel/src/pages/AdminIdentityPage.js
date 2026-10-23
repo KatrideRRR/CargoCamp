@@ -12,7 +12,8 @@ import {
     isAdminTokenValid,
     refreshAdminSession,
 } from "../utils/adminSession";
-
+import AdminContractEvidencePanel
+    from "../components/AdminContractEvidencePanel";
 import "../styles/AdminIdentityPage.css";
 import VerifiedIdentityManagement
     from "../components/VerifiedIdentityManagement";
@@ -437,6 +438,8 @@ function AdminIdentityPage() {
                 </header>
 
                 <VerifiedIdentityManagement />
+
+                <AdminContractEvidencePanel />
 
                 <section className="admin-identity-summary">
                     <div className="admin-identity-counter">
