@@ -63,32 +63,6 @@ router.get(
         try {
             const userId = Number(req.user.id);
 
-            const verifications =
-                await IdentityVerification.findAll({
-                    where: {
-                        userId,
-                        countryCode: "RU",
-                    },
-
-                    attributes: [
-                        "id",
-                        "status",
-                        "assuranceLevel",
-                        "verifiedAt",
-                        "expiresAt",
-                        "rejectionReason",
-                        "createdAt",
-                    ],
-
-                    order: [
-                        ["createdAt", "DESC"],
-                        ["id", "DESC"],
-                    ],
-                });
-
-            const now = new Date();
-
-
             const result =
                 await getCurrentIdentityVerification(
                     userId

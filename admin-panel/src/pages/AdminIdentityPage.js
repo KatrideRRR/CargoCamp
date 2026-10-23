@@ -14,7 +14,8 @@ import {
 } from "../utils/adminSession";
 
 import "../styles/AdminIdentityPage.css";
-
+import VerifiedIdentityManagement
+    from "../components/VerifiedIdentityManagement";
 
 const DOCUMENT_TYPES = {
     passport_page: "Документ, удостоверяющий личность",
@@ -435,6 +436,7 @@ function AdminIdentityPage() {
                     </button>
                 </header>
 
+                <VerifiedIdentityManagement />
 
                 <section className="admin-identity-summary">
                     <div className="admin-identity-counter">

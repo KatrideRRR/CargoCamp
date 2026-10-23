@@ -1,0 +1,252 @@
+
+.cc-verified-admin {
+    margin-bottom: 26px;
+    padding: 24px;
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    background: #ffffff;
+}
+
+.cc-verified-admin * {
+    box-sizing: border-box;
+}
+
+.cc-verified-admin-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.cc-verified-admin-header h2 {
+    margin: 0 0 7px;
+    font-size: 21px;
+    color: #0f172a;
+}
+
+.cc-verified-admin-header p,
+.cc-verified-admin-footnote {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #64748b;
+}
+
+.cc-verified-admin-header > strong {
+    padding: 8px 13px;
+    border-radius: 12px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 18px;
+}
+
+.cc-verified-admin-search {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+    margin-bottom: 18px;
+}
+
+.cc-verified-admin-search input {
+    flex: 1 1 210px;
+    min-width: 0;
+    padding: 11px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    font: inherit;
+}
+
+.cc-verified-admin button {
+    padding: 10px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #fff;
+    color: #1d4ed8;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.cc-verified-admin button:hover:not(:disabled) {
+    background: #eff6ff;
+}
+
+.cc-verified-admin button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.cc-verified-admin-list {
+    display: grid;
+    gap: 12px;
+}
+
+.cc-verified-admin-card {
+    padding: 17px;
+    border: 1px solid #e2e8f0;
+    border-radius: 13px;
+}
+
+.cc-verified-admin-person {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.cc-verified-admin-person strong {
+    font-size: 15px;
+    color: #0f172a;
+}
+
+.cc-verified-admin-person p {
+    margin: 5px 0;
+    font-size: 13px;
+    color: #475569;
+    overflow-wrap: anywhere;
+}
+
+.cc-verified-admin-person small {
+    color: #64748b;
+}
+
+.cc-verified-admin-badge {
+    align-self: flex-start;
+    padding: 6px 9px;
+    background: #ecfdf5;
+    border-radius: 8px;
+    color: #047857;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.cc-verified-admin-dates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    margin: 13px 0;
+    color: #475569;
+    font-size: 12px;
+}
+
+.cc-verified-admin-details {
+    display: grid;
+    gap: 10px;
+    margin-top: 17px;
+    padding-top: 15px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.cc-verified-admin-details h3 {
+    margin: 8px 0 0;
+    font-size: 14px;
+}
+
+.cc-verified-admin-history {
+    display: grid;
+    gap: 5px;
+    padding: 11px;
+    border-radius: 10px;
+    background: #f8fafc;
+    font-size: 12px;
+    color: #475569;
+}
+
+.cc-verified-admin-history strong {
+    color: #1e293b;
+}
+
+.cc-verified-admin-history p {
+    margin: 3px 0 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.cc-verified-admin-revoke {
+    display: grid;
+    gap: 10px;
+    margin-top: 8px;
+    padding: 14px;
+    border: 1px solid #fecaca;
+    border-radius: 11px;
+}
+
+.cc-verified-admin-revoke p {
+    margin: 0;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.cc-verified-admin-revoke textarea {
+    width: 100%;
+    padding: 11px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    font: inherit;
+    resize: vertical;
+}
+
+.cc-verified-admin button.danger {
+    color: #b91c1c;
+    border-color: #fca5a5;
+    justify-self: start;
+}
+
+.cc-verified-admin button.danger:hover:not(:disabled) {
+    background: #fef2f2;
+}
+
+.cc-verified-admin-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 18px;
+    font-size: 12px;
+    color: #64748b;
+}
+
+.cc-verified-admin-error,
+.cc-verified-admin-success,
+.cc-verified-admin-empty {
+    margin: 12px 0;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 13px;
+}
+
+.cc-verified-admin-error {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.cc-verified-admin-success {
+    background: #f0fdf4;
+    color: #15803d;
+}
+
+.cc-verified-admin-empty {
+    background: #f8fafc;
+    color: #64748b;
+}
+
+.cc-verified-admin-footnote {
+    margin-top: 17px;
+}
+
+@media (max-width: 600px) {
+    .cc-verified-admin {
+        padding: 14px;
+    }
+
+    .cc-verified-admin-person {
+        flex-direction: column;
+    }
+
+    .cc-verified-admin-pagination {
+        flex-wrap: wrap;
+    }
+}

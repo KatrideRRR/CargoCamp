@@ -1,6 +1,6 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
-
+const { QueryTypes, Op } = require("sequelize");
 const {
     sequelize,
     User,
@@ -223,6 +223,390 @@ router.get(
         }
     }
 );
+
+
+/*
+ * GET /api/admin/identity/verified
+ *
+ * Параметры:
+ *   page=1
+ *   q=79781234567
+ *   q=123
+ *
+ * Без q возвращаем последние 20 действующих
+ * проверок. Поиск по телефону или ID.
+ *
+ * Важное условие: берём только ПОСЛЕДНЮЮ
+ * заявку пользователя, а не любую старую
+ * запись со статусом verified.
+ */
+router.get("/verified", async (req, res) => {
+    try {
+        const rawPage = Number(
+            req.query.page || 1
+        );
+
+        if (
+            !Number.isSafeInteger(rawPage) ||
+            rawPage < 1 ||
+            rawPage > 500
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Некорректная страница",
+            });
+        }
+
+        const page = rawPage;
+        const limit = 20;
+        const offset = (page - 1) * limit;
+
+        const q = String(
+            req.query.q || ""
+        ).trim();
+
+        if (q.length > 30) {
+            return res.status(400).json({
+                success: false,
+                message: "Слишком длинный запрос",
+            });
+        }
+
+        let searchSql = "";
+        const replacements = {
+            limit,
+            offset,
+        };
+
+        if (q) {
+            const digits = q.replace(/\D/g, "");
+
+            if (
+                /^[1-9]\d{0,9}$/.test(q)
+            ) {
+                replacements.userId = Number(q);
+
+                if (digits.length >= 4) {
+                    replacements.phone =
+                        `%${digits}%`;
+
+                    searchSql = `
+                        AND (
+                            u.id = :userId
+                            OR u.phone LIKE :phone
+                        )
+                    `;
+                } else {
+                    searchSql =
+                        "AND u.id = :userId";
+                }
+
+            } else if (
+                digits.length >= 4 &&
+                digits.length <= 11 &&
+                /^[+\d\s()\-]+$/.test(q)
+            ) {
+                replacements.phone =
+                    `%${digits}%`;
+
+                searchSql = `
+                    AND REPLACE(
+                        REPLACE(
+                            REPLACE(
+                                REPLACE(
+                                    REPLACE(
+                                        u.phone,
+                                        '+', ''
+                                    ),
+                                    ' ', ''
+                                ),
+                                '-', ''
+                            ),
+                            '(', ''
+                        ),
+                        ')', ''
+                    ) LIKE :phone
+                `;
+
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Введите ID пользователя или минимум 4 цифры телефона",
+                });
+            }
+        }
+
+        /*
+         * SQL-фрагмент searchSql выбирается
+         * только из констант выше.
+         * Значения пользователя передаются
+         * отдельно через replacements.
+         */
+        const whereSql = `
+            iv.country_code = 'RU'
+            AND iv.status = 'verified'
+            AND iv.verified_at IS NOT NULL
+            AND iv.verified_at <= UTC_TIMESTAMP(3)
+            AND iv.expires_at IS NOT NULL
+            AND iv.expires_at > UTC_TIMESTAMP(3)
+
+            AND iv.id = (
+                SELECT iv2.id
+                FROM identity_verifications iv2
+                WHERE iv2.user_id = iv.user_id
+                  AND iv2.country_code = 'RU'
+                ORDER BY
+                    iv2.created_at DESC,
+                    iv2.id DESC
+                LIMIT 1
+            )
+
+            ${searchSql}
+        `;
+
+        const fromSql = `
+            FROM identity_verifications iv
+            INNER JOIN users u
+                ON u.id = iv.user_id
+            WHERE ${whereSql}
+        `;
+
+        const [countRows, rows] =
+            await Promise.all([
+                sequelize.query(
+                    `SELECT COUNT(*) AS total ${fromSql}`,
+                    {
+                        replacements,
+                        type: QueryTypes.SELECT,
+                    }
+                ),
+
+                sequelize.query(
+                    `
+                    SELECT
+                        iv.id AS verificationId,
+                        iv.user_id AS userId,
+                        iv.status AS status,
+                        iv.assurance_level AS assuranceLevel,
+                        iv.verification_method AS verificationMethod,
+                        iv.verified_at AS verifiedAt,
+                        iv.expires_at AS expiresAt,
+                        iv.reviewed_by AS reviewedBy,
+                        u.username AS username,
+                        u.phone AS phone
+                    ${fromSql}
+                    ORDER BY
+                        iv.verified_at DESC,
+                        iv.id DESC
+                    LIMIT :limit OFFSET :offset
+                    `,
+                    {
+                        replacements,
+                        type: QueryTypes.SELECT,
+                    }
+                ),
+            ]);
+
+        return res.json({
+            success: true,
+            users: rows,
+            page,
+            pageSize: limit,
+            total: Number(
+                countRows[0]?.total || 0
+            ),
+        });
+
+    } catch (error) {
+        console.error(
+            "Verified identities list error:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message:
+                "Не удалось загрузить подтверждённых пользователей",
+        });
+    }
+});
+
+
+/*
+ * GET /api/admin/identity/users/:userId/history
+ *
+ * История проверок + административных
+ * решений. Не возвращает содержимое
+ * паспортных документов.
+ */
+router.get(
+    "/users/:userId/history",
+    async (req, res) => {
+        try {
+            if (!validId(req.params.userId)) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Некорректный ID пользователя",
+                });
+            }
+
+            const userId =
+                Number(req.params.userId);
+
+            const user = await User.findByPk(
+                userId,
+                {
+                    attributes: [
+                        "id",
+                        "username",
+                        "phone",
+                    ],
+                }
+            );
+
+            if (!user) {
+                return res.sendStatus(404);
+            }
+
+            const [
+                current,
+                verifications,
+                actions,
+            ] = await Promise.all([
+                getCurrentIdentityVerification(
+                    userId
+                ),
+
+                IdentityVerification.findAll({
+                    where: {
+                        userId,
+                        countryCode: "RU",
+                    },
+
+                    attributes: [
+                        "id",
+                        "status",
+                        "assuranceLevel",
+                        "verificationMethod",
+                        "verifiedAt",
+                        "expiresAt",
+                        "reviewedBy",
+                        "rejectionReason",
+                        "createdAt",
+                        "updatedAt",
+                    ],
+
+                    order: [
+                        ["createdAt", "DESC"],
+                        ["id", "DESC"],
+                    ],
+
+                    limit: 30,
+                }),
+
+                ActionLog.findAll({
+                    where: {
+                        entityType: "user",
+                        entityId: userId,
+
+                        actionType: {
+                            [Op.in]: [
+                                "identity_application_approved",
+                                "identity_application_rejected",
+                                "identity_verification_revoked",
+                            ],
+                        },
+                    },
+
+                    attributes: [
+                        "id",
+                        "ts",
+                        "actorUserId",
+                        "actionType",
+                        "meta",
+                    ],
+
+                    order: [
+                        ["ts", "DESC"],
+                        ["id", "DESC"],
+                    ],
+
+                    limit: 50,
+                }),
+            ]);
+
+            /*
+             * Аудируем просмотр истории,
+             * поскольку она содержит
+             * чувствительные сведения.
+             */
+            await ActionLog.create({
+                actorUserId: req.user.id,
+                actorRole: "admin",
+
+                actionType:
+                    "identity_history_viewed",
+
+                entityType: "user",
+                entityId: userId,
+
+                meta: {
+                    viewedAt:
+                        new Date().toISOString(),
+                },
+            });
+
+            return res.json({
+                success: true,
+
+                user,
+
+                current: {
+                    verificationId:
+                        current.record?.id || null,
+
+                    status: current.status,
+                    verified: current.verified,
+                },
+
+                verifications,
+                actions: actions.map(
+                    (action) => ({
+                        id: action.id,
+                        ts: action.ts,
+                        actorUserId:
+                        action.actorUserId,
+
+                        actionType:
+                        action.actionType,
+
+                        verificationId:
+                            action.meta
+                                ?.verificationId || null,
+
+                        reason:
+                            action.meta?.reason || null,
+                    })
+                ),
+            });
+
+        } catch (error) {
+            console.error(
+                "Identity history error:",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                message:
+                    "Не удалось получить историю проверки личности",
+            });
+        }
+    }
+);
+
 
 /*
  * GET /api/admin/identity/:id/document/:documentId
