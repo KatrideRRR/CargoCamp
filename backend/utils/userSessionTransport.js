@@ -5,7 +5,12 @@ const COOKIE_PATH = "/api/auth/session";
 const WEB_ORIGINS = new Set([
     "https://cargocamp.ru",
     "https://www.cargocamp.ru",
+
+    // Локальная разработка
     "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:8080",
+    "http://localhost:8100",
 ]);
 
 const NATIVE_ORIGINS = new Set([
