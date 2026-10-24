@@ -3638,13 +3638,9 @@ module.exports = (io) => {
                 const isExecutor =
                     executorId === userId;
 
-                if (
-                    !isCreator &&
-                    !isExecutor
-                ) {
+                if (!isExecutor) {
                     return res.status(403).json({
-                        message:
-                            "Начать работу может только участник заказа",
+                        message: "Начать работу может только исполнитель заказа",
                     });
                 }
 

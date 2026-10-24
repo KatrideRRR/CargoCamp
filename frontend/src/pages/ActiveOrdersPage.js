@@ -1710,8 +1710,8 @@ const ActiveOrdersPage = () => {
                                             completedBy.length === 1 &&
                                             !isCompletedByUser;
 
-                                        const isExecutor = order.executorId === user.id;
-                                        const isCreator = order.creatorId === user.id;
+                                        const isExecutor = Number(order.executorId) === Number(user.id);
+                                        const isCreator = Number(order.creatorId) === Number(user.id);
 
                                         const disputeKey =
                                             `regular:${order.id}`;
@@ -1859,15 +1859,17 @@ const ActiveOrdersPage = () => {
                                                             )}
                                                         </button>
 
-                                                        <button
-                                                            className="route-button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleRouteClick(order);
-                                                            }}
-                                                        >
-                                                            {isMobile ? <FaRoute /> : "Маршрут"}
-                                                        </button>
+                                                        {isExecutor && (
+                                                            <button
+                                                                className="route-button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleRouteClick(order);
+                                                                }}
+                                                            >
+                                                                {isMobile ? <FaRoute /> : "Маршрут"}
+                                                            </button>
+                                                        )}
 
                                                         {dispute ? (
                                                             <button
@@ -1929,12 +1931,7 @@ const ActiveOrdersPage = () => {
                                                                     Напомнить
                                                                 </button>
                                                             </>
-                                                        ) : !order.workStartedAt &&
-                                                        (
-                                                            hourly
-                                                                ? isCreator || isExecutor
-                                                                : isExecutor
-                                                        ) ? (
+                                                        ) : !order.workStartedAt && isExecutor ? (
                                                             <button
                                                                 className="start-main-button"
                                                                 onClick={(event) => {
@@ -1962,7 +1959,7 @@ const ActiveOrdersPage = () => {
                                                                         ? <FaPlay />
                                                                         : "Начать работу"}
                                                             </button>
-                                                        ) : (
+                                                        ) : (order.workStartedAt || !hourly) ? (
                                                             <button
                                                                 className="complete-button"
                                                                 onClick={(event) => {
@@ -1972,7 +1969,7 @@ const ActiveOrdersPage = () => {
                                                             >
                                                                 {isMobile ? <FaCheck /> : isWaitingForMe ? "Подтвердить завершение" : "Завершить"}
                                                             </button>
-                                                        )}
+                                                        ) : null}
                                                     </div>
                                                 </div>
 
