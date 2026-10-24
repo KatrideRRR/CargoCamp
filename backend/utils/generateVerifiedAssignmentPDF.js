@@ -110,6 +110,44 @@ function renderHtml(snapshot, photoAnnex) {
         color: #64748b;
         font-size: 10px;
     }
+        .parties {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        break-inside: avoid;
+    }
+
+    .party-card {
+        min-width: 0;
+        padding: 14px;
+        border: 1px solid #dbe3ef;
+        border-radius: 10px;
+        background: #f8fafc;
+    }
+
+    .party-card h3 {
+        margin: 0 0 10px;
+        font-size: 14px;
+    }
+
+    .party-card .row {
+        display: block;
+        margin: 8px 0;
+        padding: 0;
+        border: 0;
+    }
+
+    .party-card .row strong {
+        display: block;
+        width: auto;
+        color: #64748b;
+        font-size: 10px;
+    }
+
+    .party-card .row span {
+        display: block;
+        font-size: 12px;
+    }
 </style>
 </head>
 <body>
@@ -130,12 +168,22 @@ ${row("Сформирован", formatDate(snapshot.generatedAt))}
 
 <h2>1. Участники</h2>
 
-${row("Заказчик, ID", customer.userId)}
-${row("Имя в профиле", customer.profileName)}
-${row("Проверка личности", "Подтверждена на момент формирования")}
-${row("Исполнитель, ID", executor.userId)}
-${row("Имя в профиле", executor.profileName)}
-${row("Проверка личности", "Подтверждена на момент формирования")}
+<div class="parties">
+    <section class="party-card">
+        <h3>Заказчик</h3>
+        ${row("Имя в профиле", customer.profileName)}
+        ${row("ID пользователя", customer.userId)}
+        ${row("Проверка личности", "Подтверждена на момент формирования")}
+    </section>
+
+    <section class="party-card">
+        <h3>Исполнитель</h3>
+        ${row("Имя в профиле", executor.profileName)}
+        ${row("ID пользователя", executor.userId)}
+        ${row("Проверка личности", "Подтверждена на момент формирования")}
+    </section>
+</div>
+
 
 <h2>2. Задание</h2>
 
