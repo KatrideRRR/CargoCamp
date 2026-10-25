@@ -13,6 +13,10 @@ const {
 const generateVerifiedCompletionActPDF =
     require("../utils/generateVerifiedCompletionActPDF");
 
+const {
+    readDisputesSnapshot,
+} = require("./completionActEvidenceService");
+
 const verifiedRoot = path.join(
     contractsRoot,
     "verified"
@@ -65,6 +69,12 @@ async function prepareVerifiedActV2({
         ...originalSnapshot,
 
         version: 2,
+
+        disputes:
+            await readDisputesSnapshot(order.id),
+
+        disputesCapturedAt:
+            reviewedAt.toISOString(),
 
         documentNumber:
             `CC-ACT-${originalAct.orderId}-V2`,

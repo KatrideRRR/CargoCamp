@@ -709,7 +709,7 @@ router.post("/:actId/remediation/review", async (req, res) => {
                                     templateCode:
                                         "verified_completion_act_default",
 
-                                    templateVersion: "3",
+                                    templateVersion: "4",
 
                                     storageKey:
                                     prepared.storageKey,

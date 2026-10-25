@@ -2859,6 +2859,30 @@ module.exports = (io) => {
 
                 executorId === normalizedUserId;
 
+            const unfinishedChange =
+                await db.OrderChangeRequest.findOne({
+                    where: {
+                        orderId: Number(order.id),
+                        status: {
+                            [Op.in]: [
+                                "pending",
+                                "approved_pending_agreement",
+                            ],
+                        },
+                    },
+                    attributes: ["id"],
+                });
+
+            if (unfinishedChange) {
+                return res.status(409).json({
+                    success: false,
+                    message:
+                        "По заказу есть незавершённое согласование " +
+                        "дополнительных работ. Сначала завершите " +
+                        "оформление соглашения.",
+                });
+            }
+
             if (
 
                 !isCreator &&
@@ -2876,6 +2900,8 @@ module.exports = (io) => {
                 });
 
             }
+
+
 
             /*
 

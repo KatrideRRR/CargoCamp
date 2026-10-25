@@ -1,8 +1,6 @@
 
 const puppeteer = require("puppeteer");
-
-const renderPhotoAnnex =
-    require("./renderPhotoAnnex");
+const renderPhotoAnnex = require("./renderPhotoAnnex");
 
 function escapeHtml(value) {
     return String(value ?? "—")
@@ -18,18 +16,30 @@ function formatDate(value) {
 
     const date = new Date(value);
 
-    if (Number.isNaN(date.getTime())) {
-        return "Не указано";
-    }
+    return Number.isNaN(date.getTime())
+        ? "Не указано"
+        : date.toLocaleString("ru-RU", {
+            timeZone: "Europe/Moscow",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+}
 
-    return date.toLocaleString("ru-RU", {
-        timeZone: "Europe/Moscow",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-    });
+function money(value) {
+    const kopecks = Number(value);
+
+    if (!Number.isFinite(kopecks)) return "—";
+
+    return (kopecks / 100).toLocaleString(
+        "ru-RU",
+        {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }
+    ) + " ₽";
 }
 
 function renderHtml(data, photoAnnex) {
@@ -40,6 +50,40 @@ function renderHtml(data, photoAnnex) {
         </div>
     `;
 
+    const details = Array.isArray(data.serviceDetailRows)
+        ? data.serviceDetailRows
+        : [];
+
+    const addenda = Array.isArray(data.addenda)
+        ? data.addenda
+        : [];
+
+    const disputes = Array.isArray(data.disputes)
+        ? data.disputes
+        : [];
+
+    // Поддерживаем также ранее созданные снимки актов.
+    const legacyPrice = Math.round(
+        Number(data.priceRub || 0) * 100
+    );
+
+    const originalPrice =
+        data.originalPriceKopecks ?? legacyPrice;
+
+    const finalPrice =
+        data.finalPriceKopecks ?? legacyPrice;
+
+    const paymentLabels = {
+        cash: "Наличными",
+        guarantee: "Гарантийная сделка",
+        installment: "Рассрочка",
+    };
+
+    const paymentType =
+        paymentLabels[data.paymentType] ||
+        data.paymentType ||
+        "Не указан";
+
     return `<!doctype html>
 <html lang="ru">
 <head>
@@ -49,38 +93,73 @@ function renderHtml(data, photoAnnex) {
         font-family: Arial, sans-serif;
         color: #172033;
         font-size: 12px;
-        line-height: 1.6;
+        line-height: 1.55;
         padding: 14px;
     }
 
     h1 {
-        margin-bottom: 5px;
         font-size: 21px;
-        color: #0f172a;
+        margin: 0 0 5px;
     }
 
     h2 {
-        margin-top: 25px;
         font-size: 15px;
+        margin: 25px 0 12px;
+        break-after: avoid;
+        page-break-after: avoid;
+    }
+
+    h3 {
+        font-size: 13px;
+        margin: 0 0 8px;
     }
 
     .subtitle {
         color: #64748b;
-        margin-bottom: 22px;
+        margin-bottom: 20px;
     }
 
-    .notice {
+    .notice, .summary {
+        padding: 14px;
         border: 1px solid #bfdbfe;
         background: #eff6ff;
-        padding: 13px;
         border-radius: 9px;
+        margin: 14px 0;
+    }
+
+    .parties {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .party {
+        min-width: 0;
+        padding: 14px;
+        border: 1px solid #dbe3ef;
+        border-radius: 10px;
+        background: #f8fafc;
+    }
+
+    .party strong {
+        display: block;
+        overflow-wrap: anywhere;
+    }
+
+    .party small {
+        display: block;
+        margin-top: 6px;
+        color: #64748b;
     }
 
     .row {
         display: flex;
-        gap: 15px;
-        padding: 9px 0;
+        gap: 14px;
+        padding: 8px 0;
         border-bottom: 1px solid #e2e8f0;
+        break-inside: avoid;
     }
 
     .row strong {
@@ -88,23 +167,51 @@ function renderHtml(data, photoAnnex) {
     }
 
     .row span {
+        min-width: 0;
         flex: 1;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
     }
 
+    .entry {
+        border: 1px solid #dbe3ef;
+        border-radius: 9px;
+        padding: 13px;
+        margin: 13px 0;
+    }
+
+    .entry-title {
+        font-weight: bold;
+        margin-bottom: 7px;
+    }
+
+    .work {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        margin: 10px 0;
+    }
+
+    .muted {
+        color: #64748b;
+    }
+
     .warning {
-        margin-top: 23px;
-        background: #fffbeb;
-        border: 1px solid #fde68a;
-        border-radius: 10px;
-        padding: 15px;
+        padding: 14px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        border-radius: 9px;
+        margin-top: 22px;
     }
 
     .footer {
-        margin-top: 25px;
-        color: #64748b;
         font-size: 10px;
+        color: #64748b;
+        margin-top: 24px;
+    }
+
+    .hash {
+        font-size: 9px;
+        overflow-wrap: anywhere;
     }
 </style>
 </head>
@@ -113,110 +220,218 @@ function renderHtml(data, photoAnnex) {
 <h1>АКТ О ЗАВЕРШЕНИИ ЗАКАЗА</h1>
 
 <div class="subtitle">
-    CargoCamp · Проект документа · Версия ${escapeHtml(data.version)}
+    CargoCamp · Заказ №${escapeHtml(data.orderId)}
+    · Версия ${escapeHtml(data.version)}
 </div>
 
 <div class="notice">
-    ПРОЕКТ АКТА. НЕ ПОДПИСАН СТОРОНАМИ.
-    Не является автоматическим подтверждением
-    качества, оплаты или отсутствия претензий.
+    <strong>Электронный документ CargoCamp.</strong>
+    Статус приёмки и электронной подписи определяется
+    по отдельным записям системы, связанным
+    с контрольной суммой данного PDF.
+    Сформированный документ не подписывается автоматически.
 </div>
 
 <h2>1. Сведения о документе</h2>
 
 ${row("Номер акта", data.documentNumber)}
-${row("Заказ №", data.orderId)}
-${row("Договор-задание", data.assignmentNumber)}
+${row("Основной договор", data.assignmentNumber)}
 ${row("Дата формирования", formatDate(data.generatedAt))}
+
+<div class="hash">
+    SHA-256 основного договора:
+    ${escapeHtml(data.assignmentHash)}
+</div>
 
 <h2>2. Участники</h2>
 
-${row("Заказчик", data.customerName)}
-${row("ID заказчика", data.customerId)}
-${row("Исполнитель", data.executorName)}
-${row("ID исполнителя", data.executorId)}
+<div class="parties">
+    <div class="party">
+        <h3>Заказчик</h3>
+        <strong>${escapeHtml(data.customerName)}</strong>
+        <small>ID пользователя: ${escapeHtml(data.customerId)}</small>
+    </div>
 
-<h2>3. Сведения о заказе</h2>
+    <div class="party">
+        <h3>Исполнитель</h3>
+        <strong>${escapeHtml(data.executorName)}</strong>
+        <small>ID пользователя: ${escapeHtml(data.executorId)}</small>
+    </div>
+</div>
+
+<h2>3. Первоначальное задание</h2>
 
 ${row("Категория", data.category)}
 ${row("Подкатегория", data.subcategory)}
-${row("Адрес", data.address)}
+${row("Услуга", data.service || "—")}
+${row("Основной адрес", data.address)}
 ${row("Описание", data.description)}
-${row("Согласованная стоимость", data.priceRub + " ₽")}
-${row("Способ оплаты", data.paymentType)}
 
-<h2>4. Отметки о завершении</h2>
+${row(
+        "Запланированное время",
+        data.isAsap
+            ? "Как можно скорее"
+            : formatDate(data.plannedTime)
+    )}
 
-${row("Начало работы", formatDate(data.workStartedAt))}
-${row("Окончание работы", formatDate(data.workEndedAt))}
+${details.length ? `
+<h3 style="margin-top: 15px;">
+    Дополнительные параметры заказа
+</h3>
+
+${details.map((item) =>
+        row(item.label, item.value)
+    ).join("")}
+` : ""}
+
+<h2>4. Согласованная стоимость</h2>
+
+${row("Первоначальная стоимость", money(originalPrice))}
+
+${addenda.map((item) => `
+    <div class="entry">
+        <div class="entry-title">
+            Дополнительное соглашение
+            ${escapeHtml(item.documentNumber)}
+        </div>
+
+        <div class="work">
+            ${escapeHtml(item.additionalWork)}
+        </div>
+
+        ${row("Стоимость до изменения", money(item.beforePriceKopecks))}
+        ${row("Стоимость после изменения", money(item.afterPriceKopecks))}
+        ${row("Подписано обеими сторонами", formatDate(item.signedAt))}
+
+        <div class="hash">
+            SHA-256 соглашения:
+            ${escapeHtml(item.documentHash)}
+        </div>
+    </div>
+`).join("")}
+
+<div class="summary">
+    <strong>Итоговая согласованная стоимость:</strong>
+    ${escapeHtml(money(finalPrice))}
+</div>
+
+${row("Способ оплаты", paymentType)}
+
+<div class="muted">
+    Указанная стоимость является согласованной стоимостью
+    заказа. Этот акт сам по себе не подтверждает факт
+    передачи или получения денежных средств.
+</div>
+
+<h2>5. Фактическое выполнение</h2>
+
+${row("Начало выполнения", formatDate(data.workStartedAt))}
+${row("Окончание выполнения", formatDate(data.workEndedAt))}
 ${row("Завершение заказа", formatDate(data.completedAt))}
-${row("Отметка заказчика", "Завершение подтверждено в приложении")}
-${row("Отметка исполнителя", "Завершение подтверждено в приложении")}
+${row("Заказчик", "Отметил завершение в CargoCamp")}
+${row("Исполнитель", "Отметил завершение в CargoCamp")}
+
+<h2>6. Споры и замечания</h2>
+
+${data.disputesCapturedAt
+        ? row(
+            "Состояние споров на дату",
+            formatDate(data.disputesCapturedAt)
+        )
+        : ""}
+
+${disputes.length === 0 ? `
+    <p class="muted">
+        ${data.disputesCapturedAt
+        ? "На дату формирования акта зарегистрированных споров по заказу нет."
+        : "В исходном экземпляре акта сведения о спорах не зафиксированы."}
+    </p>
+` : disputes.map((dispute) => `
+    <div class="entry">
+        <div class="entry-title">
+            Спор №${escapeHtml(dispute.id)}
+        </div>
+
+        ${row("Дата открытия", formatDate(dispute.createdAt))}
+        ${row(
+        "Инициатор",
+        dispute.openedByRole === "creator"
+            ? "Заказчик"
+            : "Исполнитель"
+    )}
+        ${row("Причина", dispute.reason)}
+        ${row("Описание", dispute.description || "Не указано")}
+        ${row("Статус", dispute.status)}
+        ${row(
+        "Результат рассмотрения",
+        dispute.resolution || "Не зафиксирован"
+    )}
+        ${row("Дата решения", formatDate(dispute.resolvedAt))}
+        ${row(
+        "Прикреплённые доказательства",
+        Array.isArray(dispute.evidence)
+            ? dispute.evidence.length
+            : 0
+    )}
+
+        ${(dispute.evidence || []).map((photo, index) => `
+            <div class="hash">
+                Доказательство ${index + 1} · SHA-256:
+                ${escapeHtml(photo.sha256 || "—")}
+            </div>
+        `).join("")}
+    </div>
+`).join("")}
 
 ${data.remediation ? `
-<h2>5. Устранение ранее заявленных замечаний</h2>
+<h2>7. Исправление замечаний</h2>
 
 ${row(
         "Предыдущий акт",
         data.remediation.previousDocumentNumber
     )}
-
 ${row(
-        "Первоначальные замечания заказчика",
+        "Первоначальные замечания",
         data.remediation.originalRemarks
     )}
-
 ${row(
-        "Сообщение исполнителя об исправлениях",
+        "Сообщение исполнителя",
         data.remediation.executorComment
     )}
-
 ${row(
-        "Исполнитель сообщил об исправлениях",
+        "Дата сообщения об исправлениях",
         formatDate(data.remediation.submittedAt)
     )}
-
 ${row(
-        "Заказчик проверил исправления",
+        "Проверка заказчиком",
         formatDate(data.remediation.reviewedAt)
     )}
-
 ${row(
         "Комментарий заказчика",
         data.remediation.reviewComment || "Не указан"
     )}
-
-<div class="notice">
-    Заказчик подтвердил, что ознакомился
-    с сообщением исполнителя об исправлениях.
-    Это подтверждение само по себе не является
-    окончательной приёмкой работ без замечаний
-    и не заменяет подписание настоящего акта.
-</div>
 ` : ""}
 
 <div class="warning">
-    <strong>Важное пояснение.</strong>
+    <strong>Порядок подтверждения.</strong>
 
-    Отметки о завершении заказа отражают действия
-    пользователей в CargoCamp.
+    Отметка о завершении работ не равнозначна
+    приёмке результата без замечаний.
 
-    Они сами по себе не удостоверяют надлежащее
-    качество работ, отсутствие недостатков,
-    отсутствие претензий или получение оплаты.
+    Приёмка фиксируется отдельно заказчиком,
+    после чего акт может быть подписан сторонами
+    в предусмотренном CargoCamp порядке.
 
-    Настоящий документ является проектом акта.
-    Его отдельное электронное подписание сторонами
-    и фиксация возражений предусмотрены
-    самостоятельной процедурой.
+    Подписи привязываются к конкретной версии
+    и контрольной сумме PDF.
 </div>
 
 ${renderPhotoAnnex(photoAnnex)}
 
 <div class="footer">
-    Сформировано системой CargoCamp.
+    Документ сформирован системой CargoCamp.
     После сохранения PDF не изменяется.
-    Контроль целостности: SHA-256.
+    Контроль целостности выполняется по SHA-256.
 </div>
 
 </body>
@@ -258,7 +473,6 @@ async function generateVerifiedCompletionActPDF(
         });
 
         return Buffer.from(pdf);
-
     } finally {
         if (browser) {
             await browser.close();

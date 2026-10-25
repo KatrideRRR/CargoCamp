@@ -8,6 +8,10 @@ const {
 } = require("./orderPhotoAnnexService");
 
 const {
+    buildCompletionActEvidence,
+} = require("./completionActEvidenceService");
+
+const {
     sequelize,
     Contract,
     ContractEvent,
@@ -48,26 +52,17 @@ function parseCompletedBy(value) {
     return [];
 }
 
-function buildSnapshot(order, assignment) {
+
+function buildSnapshot(order, assignment, evidence) {
+    const assignmentSnapshot =
+        assignment.metadata?.snapshot || {};
+
     const agreedTerms =
-        assignment.metadata?.snapshot?.terms || {};
+        assignmentSnapshot.terms || {};
 
-    const priceKopecks =
-        Number(order.finalPriceKopecks) > 0
-            ? Number(order.finalPriceKopecks)
-            : Number(
-                agreedTerms.priceKopecks ??
-                Math.round(Number(order.proposedSum || 0) * 100)
-            );
-
-    if (
-        !Number.isSafeInteger(priceKopecks) ||
-        priceKopecks <= 0
-    ) {
-        throw new Error(
-            "Некорректная согласованная стоимость заказа"
-        );
-    }
+    const details = Array.isArray(agreedTerms.serviceDetailRows)
+        ? agreedTerms.serviceDetailRows
+        : [];
 
     return {
         schemaVersion: 1,
@@ -86,45 +81,64 @@ function buildSnapshot(order, assignment) {
 
         customerId: Number(order.creatorId),
         customerName:
+            assignmentSnapshot.customer?.profileName ||
             order.creator?.username ||
             `Пользователь ${order.creatorId}`,
 
         executorId: Number(order.executorId),
         executorName:
+            assignmentSnapshot.executor?.profileName ||
             order.executor?.username ||
             `Пользователь ${order.executorId}`,
 
         category:
-            order.category?.name || "—",
+            agreedTerms.category ||
+            order.category?.name ||
+            "—",
 
         subcategory:
-            order.subcategory?.name || "—",
+            agreedTerms.subcategory ||
+            order.subcategory?.name ||
+            "—",
+
+        service:
+            agreedTerms.service || "—",
 
         address:
-            agreedTerms.address ??
-            order.address ??
-            "—",
+            agreedTerms.address || order.address || "—",
 
         description:
-            agreedTerms.description ??
-            order.description ??
-            "—",
+            agreedTerms.description || order.description || "—",
 
-        priceRub: (priceKopecks / 100).toFixed(2),
+        serviceDetailRows: details,
+        serviceDetails: agreedTerms.serviceDetails || {},
+
+        plannedTime: agreedTerms.workTime || null,
+        isAsap: agreedTerms.isAsap === true,
+
+        originalPriceKopecks:
+        evidence.originalPriceKopecks,
+
+        finalPriceKopecks:
+        evidence.finalPriceKopecks,
+
+        priceRub:
+            (evidence.finalPriceKopecks / 100).toFixed(2),
+
+        addenda: evidence.addenda,
+
+        disputes: evidence.disputes,
+        disputesCapturedAt:
+        evidence.disputesCapturedAt,
 
         paymentType:
-            agreedTerms.paymentType ??
-            order.paymentType ??
+            agreedTerms.paymentType ||
+            order.paymentType ||
             "—",
 
-        workStartedAt:
-            order.workStartedAt || null,
-
-        workEndedAt:
-            order.workEndedAt || null,
-
-        completedAt:
-        order.completedAt,
+        workStartedAt: order.workStartedAt || null,
+        workEndedAt: order.workEndedAt || null,
+        completedAt: order.completedAt,
     };
 }
 
@@ -206,9 +220,15 @@ async function createVerifiedCompletionActIfEligible(order) {
         return null;
     }
 
-    const snapshot = buildSnapshot(
+    const evidence = await buildCompletionActEvidence(
         order,
         assignment
+    );
+
+    const snapshot = buildSnapshot(
+        order,
+        assignment,
+        evidence
     );
 
     const photoAnnex =
@@ -293,7 +313,7 @@ async function createVerifiedCompletionActIfEligible(order) {
                         templateCode:
                             "verified_completion_act_default",
 
-                        templateVersion: "3",
+                        templateVersion: "4",
 
                         storageKey,
                         documentHash,
