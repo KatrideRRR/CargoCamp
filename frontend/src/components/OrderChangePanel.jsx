@@ -8,6 +8,16 @@ import React, {
 import axiosInstance from "../utils/axiosInstance";
 import { socket } from "../socketClient";
 
+import SignatureAgreementPanel
+    from "./SignatureAgreementPanel";
+
+import ContractSigningPanel
+    from "./ContractSigningPanel";
+
+import {
+    downloadVerifiedContract,
+} from "../utils/downloadVerifiedContract";
+
 const ACTIVE_STATUSES = [
     "pending",
     "approved_pending_agreement",
@@ -145,6 +155,47 @@ export default function OrderChangePanel({ order, userId }) {
         }
     };
 
+
+    const generateAgreement = async () => {
+        if (!activeChange || busy) return;
+
+        try {
+            setBusy(true);
+            setError("");
+
+            await axiosInstance.post(
+                `/order-changes/${activeChange.id}/agreement`
+            );
+
+            await load();
+        } catch (error) {
+            setError(
+                error.response?.data?.message ||
+                "Не удалось создать дополнительное соглашение"
+            );
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const downloadAgreement = async (agreement) => {
+        try {
+            setError("");
+
+            await downloadVerifiedContract(
+                agreement.id,
+                agreement.version,
+                "addendum"
+            );
+        } catch (error) {
+            setError(
+                error.message ||
+                "Не удалось скачать соглашение"
+            );
+        }
+    };
+
+
     return (
         <section style={{
             border: "1px solid #dbe3ef",
@@ -194,14 +245,78 @@ export default function OrderChangePanel({ order, userId }) {
                         </strong>
                     </p>
 
+
                     {activeChange.status ===
                     "approved_pending_agreement" ? (
-                        <p style={{ fontSize: 13 }}>
-                            Следующий этап — оформление и подписание
-                            дополнительного соглашения. Текущая цена
-                            заказа пока не изменена.
-                        </p>
+                        <div style={{
+                            display: "grid",
+                            gap: 12,
+                            marginTop: 12,
+                        }}>
+                            {activeChange.agreement ? (
+                                <>
+                                    <div>
+                                        <strong>
+                                            {activeChange.agreement.documentNumber}
+                                        </strong>
+
+                                        <p style={{ fontSize: 13 }}>
+                                            Статус:{" "}
+                                            {activeChange.agreement.status === "fully_signed"
+                                                ? "Подписано обеими сторонами"
+                                                : activeChange.agreement.status === "partially_signed"
+                                                    ? "Ожидается вторая подпись"
+                                                    : "Ожидает подписания"}
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            downloadAgreement(activeChange.agreement)
+                                        }
+                                    >
+                                        Скачать дополнительное соглашение (PDF)
+                                    </button>
+
+                                    {activeChange.agreement.status !== "fully_signed" && (
+                                        <>
+                                            <SignatureAgreementPanel />
+
+                                            <ContractSigningPanel
+                                                assignment={activeChange.agreement}
+                                                onSigned={load}
+                                            />
+                                        </>
+                                    )}
+                                </>
+                            ) : (
+                                <>
+                                    <p style={{ fontSize: 13 }}>
+                                        Предложение согласовано. Для изменения цены
+                                        необходимо оформить дополнительное соглашение
+                                        к подписанному основному договору.
+                                    </p>
+
+                                    <button
+                                        type="button"
+                                        disabled={busy}
+                                        onClick={generateAgreement}
+                                    >
+                                        {busy
+                                            ? "Формируем PDF…"
+                                            : "Сформировать дополнительное соглашение"}
+                                    </button>
+                                </>
+                            )}
+
+                            <small>
+                                До завершения подписания обеими сторонами
+                                действует прежняя стоимость заказа.
+                            </small>
+                        </div>
                     ) : isAuthor ? (
+
                         <button
                             type="button"
                             disabled={busy}
@@ -332,6 +447,19 @@ export default function OrderChangePanel({ order, userId }) {
                             <small>
                                 Статус: {change.status}
                             </small>
+
+                            {change.agreement && (
+                                <div style={{ marginTop: 8 }}>
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            downloadAgreement(change.agreement)
+                                        }
+                                    >
+                                        Скачать соглашение №{change.agreement.version}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </details>

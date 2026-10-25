@@ -292,6 +292,7 @@ router.get("/:contractId/file", authenticateToken, async (req, res) => {
                             [Op.in]: [
                                 "verified_assignment",
                                 "verified_completion_act",
+                                "verified_addendum",
                             ],
                         },
                     },
@@ -446,7 +447,9 @@ router.get("/:contractId/file", authenticateToken, async (req, res) => {
             const downloadPrefix =
                 contract.type === "verified_completion_act"
                     ? "verified-act"
-                    : "verified-assignment";
+                    : contract.type === "verified_addendum"
+                        ? "verified-addendum"
+                        : "verified-assignment";
 
             res.setHeader(
                 "Content-Disposition",

@@ -10,6 +10,7 @@ const {
 const ALLOWED_TYPES = new Set([
     "verified_assignment",
     "verified_completion_act",
+    "verified_addendum",
 ]);
 
 function integrityError(message) {

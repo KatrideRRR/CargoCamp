@@ -1711,8 +1711,13 @@ const ActiveOrdersPage = () => {
 
                                                             <div className="pay-right">
                                                                 <div className="pay-price">
-                                                                    {Number(order.proposedSum ?? 0).toLocaleString("ru-RU")} ₽
-                                                                </div>
+                                                                    {(
+                                                                        Number(order.finalPriceKopecks) > 0
+                                                                            ? Number(order.finalPriceKopecks) / 100
+                                                                            : Number(order.proposedSum ?? 0)
+                                                                    ).toLocaleString("ru-RU", {
+                                                                        maximumFractionDigits: 2,
+                                                                    })} ₽                                                                </div>
                                                                 <div className="pay-type">{getPaymentLabel(order.paymentType)}</div>
                                                             </div>
                                                         </div>

@@ -52,11 +52,13 @@ function buildSnapshot(order, assignment) {
     const agreedTerms =
         assignment.metadata?.snapshot?.terms || {};
 
-    const priceKopecks = Number(
-        agreedTerms.priceKopecks ??
-        order.finalPriceKopecks ??
-        Math.round(Number(order.proposedSum || 0) * 100)
-    );
+    const priceKopecks =
+        Number(order.finalPriceKopecks) > 0
+            ? Number(order.finalPriceKopecks)
+            : Number(
+                agreedTerms.priceKopecks ??
+                Math.round(Number(order.proposedSum || 0) * 100)
+            );
 
     if (
         !Number.isSafeInteger(priceKopecks) ||

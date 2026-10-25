@@ -8,11 +8,24 @@ const authenticateToken =
 const { notifyUser } =
     require("../services/notificationService");
 
+const fs = require("fs/promises");
+const path = require("path");
+const crypto = require("crypto");
+
+const {
+    contractsRoot,
+} = require("../config/storagePaths");
+
+const generateVerifiedAddendumPDF =
+    require("../utils/generateVerifiedAddendumPDF");
+
 const {
     sequelize,
     Order,
     OrderChangeRequest,
     Dispute,
+    Contract,
+    ContractEvent,
 } = require("../models");
 
 const router = express.Router();
@@ -205,10 +218,47 @@ router.get("/order/:orderId", async (req, res) => {
             limit: 30,
         });
 
+
+        const contractIds = changes
+            .map((item) => item.agreementContractId)
+            .filter(Boolean);
+
+        const contracts = contractIds.length
+            ? await Contract.findAll({
+                where: {
+                    id: { [Op.in]: contractIds },
+                    orderId,
+                    type: "verified_addendum",
+                },
+                attributes: [
+                    "id",
+                    "status",
+                    "type",
+                    "version",
+                    "documentNumber",
+                    "documentHash",
+                    "fullySignedAt",
+                ],
+            })
+            : [];
+
+        const contractMap = new Map(
+            contracts.map((contract) => [
+                String(contract.id),
+                contract.toJSON(),
+            ])
+        );
+
         return res.json({
             success: true,
-            changes,
+            changes: changes.map((change) => ({
+                ...change.toJSON(),
+                agreement: change.agreementContractId
+                    ? contractMap.get(String(change.agreementContractId)) || null
+                    : null,
+            })),
         });
+
     } catch (error) {
         return respondError(res, error);
     }
@@ -429,5 +479,255 @@ router.post("/:changeId/respond", async (req, res) => {
         return respondError(res, error);
     }
 });
+
+
+// Создание дополнительного соглашения к подписанному договору.
+router.post("/:changeId/agreement", async (req, res) => {
+    let writtenFile = null;
+
+    try {
+        const changeId = parseId(req.params.changeId);
+        const userId = Number(req.user.id);
+        const initial = await OrderChangeRequest.findByPk(changeId);
+
+        if (!initial) {
+            throw fail(404, "Предложение не найдено");
+        }
+
+        const result = await sequelize.transaction(
+            async (transaction) => {
+                const order = await Order.findByPk(initial.orderId, {
+                    transaction,
+                    lock: transaction.LOCK.UPDATE,
+                });
+
+                assertParticipant(order, userId);
+                assertEditable(order);
+
+                const change = await OrderChangeRequest.findByPk(
+                    changeId,
+                    {
+                        transaction,
+                        lock: transaction.LOCK.UPDATE,
+                    }
+                );
+
+                if (!change) {
+                    throw fail(404, "Предложение не найдено");
+                }
+
+                if (change.agreementContractId) {
+                    const existing = await Contract.findByPk(
+                        change.agreementContractId,
+                        { transaction }
+                    );
+
+                    if (!existing) {
+                        throw fail(409, "Документ не найден");
+                    }
+
+                    return {
+                        contract: existing,
+                        created: false,
+                        order,
+                    };
+                }
+
+                if (change.status !== "approved_pending_agreement") {
+                    throw fail(
+                        409,
+                        "Дополнительные работы ещё не согласованы"
+                    );
+                }
+
+                await assertNoActiveDispute(order.id, transaction);
+
+                if (
+                    currentPrice(order) !==
+                    Number(change.basePriceKopecks)
+                ) {
+                    throw fail(
+                        409,
+                        "Стоимость заказа изменилась"
+                    );
+                }
+
+                const parent = await Contract.findOne({
+                    where: {
+                        orderId: order.id,
+                        type: "verified_assignment",
+                    },
+                    order: [["version", "DESC"]],
+                    transaction,
+                });
+
+                if (
+                    !parent ||
+                    parent.status !== "fully_signed" ||
+                    !parent.fullySignedAt ||
+                    !parent.documentHash
+                ) {
+                    throw fail(
+                        409,
+                        "Для дополнительного соглашения нужен " +
+                        "подписанный обеими сторонами основной договор"
+                    );
+                }
+
+                const lastAddendum = await Contract.findOne({
+                    where: {
+                        orderId: order.id,
+                        type: "verified_addendum",
+                    },
+                    order: [["version", "DESC"]],
+                    transaction,
+                });
+
+                const version = lastAddendum
+                    ? Number(lastAddendum.version) + 1
+                    : 1;
+
+                const snapshot = {
+                    orderId: order.id,
+                    changeId: String(change.id),
+
+                    version,
+                    documentNumber:
+                        `CC-ADD-${order.id}-V${version}`,
+
+                    generatedAt: new Date().toISOString(),
+
+                    parentId: String(parent.id),
+                    parentNumber: parent.documentNumber,
+                    parentHash: parent.documentHash,
+
+                    creatorId: order.creatorId,
+                    executorId: order.executorId,
+
+                    customerName:
+                        parent.metadata?.snapshot?.customer?.profileName ||
+                        `Пользователь ${order.creatorId}`,
+
+                    executorName:
+                        parent.metadata?.snapshot?.executor?.profileName ||
+                        `Пользователь ${order.executorId}`,
+
+                    additionalWork: change.additionalWork,
+                    basePriceKopecks: Number(change.basePriceKopecks),
+                    proposedPriceKopecks: Number(change.proposedPriceKopecks),
+                };
+
+                const pdf = await generateVerifiedAddendumPDF(snapshot);
+
+                if (
+                    pdf.length < 100 ||
+                    pdf.subarray(0, 5).toString("ascii") !== "%PDF-"
+                ) {
+                    throw new Error("Не удалось сформировать PDF");
+                }
+
+                const documentHash = crypto
+                    .createHash("sha256")
+                    .update(pdf)
+                    .digest("hex");
+
+                const directory = path.join(
+                    contractsRoot,
+                    "verified"
+                );
+
+                await fs.mkdir(directory, {
+                    recursive: true,
+                    mode: 0o700,
+                });
+
+                const fileName =
+                    `verified_addendum_${order.id}_v${version}_` +
+                    `${crypto.randomUUID()}.pdf`;
+
+                writtenFile = path.join(directory, fileName);
+
+                await fs.writeFile(writtenFile, pdf, {
+                    flag: "wx",
+                    mode: 0o600,
+                });
+
+                const contract = await Contract.create(
+                    {
+                        orderId: order.id,
+                        parentContractId: parent.id,
+
+                        type: "verified_addendum",
+                        version,
+                        status: "draft",
+
+                        documentNumber: snapshot.documentNumber,
+                        jurisdiction: "RU",
+
+                        templateCode: "verified_addendum_default",
+                        templateVersion: "5",
+
+                        storageKey: `verified/${fileName}`,
+                        documentHash,
+
+                        metadata: {
+                            snapshot,
+                            changeId: String(change.id),
+                        },
+                    },
+                    { transaction }
+                );
+
+                change.agreementContractId = contract.id;
+
+                await change.save({ transaction });
+
+                await ContractEvent.create(
+                    {
+                        contractId: contract.id,
+                        actorUserId: null,
+                        actorRole: "system",
+                        eventType: "draft_created",
+                        eventAt: new Date(),
+                        metadata: {
+                            documentHash,
+                            changeId: String(change.id),
+                            parentContractId: String(parent.id),
+                        },
+                    },
+                    { transaction }
+                );
+
+                return {
+                    contract,
+                    created: true,
+                    order,
+                };
+            }
+        );
+
+        return res.json({
+            success: true,
+            created: result.created,
+
+            contract: {
+                id: result.contract.id,
+                type: result.contract.type,
+                version: result.contract.version,
+                status: result.contract.status,
+                documentNumber: result.contract.documentNumber,
+                documentHash: result.contract.documentHash,
+            },
+        });
+    } catch (error) {
+        if (writtenFile) {
+            await fs.rm(writtenFile, { force: true })
+                .catch(console.error);
+        }
+
+        return respondError(res, error);
+    }
+});
+
 
 module.exports = router;

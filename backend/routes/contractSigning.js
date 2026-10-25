@@ -22,7 +22,7 @@ const {
     ElectronicSignatureAgreement,
     ActionLog,
     Dispute,
-
+    OrderChangeRequest,
 } = require("../models");
 
 const {
@@ -177,6 +177,7 @@ async function getContext(id, userId, transaction, lock) {
         ![
             "verified_assignment",
             "verified_completion_act",
+            "verified_addendum",
         ].includes(contract.type)
     ) {
         throw fail(404, "Документ не найден");
@@ -217,6 +218,99 @@ async function assertDocumentReadyForSigning(
     transaction = null
 ) {
     const { contract, order } = ctx;
+
+
+    if (contract.type === "verified_addendum") {
+        if (
+            order.status !== "active" ||
+            order.paymentType !== "cash"
+        ) {
+            throw fail(
+                409,
+                "Дополнительное соглашение недоступно для этого заказа"
+            );
+        }
+
+        if (
+            Array.isArray(order.completedBy) &&
+            order.completedBy.length > 0
+        ) {
+            throw fail(
+                409,
+                "Нельзя подписать изменение после подтверждения завершения"
+            );
+        }
+
+        const change = await OrderChangeRequest.findOne({
+            where: {
+                orderId: order.id,
+                agreementContractId: contract.id,
+                status: "approved_pending_agreement",
+            },
+            transaction,
+        });
+
+        if (!change) {
+            throw fail(
+                409,
+                "Согласованное предложение не найдено"
+            );
+        }
+
+        if (
+            Number(order.finalPriceKopecks) !==
+            Number(change.basePriceKopecks)
+        ) {
+            throw fail(
+                409,
+                "Согласованная цена заказа изменилась"
+            );
+        }
+
+        const parent = await Contract.findByPk(
+            contract.parentContractId,
+            { transaction }
+        );
+
+        if (
+            !parent ||
+            Number(parent.orderId) !== Number(order.id) ||
+            parent.type !== "verified_assignment" ||
+            parent.status !== "fully_signed" ||
+            !parent.fullySignedAt
+        ) {
+            throw fail(
+                409,
+                "Основной договор должен быть подписан обеими сторонами"
+            );
+        }
+
+        const dispute = await Dispute.findOne({
+            where: {
+                orderId: order.id,
+                orderType: "regular",
+                status: {
+                    [Op.in]: [
+                        "open",
+                        "in_review",
+                        "waiting_creator",
+                        "waiting_executor",
+                    ],
+                },
+            },
+            transaction,
+        });
+
+        if (dispute) {
+            throw fail(
+                409,
+                "По заказу есть открытый спор"
+            );
+        }
+
+        return;
+    }
+
 
     if (
         contract.type ===
@@ -1163,6 +1257,93 @@ router.post("/:contractId/confirm-code", async (req, res) => {
 
                 await ctx.contract.save({ transaction });
 
+
+                let addendumApplied = false;
+
+                if (
+                    fullySigned &&
+                    ctx.contract.type === "verified_addendum"
+                ) {
+                    const orderForUpdate = await Order.findByPk(
+                        ctx.order.id,
+                        {
+                            transaction,
+                            lock: transaction.LOCK.UPDATE,
+                        }
+                    );
+
+                    const change = await OrderChangeRequest.findOne({
+                        where: {
+                            orderId: ctx.order.id,
+                            agreementContractId: ctx.contract.id,
+                            status: "approved_pending_agreement",
+                        },
+                        transaction,
+                        lock: transaction.LOCK.UPDATE,
+                    });
+
+                    if (!change) {
+                        throw fail(
+                            409,
+                            "Согласованное изменение заказа не найдено"
+                        );
+                    }
+
+                    if (
+                        !orderForUpdate ||
+                        orderForUpdate.status !== "active" ||
+                        orderForUpdate.paymentType !== "cash" ||
+                        (
+                            Array.isArray(orderForUpdate.completedBy) &&
+                            orderForUpdate.completedBy.length > 0
+                        ) ||
+                        Number(orderForUpdate.finalPriceKopecks) !==
+                        Number(change.basePriceKopecks)
+                    ) {
+                        throw fail(
+                            409,
+                            "Условия заказа изменились. Применение новой цены невозможно."
+                        );
+                    }
+
+                    orderForUpdate.finalPriceKopecks =
+                        Number(change.proposedPriceKopecks);
+
+                    orderForUpdate.proposedSum = Math.round(
+                        Number(change.proposedPriceKopecks) / 100
+                    );
+
+                    await orderForUpdate.save({ transaction });
+
+                    change.status = "applied";
+                    change.appliedAt = now;
+
+                    await change.save({ transaction });
+
+                    await ContractEvent.create(
+                        {
+                            contractId: ctx.contract.id,
+                            actorUserId: null,
+                            actorRole: "system",
+                            eventType: "addendum_applied",
+                            eventAt: now,
+                            metadata: {
+                                changeId: String(change.id),
+                                basePriceKopecks:
+                                change.basePriceKopecks,
+                                newPriceKopecks:
+                                change.proposedPriceKopecks,
+                                documentHash:
+                                ctx.contract.documentHash,
+                            },
+                        },
+                        { transaction }
+                    );
+
+                    addendumApplied = true;
+                }
+
+
                 await ContractEvent.create(
                     {
                         contractId: ctx.contract.id,
@@ -1205,8 +1386,9 @@ router.post("/:contractId/confirm-code", async (req, res) => {
                 return {
                     success: true,
                     fullySigned,
-                    contractStatus:
-                    ctx.contract.status,
+                    contractStatus: ctx.contract.status,
+                    addendumApplied,
+                    orderId: ctx.order.id,
                 };
             }
         );
@@ -1216,6 +1398,36 @@ router.post("/:contractId/confirm-code", async (req, res) => {
                 success: false,
                 message: result.message,
             });
+        }
+
+
+        if (result.addendumApplied) {
+            const io = req.app.locals.io;
+
+            if (io) {
+                const updatedOrder = await Order.findByPk(result.orderId, {
+                    attributes: [
+                        "creatorId",
+                        "executorId",
+                    ],
+                });
+
+                if (updatedOrder) {
+                    for (const id of [
+                        updatedOrder.creatorId,
+                        updatedOrder.executorId,
+                    ]) {
+                        io.to(`user_${id}`).emit(
+                            "activeOrdersUpdated",
+                            {
+                                orderId: result.orderId,
+                                orderType: "regular",
+                                reason: "addendum_applied",
+                            }
+                        );
+                    }
+                }
+            }
         }
 
         return res.json(result);

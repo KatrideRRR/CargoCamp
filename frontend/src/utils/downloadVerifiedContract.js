@@ -71,7 +71,9 @@ export async function downloadVerifiedContract(
             const filenamePrefix =
                 kind === "act"
                     ? "verified_act"
-                    : "verified_contract";
+                    : kind === "addendum"
+                        ? "verified_addendum"
+                        : "verified_contract";
 
             link.download =
                 `${filenamePrefix}_${id}_v${version}.pdf`;
