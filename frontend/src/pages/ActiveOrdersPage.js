@@ -20,6 +20,7 @@ import useVerifiedAssignments from "../hooks/useVerifiedAssignments";
 import VerifiedAssignmentCard from "../components/VerifiedAssignmentCard";
 import OrderWorkPhotos from "../components/OrderWorkPhotos";
 import DisputeEvidenceInput from "../components/DisputeEvidenceInput";
+import OrderChangePanel from "../components/OrderChangePanel";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -1983,6 +1984,11 @@ const ActiveOrdersPage = () => {
                                                         <VerifiedAssignmentCard
                                                             assignment={verifiedAssignment}
                                                             onSigned={refreshAssignments}
+                                                        />
+
+                                                        <OrderChangePanel
+                                                            order={order}
+                                                            userId={user.id}
                                                         />
 
                                                         <OrderWorkPhotos

@@ -447,7 +447,7 @@ async function prerequisites(ctx, userId, transaction) {
 function requireUnsigned(contract) {
 
     if (
-        !["2", "3", "4"].includes(
+        !["2", "3", "4", "5"].includes(
             String(contract.templateVersion)
         )
     ) {
@@ -592,7 +592,7 @@ router.get("/:contractId/status", async (req, res) => {
                 Boolean(phone) &&
                 !blockedReason &&
                 !mySigned &&
-                ["2", "3", "4"].includes(
+                ["2", "3", "4", "5"].includes(
                     String(ctx.contract.templateVersion)
                 ) &&
                 ["draft", "partially_signed"].includes(

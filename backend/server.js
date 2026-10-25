@@ -62,6 +62,7 @@ const signatureAgreementRoutes = require("./routes/signatureAgreement");
 const contractSigningRoutes = require("./routes/contractSigning");
 const actAcceptanceRoutes = require("./routes/actAcceptance");
 const actRemediationRoutes = require("./routes/actRemediation");
+const orderChangesRoutes = require("./routes/orderChanges");
 
 const db = require("./models");
 const sequelize = require("./config/database");
@@ -253,6 +254,7 @@ app.use("/api/contracts/signing", contractSigningRoutes);
 app.use("/api/contracts/e-sign", signatureAgreementRoutes);
 app.use("/api/contracts", verifiedContractsRoutes);
 app.use("/api/orders", orderRoutes(io));
+app.use("/api/order-changes", orderChangesRoutes);
 app.use("/api/disputes", disputeRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messagesRoutes);

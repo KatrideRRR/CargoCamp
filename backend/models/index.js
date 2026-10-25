@@ -40,6 +40,7 @@ db.VerificationDocument = require("./VerificationDocument")(sequelize, DataTypes
 db.Contract = require("./Contract")(sequelize, DataTypes);
 db.ContractSignature = require("./ContractSignature")(sequelize, DataTypes);
 db.ContractEvent = require("./ContractEvent")(sequelize, DataTypes);
+db.OrderChangeRequest = require("./OrderChangeRequest")(sequelize, DataTypes);
 // ✅ Express (такси/курьер)
 db.ExpressOrder = require("./ExpressOrder")(sequelize, DataTypes);
 db.ExpressSavedAddress = require("./ExpressSavedAddress")(sequelize, DataTypes);
