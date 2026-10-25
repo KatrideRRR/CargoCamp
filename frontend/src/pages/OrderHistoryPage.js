@@ -409,6 +409,7 @@ const OrderHistoryPage = () => {
         actsByOrderId: verifiedActs,
         error: assignmentsError,
         refresh: refreshAssignments,
+        loading: assignmentsLoading,
     } = useVerifiedAssignments(
         regularOrders
     );
@@ -1006,7 +1007,9 @@ const OrderHistoryPage = () => {
 
                                         <div className="oh-actions">
                                             {!isExpress &&
-                                                hasContract && (
+                                                hasContract &&
+                                                !verifiedAssignment &&
+                                                !assignmentsLoading && (
                                                     <button
                                                         type="button"
                                                         className="btn btn-ghost"
@@ -1027,9 +1030,7 @@ const OrderHistoryPage = () => {
                                                     >
                                                         <FiFileText />
 
-                                                        {verifiedAssignment
-                                                            ? "Скачать обычный договор (PDF)"
-                                                            : "Скачать договор (PDF)"}
+                                                        Скачать договор (PDF)
                                                     </button>
                                                 )}
 

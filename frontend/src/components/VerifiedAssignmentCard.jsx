@@ -230,9 +230,8 @@ export default function VerifiedAssignmentCard({
             )}
 
             <div className="cc-va-footnote">
-                Документ хранится отдельно от обычного
-                договора заказа. Целостность PDF
-                проверяется системой CargoCamp.
+                Целостность PDF проверяется системой CargoCamp.
+                Документ сохраняется с историей подписания.
             </div>
         </section>
     );

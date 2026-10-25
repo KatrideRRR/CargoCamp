@@ -1534,6 +1534,7 @@ const ActiveOrdersPage = () => {
         byOrderId: verifiedAssignments,
         error: assignmentsError,
         refresh: refreshAssignments,
+        loading: assignmentsLoading,
     } = useVerifiedAssignments(
         visibleRegularOrders
     );
@@ -1944,7 +1945,7 @@ const ActiveOrdersPage = () => {
                                                             order={order}
                                                         />
 
-                                                        {hasContract && (
+                                                        {hasContract && !verifiedAssignment && !assignmentsLoading && (
                                                             <div className="contract-download-row">
                                                                 <button
                                                                     type="button"
@@ -1969,9 +1970,7 @@ const ActiveOrdersPage = () => {
             </span>
 
                                                                     <span className="contract-download-text">
-    {verifiedAssignment
-        ? "Скачать обычный договор"
-        : "Скачать договор"}
+    Скачать договор
 </span>
 
                                                                     <span className="contract-download-format">

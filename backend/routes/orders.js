@@ -2604,122 +2604,118 @@ module.exports = (io) => {
                 ],
             });
 
-            // ===== договор =====
-            const contractData = {
-                orderId: fullOrder.id,
-                approvalDate: new Date().toLocaleDateString("ru-RU"),
-                city: "Москва",
 
-                customerId: fullOrder.creatorId,
-                performerId: fullOrder.executorId,
+            // ===== ДОГОВОР ЗАКАЗА =====
+            // Сначала пытаемся создать подтверждённый договор.
+            // Обычный PDF нужен только если подтверждённого нет.
 
-                customerName: fullOrder.creator?.username || `Пользователь ${fullOrder.creatorId}`,
-                performerName: fullOrder.executor?.username || `Пользователь ${fullOrder.executorId}`,
+            let hasVerifiedAssignment = false;
 
-                category: fullOrder.category?.name || "Общая категория",
-                subcategory: fullOrder.subcategory?.name || "Общая подкатегория",
-
-                address: fullOrder.address || "Адрес не указан",
-                description: fullOrder.description || "Описание не указано",
-                price: fullOrder.proposedSum || 0,
-                paymentType: fullOrder.paymentType || "не указано",
-                dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString("ru-RU"),
-                completeAt: null,
-                completedBy: [],
-            };
-
-            const contractFileName =
-                `contract_${fullOrder.id}.pdf`;
-
-            const filePath =
-                path.join(
-                    contractsRoot,
-                    contractFileName
-                );
-
-            try {
-                const photoAnnex =
-                    await collectOrderPhotoAnnex(
-                        fullOrder,
-                        "assignment"
-                    );
-
-                await generateContractPDF(
-                    {
-                        ...contractData,
-                        photoAnnex,
-                    },
-                    filePath
-                );
-
-                await fullOrder.update({
-                    contractPath:
-                        `/contracts/${contractFileName}`,
-                });
-            } catch (err) {
-                console.error(
-                    "❌ Ошибка генерации PDF договора:",
-                    err
-                );
-            }
-
-            /*
- * CONFIRMED DEAL — VERIFIED ASSIGNMENT v1
- *
- * Создаём дополнительный проект договора,
- * только если обе стороны имеют действующую
- * IdentityVerification.
- *
- * Не подменяем старый contractPath.
- * Не меняем комиссии или статусы заказа.
- */
             try {
                 const result =
-                    await createVerifiedAssignmentIfEligible(
-                        fullOrder
-                    );
+                    await createVerifiedAssignmentIfEligible(fullOrder);
 
-                if (result?.created) {
+                hasVerifiedAssignment = Boolean(result?.contract);
+
+                if (hasVerifiedAssignment) {
                     console.log(
-                        "✅ Проект подтверждённого договора создан:",
+                        result.created
+                            ? "✅ Подтверждённый договор создан"
+                            : "ℹ️ Подтверждённый договор уже существует",
                         {
                             orderId: fullOrder.id,
-                            contractId:
-                                String(result.contract.id),
-                            version:
-                            result.contract.version,
+                            contractId: String(result.contract.id),
+                            version: result.contract.version,
                         }
                     );
-                } else if (result?.contract) {
-                    console.log(
-                        "ℹ️ Договор уже существует:",
-                        result.contract.id
-                    );
-                } else {
-                    console.log(
-                        "ℹ️ Обычная сделка без нового договора:",
-                        fullOrder.id
-                    );
                 }
-
             } catch (error) {
-                /*
-                 * В этой первой версии ошибка
-                 * создания дополнительного PDF
-                 * не отменяет уже согласованный заказ.
-                 *
-                 * При этом ошибку нельзя скрывать:
-                 * нужно исправить её и отдельно
-                 * восстановить документ.
-                 */
                 console.error(
-                    "❌ Не удалось создать проект подтверждённого договора:",
+                    "❌ Ошибка создания подтверждённого договора:",
                     {
                         orderId: fullOrder.id,
                         error,
                     }
                 );
             }
+
+            // Если подтверждённого договора нет,
+            // используем существующий обычный PDF.
+            if (!hasVerifiedAssignment) {
+                const contractData = {
+                    orderId: fullOrder.id,
+                    approvalDate: new Date().toLocaleDateString("ru-RU"),
+                    city: "Москва",
+
+                    customerId: fullOrder.creatorId,
+                    performerId: fullOrder.executorId,
+
+                    customerName:
+                        fullOrder.creator?.username ||
+                        `Пользователь ${fullOrder.creatorId}`,
+
+                    performerName:
+                        fullOrder.executor?.username ||
+                        `Пользователь ${fullOrder.executorId}`,
+
+                    category:
+                        fullOrder.category?.name || "Общая категория",
+
+                    subcategory:
+                        fullOrder.subcategory?.name || "Общая подкатегория",
+
+                    address: fullOrder.address || "Адрес не указан",
+                    description: fullOrder.description || "Описание не указано",
+                    price: fullOrder.proposedSum || 0,
+                    paymentType: fullOrder.paymentType || "не указано",
+
+                    dueDate: new Date(
+                        Date.now() + 3 * 24 * 60 * 60 * 1000
+                    ).toLocaleDateString("ru-RU"),
+
+                    completeAt: null,
+                    completedBy: [],
+                };
+
+                const contractFileName =
+                    `contract_${fullOrder.id}.pdf`;
+
+                const filePath = path.join(
+                    contractsRoot,
+                    contractFileName
+                );
+
+                try {
+                    const photoAnnex =
+                        await collectOrderPhotoAnnex(
+                            fullOrder,
+                            "assignment"
+                        );
+
+                    await generateContractPDF(
+                        {
+                            ...contractData,
+                            photoAnnex,
+                        },
+                        filePath
+                    );
+
+                    await fullOrder.update({
+                        contractPath: `/contracts/${contractFileName}`,
+                    });
+
+                    console.log(
+                        "✅ Обычный договор создан:",
+                        fullOrder.id
+                    );
+                } catch (error) {
+                    console.error(
+                        "❌ Ошибка генерации обычного договора:",
+                        error
+                    );
+                }
+            }
+
 
             io.emit("orderUpdated");
 
@@ -3183,8 +3179,36 @@ module.exports = (io) => {
                 ]
             });
 
+
+            let hasVerifiedAssignmentForCompletion = false;
+
             if (fullyCompleted) {
+                try {
+                    const existingAssignment =
+                        await db.Contract.findOne({
+                            where: {
+                                orderId: fullOrder.id,
+                                type: "verified_assignment",
+                            },
+                            attributes: ["id"],
+                        });
+
+                    hasVerifiedAssignmentForCompletion =
+                        Boolean(existingAssignment);
+                } catch (error) {
+                    console.error(
+                        "Не удалось проверить наличие договора:",
+                        error
+                    );
+                }
+            }
+
+            if (
+                fullyCompleted &&
+                !hasVerifiedAssignmentForCompletion
+            ) {
                 const data = {
+
                     orderId: fullOrder.id,
                     approvalDate: fullOrder.createdAt.toLocaleDateString("ru-RU"),
                     city: "Москва",
