@@ -19,6 +19,7 @@ import {downloadLegacyContract,} from "../utils/downloadLegacyContract";
 import useVerifiedAssignments from "../hooks/useVerifiedAssignments";
 import VerifiedAssignmentCard from "../components/VerifiedAssignmentCard";
 import OrderWorkPhotos from "../components/OrderWorkPhotos";
+import DisputeEvidenceInput from "../components/DisputeEvidenceInput";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -451,6 +452,7 @@ const ActiveOrdersPage = () => {
     const [disputeReasonCode, setDisputeReasonCode] = useState("poor_quality");
     const [disputeReason, setDisputeReason] = useState("");
     const [disputeDescription, setDisputeDescription] = useState("");
+    const [disputeEvidenceFiles, setDisputeEvidenceFiles] = useState([]);
     const [disputeLoading, setDisputeLoading] = useState(false);
     const [orderDisputes, setOrderDisputes] = useState({});
 
@@ -632,6 +634,7 @@ const ActiveOrdersPage = () => {
 
         setDisputeReason("");
         setDisputeDescription("");
+        setDisputeEvidenceFiles([]);
 
         setIsDisputeModalOpen(true);
     };
@@ -645,6 +648,7 @@ const ActiveOrdersPage = () => {
         setDisputeReasonCode("work_not_done");
         setDisputeReason("");
         setDisputeDescription("");
+        setDisputeEvidenceFiles([]);
 
         setDisputeLoading(false);
     };
@@ -728,22 +732,26 @@ const ActiveOrdersPage = () => {
 
             setDisputeLoading(true);
 
+            const formData = new FormData();
+
+            formData.append("orderId", String(selectedOrderForDispute.id));
+            formData.append("orderType", selectedDisputeOrderType);
+            formData.append("reasonCode", disputeReasonCode);
+            formData.append("reason", disputeReason.trim());
+            formData.append("description", disputeDescription.trim());
+
+            disputeEvidenceFiles.forEach((file) => {
+                formData.append("evidence", file);
+            });
+
             const res = await axios.post(
                 `${apiUrl}/api/disputes/open`,
-                {
-                    orderId: selectedOrderForDispute.id,
-
-                    // ✅ ВАЖНО
-                    orderType: selectedDisputeOrderType,
-
-                    reasonCode: disputeReasonCode,
-                    reason: disputeReason.trim(),
-                    description: disputeDescription.trim(),
-                },
+                formData,
                 {
                     headers: {
                         Authorization: `Bearer ${t}`,
                     },
+                    timeout: 120000,
                 }
             );
 
@@ -2140,6 +2148,12 @@ const ActiveOrdersPage = () => {
                                     rows={6}
                                 />
                             </div>
+
+                            <DisputeEvidenceInput
+                                files={disputeEvidenceFiles}
+                                onChange={setDisputeEvidenceFiles}
+                                disabled={disputeLoading}
+                            />
 
                             <div className="dispute-modal-actions">
                                 <button

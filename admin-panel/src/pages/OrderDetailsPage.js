@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import "../styles/OrderDetailsPage.css";
 import OrderServiceDetails from "../components/OrderServiceDetails";
+import DisputeEvidenceGallery from "../components/DisputeEvidenceGallery";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -657,6 +658,11 @@ function OrderDetailsPage() {
                                         </span>
                                     </div>
                                 </div>
+
+                                <DisputeEvidenceGallery
+                                    dispute={dispute}
+                                    token={token}
+                                />
 
                                 <div className="dispute-admin-actions">
                                     <h4>Управление спором</h4>

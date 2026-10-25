@@ -7,9 +7,68 @@ const {sendAdminNotification, adminOrderUrl, adminExpressOrderUrl} = require("..
 const authMiddleware = require('../middlewares/userAuth');
 const { Dispute, Order, ActionLog, ExpressOrder } = require('../models');
 
+const multer = require("multer");
+const jwt = require("jsonwebtoken");
+
+const {
+    authMiddleware: adminAuthMiddleware,
+} = require("../middlewares/adminAuth");
+
+const {
+    MAX_PHOTOS,
+    MAX_FILE_SIZE,
+    saveDisputeEvidence,
+    removeDisputeEvidence,
+    getEvidenceFilePath,
+} = require("../services/disputeEvidenceService");
+
+
+const evidenceUploader = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        files: MAX_PHOTOS,
+        fileSize: MAX_FILE_SIZE,
+        fields: 6,
+        fieldSize: 64 * 1024,
+    },
+}).array("evidence", MAX_PHOTOS);
+
+function parseDisputeEvidence(req, res, next) {
+    evidenceUploader(req, res, (error) => {
+        if (!error) return next();
+
+        const isSizeError = error.code === "LIMIT_FILE_SIZE";
+
+        return res.status(isSizeError ? 413 : 400).json({
+            message: isSizeError
+                ? "Каждая фотография должна быть не более 8 МБ"
+                : "Не удалось принять фотографии. Максимум 5 файлов",
+        });
+    });
+}
+
+function authenticateEvidenceViewer(req, res, next) {
+    const token = String(
+        req.headers.authorization || ""
+    ).replace(/^Bearer\s+/i, "");
+
+    const decoded = jwt.decode(token);
+
+    if (decoded?.scope === "admin") {
+        return adminAuthMiddleware(req, res, next);
+    }
+
+    return authMiddleware(req, res, next);
+}
+
+
 // Открыть спор
-router.post('/open', authMiddleware, async (req, res) => {
-    try {
+router.post(
+    "/open",
+    authMiddleware,
+    parseDisputeEvidence,
+    async (req, res) => {
+        try {
         const {
             orderId,
             orderType = "regular",
@@ -125,6 +184,8 @@ router.post('/open', authMiddleware, async (req, res) => {
             });
         }
 
+            const uploadedFiles = req.files || [];
+
         const dispute =
             await Dispute.create({
                 orderId: order.id,
@@ -154,7 +215,26 @@ router.post('/open', authMiddleware, async (req, res) => {
                 status: "open",
             });
 
-        void sendAdminNotification({
+
+            try {
+                const evidencePhotos = await saveDisputeEvidence(
+                    dispute.id,
+                    userId,
+                    uploadedFiles
+                );
+
+                if (evidencePhotos.length) {
+                    dispute.evidencePhotos = evidencePhotos;
+                    await dispute.save();
+                }
+            } catch (error) {
+                await removeDisputeEvidence(dispute.id);
+                await dispute.destroy();
+                throw error;
+            }
+
+
+            void sendAdminNotification({
             topic: "disputes",
 
             title:
@@ -337,9 +417,11 @@ router.post('/open', authMiddleware, async (req, res) => {
             error
         );
 
-        return res.status(500).json({
-            message: "Ошибка сервера"
-        });
+            return res.status(error.status || 500).json({
+                message: error.status
+                    ? error.message
+                    : "Ошибка сервера",
+            });
     }
 });
 
@@ -424,5 +506,75 @@ router.get('/order/:orderType/:orderId', authMiddleware, async (req, res) => {
             });
         }
     });
+
+
+router.get(
+    "/evidence/:disputeId/:photoId",
+    authenticateEvidenceViewer,
+    async (req, res) => {
+        try {
+            const disputeId = Number(req.params.disputeId);
+
+            if (!Number.isSafeInteger(disputeId) || disputeId <= 0) {
+                return res.status(400).json({
+                    message: "Некорректный ID спора",
+                });
+            }
+
+            const dispute = await Dispute.findByPk(disputeId);
+
+            if (!dispute) {
+                return res.sendStatus(404);
+            }
+
+            const userId = Number(req.user.id);
+            const isAdmin = req.user.role === "admin";
+
+            const isParticipant =
+                Number(dispute.creatorId) === userId ||
+                Number(dispute.executorId) === userId;
+
+            if (!isAdmin && !isParticipant) {
+                return res.sendStatus(403);
+            }
+
+            const photos = Array.isArray(dispute.evidencePhotos)
+                ? dispute.evidencePhotos
+                : [];
+
+            const photo = photos.find(
+                (item) => item.id === req.params.photoId
+            );
+
+            if (!photo) {
+                return res.sendStatus(404);
+            }
+
+            const filePath = getEvidenceFilePath(
+                dispute.id,
+                photo.id
+            );
+
+            res.setHeader("Cache-Control", "no-store");
+            res.setHeader("Content-Type", "image/jpeg");
+            res.setHeader("X-Content-Type-Options", "nosniff");
+
+            return res.sendFile(filePath, (error) => {
+                if (error && !res.headersSent) {
+                    res.sendStatus(404);
+                }
+            });
+        } catch (error) {
+            console.error("Ошибка просмотра доказательства:", error);
+
+            return res.status(error.status || 500).json({
+                message: error.status
+                    ? error.message
+                    : "Ошибка сервера",
+            });
+        }
+    }
+);
+
 
 module.exports = router;

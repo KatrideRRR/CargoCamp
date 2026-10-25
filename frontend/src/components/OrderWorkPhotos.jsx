@@ -15,14 +15,6 @@ function OrderWorkPhotos({
         return null;
     }
 
-    const role = Number(order.creatorId) === id
-        ? "customer"
-        : Number(order.executorId) === id
-            ? "executor"
-            : null;
-
-    if (!role) return null;
-
     return (
         <section className="photo-protocol-section work-photo-section">
             <h4 className="photo-protocol-title">Мои фотографии</h4>
@@ -82,3 +74,4 @@ function OrderWorkPhotos({
         </section>
     );
 }
+export default OrderWorkPhotos;

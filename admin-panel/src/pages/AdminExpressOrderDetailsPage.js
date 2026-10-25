@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import "../styles/AdminExpressOrderDetailsPage.css";
+import DisputeEvidenceGallery from "../components/DisputeEvidenceGallery";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -679,6 +680,10 @@ function AdminExpressOrderDetailsPage() {
                                     </div>
                                 )}
                             </div>
+                            <DisputeEvidenceGallery
+                                dispute={dispute}
+                                token={token}
+                            />
                         </div>
                     ))}
             </div>

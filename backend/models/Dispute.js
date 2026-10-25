@@ -106,6 +106,12 @@ module.exports = (sequelize) => {
                 allowNull: true
             },
 
+            evidencePhotos: {
+                type: DataTypes.JSON,
+                allowNull: true,
+                defaultValue: [],
+            },
+
             status: {
                 type: DataTypes.ENUM(
                     'open',

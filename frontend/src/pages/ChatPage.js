@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Capacitor } from "@capacitor/core";
+import axios from "axios";
+import DisputeEvidenceInput from "../components/DisputeEvidenceInput";
 import axiosInstance from "../utils/axiosInstance";
 import { useParams, useNavigate } from "react-router-dom";
 import "../styles/ChatPage.css";
@@ -7,6 +9,7 @@ import { useUser } from "../utils/userContext";
 import { socket } from "../socketClient";
 import Modal from "react-modal";
 import { openOrderRoute } from "../utils/orderNavigation";
+
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -111,6 +114,7 @@ const ChatPage = () => {
     const [disputeReasonCode, setDisputeReasonCode] = useState("poor_quality");
     const [disputeReason, setDisputeReason] = useState("");
     const [disputeDescription, setDisputeDescription] = useState("");
+    const [disputeEvidenceFiles, setDisputeEvidenceFiles] = useState([]);
     const [disputeLoading, setDisputeLoading] = useState(false);
     const [orderDispute, setOrderDispute] = useState(null);
 
@@ -183,7 +187,7 @@ const ChatPage = () => {
 
                 try {
                     const { data: disputeResponse } = await axiosInstance.get(
-                        `/disputes/order/${orderData.id}`
+                        `/disputes/order/${orderType}/${orderData.id}`
                     );
 
                     const dispute =
@@ -342,6 +346,7 @@ const ChatPage = () => {
         setDisputeReasonCode("poor_quality");
         setDisputeReason("");
         setDisputeDescription("");
+        setDisputeEvidenceFiles([]);
         setIsDisputeModalOpen(true);
     };
 
@@ -351,13 +356,14 @@ const ChatPage = () => {
         setDisputeReasonCode("poor_quality");
         setDisputeReason("");
         setDisputeDescription("");
+        setDisputeEvidenceFiles([]);
         setDisputeLoading(false);
     };
 
     const fetchOrderDispute = async (targetOrderId) => {
         try {
             const res = await axiosInstance.get(
-                `/disputes/order/${targetOrderId}`
+                `/disputes/order/${orderType}/${targetOrderId}`
             );
 
             const dispute =
@@ -401,12 +407,25 @@ const ChatPage = () => {
 
             setDisputeLoading(true);
 
-            const res = await axiosInstance.post("/disputes/open", {
-                orderId: selectedOrderForDispute.id,
-                reasonCode: disputeReasonCode,
-                reason: disputeReason.trim(),
-                description: disputeDescription.trim(),
+            const formData = new FormData();
+
+            formData.append("orderId", String(selectedOrderForDispute.id));
+            formData.append("orderType", orderType);
+            formData.append("reasonCode", disputeReasonCode);
+            formData.append("reason", disputeReason.trim());
+            formData.append("description", disputeDescription.trim());
+
+            disputeEvidenceFiles.forEach((file) => {
+                formData.append("evidence", file);
             });
+
+            const res = await axios.post(
+                `${apiUrl}/api/disputes/open`,
+                formData,
+                {
+                    timeout: 120000,
+                }
+            );
 
             if (res.data?.dispute) {
                 setOrderDispute(res.data.dispute);
@@ -726,6 +745,12 @@ const ChatPage = () => {
                                 rows={5}
                             />
                         </div>
+
+                        <DisputeEvidenceInput
+                            files={disputeEvidenceFiles}
+                            onChange={setDisputeEvidenceFiles}
+                            disabled={disputeLoading}
+                        />
 
                         <div className="chat-dispute-actions">
                             <button
