@@ -90,6 +90,29 @@ ${escapeHtml(data.paymentType)}
           <li>Исполнитель обязуется выполнить работу по заказу в категории: <strong>${data.category || "—"}</strong>, подкатегории: <strong>${data.subcategory || "—"}</strong>.</li>
           <li>Адрес выполнения: <strong>${data.address || "—"}</strong>.</li>
           <li>Описание заказа: ${data.description || "—"}</li>
+
+<li>
+    Услуга:
+    <strong>${escapeHtml(data.serviceName || "—")}</strong>
+</li>
+
+${Array.isArray(data.serviceDetailRows) &&
+    data.serviceDetailRows.length > 0
+        ? `
+        <li>
+            <strong>Дополнительные условия заказа:</strong>
+            <ul>
+                ${data.serviceDetailRows.map((item) => `
+                    <li>
+                        ${escapeHtml(item.label)}:
+                        <strong>${escapeHtml(item.value)}</strong>
+                    </li>
+                `).join("")}
+            </ul>
+        </li>
+    `
+        : ""}
+
           <li>Стоимость работ: <strong>${data.price ?? 0} ₽</strong>.</li>
           <li>Форма оплаты: <strong>${data.paymentType || "—"}</strong>.</li>
           <li>Срок выполнения заказа до: <strong>${data.dueDate || "—"}</strong>.</li>

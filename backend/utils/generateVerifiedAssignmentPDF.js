@@ -30,6 +30,10 @@ function renderHtml(snapshot, photoAnnex) {
     const customer = snapshot.customer;
     const executor = snapshot.executor;
 
+    const detailRows = Array.isArray(terms.serviceDetailRows)
+        ? terms.serviceDetailRows
+        : [];
+
     const priceRub = (
         Number(terms.priceKopecks) / 100
     ).toFixed(2);
@@ -187,13 +191,33 @@ ${row("Сформирован", formatDate(snapshot.generatedAt))}
 
 <h2>2. Задание</h2>
 
+
 ${row("Категория", terms.category)}
 ${row("Подкатегория", terms.subcategory)}
-${row("Адрес", terms.address)}
+${row("Услуга", terms.service || "—")}
+${row("Основной адрес / место начала работ", terms.address)}
 ${row("Описание", terms.description)}
-${row("Запланированное время", formatDate(terms.workTime))}
-${row("Стоимость работ", priceRub + " ₽")}
+
+${row(
+        "Время выполнения",
+        terms.isAsap
+            ? "Как можно скорее"
+            : formatDate(terms.workTime)
+    )}
+
+${row("Согласованная стоимость", priceRub + " ₽")}
 ${row("Способ оплаты", terms.paymentType)}
+
+${detailRows.length > 0 ? `
+<h2>3. Дополнительные условия заказа</h2>
+
+${detailRows.map((item) =>
+        row(item.label, item.value)
+    ).join("")}
+` : ""}
+
+<h2>${detailRows.length > 0 ? "4" : "3"}. Статус документа</h2>
+
 
 <h2>3. Статус документа</h2>
 

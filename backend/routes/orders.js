@@ -9,7 +9,14 @@ const { Op } = require('sequelize');
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
-const { Order, User, Category, Subcategory, ExpressOrder } = require('../models');
+const {
+    Order,
+    User,
+    Category,
+    Subcategory,
+    ExpressOrder,
+    Service,
+} = require("../models");
 const generateContractPDF = require('../utils/generateContractPDF');
 const {createVerifiedAssignmentIfEligible,} = require("../services/verifiedContractService");
 const {createVerifiedCompletionActIfEligible,} = require("../services/verifiedCompletionActService");
@@ -2601,6 +2608,7 @@ module.exports = (io) => {
                     { model: User, as: "executor" },
                     { model: Category, as: "category" },
                     { model: Subcategory, as: "subcategory" },
+                    { model: Service, as: "service" },
                 ],
             });
 
@@ -2643,6 +2651,11 @@ module.exports = (io) => {
             // используем существующий обычный PDF.
             if (!hasVerifiedAssignment) {
                 const contractData = {
+                    serviceName:
+                        fullOrder.service?.name || "—",
+
+                    serviceDetailRows:
+                    buildOrderContractDetails(fullOrder).rows,
                     orderId: fullOrder.id,
                     approvalDate: new Date().toLocaleDateString("ru-RU"),
                     city: "Москва",
@@ -2666,7 +2679,10 @@ module.exports = (io) => {
 
                     address: fullOrder.address || "Адрес не указан",
                     description: fullOrder.description || "Описание не указано",
-                    price: fullOrder.proposedSum || 0,
+                    price:
+                        Number(fullOrder.finalPriceKopecks) > 0
+                            ? Number(fullOrder.finalPriceKopecks) / 100
+                            : Number(fullOrder.proposedSum || 0),
                     paymentType: fullOrder.paymentType || "не указано",
 
                     dueDate: new Date(
@@ -3175,7 +3191,8 @@ module.exports = (io) => {
                     { model: User, as: "creator" },
                     { model: User, as: "executor" },
                     { model: Category, as: "category" },
-                    { model: Subcategory, as: "subcategory" }
+                    { model: Subcategory, as: "subcategory" },
+                    { model: Service, as: "service" },
                 ]
             });
 
@@ -3210,6 +3227,11 @@ module.exports = (io) => {
                 const data = {
 
                     orderId: fullOrder.id,
+                    serviceName:
+                        fullOrder.service?.name || "—",
+
+                    serviceDetailRows:
+                    buildOrderContractDetails(fullOrder).rows,
                     approvalDate: fullOrder.createdAt.toLocaleDateString("ru-RU"),
                     city: "Москва",
                     customerId: fullOrder.creatorId,
@@ -3220,7 +3242,10 @@ module.exports = (io) => {
                     subcategory: fullOrder.subcategory?.name || "",
                     address: fullOrder.address,
                     description: fullOrder.description,
-                    price: fullOrder.proposedSum,
+                    price:
+                        Number(fullOrder.finalPriceKopecks) > 0
+                            ? Number(fullOrder.finalPriceKopecks) / 100
+                            : Number(fullOrder.proposedSum || 0),
                     paymentType: fullOrder.paymentType,
                     dueDate: new Date(fullOrder.createdAt.getTime() + 5 * 24 * 60 * 60 * 1000).toLocaleDateString("ru-RU"),
                     completeAt: fullOrder.completedAt,

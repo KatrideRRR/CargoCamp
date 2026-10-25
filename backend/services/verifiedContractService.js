@@ -4,7 +4,9 @@ const crypto = require("crypto");
 const {
     getCurrentVerifiedIdentity,
 } = require("./identityStatusService");
-
+const {
+    buildOrderContractDetails,
+} = require("./orderContractDetailsService");
 const {
     collectOrderPhotoAnnex,
 } = require("./orderPhotoAnnexService");
@@ -77,6 +79,8 @@ function createSnapshot(
         );
     }
 
+    const detailSnapshot = buildOrderContractDetails(order);
+
     return {
         schemaVersion: 1,
         version: VERSION,
@@ -113,6 +117,18 @@ function createSnapshot(
 
         terms: {
             orderId,
+
+            service:
+                order.service?.name || "—",
+
+            isAsap:
+                order.isAsap === true,
+
+            serviceDetails:
+            detailSnapshot.raw,
+
+            serviceDetailRows:
+            detailSnapshot.rows,
 
             category:
                 order.category?.name || "—",
@@ -292,7 +308,7 @@ async function createVerifiedAssignmentIfEligible(order) {
                                 templateCode:
                                     "verified_assignment_default",
 
-                                templateVersion: "4",
+                                templateVersion: "5",
 
                                 storageKey,
                                 documentHash,
