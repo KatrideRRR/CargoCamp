@@ -1,5 +1,6 @@
 import { toast } from "react-toastify";
 import React, { createContext, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { socket } from "../socketClient";
 import axiosInstance from "../utils/axiosInstance";
 import "../styles/modalContext.css";
@@ -174,6 +175,7 @@ const isNotificationFresh = (
 };
 
 export const ModalProvider = ({ children }) => {
+    const navigate = useNavigate();
     const [modalData, setModalData] = useState(null);
     const [userId, setUserId] = useState(null);
     const [notificationData, setNotificationData] = useState(null);
@@ -663,6 +665,11 @@ export const ModalProvider = ({ children }) => {
                     autoPaymentProcessing: !!data.autoPaymentProcessing,
                     autoPaymentStatus: data.autoPaymentStatus || null,
                 });
+                if (data.orderId) {
+                    navigate(
+                        `/active-orders?view=performing&orderId=${data.orderId}&orderType=regular&reason=approved`
+                    );
+                }
             }
         };
 
@@ -1015,7 +1022,7 @@ export const ModalProvider = ({ children }) => {
             socket.off("new_notification", handleNewNotification);
             socket.off("expressOrderCancelled", handleExpressOrderCancelled);
         };
-    }, [userId]);
+    }, [userId, navigate]);
 
     const openDebtModal = ({ title, description, amount, returnPath }) => {
         setDebtModalData({

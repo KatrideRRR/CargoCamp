@@ -461,12 +461,18 @@ function App() {
                         return;
                     }
 
+                    if (type === "order_request_approved" && orderId) {
+                        navigate(
+                            `/active-orders?view=performing&orderId=${orderId}&orderType=regular&reason=approved`
+                        );
+                        return;
+                    }
+
                     if (
                         [
                             "express_status_changed",
                             "express_arrived",
                             "express_completed",
-                            "order_request_approved",
                             "order_started",
                             "order_completion_requested",
                             "order_completion_reminder",
