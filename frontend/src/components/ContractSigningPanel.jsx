@@ -61,6 +61,33 @@ export default function ContractSigningPanel({
             setError("");
             setMessage("");
 
+
+            if (state?.signingMethod === "click") {
+                const response = await axiosInstance.post(
+                    `${base}/click-sign`,
+                    {
+                        documentHash: assignment.documentHash,
+                        intentConfirmed: true,
+                    }
+                );
+
+                setConfirmed(false);
+
+                setMessage(
+                    response.data.fullySigned
+                        ? "Документ подписан обеими сторонами."
+                        : "Подпись сохранена. Ожидается вторая сторона."
+                );
+
+                await refresh();
+
+                if (onSigned) {
+                    onSigned();
+                }
+
+                return;
+            }
+
             const response = await axiosInstance.post(
                 `${base}/request-code`,
                 {
@@ -150,7 +177,11 @@ export default function ContractSigningPanel({
             >
                 <span>
                     <strong>✍️ Подписание договора</strong>
-                    <small>SMS-подтверждение документа</small>
+<small>
+    {state?.signingMethod === "click"
+        ? "Подписание без повторной SMS"
+        : "Первое подтверждение — SMS"}
+</small>
                 </span>
 
                 <span aria-hidden="true">
@@ -210,12 +241,14 @@ export default function ContractSigningPanel({
                                         {assignment.documentNumber}
                                         {" · "}
                                         Версия {assignment.version}.
-                                        Код будет отправлен на{" "}
-                                        {state.maskedPhone}.
+                                        {state.signingMethod === "click"
+                                            ? "Подписание доступно с подтверждённой ПЭП."
+                                            : `Код будет отправлен на ${state.maskedPhone}.`}
                                     </p>
 
-                                    {!state.pendingChallenge && (
-                                        <>
+                                    {(state.signingMethod === "click" ||
+                                        !state.pendingChallenge) && (
+                                            <>
                                             <label className="cc-signing-consent">
                                                 <input
                                                     type="checkbox"
@@ -246,13 +279,17 @@ export default function ContractSigningPanel({
                                                 disabled={!confirmed || busy}
                                                 onClick={requestCode}
                                             >
-                                                Отправить SMS-код
-                                            </button>
+                                                {busy
+                                                    ? "Подписываем…"
+                                                    : state.signingMethod === "click"
+                                                        ? "Подписать документ"
+                                                        : "Отправить SMS-код"}                                            </button>
                                         </>
                                     )}
 
-                                    {state.pendingChallenge && (
-                                        <>
+                                    {state.signingMethod === "sms" &&
+                                        state.pendingChallenge && (
+                                            <>
                                             <label className="cc-signing-code-label">
                                                 Код из SMS
                                                 <input
@@ -287,6 +324,15 @@ export default function ContractSigningPanel({
                                     )}
                                 </>
                             )}
+
+                            {state.signingMethod === "reauth" &&
+                                !state.mySigned && (
+                                    <p className="cc-signing-note">
+                                        Первичная SMS-проверка ПЭП действует,
+                                        но для подписания требуется повторный вход
+                                        в аккаунт CargoCamp.
+                                    </p>
+                                )}
 
                             <button
                                 type="button"

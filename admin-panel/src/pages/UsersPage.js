@@ -7,6 +7,7 @@ const apiUrl = process.env.REACT_APP_API_URL;
 
 function UsersPage() {
     const [users, setUsers] = useState([]);
+    const [pepRecords, setPepRecords] = useState({});
     const [searchQuery, setSearchQuery] = useState("");
     const [filteredUsers, setFilteredUsers] = useState([]);
     const [documentsCount, setDocumentsCount] = useState({});
@@ -282,6 +283,31 @@ function UsersPage() {
                 );
             });
     }, [token]);
+
+
+    useEffect(() => {
+        if (!token) return;
+
+        axios.get(
+            `${apiUrl}/api/admin/pep/enrollments`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            }
+        ).then((response) => {
+            const map = {};
+
+            for (const record of response.data?.enrollments || []) {
+                map[String(record.userId)] = record;
+            }
+
+            setPepRecords(map);
+        }).catch((error) => {
+            console.error("Не удалось загрузить ПЭП:", error);
+        });
+    }, [token]);
+
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -766,7 +792,7 @@ function UsersPage() {
                         <th>Телефон</th>
                         <th>Дата регистрации</th>
                         <th>Рейтинг</th>
-                        <th>Верификация</th>
+                        <th>ПЭП</th>
                         <th>Роль</th>
                         <th>Премиум</th>
                         <th>Автомобиль</th>
@@ -876,6 +902,80 @@ function UsersPage() {
                                                     : "Не верифицирован"}
                                         </button>
                                     </td>
+
+
+                                    <td>
+                                        {(() => {
+                                            const pep = pepRecords[String(user.id)];
+
+                                            if (!pep) {
+                                                return "Не подключена";
+                                            }
+
+                                            if (pep.revokedAt) {
+                                                return "Отозвана";
+                                            }
+
+                                            if (
+                                                new Date(pep.expiresAt).getTime() <= Date.now()
+                                            ) {
+                                                return "Требует SMS";
+                                            }
+
+                                            return (
+                                                <div>
+                                                    <strong>SMS подтверждена</strong>
+
+                                                    <div style={{ fontSize: 12, marginTop: 4 }}>
+                                                        До{" "}
+                                                        {new Date(pep.expiresAt)
+                                                            .toLocaleDateString("ru-RU")}
+                                                    </div>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            const reason = window.prompt(
+                                                                "Причина повторной проверки ПЭП:"
+                                                            );
+
+                                                            if (!reason) return;
+
+                                                            try {
+                                                                await axios.post(
+                                                                    `${apiUrl}/api/admin/pep/${user.id}/revoke`,
+                                                                    { reason },
+                                                                    {
+                                                                        headers: {
+                                                                            Authorization: `Bearer ${token}`,
+                                                                        },
+                                                                    }
+                                                                );
+
+                                                                setPepRecords((previous) => ({
+                                                                    ...previous,
+                                                                    [String(user.id)]: {
+                                                                        ...pep,
+                                                                        revokedAt:
+                                                                            new Date().toISOString(),
+                                                                        revokeReason: reason,
+                                                                    },
+                                                                }));
+                                                            } catch (error) {
+                                                                alert(
+                                                                    error.response?.data?.message ||
+                                                                    "Ошибка отзыва ПЭП"
+                                                                );
+                                                            }
+                                                        }}
+                                                    >
+                                                        Назначить повторную проверку
+                                                    </button>
+                                                </div>
+                                            );
+                                        })()}
+                                    </td>
+
 
                                     <td>
                                         {user.role ===

@@ -23,6 +23,8 @@ const {
     ActionLog,
     Dispute,
     OrderChangeRequest,
+    PepEnrollment,
+    AuthSession,
 } = require("../models");
 
 const {
@@ -538,6 +540,98 @@ async function prerequisites(ctx, userId, transaction) {
     };
 }
 
+
+async function getActivePepEnrollment({
+                                          userId,
+                                          policy,
+                                          phone,
+                                          verification,
+                                          transaction = null,
+                                      }) {
+    if (
+        !policy.enabled ||
+        !verification ||
+        !/^[a-f0-9]{64}$/i.test(
+            process.env.SIGNATURE_OTP_SECRET_HEX || ""
+        )
+    ) {
+        return null;
+    }
+
+    const enrollment = await PepEnrollment.findOne({
+        where: { userId },
+        transaction,
+    });
+
+    if (
+        !enrollment ||
+        enrollment.revokedAt ||
+        new Date(enrollment.expiresAt).getTime() <= Date.now() ||
+        enrollment.policyCode !== policy.code ||
+        enrollment.policyVersion !== policy.version ||
+        !safeHashEqual(enrollment.policySha256, policy.sha256) ||
+        Number(enrollment.verificationId) !==
+        Number(verification.id)
+    ) {
+        return null;
+    }
+
+    let normalizedPhone;
+
+    try {
+        normalizedPhone = normalizePhone(phone);
+    } catch {
+        return null;
+    }
+
+    const fingerprint = hmac(`phone:${normalizedPhone}`);
+
+    if (
+        !safeHashEqual(
+            enrollment.phoneFingerprint,
+            fingerprint
+        )
+    ) {
+        return null;
+    }
+
+    return enrollment;
+}
+
+async function hasRecentSigningSession(req) {
+    if (
+        req.user?.scope !== "user" ||
+        !req.user?.sid
+    ) {
+        return false;
+    }
+
+    const session = await AuthSession.findByPk(
+        req.user.sid
+    );
+
+    if (
+        !session ||
+        session.scope !== "user" ||
+        Number(session.userId) !== Number(req.user.id) ||
+        session.revokedAt ||
+        new Date(session.expiresAt).getTime() <= Date.now() ||
+        new Date(session.absoluteExpiresAt).getTime() <= Date.now()
+    ) {
+        return false;
+    }
+
+    // Для подписания без SMS требуется
+    // вход в аккаунт не старше семи дней.
+    const sessionAge =
+        Date.now() - new Date(session.createdAt).getTime();
+
+    return Number.isFinite(sessionAge) &&
+        sessionAge >= 0 &&
+        sessionAge <= 7 * 24 * 60 * 60 * 1000;
+}
+
+
 function requireUnsigned(contract) {
 
     if (
@@ -654,6 +748,30 @@ router.get("/:contractId/status", async (req, res) => {
                 process.env.SIGNATURE_OTP_SECRET_HEX || ""
             );
 
+
+        const myIdentity =
+            ctx.partyRole === "creator"
+                ? identities[0]
+                : identities[1];
+
+        const pepEnrollment =
+            await getActivePepEnrollment({
+                userId,
+                policy,
+                phone,
+                verification: myIdentity,
+            });
+
+        const recentSession =
+            await hasRecentSigningSession(req);
+
+        const signingMethod = pepEnrollment
+            ? recentSession
+                ? "click"
+                : "reauth"
+            : "sms";
+
+
         const pending = await SignatureChallenge.findOne({
             where: {
                 contractId: ctx.contract.id,
@@ -671,7 +789,14 @@ router.get("/:contractId/status", async (req, res) => {
 
         return res.json({
             success: true,
-            enabled,
+            enabled: enabled || (
+                policy.enabled && Boolean(pepEnrollment)
+            ),
+            signingMethod,
+            pepActivatedAt:
+                pepEnrollment?.activatedAt || null,
+            pepExpiresAt:
+                pepEnrollment?.expiresAt || null,
             accepted,
             identitiesValid,
             mySigned,
@@ -680,7 +805,10 @@ router.get("/:contractId/status", async (req, res) => {
             contractStatus: ctx.contract.status,
             maskedPhone: phone ? maskPhone(phone) : null,
             canSign:
-                enabled &&
+                (
+                    signingMethod === "click" ||
+                    (signingMethod === "sms" && enabled)
+                ) &&
                 accepted &&
                 identitiesValid &&
                 Boolean(phone) &&
@@ -1182,7 +1310,7 @@ router.post("/:contractId/confirm-code", async (req, res) => {
                     };
                 }
 
-                await ContractSignature.create(
+                const savedSignature = await ContractSignature.create(
                     {
                         contractId: ctx.contract.id,
                         userId,
@@ -1229,6 +1357,42 @@ router.post("/:contractId/confirm-code", async (req, res) => {
                 challenge.consumedAt = now;
 
                 await challenge.save({ transaction });
+
+
+                // Успешная SMS-подпись одновременно
+                // подтверждает подключение ПЭП.
+                // Срок действия — 180 дней.
+                const pepExpiresAt = new Date(
+                    now.getTime() + 180 * 24 * 60 * 60 * 1000
+                );
+
+                await PepEnrollment.upsert(
+                    {
+                        userId,
+                        agreementId: prereq.agreement.id,
+                        verificationId: prereq.identity.id,
+                        bootstrapSignatureId: savedSignature.id,
+                        bootstrapChallengeId: challenge.id,
+
+                        policyCode: prereq.policy.code,
+                        policyVersion: prereq.policy.version,
+                        policySha256: prereq.policy.sha256,
+
+                        // Отпечаток телефона уже получен
+                        // при отправке проверенного SMS.
+                        phoneFingerprint:
+                        challenge.recipientFingerprint,
+
+                        activatedAt: now,
+                        expiresAt: pepExpiresAt,
+
+                        revokedAt: null,
+                        revokedBy: null,
+                        revokeReason: null,
+                    },
+                    { transaction }
+                );
+
 
                 const signatures =
                     await ContractSignature.count({
@@ -1436,5 +1600,327 @@ router.post("/:contractId/confirm-code", async (req, res) => {
         return respondError(res, error);
     }
 });
+
+
+// Подписание документа кнопкой после первичного SMS-подтверждения.
+router.post("/:contractId/click-sign", async (req, res) => {
+    try {
+        const userId = Number(req.user.id);
+        const policy = getSignaturePolicy();
+
+        if (!policy.enabled) {
+            throw fail(503, "Электронное подписание не включено");
+        }
+
+        if (req.body?.intentConfirmed !== true) {
+            throw fail(400, "Подтвердите намерение подписать документ");
+        }
+
+        if (!(await hasRecentSigningSession(req))) {
+            throw fail(
+                403,
+                "Для подписания войдите в аккаунт повторно"
+            );
+        }
+
+        const before = await getContext(
+            req.params.contractId,
+            userId
+        );
+
+        requireUnsigned(before.contract);
+
+        await assertDocumentReadyForSigning(before);
+
+        if (
+            !safeHashEqual(
+                req.body?.documentHash,
+                before.contract.documentHash
+            )
+        ) {
+            throw fail(409, "Документ изменился. Обновите страницу.");
+        }
+
+        await assertVerifiedPdfIntegrity(before.contract);
+
+        const result = await sequelize.transaction(
+            async (transaction) => {
+                const ctx = await getContext(
+                    req.params.contractId,
+                    userId,
+                    transaction,
+                    true
+                );
+
+                requireUnsigned(ctx.contract);
+                await assertDocumentReadyForSigning(ctx, transaction);
+
+                if (
+                    !safeHashEqual(
+                        before.contract.documentHash,
+                        ctx.contract.documentHash
+                    )
+                ) {
+                    throw fail(409, "Документ изменился");
+                }
+
+                const existing = await ContractSignature.findOne({
+                    where: {
+                        contractId: ctx.contract.id,
+                        userId,
+                    },
+                    transaction,
+                });
+
+                if (existing) {
+                    throw fail(409, "Вы уже подписали этот документ");
+                }
+
+                const prereq = await prerequisites(
+                    ctx,
+                    userId,
+                    transaction
+                );
+
+                const user = await User.findByPk(userId, {
+                    transaction,
+                });
+
+                const enrollment =
+                    await getActivePepEnrollment({
+                        userId,
+                        policy: prereq.policy,
+                        phone: user?.phone,
+                        verification: prereq.identity,
+                        transaction,
+                    });
+
+                if (!enrollment) {
+                    throw fail(
+                        403,
+                        "Требуется первичное или повторное SMS-подтверждение ПЭП"
+                    );
+                }
+
+                const now = new Date();
+
+                await ContractSignature.create(
+                    {
+                        contractId: ctx.contract.id,
+                        userId,
+                        partyRole: ctx.partyRole,
+                        method: "authenticated_click",
+                        documentHash: ctx.contract.documentHash,
+                        signedAt: now,
+                        ipAddress: getIp(req),
+                        userAgent: getUa(req),
+                        verificationId: prereq.identity.id,
+
+                        verificationSnapshot: {
+                            id: String(prereq.identity.id),
+                            verifiedAt: prereq.identity.verifiedAt,
+                            expiresAt: prereq.identity.expiresAt,
+                        },
+
+                        signaturePolicyCode: prereq.policy.code,
+                        signaturePolicyVersion: prereq.policy.version,
+
+                        evidence: {
+                            method: "authenticated_click",
+                            sessionId: String(req.user.sid),
+                            pepEnrollmentId: String(enrollment.id),
+                            bootstrapSignatureId:
+                                String(enrollment.bootstrapSignatureId),
+                            agreementId: String(prereq.agreement.id),
+                            policySha256: prereq.policy.sha256,
+                            documentHash: ctx.contract.documentHash,
+                            intentConfirmed: true,
+                        },
+                    },
+                    { transaction }
+                );
+
+                const count = await ContractSignature.count({
+                    where: {
+                        contractId: ctx.contract.id,
+                        userId: {
+                            [Op.in]: [
+                                ctx.order.creatorId,
+                                ctx.order.executorId,
+                            ],
+                        },
+                    },
+                    transaction,
+                });
+
+                const fullySigned = count >= 2;
+
+                ctx.contract.status = fullySigned
+                    ? "fully_signed"
+                    : "partially_signed";
+
+                if (fullySigned) {
+                    ctx.contract.fullySignedAt = now;
+                    ctx.contract.finalizedAt = now;
+                }
+
+                await ctx.contract.save({ transaction });
+
+                let addendumApplied = false;
+
+                if (
+                    fullySigned &&
+                    ctx.contract.type === "verified_addendum"
+                ) {
+                    const updatedOrder = await Order.findByPk(
+                        ctx.order.id,
+                        {
+                            transaction,
+                            lock: transaction.LOCK.UPDATE,
+                        }
+                    );
+
+                    const change = await OrderChangeRequest.findOne({
+                        where: {
+                            orderId: ctx.order.id,
+                            agreementContractId: ctx.contract.id,
+                            status: "approved_pending_agreement",
+                        },
+                        transaction,
+                        lock: transaction.LOCK.UPDATE,
+                    });
+
+                    if (
+                        !change ||
+                        !updatedOrder ||
+                        updatedOrder.status !== "active" ||
+                        updatedOrder.paymentType !== "cash" ||
+                        (
+                            Array.isArray(updatedOrder.completedBy) &&
+                            updatedOrder.completedBy.length > 0
+                        ) ||
+                        Number(updatedOrder.finalPriceKopecks) !==
+                        Number(change.basePriceKopecks)
+                    ) {
+                        throw fail(
+                            409,
+                            "Условия заказа изменились. Соглашение нельзя применить."
+                        );
+                    }
+
+                    updatedOrder.finalPriceKopecks =
+                        Number(change.proposedPriceKopecks);
+
+                    updatedOrder.proposedSum =
+                        Math.round(
+                            Number(change.proposedPriceKopecks) / 100
+                        );
+
+                    await updatedOrder.save({ transaction });
+
+                    change.status = "applied";
+                    change.appliedAt = now;
+
+                    await change.save({ transaction });
+
+                    await ContractEvent.create(
+                        {
+                            contractId: ctx.contract.id,
+                            actorUserId: null,
+                            actorRole: "system",
+                            eventType: "addendum_applied",
+                            eventAt: now,
+                            metadata: {
+                                changeId: String(change.id),
+                                basePriceKopecks: change.basePriceKopecks,
+                                newPriceKopecks: change.proposedPriceKopecks,
+                                documentHash: ctx.contract.documentHash,
+                            },
+                        },
+                        { transaction }
+                    );
+
+                    addendumApplied = true;
+                }
+
+                await ContractEvent.create(
+                    {
+                        contractId: ctx.contract.id,
+                        actorUserId: userId,
+                        actorRole: ctx.partyRole,
+                        eventType: "signature_confirmed",
+                        eventAt: now,
+                        metadata: {
+                            method: "authenticated_click",
+                            pepEnrollmentId: String(enrollment.id),
+                            sessionId: String(req.user.sid),
+                            documentHash: ctx.contract.documentHash,
+                            fullySigned,
+                        },
+                    },
+                    { transaction }
+                );
+
+                await ActionLog.create(
+                    {
+                        actorUserId: userId,
+                        actorRole: "user",
+                        actionType: "verified_contract_signed",
+                        entityType: "order",
+                        entityId: ctx.order.id,
+                        orderId: ctx.order.id,
+                        ip: getIp(req),
+                        ua: getUa(req),
+                        meta: {
+                            contractId: String(ctx.contract.id),
+                            method: "authenticated_click",
+                            fullySigned,
+                        },
+                    },
+                    { transaction }
+                );
+
+                return {
+                    success: true,
+                    fullySigned,
+                    contractStatus: ctx.contract.status,
+                    addendumApplied,
+                    orderId: ctx.order.id,
+                };
+            }
+        );
+
+        if (result.addendumApplied) {
+            const io = req.app.locals.io;
+
+            if (io) {
+                const order = await Order.findByPk(result.orderId, {
+                    attributes: ["creatorId", "executorId"],
+                });
+
+                if (order) {
+                    for (const id of [
+                        order.creatorId,
+                        order.executorId,
+                    ]) {
+                        io.to(`user_${id}`).emit(
+                            "activeOrdersUpdated",
+                            {
+                                orderId: result.orderId,
+                                orderType: "regular",
+                                reason: "addendum_applied",
+                            }
+                        );
+                    }
+                }
+            }
+        }
+
+        return res.json(result);
+    } catch (error) {
+        return respondError(res, error);
+    }
+});
+
 
 module.exports = router;

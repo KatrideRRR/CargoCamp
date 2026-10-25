@@ -63,6 +63,7 @@ const contractSigningRoutes = require("./routes/contractSigning");
 const actAcceptanceRoutes = require("./routes/actAcceptance");
 const actRemediationRoutes = require("./routes/actRemediation");
 const orderChangesRoutes = require("./routes/orderChanges");
+const adminPepRoutes = require("./routes/adminPep");
 
 const db = require("./models");
 const sequelize = require("./config/database");
@@ -261,6 +262,7 @@ app.use("/api/messages", messagesRoutes);
 app.use("/api/category", categoryRouter);
 app.use("/api/identity", identityRoutes);
 app.use("/api/admin/identity", adminIdentityRoutes);
+app.use("/api/admin/pep", adminPepRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/payments", payments);
 app.use("/api/express", expressOrdersRoutes);
