@@ -13,6 +13,9 @@ import {
     hasSubmittedReview,
     markReviewSubmitted,
 } from "../utils/reviewReminder";
+import {
+    downloadVerifiedContract,
+} from "../utils/downloadVerifiedContract";
 
 export const ModalContext = createContext(null);
 
@@ -1536,6 +1539,31 @@ export const ModalProvider = ({ children }) => {
                                 <b>{formatDuration(completionSuccessData.startedAt, completionSuccessData.completedAt)}</b>
                             </div>
                         </div>
+
+
+                        {completionSuccessData.actId && (
+                            <button
+                                type="button"
+                                className="modal-btn modal-btn-primary"
+                                onClick={async () => {
+                                    try {
+                                        await downloadVerifiedContract(
+                                            completionSuccessData.actId,
+                                            completionSuccessData.actVersion,
+                                            "act"
+                                        );
+                                    } catch (error) {
+                                        alert(
+                                            error.message ||
+                                            "Не удалось скачать акт"
+                                        );
+                                    }
+                                }}
+                            >
+                                Скачать акт завершения PDF
+                            </button>
+                        )}
+
 
                         <div className="modal-actions">
                             {canReviewFromSuccessModal && (

@@ -12,6 +12,10 @@ const {
 } = require("./completionActEvidenceService");
 
 const {
+    buildCompletionPaymentSnapshot,
+} = require("./completionPaymentSnapshotService");
+
+const {
     sequelize,
     Contract,
     ContractEvent,
@@ -53,7 +57,12 @@ function parseCompletedBy(value) {
 }
 
 
-function buildSnapshot(order, assignment, evidence) {
+function buildSnapshot(
+    order,
+    assignment,
+    evidence,
+    paymentEvidence
+) {
     const assignmentSnapshot =
         assignment.metadata?.snapshot || {};
 
@@ -135,6 +144,8 @@ function buildSnapshot(order, assignment, evidence) {
             agreedTerms.paymentType ||
             order.paymentType ||
             "—",
+
+        paymentEvidence,
 
         workStartedAt: order.workStartedAt || null,
         workEndedAt: order.workEndedAt || null,
@@ -225,10 +236,14 @@ async function createVerifiedCompletionActIfEligible(order) {
         assignment
     );
 
+    const paymentEvidence =
+        await buildCompletionPaymentSnapshot(order);
+
     const snapshot = buildSnapshot(
         order,
         assignment,
-        evidence
+        evidence,
+        paymentEvidence
     );
 
     const photoAnnex =
@@ -352,6 +367,54 @@ async function createVerifiedCompletionActIfEligible(order) {
                     },
                     { transaction }
                 );
+
+
+                const customerDecision =
+                    snapshot.paymentEvidence?.customer;
+
+                if (
+                    customerDecision &&
+                    ["accepted", "remarks"].includes(
+                        customerDecision.qualityDecision
+                    )
+                ) {
+                    await ContractEvent.create(
+                        {
+                            contractId: created.id,
+
+                            actorUserId:
+                                Number(order.creatorId),
+
+                            actorRole: "creator",
+
+                            eventType:
+                                "act_customer_decision",
+
+                            eventAt:
+                            customerDecision.confirmedAt,
+
+                            metadata: {
+                                decision:
+                                customerDecision.qualityDecision,
+
+                                comment:
+                                    customerDecision.remarks || "",
+
+                                disputeId: null,
+
+                                documentHash,
+                                documentVersion: VERSION,
+
+                                source: "completion_modal",
+
+                                payoutAuthorized:
+                                customerDecision.payoutAuthorized,
+                            },
+                        },
+                        { transaction }
+                    );
+                }
+
 
                 return created;
             }

@@ -4633,3 +4633,56 @@ body {
     line-height: 1.25;
     text-align: center;
 }
+.completion-confirmation-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 18px 0;
+}
+
+.completion-confirmation-fields fieldset {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid #dbe3ef;
+    border-radius: 12px;
+}
+
+.completion-confirmation-fields legend {
+    font-weight: 600;
+    padding: 0 6px;
+}
+
+.completion-confirmation-fields label {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    cursor: pointer;
+    line-height: 1.5;
+}
+
+.completion-confirmation-fields input[type="radio"],
+.completion-confirmation-fields input[type="checkbox"] {
+    flex: 0 0 auto;
+    margin-top: 4px;
+}
+
+.completion-confirmation-fields textarea,
+.completion-confirmation-fields input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font: inherit;
+}
+
+.completion-guarantee-info {
+    padding: 14px;
+    border: 1px solid #bfdbfe;
+    background: #eff6ff;
+    border-radius: 12px;
+    line-height: 1.5;
+}

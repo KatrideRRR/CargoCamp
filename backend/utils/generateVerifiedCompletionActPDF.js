@@ -383,8 +383,121 @@ ${disputes.length === 0 ? `
     </div>
 `).join("")}
 
+
+<h2>7. Подтверждения при завершении и расчёты</h2>
+
+${data.paymentEvidence ? `
+${row(
+        "Подтверждение заказчика",
+        formatDate(data.paymentEvidence.customer?.confirmedAt)
+    )}
+
+${row(
+        "Подтверждение исполнителя",
+        formatDate(data.paymentEvidence.executor?.confirmedAt)
+    )}
+
+${row(
+        "Решение заказчика",
+        data.paymentEvidence.customer?.qualityDecision === "accepted"
+            ? "Работы приняты без замечаний на момент подтверждения"
+            : data.paymentEvidence.customer?.qualityDecision === "remarks"
+                ? "Работы завершены, заявлены замечания"
+                : "Решение не зафиксировано"
+    )}
+
+${data.paymentEvidence.customer?.remarks
+        ? row(
+            "Замечания заказчика",
+            data.paymentEvidence.customer.remarks
+        )
+        : ""}
+
+${data.paymentEvidence.paymentType === "cash" ? `
+${row(
+        "Заказчик заявил об оплате",
+        data.paymentEvidence.customer?.cashAmountKopecks == null
+            ? "Не зафиксировано"
+            : money(data.paymentEvidence.customer.cashAmountKopecks)
+    )}
+
+${row(
+        "Исполнитель заявил о получении",
+        data.paymentEvidence.executor?.cashAmountKopecks == null
+            ? "Не зафиксировано"
+            : money(data.paymentEvidence.executor.cashAmountKopecks)
+    )}
+
+${row(
+        "Сверка заявлений",
+        data.paymentEvidence.cashReconciled === true
+            ? "Суммы совпадают по заявлениям сторон"
+            : data.paymentEvidence.cashReconciled === false
+                ? "Суммы расходятся. Требуется уточнение."
+                : "Недостаточно сведений"
+    )}
+` : ""}
+
+${data.paymentEvidence.paymentType === "guarantee" ? `
+${row(
+        "Разрешение заказчика на выплату",
+        data.paymentEvidence.guarantee?.releaseAuthorized
+            ? "Дано"
+            : "Не дано"
+    )}
+
+${row(
+        "Время разрешения",
+        formatDate(
+            data.paymentEvidence.guarantee?.authorizationAt
+        )
+    )}
+
+${row(
+        "Механизм оплаты",
+        data.paymentEvidence.guarantee?.mechanism === "safe_deal"
+            ? "YooKassa Safe Deal"
+            : "Двухстадийный платёж"
+    )}
+
+${row(
+        "Учётный статус обеспечения",
+        data.paymentEvidence.guarantee?.recordedProviderStatus ||
+        "Не указан"
+    )}
+
+${row(
+        "Учётный статус платежа",
+        data.paymentEvidence.guarantee?.recordedPaymentStatus ||
+        "Не указан"
+    )}
+
+${row(
+        "Выплата исполнителю",
+        "Не подтверждена на момент формирования акта"
+    )}
+` : ""}
+
+<div class="warning">
+    Подтверждения сторон отражают их заявления
+    в интерфейсе CargoCamp.
+
+    При наличных расчётах совпадение заявленных сумм
+    не заменяет чек или отдельную расписку.
+
+    Разрешение заказчика на выплату по гарантии
+    не означает фактического перечисления средств.
+</div>
+` : `
+<p>
+    Подтверждения об оплате при завершении
+    в данном экземпляре акта не зафиксированы.
+</p>
+`}
+
+
 ${data.remediation ? `
-<h2>7. Исправление замечаний</h2>
+<h2>8. Исправление замечаний</h2>
 
 ${row(
         "Предыдущий акт",

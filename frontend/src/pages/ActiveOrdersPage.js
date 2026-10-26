@@ -476,6 +476,13 @@ const ActiveOrdersPage = () => {
         setCompletionSubmitting,
     ] = useState(false);
 
+    const [completionQuality, setCompletionQuality] = useState("");
+    const [completionRemarks, setCompletionRemarks] = useState("");
+    const [completionCashStatus, setCompletionCashStatus] = useState("");
+    const [completionCashAmount, setCompletionCashAmount] = useState("");
+    const [completionPayoutAuthorized, setCompletionPayoutAuthorized] =
+        useState(false);
+
     const [photoUploading, setPhotoUploading] = useState({});
     const [startingWork, setStartingWork] = useState({});
 
@@ -1053,9 +1060,13 @@ const ActiveOrdersPage = () => {
     };
 
     const openCompletionModal = (order) => {
-        if (!order?.id) {
-            return;
-        }
+        if (!order?.id) return;
+
+        setCompletionQuality("");
+        setCompletionRemarks("");
+        setCompletionCashStatus("");
+        setCompletionCashAmount("");
+        setCompletionPayoutAuthorized(false);
 
         setCompletionModalOrder(order);
     };
@@ -1088,10 +1099,86 @@ const ActiveOrdersPage = () => {
 
                 setCompletionSubmitting(true);
 
+
+                const isCreator =
+                    Number(order.creatorId) === Number(user?.id);
+
+                const isCash = order.paymentType === "cash";
+                const isGuarantee = order.paymentType === "guarantee";
+
+                const completion = {
+                    workConfirmed: true,
+                    qualityDecision: isCreator
+                        ? completionQuality
+                        : null,
+                    remarks: isCreator &&
+                    completionQuality === "remarks"
+                        ? completionRemarks.trim()
+                        : null,
+                    payoutAuthorized: isCreator &&
+                        isGuarantee &&
+                        completionQuality === "accepted" &&
+                        completionPayoutAuthorized,
+                    cashStatus: isCash
+                        ? completionCashStatus
+                        : null,
+                    cashAmountKopecks: null,
+                };
+
+                if (
+                    isCreator &&
+                    !["accepted", "remarks"].includes(completionQuality)
+                ) {
+                    throw new Error("Укажите результат приёмки");
+                }
+
+                if (
+                    isCreator &&
+                    completionQuality === "remarks" &&
+                    completionRemarks.trim().length < 10
+                ) {
+                    throw new Error("Опишите замечания: минимум 10 символов");
+                }
+
+                if (
+                    isCash &&
+                    !["full", "partial", "none"].includes(completionCashStatus)
+                ) {
+                    throw new Error("Укажите состояние оплаты");
+                }
+
+                if (
+                    isCash &&
+                    completionCashStatus === "partial"
+                ) {
+                    const amount = completionCashAmount
+                        .trim()
+                        .replace(",", ".");
+
+                    if (!/^\d+(?:\.\d{1,2})?$/.test(amount)) {
+                        throw new Error("Укажите сумму с точностью до копеек");
+                    }
+
+                    completion.cashAmountKopecks =
+                        Math.round(Number(amount) * 100);
+                }
+
+                if (
+                    isCreator &&
+                    isGuarantee &&
+                    completionQuality === "accepted" &&
+                    !completionPayoutAuthorized
+                ) {
+                    throw new Error(
+                        "Подтвердите разрешение на выплату"
+                    );
+                }
+
+
                 const res =
                     await axiosInstance.post(
                         `/orders/complete/${orderId}`,
-                        {},
+                        { completion },
                         {
                             headers: {
                                 Authorization:
@@ -1122,29 +1209,49 @@ const ActiveOrdersPage = () => {
                 const executorId =
                     updatedOrder?.executorId;
 
-                if (
-                    updatedOrder?.status ===
-                    "completed"
-                ) {
-                    openCompletionSuccessModal(
-                        buildCompletionPayload({
-                            order:
-                            updatedOrder,
-                            orderType:
-                                "regular",
-                        })
-                    );
+
+                if (updatedOrder?.status === "completed") {
+                    let completedAct = null;
+
+                    try {
+                        const summary = await axiosInstance.post(
+                            "/contracts/assignments/summary",
+                            {
+                                orderIds: [Number(orderId)],
+                            }
+                        );
+
+                        completedAct = (summary.data?.acts || []).find(
+                            (act) =>
+                                Number(act.orderId) === Number(orderId)
+                        ) || null;
+                    } catch (error) {
+                        console.error(
+                            "Не удалось загрузить акт завершения:",
+                            error
+                        );
+                    }
+
+                    openCompletionSuccessModal({
+                        ...buildCompletionPayload({
+                            order: updatedOrder,
+                            orderType: "regular",
+                        }),
+                        actId: completedAct?.id || null,
+                        actVersion: completedAct?.version || null,
+                    });
                 } else {
                     alert(
                         "Вы подтвердили завершение. Ожидаем подтверждение второй стороны."
                     );
                 }
+
             } catch (error) {
                 console.error(error);
 
                 alert(
-                    error.response?.data
-                        ?.message ||
+                    error.response?.data?.message ||
+                    error.message ||
                     "Ошибка при завершении заказа"
                 );
             } finally {
@@ -2295,6 +2402,136 @@ const ActiveOrdersPage = () => {
                                             completionModalOrder.id
                                         }
                                     </p>
+
+
+                                    <div className="completion-confirmation-fields">
+                                        {Number(completionModalOrder.creatorId) === Number(user?.id) && (
+                                            <fieldset>
+                                                <legend>Результат приёмки работ</legend>
+
+                                                <label>
+                                                    <input
+                                                        type="radio"
+                                                        name="completion-quality"
+                                                        checked={completionQuality === "accepted"}
+                                                        onChange={() => {
+                                                            setCompletionQuality("accepted");
+                                                            setCompletionPayoutAuthorized(false);
+                                                        }}
+                                                    />
+                                                    Работа выполнена, претензий на момент приёмки нет
+                                                </label>
+
+                                                <label>
+                                                    <input
+                                                        type="radio"
+                                                        name="completion-quality"
+                                                        checked={completionQuality === "remarks"}
+                                                        onChange={() => {
+                                                            setCompletionQuality("remarks");
+                                                            setCompletionPayoutAuthorized(false);
+                                                        }}
+                                                    />
+                                                    Работа завершена, но есть замечания
+                                                </label>
+
+                                                {completionQuality === "remarks" && (
+                                                    <textarea
+                                                        value={completionRemarks}
+                                                        onChange={(e) =>
+                                                            setCompletionRemarks(e.target.value)
+                                                        }
+                                                        maxLength={1500}
+                                                        rows={3}
+                                                        placeholder="Опишите замечания"
+                                                    />
+                                                )}
+                                            </fieldset>
+                                        )}
+
+                                        {completionModalOrder.paymentType === "cash" && (
+                                            <fieldset>
+                                                <legend>
+                                                    {Number(completionModalOrder.creatorId) === Number(user?.id)
+                                                        ? "Вы оплатили работу?"
+                                                        : "Вы получили оплату за работу?"}
+                                                </legend>
+
+                                                {[
+                                                    ["full", "Да, полностью"],
+                                                    ["partial", "Частично"],
+                                                    ["none", "Нет"],
+                                                ].map(([value, label]) => (
+                                                    <label key={value}>
+                                                        <input
+                                                            type="radio"
+                                                            name="completion-cash"
+                                                            checked={completionCashStatus === value}
+                                                            onChange={() => setCompletionCashStatus(value)}
+                                                        />
+                                                        {label}
+                                                    </label>
+                                                ))}
+
+                                                {completionCashStatus === "partial" && (
+                                                    <input
+                                                        type="text"
+                                                        inputMode="decimal"
+                                                        placeholder="Полученная или оплаченная сумма, ₽"
+                                                        value={completionCashAmount}
+                                                        onChange={(e) =>
+                                                            setCompletionCashAmount(e.target.value)
+                                                        }
+                                                    />
+                                                )}
+                                            </fieldset>
+                                        )}
+
+                                        {completionModalOrder.paymentType === "guarantee" && (
+                                            <div className="completion-guarantee-info">
+                                                <strong>Гарантийная оплата</strong>
+
+                                                <p>
+                                                    Завершение работ не означает автоматическую
+                                                    выплату исполнителю.
+                                                </p>
+
+                                                {Number(completionModalOrder.creatorId) ===
+                                                Number(user?.id) ? (
+                                                    completionQuality === "accepted" && (
+                                                        <label>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={completionPayoutAuthorized}
+                                                                onChange={(e) =>
+                                                                    setCompletionPayoutAuthorized(
+                                                                        e.target.checked
+                                                                    )
+                                                                }
+                                                            />
+                                                            Подтверждаю приёмку результата работ
+                                                            и разрешаю выплату исполнителю
+                                                            в рамках гарантийной сделки.
+                                                        </label>
+                                                    )
+                                                ) : (
+                                                    <p>
+                                                        После подтверждения заказчиком приёмки
+                                                        и разрешения выплаты CargoCamp сможет
+                                                        инициировать расчёт с исполнителем.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {completionModalOrder.paymentType === "installment" && (
+                                            <p>
+                                                Подтверждение завершения работ не означает
+                                                полного погашения рассрочки.
+                                            </p>
+                                        )}
+                                    </div>
+
 
                                     {hourly &&
                                     completionModalOrder

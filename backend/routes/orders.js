@@ -29,7 +29,9 @@ const { sendNotifications } = require("../socket");
 const { calculateRecommendedPrice } = require("../services/recommendedPriceService");
 const { collectOrderPhotoAnnex,} = require("../services/orderPhotoAnnexService");
 const {getGuaranteeEligibility, hasVerifiedIdentity,} = require("../services/guaranteeEligibilityService");
-
+const {
+    buildCompletionPaymentSnapshot,
+} = require("../services/completionPaymentSnapshotService");
 const {uploadsRoot, ordersRoot, tempRoot, contractsRoot, ensureDirectory,} = require("../config/storagePaths");
 const uploadDocumentRoot = path.resolve(__dirname, "..", "upload-document");
 ensureDirectory(uploadDocumentRoot);
@@ -2945,6 +2947,214 @@ module.exports = (io) => {
 
             }
 
+
+            // Данные из модального окна завершения.
+            const completion = req.body?.completion;
+
+            if (
+                !completion ||
+                completion.workConfirmed !== true
+            ) {
+                return res.status(400).json({
+                    message: "Подтвердите выполнение работы",
+                });
+            }
+
+            if (order.status !== "active") {
+                return res.status(409).json({
+                    message: "Заказ нельзя завершить в текущем статусе",
+                });
+            }
+
+            const qualityDecision = isCreator
+                ? completion.qualityDecision
+                : null;
+
+            const remarks = isCreator &&
+            qualityDecision === "remarks"
+                ? String(completion.remarks || "").trim()
+                : null;
+
+            if (
+                isCreator &&
+                !["accepted", "remarks"].includes(qualityDecision)
+            ) {
+                return res.status(400).json({
+                    message: "Укажите результат приёмки работ",
+                });
+            }
+
+            if (
+                remarks &&
+                (remarks.length < 10 || remarks.length > 1500)
+            ) {
+                return res.status(400).json({
+                    message: "Замечания должны содержать от 10 до 1500 символов",
+                });
+            }
+
+            if (
+                isCreator &&
+                qualityDecision === "remarks" &&
+                !remarks
+            ) {
+                return res.status(400).json({
+                    message: "Опишите замечания по работе",
+                });
+            }
+
+            if (
+                isCreator &&
+                qualityDecision === "accepted"
+            ) {
+                const activeDispute = await db.Dispute.findOne({
+                    where: {
+                        orderId: order.id,
+                        orderType: "regular",
+                        status: {
+                            [Op.in]: [
+                                "open",
+                                "in_review",
+                                "waiting_creator",
+                                "waiting_executor",
+                            ],
+                        },
+                    },
+                });
+
+                if (activeDispute) {
+                    return res.status(409).json({
+                        message:
+                            "По заказу открыт спор. " +
+                            "Приёмка без замечаний недоступна.",
+                    });
+                }
+            }
+
+            const payoutAuthorized =
+                isCreator &&
+                order.paymentType === "guarantee" &&
+                qualityDecision === "accepted" &&
+                completion.payoutAuthorized === true;
+
+            if (
+                isCreator &&
+                order.paymentType === "guarantee" &&
+                qualityDecision === "accepted" &&
+                !payoutAuthorized
+            ) {
+                return res.status(400).json({
+                    message:
+                        "Подтвердите разрешение на выплату " +
+                        "или укажите замечания",
+                });
+            }
+
+            if (
+                completion.payoutAuthorized === true &&
+                !payoutAuthorized
+            ) {
+                return res.status(400).json({
+                    message: "Недопустимое разрешение на выплату",
+                });
+            }
+
+            let cashStatus = null;
+            let cashAmountKopecks = null;
+
+            if (order.paymentType === "cash") {
+                cashStatus = completion.cashStatus;
+
+                if (
+                    !["full", "partial", "none"].includes(cashStatus)
+                ) {
+                    return res.status(400).json({
+                        message: "Укажите состояние оплаты наличными",
+                    });
+                }
+
+                const fullAmount = Number(order.finalPriceKopecks) > 0
+                    ? Number(order.finalPriceKopecks)
+                    : Math.round(Number(order.proposedSum || 0) * 100);
+
+                if (
+                    !Number.isSafeInteger(fullAmount) ||
+                    fullAmount <= 0
+                ) {
+                    return res.status(409).json({
+                        message: "Некорректная согласованная цена заказа",
+                    });
+                }
+
+                if (cashStatus === "full") {
+                    cashAmountKopecks = fullAmount;
+                } else if (cashStatus === "none") {
+                    cashAmountKopecks = 0;
+                } else {
+                    cashAmountKopecks =
+                        Number(completion.cashAmountKopecks);
+
+                    if (
+                        !Number.isSafeInteger(cashAmountKopecks) ||
+                        cashAmountKopecks <= 0 ||
+                        cashAmountKopecks >= fullAmount
+                    ) {
+                        return res.status(400).json({
+                            message: "Укажите корректную сумму частичной оплаты",
+                        });
+                    }
+                }
+            }
+
+            const decisionData = {
+                orderId: Number(order.id),
+                userId: normalizedUserId,
+                partyRole: isCreator ? "creator" : "executor",
+                qualityDecision,
+                remarks,
+                cashStatus,
+                cashAmountKopecks,
+                payoutAuthorized,
+                confirmedAt: new Date(),
+                ipAddress:
+                    String(req.socket.remoteAddress || "")
+                        .slice(0, 64) || null,
+                userAgent:
+                    String(req.get("user-agent") || "")
+                        .slice(0, 1000) || null,
+            };
+
+            // Повтор после сетевой ошибки не создаёт
+            // второе подтверждение и не меняет первое.
+            const [savedDecision, decisionCreated] =
+                await db.OrderCompletionDecision.findOrCreate({
+                    where: {
+                        orderId: Number(order.id),
+                        userId: normalizedUserId,
+                    },
+                    defaults: decisionData,
+                });
+
+            if (
+                !decisionCreated &&
+                (
+                    savedDecision.qualityDecision !== qualityDecision ||
+                    (savedDecision.remarks || null) !== remarks ||
+                    savedDecision.cashStatus !== cashStatus ||
+                    Number(savedDecision.cashAmountKopecks ?? -1) !==
+                    Number(cashAmountKopecks ?? -1) ||
+                    Boolean(savedDecision.payoutAuthorized) !==
+                    Boolean(payoutAuthorized)
+                )
+            ) {
+                return res.status(409).json({
+                    message:
+                        "Ваше решение уже зафиксировано. " +
+                        "Изменить его повторным завершением нельзя.",
+                });
+            }
+
+
             /*
 
              * Первый участник, который нажал завершение,
@@ -3096,37 +3306,10 @@ module.exports = (io) => {
                 order.completedAt = new Date();
                 fullyCompleted = true;
 
-                if (order.paymentType === "guarantee" && order.dealStatus === "funds_held" && order.yookassa_payment_id) {
-                    const amountValue = (Number(order.finalPriceKopecks || 0) / 100).toFixed(2);
-
-                    try {
-                        const captured = await yooKassa.capturePayment(order.yookassa_payment_id, {
-                            amount: { value: amountValue, currency: "RUB" }
-                        });
-
-                        order.yookassa_payment_status = captured.status;
-                    } catch (e) {
-                        console.error("capturePayment error:", e);
-
-                        await req.logAction({
-                            req,
-                            actorUserId: null,
-                            actorRole: "system",
-                            actionType: "payment_capture_failed",
-                            entityType: "payment",
-                            entityId: null,
-                            orderId: order.id,
-                            paymentId: order.yookassa_payment_id,
-                            severity: "error",
-                            success: false,
-                            meta: { error: String(e?.message || e) },
-                        });
-
-                        return res.status(500).json({
-                            message: "Не удалось завершить заказ: ошибка списания оплаты по гарантии",
-                        });
-                    }
-                }
+                // Завершение работ НЕ списывает гарантийные деньги.
+                // Разрешение заказчика записывается отдельно.
+                // Реальную выплату выполняет отдельный
+                // защищённый платёжный процесс.
             }
 
             await order.save();
@@ -3250,8 +3433,10 @@ module.exports = (io) => {
                 fullyCompleted &&
                 !hasVerifiedAssignmentForCompletion
             ) {
+                const completionPaymentEvidence =
+                    await buildCompletionPaymentSnapshot(fullOrder);
                 const data = {
-
+                    completionPaymentEvidence,
                     orderId: fullOrder.id,
                     serviceName:
                         fullOrder.service?.name || "—",

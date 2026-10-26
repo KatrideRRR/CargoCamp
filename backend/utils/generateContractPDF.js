@@ -149,6 +149,88 @@ ${Array.isArray(data.serviceDetailRows) &&
 не удостоверяет отсутствие претензий, получение
 оплаты или подписание отдельного акта приёмки.
               </p>
+
+
+${data.completionPaymentEvidence ? `
+    <h3>Заявления сторон при завершении</h3>
+
+    <p>
+        Решение заказчика:
+        ${escapeHtml(
+                data.completionPaymentEvidence.customer
+                    ?.qualityDecision === "accepted"
+                    ? "Принято без замечаний"
+                    : data.completionPaymentEvidence.customer
+                        ?.qualityDecision === "remarks"
+                        ? "Заявлены замечания"
+                        : "Не зафиксировано"
+            )}
+    </p>
+
+    ${data.completionPaymentEvidence.customer?.remarks
+                ? `<p>
+            Замечания:
+            ${escapeHtml(
+                    data.completionPaymentEvidence.customer.remarks
+                )}
+        </p>`
+                : ""}
+
+    ${data.completionPaymentEvidence.paymentType === "cash"
+                ? `
+            <p>
+                Заказчик заявил об оплате:
+                ${escapeHtml(
+                    data.completionPaymentEvidence.customer
+                        ?.cashAmountKopecks == null
+                        ? "Не зафиксировано"
+                        : (
+                        Number(
+                            data.completionPaymentEvidence.customer
+                                .cashAmountKopecks
+                        ) / 100
+                    ).toFixed(2) + " ₽"
+                )}
+            </p>
+
+            <p>
+                Исполнитель заявил о получении:
+                ${escapeHtml(
+                    data.completionPaymentEvidence.executor
+                        ?.cashAmountKopecks == null
+                        ? "Не зафиксировано"
+                        : (
+                        Number(
+                            data.completionPaymentEvidence.executor
+                                .cashAmountKopecks
+                        ) / 100
+                    ).toFixed(2) + " ₽"
+                )}
+            </p>
+        `
+                : ""}
+
+    ${data.completionPaymentEvidence.paymentType === "guarantee"
+                ? `<p>
+            Заказчик:
+            ${data.completionPaymentEvidence.guarantee
+                    ?.releaseAuthorized
+                    ? "разрешил выплату"
+                    : "не разрешил выплату"}.
+            Фактическая выплата исполнителю
+            данным документом не подтверждается.
+        </p>`
+                : ""}
+
+    <p>
+        Данные являются заявлениями сторон,
+        зафиксированными системой CargoCamp.
+        Они не заменяют отдельную электронную подпись
+        или документы платёжного провайдера.
+    </p>
+` : ""}
+
+
             </div>
           `
             : ""
