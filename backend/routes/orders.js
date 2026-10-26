@@ -2127,7 +2127,7 @@ module.exports = (io) => {
 
     router.post("/:id/request", authenticateToken, async (req, res) => {
         const { id } = req.params;
-        const { proposedSum, comment } = req.body;
+        const { proposedSum, comment, availableAt } = req.body;
         const executorId = req.user.id;
 
         try {
@@ -2150,12 +2150,53 @@ module.exports = (io) => {
                 });
             }
 
-            const busyRegular = await hasBusyRegularOrder(Order, executorId);
-            const busyTaxi = await hasBusyExpressOrder(ExpressOrder, executorId);
+            const activeRegular = await Order.findOne({
+                where: {
+                    executorId,
+                    status: "active",
+                },
+            });
 
-            if (busyRegular || busyTaxi) {
+            const activeExpress = await hasBusyExpressOrder(
+                ExpressOrder,
+                executorId
+            );
+
+            if (activeExpress) {
+                return res.status(409).json({
+                    message:
+                        "Пока выполняется экспресс-заказ, откликнуться на обычный заказ нельзя.",
+                });
+            }
+
+            const rawAvailableAt =
+                typeof availableAt === "string"
+                    ? availableAt.trim()
+                    : "";
+
+            const parsedAvailableAt = rawAvailableAt
+                ? new Date(rawAvailableAt)
+                : null;
+
+            if (
+                parsedAvailableAt &&
+                (
+                    !Number.isFinite(parsedAvailableAt.getTime()) ||
+                    parsedAvailableAt.getTime() <= Date.now() ||
+                    parsedAvailableAt.getTime() >
+                    Date.now() + 7 * 24 * 60 * 60 * 1000
+                )
+            ) {
                 return res.status(400).json({
-                    message: "У вас уже есть активный заказ. Завершите его, чтобы брать новый.",
+                    message:
+                        "Укажите корректное время начала в пределах следующих 7 дней.",
+                });
+            }
+
+            if (activeRegular && !parsedAvailableAt) {
+                return res.status(400).json({
+                    message:
+                        "Вы уже выполняете заказ. Укажите, когда сможете приступить к следующему.",
                 });
             }
 
@@ -2209,6 +2250,10 @@ module.exports = (io) => {
                 executorId,
                 proposedSum: safeProposedSum,
                 comment: safeComment,
+                availableAt: parsedAvailableAt
+                    ? parsedAvailableAt.toISOString()
+                    : null,
+                sourceOrderId: activeRegular?.id || null,
                 createdAt: new Date().toISOString(),
             });
 
@@ -2287,68 +2332,67 @@ module.exports = (io) => {
         }
     });
 
-    router.get('/:id/requested-executors', authenticateToken, async (req, res) => {
-        const { id } = req.params;
-
+    router.get("/:id/requested-executors", authenticateToken, async (req, res) => {
         try {
-            const order = await Order.findByPk(id);
-            let requests = [];
-            try {
-                if (typeof order.requests === 'string' && order.requests.trim() !== '') {
-                    requests = JSON.parse(order.requests);
-                }
-            } catch (e) {
-                console.error('Ошибка парсинга order.requests:', e);
-                requests = [];
-            }
+            const order = await Order.findByPk(req.params.id);
 
             if (!order) {
-                return res.status(404).json({ message: 'Заказ не найден' });
+                return res.status(404).json({
+                    message: "Заказ не найден",
+                });
             }
 
-            let requestedExecutors = [];
-            if (order.requestedExecutors) {
-                // Проверяем, что строка не пуста и является строкой
-                if (typeof order.requestedExecutors === 'string' && order.requestedExecutors.trim() !== '') {
-                    try {
-                        requestedExecutors = JSON.parse(order.requestedExecutors);
-                        // Проверяем, что результат парсинга является массивом
-                        if (!Array.isArray(requestedExecutors)) {
-                            requestedExecutors = [];
-                        }
-                    } catch (error) {
-                        console.error('Ошибка парсинга requestedExecutors:', error);
-                        requestedExecutors = [];
-                    }
-                } else {
-                    // Если строка пуста или невалидна, присваиваем пустой массив
-                    requestedExecutors = [];
-                }
+            if (Number(order.creatorId) !== Number(req.user.id)) {
+                return res.status(403).json({
+                    message: "Нет доступа к заявкам",
+                });
             }
 
+            const requests = safeJsonArray(order.requests);
+            const requestedIds = safeJsonArray(
+                order.requestedExecutors
+            );
 
-            if (requestedExecutors.length === 0) {
+            if (!requestedIds.length) {
                 return res.json([]);
             }
 
-            // Находим пользователей по ID
             const executors = await User.findAll({
-                where: { id: requestedExecutors },
-                attributes: ['id', 'username', 'rating', 'ratingCount', 'userStatus'] // Выбираем нужные поля
-            });
-            const result = executors.map(exec => {
-                const reqData = requests.find(r => r.executorId === exec.id);
-                return {
-                    ...exec.toJSON(),
-                    proposedSum: reqData?.proposedSum,
-                    comment: reqData?.comment
-                };
+                where: {
+                    id: { [Op.in]: requestedIds },
+                },
+                attributes: [
+                    "id",
+                    "username",
+                    "rating",
+                    "ratingCount",
+                    "userStatus",
+                ],
             });
 
-            res.json(result);
+            return res.json(
+                executors.map((executor) => {
+                    const request = requests.find(
+                        (item) =>
+                            Number(item.executorId) ===
+                            Number(executor.id)
+                    );
+
+                    return {
+                        ...executor.toJSON(),
+                        proposedSum: request?.proposedSum ?? null,
+                        comment: request?.comment || "",
+                        availableAt: request?.availableAt || null,
+                        sourceOrderId: request?.sourceOrderId || null,
+                    };
+                })
+            );
         } catch (error) {
-            console.error('Ошибка при получении запросивших исполнителей:', error);
-            res.status(500).json({ message: 'Ошибка сервера' });
+            console.error("Ошибка получения заявок:", error);
+
+            return res.status(500).json({
+                message: "Ошибка сервера",
+            });
         }
     });
 

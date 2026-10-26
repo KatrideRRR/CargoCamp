@@ -913,6 +913,38 @@ const MyOrdersPage = () => {
                     </span>
                                                                                 </div>
 
+                                                                                {executor.availableAt && (
+                                                                                    <div className={styles.execLine}>
+        <span className={styles.k}>
+            Готов приступить
+        </span>
+
+                                                                                        <span className={styles.v}>
+            {new Date(executor.availableAt).toLocaleString(
+                "ru-RU",
+                {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                }
+            )}
+        </span>
+                                                                                    </div>
+                                                                                )}
+
+                                                                                {executor.sourceOrderId && (
+                                                                                    <div className={styles.execLine}>
+        <span className={styles.k}>
+            Занятость
+        </span>
+
+                                                                                        <span className={styles.v}>
+            Завершает предыдущий заказ
+        </span>
+                                                                                    </div>
+                                                                                )}
+
                                                                                 {executor.comment ? (
                                                                                     <div className={styles.execLine}>
                                                                                         <span className={styles.k}>Комментарий</span>

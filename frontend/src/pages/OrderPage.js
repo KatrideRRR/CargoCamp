@@ -17,6 +17,7 @@ import {
 import { FiAlertTriangle } from "react-icons/fi";
 import { toast } from "react-toastify";
 import ExpressRouteButtons from "../components/ExpressRouteButtons";
+import RegularAdvanceTimeField from "../components/RegularAdvanceTimeField";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -147,6 +148,7 @@ const OrderPage = () => {
     const [requestModalOpen, setRequestModalOpen] = useState(false);
     const [requestSum, setRequestSum] = useState("");
     const [requestComment, setRequestComment] = useState("");
+    const [requestAvailableAt, setRequestAvailableAt] = useState("");
     const [requestSubmitting, setRequestSubmitting] = useState(false);
     const userId = profile?.id || null;
 
@@ -333,7 +335,7 @@ const OrderPage = () => {
         setCurrentImageIndex((prevIndex) => (prevIndex - 1 + currentImages.length) % currentImages.length);
     };
 
-    const savePendingOrderRequest = ({ orderId, proposedSum, comment }) => {
+    const savePendingOrderRequest = ({ orderId, proposedSum, comment, availableAt }) => {
         sessionStorage.setItem(
             "pendingOrderRequestAfterDebtPayment",
             JSON.stringify({
@@ -342,6 +344,7 @@ const OrderPage = () => {
                 comment: comment || "",
                 returnTo: `/order/${orderId}`,
                 createdAt: Date.now(),
+                availableAt: availableAt || null,
             })
         );
     };
@@ -398,6 +401,7 @@ const OrderPage = () => {
 
         setRequestComment("");
         setRequestModalOpen(true);
+        setRequestAvailableAt("");
     };
 
     const closeRequestModal = () => {
@@ -406,6 +410,7 @@ const OrderPage = () => {
         setRequestModalOpen(false);
         setRequestSum("");
         setRequestComment("");
+        setRequestAvailableAt("");
     };
 
     const handleRequestSumChange = (e) => {
@@ -428,6 +433,8 @@ const OrderPage = () => {
                 {
                     proposedSum,
                     comment,
+                    availableAt,
+
                 },
                 {
                     headers: {
@@ -571,6 +578,7 @@ const OrderPage = () => {
                 orderId: order.id,
                 proposedSum: normalizedSum,
                 comment: requestComment.trim(),
+                availableAt: pendingRequest.availableAt || null,
             });
 
             closeRequestModal();
@@ -1160,6 +1168,11 @@ const OrderPage = () => {
                                 maxLength={500}
                             />
                         </div>
+
+                        <RegularAdvanceTimeField
+                            value={requestAvailableAt}
+                            onChange={setRequestAvailableAt}
+                        />
 
                         <div className="request-order-actions">
                             <button

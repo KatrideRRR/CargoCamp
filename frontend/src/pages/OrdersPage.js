@@ -14,7 +14,7 @@ import TaxiVehicleGateModal from "../components/TaxiVehicleGateModal";
 import "../styles/OrdersPage.css";
 import YandexMapModal from "../components/YandexMapModal";
 import ExpressRouteButtons from "../components/ExpressRouteButtons";
-
+import RegularAdvanceTimeField from "../components/RegularAdvanceTimeField";
 import { FaMapMarkedAlt, FaSlidersH, FaLocationArrow } from "react-icons/fa";
 import { FiAlertTriangle } from "react-icons/fi";
 import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
@@ -210,6 +210,7 @@ const OrdersPage = () => {
     const [requestOrder, setRequestOrder] = useState(null);
     const [requestSum, setRequestSum] = useState("");
     const [requestComment, setRequestComment] = useState("");
+    const [requestAvailableAt, setRequestAvailableAt] = useState("");
     const [requestSubmitting, setRequestSubmitting] = useState(false);
 
     const { openDebtModal } = useContext(ModalContext);
@@ -452,7 +453,7 @@ const OrdersPage = () => {
         }
     }, [userId]);
 
-    const savePendingOrderRequest = ({ orderId, proposedSum, comment }) => {
+    const savePendingOrderRequest = ({ orderId, proposedSum, comment, availableAt }) => {
         sessionStorage.setItem(
             "pendingOrderRequestAfterDebtPayment",
             JSON.stringify({
@@ -460,6 +461,7 @@ const OrdersPage = () => {
                 proposedSum,
                 comment: comment || "",
                 createdAt: Date.now(),
+                availableAt: availableAt || null,
             })
         );
     };
@@ -488,7 +490,8 @@ const OrdersPage = () => {
 
             await axiosInstance.post(
                 `/orders/${orderId}/request`,
-                { proposedSum, comment },
+                { proposedSum, comment,  availableAt,
+                },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
@@ -1089,6 +1092,7 @@ const OrdersPage = () => {
                             orderId: pendingRequest.orderId,
                             proposedSum: pendingRequest.proposedSum,
                             comment: pendingRequest.comment || "",
+                            availableAt: pendingRequest.availableAt || null,
                         });
 
                         clearPendingOrderRequest();
@@ -1174,6 +1178,13 @@ const OrdersPage = () => {
 
         if (busyState.hasAnyBusy) {
             toast.info(busyHintText);
+            return;
+        }
+
+        if (busyState.hasBusyRegular && !requestAvailableAt) {
+            toast.info(
+                "Укажите, когда сможете освободиться от текущего заказа."
+            );
             return;
         }
 
@@ -1596,7 +1607,7 @@ const OrdersPage = () => {
                                                 {!isExpress && canRequestRegular && (
                                                     <button
                                                         className="btn btn-primary"
-                                                        disabled={busyState.loading || busyState.hasAnyBusy}
+                                                        disabled={busyState.loading || busyState.hasBusyTaxi}
                                                         title={busyState.hasAnyBusy ? busyHintText : ""}
                                                         onClick={() => {
                                                             const token = localStorage.getItem("authToken");
@@ -1607,7 +1618,7 @@ const OrdersPage = () => {
                                                                 return;
                                                             }
 
-                                                            if (busyState.hasAnyBusy) {
+                                                            if (busyState.hasBusyTaxi) {
                                                                 toast.info(busyHintText);
                                                                 return;
                                                             }
@@ -1710,8 +1721,23 @@ const OrdersPage = () => {
                                                 )}
                                             </div>
 
-                                            {busyState.hasAnyBusy && canTakeOrder && (
-                                                <div className="blocked-order-hint">{busyHintText}</div>
+                                            {busyState.hasBusyRegular && canRequestRegular && (
+                                                <div className="blocked-order-hint">
+                                                    Можно отправить предварительный отклик.
+                                                    Укажите время освобождения.
+                                                </div>
+                                            )}
+
+                                            {busyState.hasAnyBusy && canAcceptExpress && (
+                                                <div className="blocked-order-hint">
+                                                    {busyHintText}
+                                                </div>
+                                            )}
+
+                                            {busyState.hasBusyTaxi && canRequestRegular && (
+                                                <div className="blocked-order-hint">
+                                                    {busyHintText}
+                                                </div>
                                             )}
                                         </div>
                                     </li>
@@ -2010,6 +2036,11 @@ const OrdersPage = () => {
                                 maxLength={500}
                             />
                         </div>
+
+                        <RegularAdvanceTimeField
+                            value={requestAvailableAt}
+                            onChange={setRequestAvailableAt}
+                        />
 
                         <div className="request-order-actions">
                             <button
