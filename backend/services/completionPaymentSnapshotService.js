@@ -2,6 +2,7 @@
 const {
     OrderCompletionDecision,
     OrderSafeDeal,
+    OrderCompletionCorrection,
 } = require("../models");
 
 function serializeDecision(record) {
@@ -42,6 +43,27 @@ async function buildCompletionPaymentSnapshot(order) {
             item.partyRole === "executor"
     );
 
+
+    const correctionRecords =
+        await OrderCompletionCorrection.findAll({
+            where: {
+                orderId: order.id,
+            },
+            order: [["id", "ASC"]],
+        });
+
+    const corrections = correctionRecords.map((item) => ({
+        roundNumber: Number(item.roundNumber),
+        eventType: item.eventType,
+        actorUserId: Number(item.actorUserId),
+        comment: item.comment,
+        eventAt: item.eventAt,
+    }));
+
+    const lastCorrection =
+        corrections[corrections.length - 1] || null;
+
+
     const safeDeal =
         order.paymentType === "guarantee"
             ? await OrderSafeDeal.findOne({
@@ -49,7 +71,34 @@ async function buildCompletionPaymentSnapshot(order) {
             })
             : null;
 
-    const customer = serializeDecision(creator);
+    const originalCustomer = serializeDecision(creator);
+
+    const customer = originalCustomer
+        ? {
+            ...originalCustomer,
+
+            originalQualityDecision:
+            originalCustomer.qualityDecision,
+
+            originalRemarks:
+            originalCustomer.remarks,
+
+            qualityDecision:
+                lastCorrection?.eventType === "accepted"
+                    ? "accepted"
+                    : originalCustomer.qualityDecision,
+
+            remarks:
+                lastCorrection?.eventType === "accepted"
+                    ? null
+                    : originalCustomer.remarks,
+
+            acceptedAfterCorrectionsAt:
+                lastCorrection?.eventType === "accepted"
+                    ? lastCorrection.eventAt
+                    : null,
+        }
+        : null;
     const performer = serializeDecision(executor);
 
     let cashReconciled = null;
@@ -72,7 +121,7 @@ async function buildCompletionPaymentSnapshot(order) {
         executor: performer,
 
         cashReconciled,
-
+        corrections,
         guarantee: order.paymentType === "guarantee"
             ? {
                 releaseAuthorized:

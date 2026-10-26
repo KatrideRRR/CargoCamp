@@ -21,6 +21,15 @@ import VerifiedAssignmentCard from "../components/VerifiedAssignmentCard";
 import OrderWorkPhotos from "../components/OrderWorkPhotos";
 import DisputeEvidenceInput from "../components/DisputeEvidenceInput";
 import OrderChangePanel from "../components/OrderChangePanel";
+import ContractSigningPanel
+    from "../components/ContractSigningPanel";
+
+import SignatureAgreementPanel
+    from "../components/SignatureAgreementPanel";
+
+import {
+    downloadVerifiedContract,
+} from "../utils/downloadVerifiedContract";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -482,6 +491,17 @@ const ActiveOrdersPage = () => {
     const [completionCashAmount, setCompletionCashAmount] = useState("");
     const [completionPayoutAuthorized, setCompletionPayoutAuthorized] =
         useState(false);
+
+    const [correctionOrder, setCorrectionOrder] = useState(null);
+    const [correctionComment, setCorrectionComment] = useState("");
+    const [correctionDecision, setCorrectionDecision] = useState("");
+    const [correctionSubmitting, setCorrectionSubmitting] =
+        useState(false);
+
+    const [pendingSigningActs, setPendingSigningActs] = useState([]);
+    const [missingCompletionActs, setMissingCompletionActs] =
+        useState([]);
+    const [signingAct, setSigningAct] = useState(null);
 
     const [photoUploading, setPhotoUploading] = useState({});
     const [startingWork, setStartingWork] = useState({});
@@ -1115,10 +1135,7 @@ const ActiveOrdersPage = () => {
                     completionQuality === "remarks"
                         ? completionRemarks.trim()
                         : null,
-                    payoutAuthorized: isCreator &&
-                        isGuarantee &&
-                        completionQuality === "accepted" &&
-                        completionPayoutAuthorized,
+                    payoutAuthorized: false,
                     cashStatus: isCash
                         ? completionCashStatus
                         : null,
@@ -1163,17 +1180,6 @@ const ActiveOrdersPage = () => {
                         Math.round(Number(amount) * 100);
                 }
 
-                if (
-                    isCreator &&
-                    isGuarantee &&
-                    completionQuality === "accepted" &&
-                    !completionPayoutAuthorized
-                ) {
-                    throw new Error(
-                        "Подтвердите разрешение на выплату"
-                    );
-                }
-
 
                 const res =
                     await axiosInstance.post(
@@ -1210,41 +1216,38 @@ const ActiveOrdersPage = () => {
                     updatedOrder?.executorId;
 
 
+
                 if (updatedOrder?.status === "completed") {
-                    let completedAct = null;
-
-                    try {
-                        const summary = await axiosInstance.post(
-                            "/contracts/assignments/summary",
-                            {
-                                orderIds: [Number(orderId)],
-                            }
+                    if (updatedOrder.completionAct) {
+                        setSigningAct(updatedOrder.completionAct);
+                    } else if (updatedOrder.documentPending) {
+                        alert(
+                            "Заказ завершён, но формирование PDF " +
+                            "потребует повторного запроса."
                         );
-
-                        completedAct = (summary.data?.acts || []).find(
-                            (act) =>
-                                Number(act.orderId) === Number(orderId)
-                        ) || null;
-                    } catch (error) {
-                        console.error(
-                            "Не удалось загрузить акт завершения:",
-                            error
+                    } else {
+                        openCompletionSuccessModal(
+                            buildCompletionPayload({
+                                order: updatedOrder,
+                                orderType: "regular",
+                            })
                         );
                     }
-
-                    openCompletionSuccessModal({
-                        ...buildCompletionPayload({
-                            order: updatedOrder,
-                            orderType: "regular",
-                        }),
-                        actId: completedAct?.id || null,
-                        actVersion: completedAct?.version || null,
-                    });
+                } else if (
+                    updatedOrder?.completionPhase === "needs_correction"
+                ) {
+                    alert(
+                        "Обе стороны отметили завершение работы, " +
+                        "но заказчик указал замечания. " +
+                        "Заказ остаётся в работе до их устранения."
+                    );
                 } else {
                     alert(
-                        "Вы подтвердили завершение. Ожидаем подтверждение второй стороны."
+                        "Ваше подтверждение сохранено. " +
+                        "Ожидаем вторую сторону."
                     );
                 }
+
 
             } catch (error) {
                 console.error(error);
@@ -1258,6 +1261,80 @@ const ActiveOrdersPage = () => {
                 setCompletionSubmitting(false);
             }
         };
+
+
+    const openCorrectionModal = (order, mode) => {
+        setCorrectionOrder({ order, mode });
+        setCorrectionComment("");
+        setCorrectionDecision("");
+    };
+
+    const submitCorrectionModal = async () => {
+        if (!correctionOrder || correctionSubmitting) return;
+
+        const { order, mode } = correctionOrder;
+
+        try {
+            setCorrectionSubmitting(true);
+
+            let response;
+
+            if (mode === "submit") {
+                response = await axiosInstance.post(
+                    `/orders/${order.id}/corrections/submit`,
+                    {
+                        comment: correctionComment.trim(),
+                    }
+                );
+            } else {
+                response = await axiosInstance.post(
+                    `/orders/${order.id}/corrections/review`,
+                    {
+                        decision: correctionDecision,
+                        comment: correctionComment.trim(),
+                    }
+                );
+            }
+
+            setCorrectionOrder(null);
+
+            await fetchActiveOrders();
+
+            if (
+                response.data?.status === "completed" &&
+                response.data?.completionAct
+            ) {
+                setSigningAct(response.data.completionAct);
+            } else if (response.data?.documentPending) {
+                alert(
+                    "Работы приняты, но PDF пока не сформирован. " +
+                    "Повторите формирование документа."
+                );
+            } else if (response.data?.completionPhase === "completed") {
+                openCompletionSuccessModal(
+                    buildCompletionPayload({
+                        order: response.data,
+                        orderType: "regular",
+                    })
+                );
+            } else {
+                alert(
+                    mode === "submit"
+                        ? "Исправления переданы заказчику."
+                        : "Ваше решение по исправлениям сохранено."
+                );
+            }
+        } catch (error) {
+            alert(
+                error.response?.data?.message ||
+                error.message ||
+                "Не удалось сохранить решение"
+            );
+        } finally {
+            setCorrectionSubmitting(false);
+        }
+    };
+
 
     const remindCompleteOrder = async (orderId) => {
         try {
@@ -1325,6 +1402,53 @@ const ActiveOrdersPage = () => {
         }
     };
 
+
+    const fetchPendingSigningActs = async () => {
+        try {
+            const response = await axiosInstance.get(
+                "/orders/pending-act-signatures"
+            );
+
+            setPendingSigningActs(
+                Array.isArray(response.data?.acts)
+                    ? response.data.acts
+                    : []
+            );
+
+            setMissingCompletionActs(
+                Array.isArray(response.data?.missingOrderIds)
+                    ? response.data.missingOrderIds
+                    : []
+            );
+        } catch (error) {
+            console.error(
+                "Не удалось загрузить неподписанные акты:",
+                error
+            );
+        }
+    };
+
+    const retryCompletionAct = async (orderId) => {
+        try {
+            const response = await axiosInstance.post(
+                `/orders/${orderId}/ensure-completion-act`,
+                {}
+            );
+
+            await fetchPendingSigningActs();
+
+            if (response.data?.act) {
+                setSigningAct(response.data.act);
+            }
+        } catch (error) {
+            alert(
+                error.response?.data?.message ||
+                "Не удалось сформировать акт"
+            );
+        }
+    };
+
+
     const fetchActiveOrders = async () => {
         try {
             const t = localStorage.getItem("authToken");
@@ -1387,6 +1511,8 @@ const ActiveOrdersPage = () => {
             });
 
             setOrders(filteredOrders);
+
+            await fetchPendingSigningActs();
 
             // подгрузим данные по спорам
             const disputeEntries =
@@ -1699,6 +1825,63 @@ const ActiveOrdersPage = () => {
                                 </div>
                             )}
 
+
+                            {(pendingSigningActs.length > 0 ||
+                                missingCompletionActs.length > 0) && (
+                                <section className="completion-signing-queue">
+                                    <h3>Оформление завершённых заказов</h3>
+
+                                    <p>
+                                        Эти действия доступны здесь.
+                                        Переходить в историю заказов не требуется.
+                                    </p>
+
+                                    {pendingSigningActs.map((act) => (
+                                        <div
+                                            key={act.id}
+                                            className="completion-signing-queue__item"
+                                        >
+                                            <div>
+                                                <strong>
+                                                    Акт по заказу №{act.orderId}
+                                                </strong>
+
+                                                <small>
+                                                    {act.documentNumber}
+                                                </small>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setSigningAct(act)}
+                                            >
+                                                Открыть акт
+                                            </button>
+                                        </div>
+                                    ))}
+
+                                    {missingCompletionActs.map((orderId) => (
+                                        <div
+                                            key={`missing-${orderId}`}
+                                            className="completion-signing-queue__item"
+                                        >
+                <span>
+                    Документ по заказу №{orderId}
+                    ещё не сформирован
+                </span>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => retryCompletionAct(orderId)}
+                                            >
+                                                Сформировать акт
+                                            </button>
+                                        </div>
+                                    ))}
+                                </section>
+                            )}
+
+
                             <div className="active-orders-topbar">
                                 <div className="active-orders-title-wrap">
                                     <div className="active-orders-title">Активные заказы</div>
@@ -1972,7 +2155,45 @@ const ActiveOrdersPage = () => {
                                                                     Напомнить
                                                                 </button>
                                                             </>
+
+
+
+                                                        ) : order.completionPhase === "needs_correction" ? (
+                                                            isExecutor ? (
+                                                                <button
+                                                                    type="button"
+                                                                    className="complete-button"
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        openCorrectionModal(order, "submit");
+                                                                    }}
+                                                                >
+                                                                    Исправления выполнены
+                                                                </button>
+                                                            ) : (
+                                                                <span className="completion-stage-note">
+            Ожидаем исправления от исполнителя
+        </span>
+                                                            )
+                                                        ) : order.completionPhase === "awaiting_review" ? (
+                                                            isCreator ? (
+                                                                <button
+                                                                    type="button"
+                                                                    className="complete-button"
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        openCorrectionModal(order, "review");
+                                                                    }}
+                                                                >
+                                                                    Проверить исправления
+                                                                </button>
+                                                            ) : (
+                                                                <span className="completion-stage-note">
+            Ожидаем решения заказчика
+        </span>
+                                                            )
                                                         ) : !order.workStartedAt && isExecutor ? (
+
                                                             <button
                                                                 className="start-main-button"
                                                                 onClick={(event) => {
@@ -2492,6 +2713,16 @@ const ActiveOrdersPage = () => {
                                                 <strong>Гарантийная оплата</strong>
 
                                                 <p>
+                                                    Выплаты через гарантийную сделку временно
+                                                    недоступны. Завершение заказа и приёмка
+                                                    работ не инициируют списание или перевод денег.
+                                                </p>
+                                            </div>
+                                        )}
+                                        <div className="completion-guarantee-info">
+                                                <strong>Гарантийная оплата</strong>
+
+                                                <p>
                                                     Завершение работ не означает автоматическую
                                                     выплату исполнителю.
                                                 </p>
@@ -2751,6 +2982,206 @@ const ActiveOrdersPage = () => {
                             );
                         })()}
                     </Modal>
+
+
+                    <Modal
+                        appElement={document.getElementById("root")}
+                        isOpen={Boolean(correctionOrder)}
+                        onRequestClose={() => {
+                            if (!correctionSubmitting) {
+                                setCorrectionOrder(null);
+                            }
+                        }}
+                        contentLabel="Исправление замечаний"
+                        className="completion-work-modal"
+                        overlayClassName="completion-work-modal-overlay"
+                    >
+                        {correctionOrder && (
+                            <div className="completion-work-modal__content">
+                                <h2 className="completion-work-modal__title">
+                                    {correctionOrder.mode === "submit"
+                                        ? "Устранение замечаний"
+                                        : "Проверка исправлений"}
+                                </h2>
+
+                                <p>
+                                    Заказ №{correctionOrder.order.id}
+                                </p>
+
+                                {correctionOrder.order.completionRemarks && (
+                                    <div className="completion-remarks-box">
+                                        <strong>Замечания заказчика</strong>
+                                        <p>
+                                            {correctionOrder.order.completionRemarks}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {correctionOrder.mode === "review" && (
+                                    <fieldset className="completion-correction-choices">
+                                        <legend>Ваше решение</legend>
+
+                                        <label>
+                                            <input
+                                                type="radio"
+                                                name="correction-review"
+                                                checked={correctionDecision === "accepted"}
+                                                onChange={() =>
+                                                    setCorrectionDecision("accepted")
+                                                }
+                                            />
+                                            Исправления приняты, замечаний больше нет
+                                        </label>
+
+                                        <label>
+                                            <input
+                                                type="radio"
+                                                name="correction-review"
+                                                checked={correctionDecision === "rejected"}
+                                                onChange={() =>
+                                                    setCorrectionDecision("rejected")
+                                                }
+                                            />
+                                            Остались недостатки
+                                        </label>
+                                    </fieldset>
+                                )}
+
+                                <textarea
+                                    rows={4}
+                                    maxLength={1500}
+                                    value={correctionComment}
+                                    onChange={(event) =>
+                                        setCorrectionComment(event.target.value)
+                                    }
+                                    placeholder={
+                                        correctionOrder.mode === "submit"
+                                            ? "Расскажите, что исправлено"
+                                            : correctionDecision === "rejected"
+                                                ? "Какие замечания остались?"
+                                                : "Комментарий (необязательно)"
+                                    }
+                                />
+
+                                <div className="completion-work-modal__actions">
+                                    <button
+                                        type="button"
+                                        className="completion-work-modal__cancel"
+                                        disabled={correctionSubmitting}
+                                        onClick={() => setCorrectionOrder(null)}
+                                    >
+                                        Отмена
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        className="completion-work-modal__submit"
+                                        disabled={
+                                            correctionSubmitting ||
+                                            (
+                                                correctionOrder.mode === "review" &&
+                                                !correctionDecision
+                                            ) ||
+                                            (
+                                                (
+                                                    correctionOrder.mode === "submit" ||
+                                                    correctionDecision === "rejected"
+                                                ) &&
+                                                correctionComment.trim().length < 10
+                                            )
+                                        }
+                                        onClick={submitCorrectionModal}
+                                    >
+                                        {correctionSubmitting
+                                            ? "Сохраняем..."
+                                            : "Подтвердить"}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </Modal>
+
+
+
+                    <Modal
+                        appElement={document.getElementById("root")}
+                        isOpen={Boolean(signingAct)}
+                        onRequestClose={() => setSigningAct(null)}
+                        contentLabel="Подписание акта завершения"
+                        className="completion-work-modal"
+                        overlayClassName="completion-work-modal-overlay"
+                    >
+                        {signingAct && (
+                            <div className="completion-work-modal__content">
+                                <button
+                                    type="button"
+                                    className="completion-work-modal__close"
+                                    onClick={() => setSigningAct(null)}
+                                >
+                                    ✖
+                                </button>
+
+                                <h2 className="completion-work-modal__title">
+                                    Акт завершения заказа
+                                </h2>
+
+                                <p>
+                                    {signingAct.documentNumber}
+                                </p>
+
+                                <div className="completion-signing-details">
+                                    <strong>Документ сформирован</strong>
+
+                                    <p>
+                                        Ознакомьтесь с PDF перед подписанием.
+                                    </p>
+
+                                    <small>
+                                        SHA-256: {signingAct.documentHash}
+                                    </small>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    className="completion-work-modal__submit"
+                                    onClick={async () => {
+                                        try {
+                                            await downloadVerifiedContract(
+                                                signingAct.id,
+                                                signingAct.version,
+                                                "act"
+                                            );
+                                        } catch (error) {
+                                            alert(
+                                                error.message ||
+                                                "Не удалось открыть PDF"
+                                            );
+                                        }
+                                    }}
+                                >
+                                    Скачать и прочитать акт PDF
+                                </button>
+
+                                <SignatureAgreementPanel />
+
+                                <ContractSigningPanel
+                                    key={signingAct.id}
+                                    assignment={signingAct}
+                                    defaultOpened
+                                    onSigned={fetchPendingSigningActs}
+                                />
+
+                                <button
+                                    type="button"
+                                    className="completion-work-modal__cancel"
+                                    onClick={() => setSigningAct(null)}
+                                >
+                                    Закрыть
+                                </button>
+                            </div>
+                        )}
+                    </Modal>
+
 
                     {/* Images Modal */}
                     <Modal

@@ -6,8 +6,9 @@ import axiosInstance from "../utils/axiosInstance";
 export default function ContractSigningPanel({
                                                  assignment,
                                                  onSigned,
+                                                 defaultOpened = false,
                                              }) {
-    const [opened, setOpened] = useState(false);
+    const [opened, setOpened] = useState(defaultOpened);
     const [state, setState] = useState(null);
     const [loading, setLoading] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -176,8 +177,10 @@ export default function ContractSigningPanel({
                 onClick={() => setOpened(!opened)}
             >
                 <span>
-                    <strong>✍️ Подписание договора</strong>
-<small>
+<strong>
+    ✍️ {isAct ? "Подписание акта" : "Подписание договора"}
+</strong>
+                    <small>
     {state?.signingMethod === "click"
         ? "Подписание без повторной SMS"
         : "Первое подтверждение — SMS"}

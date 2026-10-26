@@ -398,7 +398,10 @@ async function createVerifiedCompletionActIfEligible(order) {
                                 customerDecision.qualityDecision,
 
                                 comment:
-                                    customerDecision.remarks || "",
+                                    customerDecision.qualityDecision === "accepted"
+                                        ? ""
+                                        : customerDecision.remarks || "",
+
 
                                 disputeId: null,
 

@@ -386,6 +386,38 @@ ${disputes.length === 0 ? `
 
 <h2>7. Подтверждения при завершении и расчёты</h2>
 
+
+${data.paymentEvidence?.corrections?.length ? `
+    <h3>История устранения замечаний</h3>
+
+    ${row(
+        "Первоначальные замечания заказчика",
+        data.paymentEvidence.customer?.originalRemarks ||
+        "Не указаны"
+    )}
+
+    ${data.paymentEvidence.corrections.map((event) => `
+        <div class="entry">
+            <div class="entry-title">
+                Исправление №${escapeHtml(event.roundNumber)}
+            </div>
+
+            ${row(
+        "Действие",
+        event.eventType === "submitted"
+            ? "Исполнитель сообщил об устранении недостатков"
+            : event.eventType === "accepted"
+                ? "Заказчик принял исправления"
+                : "Заказчик указал оставшиеся недостатки"
+    )}
+
+            ${row("Дата действия", formatDate(event.eventAt))}
+            ${row("Комментарий", event.comment || "Не указан")}
+        </div>
+    `).join("")}
+` : ""}
+
+
 ${data.paymentEvidence ? `
 ${row(
         "Подтверждение заказчика",

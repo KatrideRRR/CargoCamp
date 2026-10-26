@@ -4686,3 +4686,119 @@ body {
     border-radius: 12px;
     line-height: 1.5;
 }
+
+.completion-stage-note {
+    display: block;
+    padding: 10px 12px;
+    background: #f1f5f9;
+    color: #334155;
+    border-radius: 10px;
+    font-size: 13px;
+}
+
+.completion-remarks-box {
+    padding: 14px;
+    border: 1px solid #fcd34d;
+    background: #fffbeb;
+    border-radius: 10px;
+    overflow-wrap: anywhere;
+}
+
+.completion-remarks-box p {
+    white-space: pre-wrap;
+    margin: 8px 0 0;
+}
+
+.completion-correction-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.completion-correction-choices label {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    cursor: pointer;
+}
+
+.completion-work-modal__content textarea {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 100px;
+    padding: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    font: inherit;
+    resize: vertical;
+    margin: 14px 0;
+}
+
+.completion-signing-queue {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+    border: 1px solid #bfdbfe;
+    border-radius: 14px;
+    background: #eff6ff;
+}
+
+.completion-signing-queue h3 {
+    margin: 0;
+}
+
+.completion-signing-queue p {
+    margin: 0;
+    font-size: 13px;
+}
+
+.completion-signing-queue__item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: #fff;
+    border-radius: 10px;
+}
+
+.completion-signing-queue__item div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.completion-signing-queue__item small {
+    color: #64748b;
+    overflow-wrap: anywhere;
+}
+
+.completion-signing-queue__item button {
+    flex-shrink: 0;
+    border: 0;
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: #2563eb;
+    color: white;
+    cursor: pointer;
+}
+
+.completion-signing-details {
+    padding: 14px;
+    border-radius: 10px;
+    background: #f8fafc;
+    margin-bottom: 14px;
+}
+
+.completion-signing-details small {
+    display: block;
+    overflow-wrap: anywhere;
+    color: #64748b;
+}
