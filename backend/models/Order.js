@@ -23,8 +23,41 @@ module.exports = (sequelize) => {
             proposedSum: { type: DataTypes.INTEGER, allowNull: true },
             coordinates: { type: DataTypes.STRING, allowNull: true },
             userId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'users', key: 'id' } },
-            status: { type: DataTypes.ENUM('pending', 'active', 'completed', 'expired', 'pending_payment'), defaultValue: 'pending' },
+            status: {
+                type: DataTypes.ENUM(
+                    "pending",
+                    "reserved",
+                    "active",
+                    "completed",
+                    "expired",
+                    "pending_payment"
+                ),
+                defaultValue: "pending",
+            },
             executorId: { type: DataTypes.INTEGER, allowNull: true },
+            reservationSourceOrderId: {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+                field: "reservation_source_order_id",
+            },
+
+            reservationAvailableAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+                field: "reservation_available_at",
+            },
+
+            reservationApprovedAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+                field: "reservation_approved_at",
+            },
+
+            reservationReadyAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+                field: "reservation_ready_at",
+            },
             creatorId: { type: DataTypes.INTEGER, allowNull: false },
             completedBy: { type: DataTypes.JSON, allowNull: false, defaultValue: [] },
             images: {

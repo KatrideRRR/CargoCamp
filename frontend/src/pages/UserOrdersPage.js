@@ -245,45 +245,15 @@ const UserOrdersPage = () => {
         };
     }, [fetchPageData]);
 
-    const handleRequestOrder = async (
-        orderId
-    ) => {
-        const token =
-            localStorage.getItem(
-                "authToken"
-            );
+    const handleRequestOrder = (orderId) => {
+        const token = localStorage.getItem("authToken");
 
         if (!token) {
-            alert(
-                "Вы не авторизованы. Пожалуйста, войдите в систему."
-            );
-
             navigate("/login");
             return;
         }
 
-        try {
-            await axiosInstance.post(
-                `/orders/${orderId}/request`
-            );
-
-            alert(
-                "Запрос отправлен заказчику."
-            );
-
-            await fetchPageData();
-        } catch (requestError) {
-            console.error(
-                "Ошибка запроса на выполнение заказа:",
-                requestError
-            );
-
-            alert(
-                requestError.response?.data
-                    ?.message ||
-                "Не удалось отправить запрос"
-            );
-        }
+        navigate(`/order/${orderId}`);
     };
 
     const openModal = (images) => {
@@ -796,7 +766,7 @@ const UserOrdersPage = () => {
 
                                                 <div className="order-main-actions">
                                                     <Link
-                                                        to={`/orders/${order.id}`}
+                                                        to={`/order/${order.id}`}
                                                         className="btn btn-ghost"
                                                     >
                                                         Открыть

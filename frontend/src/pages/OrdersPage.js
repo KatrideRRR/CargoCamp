@@ -416,10 +416,22 @@ const OrdersPage = () => {
             if (expressRes.status === "fulfilled") {
                 const expressOrders = expressRes.value?.data?.orders || [];
                 hasBusyTaxi = expressOrders.some((o) => {
-                    const isExecutor = Number(o.executorId) === Number(userId);
-                    const isTaxi = String(o.type) === "taxi";
-                    const activeStatuses = ["accepted", "on_the_way_to_A", "arrived_at_A", "in_progress"];
-                    return isExecutor && isTaxi && activeStatuses.includes(String(o.status));
+                    const isExecutor =
+                        Number(o.executorId) === Number(userId);
+
+                    const activeStatuses = [
+                        "accepted",
+                        "on_the_way_to_A",
+                        "arrived_at_A",
+                        "waiting_at_A",
+                        "picked_up",
+                        "in_progress",
+                    ];
+
+                    return (
+                        isExecutor &&
+                        activeStatuses.includes(String(o.status))
+                    );
                 });
             }
 
@@ -522,7 +534,7 @@ const OrdersPage = () => {
         }
 
         if (busyState.hasBusyTaxi) {
-            return "У вас уже есть активный заказ такси. Сначала завершите его.";
+            return "У вас уже есть активный экспресс-заказ. Сначала завершите его.";
         }
 
         return "У вас уже есть активный заказ. Сначала завершите его.";

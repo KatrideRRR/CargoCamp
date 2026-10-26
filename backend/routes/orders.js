@@ -135,20 +135,26 @@ async function hasBusyRegularOrder(Order, executorId, excludeOrderId = null) {
     return !!busyOrder;
 }
 
-async function hasBusyTaxiOrder(ExpressOrder, executorId) {
+async function hasBusyExpressOrder(ExpressOrder, executorId) {
     if (!ExpressOrder) return false;
 
-    const busyTaxi = await ExpressOrder.findOne({
+    const busyOrder = await ExpressOrder.findOne({
         where: {
             executorId,
-            type: "taxi",
             status: {
-                [Op.notIn]: ["completed", "cancelled"],
+                [Op.in]: [
+                    "accepted",
+                    "on_the_way_to_A",
+                    "arrived_at_A",
+                    "waiting_at_A",
+                    "picked_up",
+                    "in_progress",
+                ],
             },
         },
     });
 
-    return !!busyTaxi;
+    return Boolean(busyOrder);
 }
 
 async function removeExecutorFromOtherPendingOrders(Order, executorId, approvedOrderId) {
@@ -2145,7 +2151,7 @@ module.exports = (io) => {
             }
 
             const busyRegular = await hasBusyRegularOrder(Order, executorId);
-            const busyTaxi = await hasBusyTaxiOrder(ExpressOrder, executorId);
+            const busyTaxi = await hasBusyExpressOrder(ExpressOrder, executorId);
 
             if (busyRegular || busyTaxi) {
                 return res.status(400).json({
@@ -2419,7 +2425,10 @@ module.exports = (io) => {
             }
 
             const executorBusyRegular = await hasBusyRegularOrder(Order, normalizedExecutorId, order.id);
-            const executorBusyTaxi = await hasBusyTaxiOrder(ExpressOrder, normalizedExecutorId);
+            const executorBusyTaxi = await hasBusyExpressOrder(
+                ExpressOrder,
+                normalizedExecutorId
+            );
 
             if (executorBusyRegular || executorBusyTaxi) {
                 return res.status(409).json({
