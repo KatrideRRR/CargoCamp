@@ -12,6 +12,7 @@ import Modal from "react-modal";
 import axiosInstance from "../utils/axiosInstance";
 import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
 import ExpressOrderCard from "../components/ExpressOrderCard";
+import RegularReservedOrderCard from "../components/RegularReservedOrderCard";
 import { ModalContext } from "../components/modalContext";
 import { openOrderRoute } from "../utils/orderNavigation";
 import OrderWorkTimer from "../components/OrderWorkTimer";
@@ -421,6 +422,8 @@ const ActiveOrdersPage = () => {
 
     const [orders, setOrders] = useState([]);
     const [expressOrders, setExpressOrders] = useState([]);
+
+    const [collapsedRegular, setCollapsedRegular] = useState({});
 
     const [activeView, setActiveView] = useState(() => {
         const params = new URLSearchParams(window.location.search);
@@ -1750,18 +1753,24 @@ const ActiveOrdersPage = () => {
     const targetOrderId = new URLSearchParams(window.location.search).get("orderId");
 
     const sortTargetOrderFirst = (list) => {
-        if (!targetOrderId) return list;
-
         return [...list].sort((a, b) => {
-            if (String(a.id) === String(targetOrderId)) return -1;
-            if (String(b.id) === String(targetOrderId)) return 1;
+            if (a.status !== b.status) {
+                if (a.status === "active") return -1;
+                if (b.status === "active") return 1;
+            }
+
+            if (targetOrderId) {
+                if (String(a.id) === String(targetOrderId)) return -1;
+                if (String(b.id) === String(targetOrderId)) return 1;
+            }
+
             return 0;
         });
     };
 
     const visibleRegularOrders =
         activeView === "performing"
-            ? sortTargetOrderFirst(performingOrders).slice(0, 1)
+            ? sortTargetOrderFirst(performingOrders)
             : sortTargetOrderFirst(createdOrders);
 
     const {
@@ -1770,7 +1779,9 @@ const ActiveOrdersPage = () => {
         refresh: refreshAssignments,
         loading: assignmentsLoading,
     } = useVerifiedAssignments(
-        visibleRegularOrders
+        visibleRegularOrders.filter(
+            (order) => order.status === "active"
+        )
     );
 
     const visibleExpressOrders =
@@ -1912,8 +1923,10 @@ const ActiveOrdersPage = () => {
                             {hasAny ? (
                                 <ul className="orders-list">
                                     {/* обычные активные заказы */}
-                                    {visibleRegularOrders.map((order) => {
-                                        const completedBy = Array.isArray(order.completedBy)
+                                    {visibleRegularOrders
+                                        .filter((order) => order.status === "active")
+                                        .map((order) => {
+                                            const completedBy = Array.isArray(order.completedBy)
                                             ? order.completedBy.map((id) => Number(id)).filter(Number.isFinite)
                                             : [];
 
@@ -1955,9 +1968,29 @@ const ActiveOrdersPage = () => {
                                                 String(order.id)
                                                 ] || null;
 
-                                        return (
-                                            <li key={order.id} className="order-card">
-                                                <div className="order-header">
+                                            return (
+                                                <li key={order.id} className="order-card">
+                                                    <button
+                                                        type="button"
+                                                        className="cc-collapse-toggle"
+                                                        onClick={() =>
+                                                            setCollapsedRegular((prev) => ({
+                                                                ...prev,
+                                                                [order.id]: !prev[order.id],
+                                                            }))
+                                                        }
+                                                    >
+                                                        <span>Заказ №{order.id} · В работе</span>
+                                                        <span>
+                {collapsedRegular[order.id]
+                    ? "Развернуть"
+                    : "Свернуть"}
+            </span>
+                                                    </button>
+
+                                                    {!collapsedRegular[order.id] && (
+                                                        <>
+                                                        <div className="order-header">
                                                     <div className="order-top">
                                                         <div className="order-title-wrap">
                                                             <div className="order-title">
@@ -2332,9 +2365,30 @@ const ActiveOrdersPage = () => {
                                                             renderPhotos={renderPhotoList}
                                                         />
                                                     </div>
-                                            </li>
-                                        );
-                                    })}
+                                                        </>
+                                                    )}
+                                                </li>
+                                            );
+                                        })}
+
+                                    {/* Забронированные обычные заказы */}
+                                    {visibleRegularOrders
+                                        .filter((order) => order.status === "reserved")
+                                        .map((order) => (
+                                            <RegularReservedOrderCard
+                                                key={`reserved-${order.id}`}
+                                                order={order}
+                                                isBusy={orders.some(
+                                                    (current) =>
+                                                        Number(current.executorId) ===
+                                                        Number(order.executorId) &&
+                                                        current.status === "active"
+                                                )}
+                                                onOpenChat={(orderId) =>
+                                                    handleOpenChat(orderId, "regular")
+                                                }
+                                            />
+                                        ))}
 
                                     {/* express активные заказы */}
                                     {visibleExpressOrders.map((eo) => (

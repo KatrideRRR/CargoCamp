@@ -1948,7 +1948,9 @@ module.exports = (io) => {
 
             const activeOrders = await Order.findAll({
                 where: {
-                    status: 'active',
+                    status: {
+                        [Op.in]: ["active", "reserved"],
+                    },
                     [Op.or]: [{ creatorId: userId }, { executorId: userId }],
                 },
                 include: [
@@ -1976,7 +1978,10 @@ module.exports = (io) => {
 
             const ordersWithCompletionPhase = await Promise.all(
                 activeOrders.map(async (order) => {
-                    const phase = await getCompletionPhase(order);
+                    const phase =
+                        order.status === "reserved"
+                            ? "reserved"
+                            : await getCompletionPhase(order);
 
                     let completionRemarks = null;
 

@@ -4802,3 +4802,69 @@ body {
     overflow-wrap: anywhere;
     color: #64748b;
 }
+
+/* Сворачивание обычных активных заказов */
+
+.active-orders .cc-collapse-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border: 0;
+    border-radius: 12px;
+    background: #eaf2ff;
+    color: #17469b;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: left;
+}
+
+/* Забронированный заказ */
+
+.active-orders .cc-reserved-order {
+    border: 1px solid #b9cff5;
+}
+
+.active-orders .cc-reserved-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    padding: 15px;
+    list-style: none;
+}
+
+.active-orders .cc-reserved-summary::-webkit-details-marker {
+    display: none;
+}
+
+.active-orders .cc-reserved-summary small {
+    display: block;
+    margin-top: 5px;
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.active-orders .cc-reserved-expand {
+    color: #2563eb;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.active-orders .cc-reserved-content {
+    padding: 4px 16px 16px;
+}
+
+.active-orders .cc-reserved-chat {
+    padding: 10px 16px;
+    border: 0;
+    border-radius: 10px;
+    background: #2563eb;
+    color: white;
+    font: inherit;
+    cursor: pointer;
+}
