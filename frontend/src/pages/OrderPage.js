@@ -405,8 +405,6 @@ const OrderPage = () => {
     };
 
     const closeRequestModal = () => {
-        if (requestSubmitting) return;
-
         setRequestModalOpen(false);
         setRequestSum("");
         setRequestComment("");
@@ -419,7 +417,7 @@ const OrderPage = () => {
     };
 
     const submitRegularOrderRequest = useCallback(
-        async ({ orderId, proposedSum, comment }) => {
+        async ({ orderId, proposedSum, comment, availableAt }) => {
             const token = localStorage.getItem("authToken");
 
             if (!token) {
@@ -433,8 +431,9 @@ const OrderPage = () => {
                 {
                     proposedSum,
                     comment,
-                    availableAt,
-
+                    availableAt: availableAt
+                        ? new Date(availableAt).toISOString()
+                        : null,
                 },
                 {
                     headers: {
@@ -492,6 +491,7 @@ const OrderPage = () => {
                             orderId: pendingRequest.orderId,
                             proposedSum: pendingRequest.proposedSum,
                             comment: pendingRequest.comment || "",
+                            availableAt: pendingRequest.availableAt || null,
                         });
 
                         clearPendingOrderRequest();
@@ -559,6 +559,7 @@ const OrderPage = () => {
                     orderId: order.id,
                     proposedSum: normalizedSum,
                     comment: requestComment.trim(),
+                    availableAt: requestAvailableAt,
                 });
 
                 closeRequestModal();
@@ -578,7 +579,7 @@ const OrderPage = () => {
                 orderId: order.id,
                 proposedSum: normalizedSum,
                 comment: requestComment.trim(),
-                availableAt: pendingRequest.availableAt || null,
+                availableAt: requestAvailableAt,
             });
 
             closeRequestModal();

@@ -480,7 +480,7 @@ const OrdersPage = () => {
     };
 
     const submitRegularOrderRequest = useCallback(
-        async ({ orderId, proposedSum, comment }) => {
+        async ({ orderId, proposedSum, comment, availableAt }) => {
             const token = localStorage.getItem("authToken");
             if (!token) {
                 toast.info("Войдите, чтобы запросить выполнение");
@@ -490,9 +490,18 @@ const OrdersPage = () => {
 
             await axiosInstance.post(
                 `/orders/${orderId}/request`,
-                { proposedSum, comment,  availableAt,
+                {
+                    proposedSum,
+                    comment,
+                    availableAt: availableAt
+                        ? new Date(availableAt).toISOString()
+                        : null,
                 },
-                { headers: { Authorization: `Bearer ${token}` } }
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
             );
 
             toast.success("Запрос отправлен заказчику!");
@@ -1145,16 +1154,16 @@ const OrdersPage = () => {
         );
 
         setRequestComment("");
+        setRequestAvailableAt("");
         setRequestModalOpen(true);
     };
 
     const closeRequestModal = () => {
-        if (requestSubmitting) return;
-
         setRequestModalOpen(false);
         setRequestOrder(null);
         setRequestSum("");
         setRequestComment("");
+        setRequestAvailableAt("");
     };
 
     const handleRequestSumChange = (e) => {
@@ -1176,7 +1185,7 @@ const OrdersPage = () => {
             return;
         }
 
-        if (busyState.hasAnyBusy) {
+        if (busyState.hasBusyTaxi) {
             toast.info(busyHintText);
             return;
         }
@@ -1209,6 +1218,7 @@ const OrdersPage = () => {
                     orderId: requestOrder.id,
                     proposedSum: normalizedSum,
                     comment: requestComment.trim(),
+                    availableAt: requestAvailableAt,
                 });
 
                 closeRequestModal();
@@ -1228,6 +1238,7 @@ const OrdersPage = () => {
                 orderId: requestOrder.id,
                 proposedSum: normalizedSum,
                 comment: requestComment.trim(),
+                availableAt: requestAvailableAt,
             });
 
             closeRequestModal();
