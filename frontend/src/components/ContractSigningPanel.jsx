@@ -147,7 +147,11 @@ export default function ContractSigningPanel({
 
             setMessage(
                 response.data.fullySigned
-                    ? "Договор подписан обеими сторонами."
+                    ? (
+                        isAct
+                            ? "Акт подписан обеими сторонами."
+                            : "Договор подписан обеими сторонами."
+                    )
                     : "Ваша подпись сохранена. Ожидается вторая сторона."
             );
 
@@ -178,7 +182,9 @@ export default function ContractSigningPanel({
             >
                 <span>
 <strong>
-    ✍️ {isAct ? "Подписание акта" : "Подписание договора"}
+    ✍️ : isAct
+    ? "Подписать акт"
+    : "Подписать договор"
 </strong>
                     <small>
     {state?.signingMethod === "click"
@@ -236,6 +242,12 @@ export default function ContractSigningPanel({
                                         в разделе выше.
                                     </p>
                                 )}
+
+                            {state.blockedReason && !state.mySigned && (
+                                <p className="cc-signing-error" role="alert">
+                                    {state.blockedReason}
+                                </p>
+                            )}
 
                             {state.canSign && (
                                 <>

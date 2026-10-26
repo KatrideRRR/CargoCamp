@@ -1,5 +1,20 @@
+const fs = require("fs");
+const path = require("path");
+const dotenv = require("dotenv");
 
-require("dotenv").config();
+const backendRoot = path.resolve(__dirname, "..");
+
+const envFile = fs.existsSync(
+    path.join(backendRoot, ".env.local")
+)
+    ? ".env.local"
+    : ".env";
+
+dotenv.config({
+    path: path.join(backendRoot, envFile),
+});
+
+console.log(`✅ Загружено окружение: ${envFile}`);
 
 const {
     sequelize,

@@ -890,7 +890,13 @@ router.post("/:contractId/request-code", async (req, res) => {
 
         const prepared = await sequelize.transaction(
             async (transaction) => {
-                // Сериализуем отправки одного пользователя.
+                const ctx = await getContext(
+                    req.params.contractId,
+                    userId,
+                    transaction,
+                    true
+                );
+
                 const user = await User.findByPk(userId, {
                     transaction,
                     lock: transaction.LOCK.UPDATE,
@@ -901,13 +907,6 @@ router.post("/:contractId/request-code", async (req, res) => {
                 }
 
                 const phone = normalizePhone(user.phone);
-
-                const ctx = await getContext(
-                    req.params.contractId,
-                    userId,
-                    transaction,
-                    true
-                );
 
                 requireUnsigned(ctx.contract);
 
@@ -1365,6 +1364,84 @@ router.post("/:contractId/confirm-code", async (req, res) => {
                 const pepExpiresAt = new Date(
                     now.getTime() + 180 * 24 * 60 * 60 * 1000
                 );
+
+
+                const previousEnrollment = await PepEnrollment.findOne({
+                    where: { userId },
+                    transaction,
+                    lock: transaction.LOCK.UPDATE,
+                });
+
+                await ActionLog.create(
+                    {
+                        actorUserId: userId,
+                        actorRole: "user",
+
+                        actionType: previousEnrollment
+                            ? "pep_enrollment_reactivated"
+                            : "pep_enrollment_activated",
+
+                        entityType: "user",
+                        entityId: userId,
+
+                        ip: getIp(req),
+                        ua: getUa(req),
+
+                        meta: {
+                            method: "otp_sms",
+                            contractId: String(ctx.contract.id),
+
+                            bootstrapSignatureId:
+                                String(savedSignature.id),
+
+                            bootstrapChallengeId:
+                                String(challenge.id),
+
+                            agreementId:
+                                String(prereq.agreement.id),
+
+                            identityVerificationId:
+                                String(prereq.identity.id),
+
+                            policyVersion:
+                            prereq.policy.version,
+
+                            policySha256:
+                            prereq.policy.sha256,
+
+                            activatedAt:
+                                now.toISOString(),
+
+                            expiresAt:
+                                pepExpiresAt.toISOString(),
+
+                            previousEnrollment: previousEnrollment
+                                ? {
+                                    id: String(previousEnrollment.id),
+
+                                    bootstrapSignatureId:
+                                        String(
+                                            previousEnrollment.bootstrapSignatureId
+                                        ),
+
+                                    activatedAt:
+                                    previousEnrollment.activatedAt,
+
+                                    expiresAt:
+                                    previousEnrollment.expiresAt,
+
+                                    revokedAt:
+                                    previousEnrollment.revokedAt,
+
+                                    revokeReason:
+                                    previousEnrollment.revokeReason,
+                                }
+                                : null,
+                        },
+                    },
+                    { transaction }
+                );
+
 
                 await PepEnrollment.upsert(
                     {
