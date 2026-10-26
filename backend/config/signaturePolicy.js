@@ -186,7 +186,7 @@ const POLICY_TEXT = `
 
 14.6. Ранее действовавшие редакции сохраняются в архиве. Новая редакция не изменяет задним числом условия ранее совершённых подписаний.
 
-Редакция 1.0. Конец текста Правил.
+Редакция 1.1. Конец текста Правил.
 `.trim();
 
 
@@ -196,7 +196,7 @@ const POLICY_SHA256 = crypto
     .digest("hex");
 
 const POLICY_ENABLED =
-    POLICY_VERSION === "1.0" &&
+    POLICY_VERSION === "1.1" &&
     process.env.CARGOCAMP_SIGNATURE_AGREEMENT_ENABLED ===
     "true";
 
