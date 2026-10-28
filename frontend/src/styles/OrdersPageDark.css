@@ -1,0 +1,583 @@
+/* ==============================================
+   CARGOCAMP — ORDERS DARK THEME
+   Только для системного тёмного режима
+   ============================================== */
+
+@media (prefers-color-scheme: dark) {
+
+    /* ==========================================
+       1. ОСНОВНЫЕ ЦВЕТА
+       ========================================== */
+
+    html .orders-page {
+        --orders-bg: #101824;
+
+        --orders-card: #1b2636;
+        --orders-card-solid: #1b2636;
+
+        --orders-text: #f1f5f9;
+        --orders-muted: #94a3b8;
+        --orders-soft-text: #cbd5e1;
+
+        --orders-border: rgba(148, 163, 184, 0.2);
+        --orders-border-strong: rgba(148, 163, 184, 0.35);
+
+        --orders-primary: #93c5fd;
+        --orders-primary-soft: rgba(96, 165, 250, 0.16);
+        --orders-primary-softer: rgba(96, 165, 250, 0.09);
+
+        --orders-danger: #f87171;
+        --orders-danger-bg: rgba(248, 113, 113, 0.12);
+
+        --orders-success: #4ade80;
+        --orders-success-bg: rgba(74, 222, 128, 0.12);
+
+        --orders-warning: #fbbf24;
+        --orders-warning-bg: rgba(251, 191, 36, 0.13);
+
+        --orders-purple: #c4b5fd;
+        --orders-purple-bg: rgba(167, 139, 250, 0.14);
+
+        --orders-shadow-card:
+                0 12px 35px rgba(0, 0, 0, 0.22);
+
+        --orders-shadow-soft:
+                0 6px 20px rgba(0, 0, 0, 0.2);
+
+        color: var(--orders-text);
+        color-scheme: dark;
+
+        background:
+                radial-gradient(
+                        circle at 18% 4%,
+                        rgba(37, 99, 235, 0.1),
+                        transparent 32%
+                ),
+                linear-gradient(
+                        180deg,
+                        #101824,
+                        #162133
+                );
+    }
+
+    html .orders-page--android {
+        background: #101824;
+    }
+
+    /* ==========================================
+       2. ОСНОВНЫЕ КАРТОЧКИ
+       ========================================== */
+
+    html .orders-page .glass,
+    html .orders-page .orders-top,
+    html .orders-page .orders-actions-bar,
+    html .orders-page .orders-tabs-row,
+    html .orders-page .pref-bar,
+    html .orders-page .notice,
+    html .orders-page .empty,
+    html .orders-page .order-card,
+    html .orders-page .drawer {
+
+        background:
+                linear-gradient(
+                        180deg,
+                        rgba(34, 48, 69, 0.97),
+                        rgba(24, 35, 52, 0.97)
+                );
+
+        border-color: rgba(148, 163, 184, 0.17);
+
+        box-shadow:
+                0 12px 32px rgba(0, 0, 0, 0.22);
+
+        color: var(--orders-text);
+    }
+
+    /* Убираем светлые декоративные блики */
+
+    html .orders-page .orders-top::before,
+    html .orders-page .orders-actions-bar::before,
+    html .orders-page .orders-tabs-row::before,
+    html .orders-page .pref-bar::before,
+    html .orders-page .notice::before,
+    html .orders-page .empty::before {
+        display: none;
+    }
+
+    /* ==========================================
+       3. КАРТОЧКИ ЗАКАЗОВ
+       ========================================== */
+
+    html .orders-page .order-card.my-order {
+        background:
+                linear-gradient(180deg, #283446, #1c293b);
+
+        border-color: rgba(148, 163, 184, 0.3);
+    }
+
+    html .orders-page .order-card.can-take {
+        background:
+                linear-gradient(180deg, #203751, #1a2b42);
+
+        border-color: rgba(96, 165, 250, 0.48);
+    }
+
+    html .orders-page .order-card.can-take .order-number {
+        color: #93c5fd;
+    }
+
+    html .orders-page .order-card.highlighted {
+        background:
+                linear-gradient(180deg, #342e24, #252b32);
+
+        border-color: rgba(251, 191, 36, 0.38);
+    }
+
+    html .orders-page .order-card.recommended {
+        background:
+                linear-gradient(180deg, #302b47, #22283b);
+
+        border-color: rgba(167, 139, 250, 0.38);
+    }
+
+    html .orders-page .order-card.courier {
+        background:
+                linear-gradient(180deg, #203b36, #1c2e35);
+
+        border-color: rgba(74, 222, 128, 0.3);
+    }
+
+    /* ==========================================
+       4. НОМЕРА, ПОДПИСИ И СТАТУСЫ
+       ========================================== */
+
+    html .orders-page .badge {
+        background: #2b3b51;
+        border-color: #40516a;
+        color: #e2e8f0;
+        box-shadow: none;
+    }
+
+    html .orders-page .badge-my-order {
+        color: #cbd5e1;
+    }
+
+    html .orders-page .badge-can-take {
+        color: #93c5fd;
+        background: rgba(37, 99, 235, 0.18);
+    }
+
+    html .orders-page .badge-priority {
+        color: #c4b5fd;
+        background: rgba(167, 139, 250, 0.17);
+    }
+
+    html .orders-page .badge-distance,
+    html .orders-page .badge-courier {
+        color: #86efac;
+        background: rgba(74, 222, 128, 0.12);
+    }
+
+    html .orders-page .badge-pensioner-order {
+        color: #fdba74;
+        background: rgba(249, 115, 22, 0.15);
+        border-color: rgba(249, 115, 22, 0.35);
+    }
+
+    html .orders-page .badge-payment-pending {
+        color: #fcd34d;
+        background: rgba(245, 158, 11, 0.14);
+    }
+
+    html .orders-page .badge-admin-preview {
+        color: #c4b5fd;
+        background: rgba(167, 139, 250, 0.14);
+    }
+
+    /* ==========================================
+       5. СТОИМОСТЬ ЗАКАЗА
+       ========================================== */
+
+    html .orders-page .pay-box,
+    html .orders-page .pay-icon {
+        background: #26364b;
+        border-color: #394b63;
+        box-shadow: none;
+    }
+
+    html .orders-page .pay-icon {
+        color: #93c5fd;
+    }
+
+    /* ==========================================
+       6. ОПИСАНИЕ И ДАННЫЕ ЗАКАЗА
+       ========================================== */
+
+    html .orders-page .kv,
+    html .orders-page .order-desc {
+        background: rgba(15, 23, 42, 0.35);
+        border-color: rgba(148, 163, 184, 0.15);
+    }
+
+    html .orders-page .thumb-more {
+        background: #304157;
+        border-color: #475569;
+        color: #f1f5f9;
+    }
+
+    /* ==========================================
+       7. ВРЕМЯ ВЫПОЛНЕНИЯ
+       ========================================== */
+
+    html .orders-page .order-time-box {
+        background: #26364b;
+        border-color: #394b63;
+        box-shadow: none;
+    }
+
+    html .orders-page .order-time-icon {
+        background: #304157;
+        border-color: #475569;
+    }
+
+    html .orders-page .order-time-box--asap {
+        background: #393022;
+        border-color: rgba(251, 191, 36, 0.3);
+    }
+
+    html .orders-page .order-time-box--asap .order-time-icon {
+        background: rgba(251, 191, 36, 0.14);
+    }
+
+    html .orders-page .order-time-box--asap .order-time-value {
+        color: #fcd34d;
+    }
+
+    html .orders-page .order-time-box--scheduled {
+        background: #22364d;
+        border-color: rgba(96, 165, 250, 0.35);
+    }
+
+    html .orders-page .order-time-box--scheduled .order-time-icon {
+        background: rgba(96, 165, 250, 0.13);
+    }
+
+    html .orders-page .order-time-box--scheduled .order-time-value {
+        color: #93c5fd;
+    }
+
+    /* ==========================================
+       8. КНОПКИ
+       ========================================== */
+
+    html .orders-page .btn,
+    html .orders-page a.btn,
+    html .orders-page .loc-summary,
+    html .orders-page .tab-pill,
+    html .orders-page .glass-icon-btn {
+
+        background:
+                linear-gradient(180deg, #304157, #25354a);
+
+        border-color: #40516a;
+
+        color: #e2e8f0;
+
+        box-shadow: none;
+    }
+
+    html .orders-page .btn.btn-primary,
+    html .orders-page a.btn.btn-primary {
+
+        background:
+                linear-gradient(180deg, #2854a2, #1e4081);
+
+        border-color: #3b72d0;
+
+        color: #ffffff;
+
+        box-shadow:
+                0 6px 16px rgba(37, 99, 235, 0.14);
+    }
+
+    html .orders-page .btn.btn-ghost,
+    html .orders-page a.btn.btn-ghost {
+        color: #cbd5e1;
+    }
+
+    html .orders-page .btn.btn-ghost-danger,
+    html .orders-page a.btn.btn-ghost-danger {
+        background: rgba(248, 113, 113, 0.11);
+        border-color: rgba(248, 113, 113, 0.3);
+        color: #fca5a5;
+    }
+
+    html .orders-page .tab-pill.active {
+        background: rgba(96, 165, 250, 0.18);
+        border-color: rgba(96, 165, 250, 0.45);
+        color: #93c5fd;
+    }
+
+    html .orders-page .pref-chip {
+        background: rgba(96, 165, 250, 0.14);
+        border-color: rgba(96, 165, 250, 0.3);
+        color: #93c5fd;
+        box-shadow: none;
+    }
+
+    html .orders-page .orders-location-pill {
+        background: #263a56;
+        border-color: #3b587b;
+        color: #93c5fd;
+        box-shadow: none;
+    }
+
+    /* ==========================================
+       9. ФИЛЬТРЫ И ПОЛЯ
+       ========================================== */
+
+    html .orders-page .loc-menu-panel,
+    html .orders-page .drawer-section {
+        background: #223147;
+        border-color: #3b4b62;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+    }
+
+    html .orders-page .loc-input,
+    html .orders-page .field select {
+        background: #172338;
+        border-color: #40516a;
+        color: #f1f5f9;
+        box-shadow: none;
+        color-scheme: dark;
+    }
+
+    html .orders-page .loc-input:focus {
+        background: #1d2c43;
+        border-color: #60a5fa;
+    }
+
+    html .orders-page input::placeholder {
+        color: #94a3b8;
+    }
+
+    html .orders-page .tabs-hint,
+    html .orders-page .hint-text-panel,
+    html .orders-page .radius-pill {
+        background: #26364b;
+        border-color: #394b63;
+        color: #cbd5e1;
+    }
+
+    html .orders-page .drawer-head {
+        border-bottom-color: #394b63;
+    }
+
+    html .orders-page .drawer-foot {
+        background: #1b293d;
+        border-top-color: #394b63;
+    }
+
+    html .orders-page .drawer-status-pill {
+        background: #26364b;
+        border-color: #394b63;
+        color: #cbd5e1;
+    }
+
+    html .orders-page .drawer-status-pill.active {
+        background: rgba(96, 165, 250, 0.16);
+        color: #93c5fd;
+    }
+
+    html .orders-page .drawer-profession-empty-text {
+        background: #26364b;
+        color: #cbd5e1;
+        border-color: #40516a;
+    }
+
+    html .orders-page .blocked-order-hint {
+        color: #fcd34d;
+    }
+
+    /* ==========================================
+       10. ДЕТАЛИ УСЛУГИ И РАСЧЁТ ЦЕНЫ
+       ========================================== */
+
+    html .orders-page .order-service-details {
+        background: rgba(37, 99, 235, 0.1);
+        border-color: rgba(96, 165, 250, 0.22);
+        box-shadow: none;
+    }
+
+    html .orders-page .order-service-detail {
+        background: #26364b;
+        border-color: #394b63;
+    }
+
+    html .orders-page .order-service-details__title,
+    html .orders-page .order-service-detail__value,
+    html .orders-page .order-pricing-details__title,
+    html .orders-page .order-pricing-details__row strong,
+    html .orders-page .order-pricing-details__total {
+        color: #f1f5f9;
+    }
+
+    html .orders-page .order-service-details__subtitle,
+    html .orders-page .order-service-details__range span,
+    html .orders-page .order-service-detail__label,
+    html .orders-page .order-service-details__more,
+    html .orders-page .order-pricing-details__row,
+    html .orders-page .order-pricing-details__notice {
+        color: #a8b7ca;
+    }
+
+    html .orders-page .order-service-details__range strong,
+    html .orders-page .order-pricing-details__total strong {
+        color: #93c5fd;
+    }
+
+    /* ==========================================
+       11. ЛЬГОТНЫЕ ЗАКАЗЫ
+       ========================================== */
+
+    html .orders-page .pensioner-order-notice {
+        background: #392c25;
+        border-color: rgba(249, 115, 22, 0.3);
+        box-shadow: none;
+    }
+
+    html .orders-page .pensioner-order-notice__title,
+    html .orders-page .pensioner-order-notice__text strong {
+        color: #fdba74;
+    }
+
+    html .orders-page .pensioner-order-notice__text {
+        color: #fed7aa;
+    }
+
+    /* ==========================================
+       12. ОКНО "ЗАПРОСИТЬ ВЫПОЛНЕНИЕ"
+       ReactModal находится вне .orders-page
+       ========================================== */
+
+    html .request-order-modal {
+        background: #1b2636;
+        border: 1px solid #40516a;
+        color: #f1f5f9;
+        color-scheme: dark;
+    }
+
+    html .request-order-title,
+    html .request-order-field label {
+        color: #f1f5f9;
+    }
+
+    html .request-order-subtitle {
+        color: #a8b7ca;
+    }
+
+    html .request-order-input,
+    html .request-order-textarea {
+        background: #101824;
+        border-color: #40516a;
+        color: #f1f5f9;
+        color-scheme: dark;
+    }
+
+    html .request-order-input::placeholder,
+    html .request-order-textarea::placeholder {
+        color: #94a3b8;
+    }
+
+    html .request-order-btn.ghost,
+    html .request-order-close {
+        background: #304157;
+        border-color: #475569;
+        color: #f1f5f9;
+    }
+
+    html .request-order-btn.primary {
+        background: #2563eb;
+        border-color: #2563eb;
+        color: #ffffff;
+    }
+
+    /* ==========================================
+       13. ЯНДЕКС-КАРТЫ
+       Меняем только оболочку модального окна.
+       Сами тайлы и балуны карты не перекрашиваем.
+       ========================================== */
+
+    html .yandex-map-modal-overlay .glass-modal {
+        background: #1b2636;
+        border-color: #40516a;
+        color: #f1f5f9;
+        color-scheme: dark;
+    }
+
+    html .yandex-map-modal-overlay .glass-modal-head {
+        border-bottom-color: #40516a;
+    }
+
+    html .yandex-map-modal-overlay .glass-modal-title,
+    html .yandex-map-modal-overlay .glass-picked-value {
+        color: #f1f5f9;
+    }
+
+    html .yandex-map-modal-overlay .glass-modal-subtitle,
+    html .yandex-map-modal-overlay .glass-picked-label {
+        color: #a8b7ca;
+    }
+
+    html .yandex-map-modal-overlay .glass-modal-footer,
+    html .yandex-map-modal-overlay .glass-picked {
+        background: #223147;
+        border-color: #40516a;
+        box-shadow: none;
+    }
+
+    html .yandex-map-modal-overlay .glass-icon-btn,
+    html .yandex-map-modal-overlay .glass-actions .btn {
+        background: #304157;
+        border-color: #475569;
+        color: #f1f5f9;
+        box-shadow: none;
+    }
+
+    html .yandex-map-modal-overlay .glass-actions .btn.btn-primary {
+        background: #2563eb;
+        color: #ffffff;
+        border-color: #2563eb;
+    }
+
+    html .yandex-map-modal-overlay .glass-map-loading {
+        background: #26364b;
+        border-color: #40516a;
+        color: #f1f5f9;
+    }
+
+    /* ==========================================
+       14. ПОДТВЕРЖДЕНИЕ АВТОМОБИЛЯ ТАКСИ
+       ========================================== */
+
+    html .taxi-vehicle-gate-modal {
+        background: #1b2636;
+        color: #f1f5f9;
+        border: 1px solid #40516a;
+        color-scheme: dark;
+    }
+
+    html .taxi-vehicle-gate-modal p {
+        color: #a8b7ca;
+    }
+
+    html .taxi-vehicle-gate-cancel {
+        background: #304157;
+        color: #f1f5f9;
+    }
+
+    html .taxi-vehicle-gate-profile {
+        background: #2563eb;
+        color: #ffffff;
+    }
+}

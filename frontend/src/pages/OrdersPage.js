@@ -12,6 +12,7 @@ import { toast } from "react-toastify";
 import { socket } from "../socketClient";
 import TaxiVehicleGateModal from "../components/TaxiVehicleGateModal";
 import "../styles/OrdersPage.css";
+import "../styles/OrdersPageDark.css";
 import YandexMapModal from "../components/YandexMapModal";
 import ExpressRouteButtons from "../components/ExpressRouteButtons";
 import RegularAdvanceTimeField from "../components/RegularAdvanceTimeField";
