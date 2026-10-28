@@ -7,6 +7,9 @@ const {
 const db = require("../models");
 const authenticateToken = require("../middlewares/userAuth");
 const { requestTBank, verifyNotificationToken } = require("../config/tbankClient");
+const {
+    processTBankCardNotification,
+} = require("../services/tbankCardBindingService");
 const { sendOrderPush } = require("../utils/orderPushService");
 const {sendAdminNotification, adminUsersUrl, adminOrderUrl} = require("../services/adminNotificationService");
 const {sendBusinessCashPayment, sendBusinessCashRefund,} = require("../services/businessCashService");
@@ -501,6 +504,16 @@ router.post("/webhook", async (req, res) => {
             return res.status(200).send("OK");
         }
 
+        // Уведомление о привязке карты.
+// Подпись Т-Банка уже проверена выше.
+        if (
+            String(body.NotificationType || "") === "LINKCARD"
+        ) {
+            await processTBankCardNotification(body);
+
+            return res.status(200).send("OK");
+        }
+
         const status = body.Status;
         const paymentId = String(body.PaymentId || "");
         const amountKopecks = Number(body.Amount || 0);
@@ -929,7 +942,16 @@ router.post("/webhook", async (req, res) => {
             return res.status(500).send("ERROR");
         }
 
-        return res.status(200).send("OK");    }
-});
+        if (
+            req.body?.NotificationType === "LINKCARD" ||
+            ["premium", "debt"].includes(
+                parseTBankOrderId(req.body?.OrderId).type
+            )
+        ) {
+            return res.status(500).send("ERROR");
+        }
+
+        return res.status(200).send("OK");}}
+);
 
 module.exports = router;

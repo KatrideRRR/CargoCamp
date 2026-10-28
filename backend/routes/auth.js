@@ -741,6 +741,10 @@ router.get('/profile', authenticateToken, async (req, res) => {
                 'debt', 'avatar',
                 'yookassa_payment_method_id',
                 'cardLastFour', 'cardType',
+                'tbankRebillId',
+                'tbankCardId',
+                'tbankCardMask',
+                'autoCommissionProvider',
                 'rating', 'createdAt',
                 'userStatus', 'documentPhotos',
                 'subscription_type', 'subscription_expires_at',
@@ -790,6 +794,15 @@ router.get('/profile', authenticateToken, async (req, res) => {
             yookassaPaymentMethodId: user.yookassa_payment_method_id,
             cardLastFour: user.cardLastFour,
             cardType: user.cardType,
+            tbankCardBound: Boolean(
+                user.tbankRebillId &&
+                user.tbankCardId
+            ),
+
+            tbankCardMask: user.tbankCardMask,
+
+            autoCommissionProvider:
+                user.autoCommissionProvider || "none",
             preferredCategoryIds: user.preferredCategoryIds,
 
             locationAddress: user.locationAddress,

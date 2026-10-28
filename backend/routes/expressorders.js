@@ -2122,8 +2122,8 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
 
             if (feeKopecks > 0) {
                 if (
-                    executor
-                        .yookassa_payment_method_id
+                    executor.autoCommissionProvider === "yookassa" &&
+                    executor.yookassa_payment_method_id
                 ) {
                     try {
                         const amountValue =

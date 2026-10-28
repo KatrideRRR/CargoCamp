@@ -186,6 +186,11 @@ const ProfilePage = () => {
     const [selectedPremiumProvider, setSelectedPremiumProvider] = useState("yookassa");
     const [selectedDebtProvider, setSelectedDebtProvider] = useState("yookassa");
 
+    const [
+        pendingBindProvider,
+        setPendingBindProvider,
+    ] = useState("yookassa");
+
     const [vehicleForm, setVehicleForm] = useState({
         vehicleBrand: "",
         vehicleModel: "",
@@ -1266,6 +1271,104 @@ const ProfilePage = () => {
         });
     }, [profile?.id]);
 
+    const handleBindTBankCard = async () => {
+        try {
+            const token =
+                localStorage.getItem("authToken");
+
+            const response = await axios.post(
+                `${apiUrl}/api/payment-cards/tbank/bind/create`,
+                {},
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            if (!response.data?.confirmationUrl) {
+                toast.error(
+                    "Не удалось получить ссылку для привязки"
+                );
+                return;
+            }
+
+            window.location.href =
+                response.data.confirmationUrl;
+        } catch (error) {
+            toast.error(
+                error.response?.data?.error ||
+                "Ошибка привязки карты Т-Банка"
+            );
+        }
+    };
+
+    const handleUnbindTBankCard = async () => {
+        if (
+            !window.confirm(
+                "Отвязать карту Т-Банка?"
+            )
+        ) {
+            return;
+        }
+
+        try {
+            const token =
+                localStorage.getItem("authToken");
+
+            await axios.post(
+                `${apiUrl}/api/payment-cards/tbank/unbind`,
+                {},
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            await fetchProfileData();
+
+            toast.success("Карта Т-Банка отвязана");
+        } catch (error) {
+            toast.error(
+                error.response?.data?.error ||
+                "Не удалось отвязать карту"
+            );
+
+            await fetchProfileData();
+        }
+    };
+
+    const handleAutoProviderChange = async (event) => {
+        const provider = event.target.value;
+
+        try {
+            const token =
+                localStorage.getItem("authToken");
+
+            await axios.post(
+                `${apiUrl}/api/payment-cards/auto-provider`,
+                { provider },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            await fetchProfileData();
+
+            toast.success(
+                "Настройка автоматической комиссии сохранена"
+            );
+        } catch (error) {
+            toast.error(
+                error.response?.data?.error ||
+                "Не удалось сохранить настройку"
+            );
+        }
+    };
+
     const handleBindCard = async () => {
         if (CARD_BIND_SCREENSHOT_MODE) {
             setDemoCardBound(true);
@@ -1363,7 +1466,12 @@ const ProfilePage = () => {
 
     const handleAgree = () => {
         setShowAgreement(false);
-        handleBindCard();
+
+        if (pendingBindProvider === "tbank") {
+            handleBindTBankCard();
+        } else {
+            handleBindCard();
+        }
     };
 
     const handleLogout = async () => {
@@ -1722,7 +1830,10 @@ const ProfilePage = () => {
                                 onClick={
                                     CARD_BIND_SCREENSHOT_MODE
                                         ? handleBindCard
-                                        : () => setShowAgreement(true)
+                                        : () => {
+                                            setPendingBindProvider("yookassa");
+                                            setShowAgreement(true);
+                                        }
                                 }
                             >
                                 + Привязать карту
@@ -1737,6 +1848,86 @@ const ProfilePage = () => {
                                 запроса в ЮKassa.
                             </div>
                         )}
+
+                        <div className="profile-finance-section">
+                            <div className="profile-finance-section-title">
+                                Карта Т-Банк
+                            </div>
+
+                            {profile?.tbankCardBound ? (
+                                <div className="card-row profile-finance-card-row">
+                                    <div className="card-row-text">
+                                        <div className="card-strong">
+                                            Карта привязана
+                                        </div>
+
+                                        <div className="card-muted">
+                                            {profile.tbankCardMask ||
+                                                "Карта Т-Банка"}
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        className="btn btn-ghost-danger"
+                                        onClick={handleUnbindTBankCard}
+                                    >
+                                        Отвязать
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    type="button"
+                                    className="btn btn-primary profile-finance-bind-button"
+                                    onClick={() => {
+                                        setPendingBindProvider("tbank");
+                                        setShowAgreement(true);
+                                    }}
+                                >
+                                    + Привязать через Т-Банк
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="profile-finance-section">
+                            <div className="profile-finance-section-title">
+                                Автоматическое списание комиссии
+                            </div>
+
+                            <p className="card-muted">
+                                Выберите банк, через который CargoCamp
+                                сможет списывать комиссию за выполненные
+                                заказы. Другой банк автоматически
+                                использоваться не будет.
+                            </p>
+
+                            <select
+                                className="form-control"
+                                value={
+                                    profile?.autoCommissionProvider ||
+                                    "none"
+                                }
+                                onChange={handleAutoProviderChange}
+                            >
+                                <option value="none">
+                                    Не списывать автоматически
+                                </option>
+
+                                <option
+                                    value="yookassa"
+                                    disabled={!isCardBound}
+                                >
+                                    ЮKassa
+                                </option>
+
+                                <option
+                                    value="tbank"
+                                    disabled={!profile?.tbankCardBound}
+                                >
+                                    Т-Банк
+                                </option>
+                            </select>
+                        </div>
 
                         {/* Задолженность по комиссии */}
 

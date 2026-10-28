@@ -559,6 +559,11 @@ router.post('/card/unbind', authenticateToken, async (req, res) => {
             yookassa_payment_method_saved_at: null,
             cardLastFour: null,
             cardType: null,
+
+            autoCommissionProvider:
+                user.autoCommissionProvider === "yookassa"
+                    ? "none"
+                    : user.autoCommissionProvider,
         });
 
         return res.json({ success: true });

@@ -540,7 +540,10 @@ const notifyAdminsAboutNewOrder = async ({order, category, subcategory, creatorI
 };
 
 async function tryPayCommissionFromSavedCard({ req, executor, order, amountKopecks }) {
-    if (!executor.yookassa_payment_method_id) {
+    if (
+        executor.autoCommissionProvider !== "yookassa" ||
+        !executor.yookassa_payment_method_id
+    ) {
         return {
             autoPaymentTried: false,
             autoPaymentPaid: false,
