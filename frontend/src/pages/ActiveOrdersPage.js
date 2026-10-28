@@ -24,7 +24,7 @@ import DisputeEvidenceInput from "../components/DisputeEvidenceInput";
 import OrderChangePanel from "../components/OrderChangePanel";
 import ContractSigningPanel
     from "../components/ContractSigningPanel";
-
+import "../styles/ActiveOrdersPageDark.css";
 import SignatureAgreementPanel
     from "../components/SignatureAgreementPanel";
 

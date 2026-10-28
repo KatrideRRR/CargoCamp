@@ -1,0 +1,1005 @@
+/* ================================================
+   CARGOCAMP — ACTIVE ORDERS DARK THEME
+   ================================================ */
+
+@media (prefers-color-scheme: dark) {
+
+    /* ============================================
+       1. ОСНОВНЫЕ ПЕРЕМЕННЫЕ И ФОН
+       ============================================ */
+
+    html .active-orders {
+        --ao-bg: #101824;
+        --ao-text: #f1f5f9;
+        --ao-muted: #94a3b8;
+        --ao-soft-text: #cbd5e1;
+
+        --ao-primary: #93c5fd;
+        --ao-primary-soft: rgba(96, 165, 250, 0.16);
+
+        --ao-danger: #f87171;
+        --ao-danger-soft: rgba(248, 113, 113, 0.12);
+
+        --ao-success: #4ade80;
+        --ao-success-soft: rgba(74, 222, 128, 0.12);
+
+        --ao-warning: #fbbf24;
+        --ao-warning-soft: rgba(251, 191, 36, 0.13);
+
+        --ao-border: rgba(148, 163, 184, 0.22);
+        --ao-border-blue: rgba(96, 165, 250, 0.4);
+
+        --ao-shadow-card:
+                0 12px 32px rgba(0, 0, 0, 0.24);
+
+        --ao-shadow-btn:
+                0 5px 14px rgba(0, 0, 0, 0.16);
+
+        color: var(--ao-text);
+        color-scheme: dark;
+    }
+
+    html .active-orders .pageContainer {
+        background:
+                radial-gradient(
+                        circle at 15% 5%,
+                        rgba(37, 99, 235, 0.12),
+                        transparent 35%
+                ),
+                linear-gradient(
+                        180deg,
+                        #101824,
+                        #172338
+                );
+
+        color: var(--ao-text);
+    }
+
+    html .active-orders--android .pageContainer {
+        background: #101824;
+    }
+
+    /* ============================================
+       2. ШАПКА И КАРТОЧКИ
+       ============================================ */
+
+    html .active-orders .active-orders-topbar,
+    html .active-orders .order-card,
+    html .active-orders .no-orders {
+        background:
+                linear-gradient(
+                        180deg,
+                        #223045,
+                        #182334
+                );
+
+        border-color: rgba(148, 163, 184, 0.18);
+        color: var(--ao-text);
+
+        box-shadow: var(--ao-shadow-card);
+    }
+
+    html .active-orders .active-orders-topbar::before {
+        display: none;
+    }
+
+    /*
+       У карточек ::before используется также
+       для цветового акцента экспресс-заказов.
+       Поэтому его не скрываем.
+    */
+
+    html .active-orders .order-card::before {
+        opacity: 0.18;
+    }
+
+    html .active-orders .active-orders-title,
+    html .active-orders .order-title {
+        color: var(--ao-text);
+    }
+
+    html .active-orders .active-orders-subtitle,
+    html .active-orders .order-subline {
+        color: var(--ao-muted);
+    }
+
+    html .active-orders .order-subline {
+        border-top-color: var(--ao-border);
+    }
+
+    html .active-orders .order-header p,
+    html .active-orders .order-details p,
+    html .active-orders .express-comment,
+    html .active-orders .express-meta {
+        color: var(--ao-soft-text);
+    }
+
+    html .active-orders .order-header p strong,
+    html .active-orders .order-details p strong,
+    html .active-orders .express-comment strong,
+    html .active-orders .express-meta strong {
+        color: var(--ao-text);
+    }
+
+    /* ============================================
+       3. ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК
+       ============================================ */
+
+    html .active-orders .active-orders-switch {
+        background: #18283d;
+        border-color: #35465d;
+    }
+
+    html .active-orders .active-switch-btn {
+        color: #cbd5e1;
+        background: transparent;
+    }
+
+    html .active-orders .active-switch-btn:hover {
+        background: rgba(96, 165, 250, 0.09);
+    }
+
+    html .active-orders .active-switch-btn.active {
+        background: #284569;
+        color: #bfdbfe;
+        border-color: #5275a3;
+        box-shadow: none;
+    }
+
+    /* ============================================
+       4. СТОИМОСТЬ И ОПЛАТА
+       ============================================ */
+
+    html .active-orders .pay-box,
+    html .active-orders .express-pay {
+        background: #26364b;
+        border-color: #40516a;
+        box-shadow: none;
+    }
+
+    html .active-orders .pay-icon {
+        background: #304765;
+        border-color: #5275a3;
+        color: #93c5fd;
+    }
+
+    html .active-orders .pay-price {
+        color: #f1f5f9;
+    }
+
+    html .active-orders .pay-type {
+        color: #a8b7ca;
+    }
+
+    /* ============================================
+       5. СТАТУСЫ И РОЛИ
+       ============================================ */
+
+    html .active-orders .role-badge,
+    html .active-orders .express-pill,
+    html .active-orders .dispute-status-badge {
+        background: #2a3a50;
+        color: #cbd5e1;
+        border-color: #40516a;
+        box-shadow: none;
+    }
+
+    html .active-orders .creator-role {
+        background: rgba(96, 165, 250, 0.15);
+        border-color: rgba(96, 165, 250, 0.35);
+        color: #93c5fd;
+    }
+
+    html .active-orders .executor-role {
+        background: rgba(74, 222, 128, 0.13);
+        border-color: rgba(74, 222, 128, 0.3);
+        color: #86efac;
+    }
+
+    html .active-orders
+    :is(
+        .dispute-status-open,
+        .dispute-status-in_review,
+        .dispute-status-waiting_creator,
+        .dispute-status-waiting_executor
+    ) {
+        background: rgba(251, 191, 36, 0.12);
+        color: #fcd34d;
+        border-color: rgba(251, 191, 36, 0.3);
+    }
+
+    html .active-orders
+    :is(
+        .dispute-status-resolved,
+        .dispute-status-closed
+    ) {
+        background: rgba(74, 222, 128, 0.12);
+        color: #86efac;
+        border-color: rgba(74, 222, 128, 0.3);
+    }
+
+    /* ============================================
+       6. КНОПКИ АКТИВНОГО ЗАКАЗА
+       ============================================ */
+
+    html .active-orders
+    :is(
+        .call-button,
+        .message-button,
+        .route-button,
+        .express-secondaryBtn,
+        .waiting-complete-button,
+        .remind-complete-button,
+        .cc-collapse-toggle
+    ) {
+        background: #304157;
+        border-color: #475569;
+        color: #f1f5f9;
+        box-shadow: none;
+    }
+
+    html .active-orders
+    :is(
+        .complete-button,
+        .start-main-button,
+        .start-work-button,
+        .express-primaryActionBtn
+    ) {
+        background:
+                linear-gradient(135deg, #2854a2, #1e4081);
+
+        border-color: #3b72d0;
+        color: #ffffff;
+        box-shadow: none;
+    }
+
+    html .active-orders
+    :is(
+        .dispute-button,
+        .dispute-opened-button,
+        .remove-button,
+        .express-secondaryBtnDanger
+    ) {
+        background: rgba(248, 113, 113, 0.12);
+        border-color: rgba(248, 113, 113, 0.32);
+        color: #fca5a5;
+        box-shadow: none;
+    }
+
+    html .active-orders .express-secondaryBtnWarn {
+        background: rgba(251, 191, 36, 0.12);
+        border-color: rgba(251, 191, 36, 0.3);
+        color: #fcd34d;
+    }
+
+    /* ============================================
+       7. ЭКСПРЕСС-ЗАКАЗЫ
+       ============================================ */
+
+    html .active-orders .order-card.express-card {
+        background:
+                linear-gradient(180deg, #20372f, #1a2c35);
+
+        border-color: rgba(74, 222, 128, 0.3);
+    }
+
+    html .active-orders .express-stepPremiumCircle {
+        background: #304157;
+        border-color: #475569;
+        color: #cbd5e1;
+        box-shadow: none;
+    }
+
+    html .active-orders
+    .express-stepPremium.done
+    .express-stepPremiumCircle {
+        background: rgba(74, 222, 128, 0.16);
+        border-color: rgba(74, 222, 128, 0.35);
+        color: #86efac;
+    }
+
+    html .active-orders
+    .express-stepPremium.active
+    .express-stepPremiumCircle {
+        background: rgba(251, 191, 36, 0.15);
+        border-color: rgba(251, 191, 36, 0.35);
+        color: #fcd34d;
+    }
+
+    html .active-orders .express-stepPremiumLabel {
+        color: #a8b7ca;
+    }
+
+    html .active-orders .express-stepPremiumLine {
+        background: #40516a;
+    }
+
+    html .active-orders
+    .express-stepPremiumLine.done {
+        background: #4ade80;
+    }
+
+    html .active-orders
+    :is(
+        .premium-statusBar,
+        .express-statusBar,
+        .express-ab,
+        .premium-routeBox
+    ) {
+        background: #26364b;
+        border-color: #40516a;
+        color: #f1f5f9;
+        box-shadow: none;
+    }
+
+    html .active-orders .express-abItem {
+        background: #1b293d;
+        border-color: #40516a;
+        box-shadow: none;
+    }
+
+    html .active-orders .express-abLabel {
+        color: #94a3b8;
+    }
+
+    html .active-orders .express-abValue {
+        color: #f1f5f9;
+    }
+
+    html .active-orders .express-abArrow {
+        color: #93c5fd;
+    }
+
+    /* Данные автомобиля */
+
+    html .active-orders .express-driver-vehicle-card {
+        background: #26364b;
+        border-color: #40516a;
+    }
+
+    html .active-orders .express-driver-vehicle-label,
+    html .active-orders .express-driver-vehicle-hint {
+        color: #a8b7ca;
+    }
+
+    html .active-orders .express-driver-vehicle-name {
+        color: #f1f5f9;
+    }
+
+    html .active-orders .express-driver-vehicle-icon {
+        background: rgba(96, 165, 250, 0.16);
+        color: #93c5fd;
+    }
+
+    /*
+       Автомобильный номер намеренно оставляем
+       белым с тёмным текстом.
+    */
+
+    /* ============================================
+       8. БРОНИРОВАНИЕ
+       ============================================ */
+
+    html .active-orders .cc-reserved-order {
+        background: #223147;
+        border-color: #5275a3;
+    }
+
+    html .active-orders .cc-reserved-summary {
+        color: #f1f5f9;
+    }
+
+    html .active-orders .cc-reserved-summary small {
+        color: #a8b7ca;
+    }
+
+    html .active-orders .cc-reserved-expand {
+        color: #93c5fd;
+    }
+
+    html .active-orders .cc-reserved-chat {
+        background: #2563eb;
+        color: #ffffff;
+    }
+
+    /* ============================================
+       9. ПОДРОБНОСТИ УСЛУГИ
+       ============================================ */
+
+    html .active-orders .order-details,
+    html .active-orders .order-left {
+        border-color: #40516a;
+    }
+
+    html .active-orders .order-service-details {
+        background: rgba(37, 99, 235, 0.1);
+        border-color: rgba(96, 165, 250, 0.24);
+        box-shadow: none;
+    }
+
+    html .active-orders .order-service-detail {
+        background: #26364b;
+        border-color: #40516a;
+        box-shadow: none;
+    }
+
+    html .active-orders
+    :is(
+        .order-service-details__title,
+        .order-service-detail__value,
+        .order-pricing-details__title,
+        .order-pricing-details__total,
+        .order-pricing-details__row strong
+    ) {
+        color: #f1f5f9;
+    }
+
+    html .active-orders
+    :is(
+        .order-service-details__subtitle,
+        .order-service-details__range span,
+        .order-service-detail__label,
+        .order-service-details__more,
+        .order-pricing-details__row,
+        .order-pricing-details__notice
+    ) {
+        color: #a8b7ca;
+    }
+
+    html .active-orders
+    :is(
+        .order-service-details__range strong,
+        .order-pricing-details__total strong
+    ) {
+        color: #93c5fd;
+    }
+
+    /* ============================================
+       10. ФОТОГРАФИИ ДО/ПОСЛЕ
+       ============================================ */
+
+    html .active-orders .photo-protocol-card,
+    html .active-orders .work-photo-card {
+        background: #26364b;
+        border-color: #40516a;
+        box-shadow: none;
+    }
+
+    html .active-orders .photo-protocol-card.optional {
+        background: #223147;
+    }
+
+    html .active-orders
+    :is(
+        .photo-protocol-title,
+        .photo-protocol-head strong,
+        .work-photo-card h5,
+        .photo-protocol-stage-title
+    ) {
+        color: #f1f5f9;
+    }
+
+    html .active-orders
+    :is(
+        .photo-protocol-hint,
+        .photo-empty
+    ) {
+        color: #a8b7ca;
+    }
+
+    html .active-orders .photo-protocol-warning,
+    html .active-orders .photo-protocol-alert {
+        background: rgba(251, 191, 36, 0.12);
+        color: #fcd34d;
+        border-color: rgba(251, 191, 36, 0.3);
+    }
+
+    html .active-orders .photo-protocol-optional {
+        background: rgba(96, 165, 250, 0.15);
+        color: #93c5fd;
+    }
+
+    html .active-orders
+    :is(
+        .protocol-photo,
+        .order-image
+    ) {
+        border-color: #40516a;
+        box-shadow: none;
+    }
+
+    html .active-orders .photo-upload-button {
+        background: #304765;
+        border-color: #5275a3;
+        color: #bfdbfe;
+    }
+
+    /* ============================================
+       11. ТАЙМЕР РАБОТЫ
+       ============================================ */
+
+    html .active-orders .order-work-timer {
+        background: #26364b;
+        border-color: #40516a;
+        color: #f1f5f9;
+    }
+
+    html .active-orders .order-work-timer__icon {
+        background: #304765;
+    }
+
+    html .active-orders .order-work-timer__label,
+    html .active-orders .order-work-timer__started {
+        color: #a8b7ca;
+    }
+
+    /* ============================================
+       12. ОЖИДАНИЕ ЗАВЕРШЕНИЯ
+       ============================================ */
+
+    html .active-orders .completion-waiting-box,
+    html .active-orders .completion-stage-note {
+        background: #223954;
+        border-color: rgba(96, 165, 250, 0.3);
+        color: #bfdbfe;
+    }
+
+    html .active-orders .completion-waiting-box span {
+        color: #cbd5e1;
+    }
+
+    html .active-orders .completion-waiting-box-warning {
+        background: #393022;
+        border-color: rgba(251, 191, 36, 0.3);
+        color: #fcd34d;
+    }
+
+    /* ============================================
+       13. ДОГОВОРЫ И PDF
+       ============================================ */
+
+    html .active-orders .contract-download-button {
+        background: #263a56;
+        border-color: #5275a3;
+        color: #bfdbfe;
+        box-shadow: none;
+    }
+
+    html .active-orders .contract-download-format {
+        background: rgba(96, 165, 250, 0.14);
+        border-color: rgba(96, 165, 250, 0.3);
+        color: #93c5fd;
+    }
+
+    html .active-orders .cc-verified-assignment {
+        background: #223147;
+        border-color: #40516a;
+        color: #f1f5f9;
+        box-shadow: none;
+    }
+
+    html .active-orders .cc-va-icon {
+        background: #304765;
+    }
+
+    html .active-orders .cc-va-heading small,
+    html .active-orders .cc-va-document p,
+    html .active-orders .cc-va-footnote,
+    html .active-orders .cc-va-details span {
+        color: #a8b7ca;
+    }
+
+    html .active-orders .cc-va-document,
+    html .active-orders .cc-va-details > div {
+        background: #26364b;
+        border-color: #40516a;
+    }
+
+    html .active-orders .cc-va-details strong {
+        color: #f1f5f9;
+    }
+
+    html .active-orders .cc-va-status.draft {
+        background: rgba(251, 191, 36, 0.12);
+        color: #fcd34d;
+        border-color: rgba(251, 191, 36, 0.3);
+    }
+
+    html .active-orders .cc-va-status.pending {
+        background: rgba(96, 165, 250, 0.14);
+        color: #93c5fd;
+        border-color: rgba(96, 165, 250, 0.3);
+    }
+
+    html .active-orders .cc-va-status.signed {
+        background: rgba(74, 222, 128, 0.12);
+        color: #86efac;
+        border-color: rgba(74, 222, 128, 0.3);
+    }
+
+    html .active-orders .cc-va-error {
+        background: rgba(248, 113, 113, 0.12);
+        color: #fca5a5;
+        border-color: rgba(248, 113, 113, 0.3);
+    }
+
+    /* ============================================
+       14. ПЭП И SMS-ПОДПИСАНИЕ
+       Панели встречаются и внутри React Modal.
+       ============================================ */
+
+    html :is(.active-orders, .completion-work-modal)
+    :is(.cc-signature-agreement, .cc-signing) {
+        background: #223147;
+        border-color: #40516a;
+        color: #f1f5f9;
+    }
+
+    html :is(.active-orders, .completion-work-modal)
+    :is(.cc-sa-toggle, .cc-signing-toggle) {
+        background: #26364b;
+        color: #f1f5f9;
+    }
+
+    html :is(.active-orders, .completion-work-modal)
+    :is(.cc-sa-content, .cc-signing-content) {
+        border-top-color: #40516a;
+    }
+
+    html :is(.active-orders, .completion-work-modal)
+    :is(
+        .cc-sa-toggle small,
+        .cc-signing-toggle small,
+        .cc-sa-intro,
+        .cc-sa-footer,
+        .cc-sa-accept label span,
+        .cc-signing-consent,
+        .cc-signing-code-label
+    ) {
+        color: #a8b7ca;
+    }
+
+    html :is(.active-orders, .completion-work-modal)
+    :is(
+        .cc-sa-policy-text,
+        .cc-signing-note
+    ) {
+        background: #1b293d;
+        border-color: #40516a;
+        color: #cbd5e1;
+    }
+
+    html :is(.active-orders, .completion-work-modal)
+    .cc-signing-code-label input {
+        background: #142238;
+        border-color: #40516a;
+        color: #f1f5f9;
+        color-scheme: dark;
+    }
+
+    html :is(.active-orders, .completion-work-modal)
+    :is(
+        .cc-sa-history,
+        .cc-sa-history details
+    ) {
+        border-color: #40516a;
+    }
+
+    html :is(.active-orders, .completion-work-modal)
+    :is(
+        .cc-sa-history > button,
+        .cc-signing-refresh
+    ) {
+        background: #304157;
+        border-color: #475569;
+        color: #bfdbfe;
+    }
+
+    html :is(.active-orders, .completion-work-modal)
+    .cc-sa-history details p {
+        color: #a8b7ca;
+    }
+
+    html :is(.active-orders, .completion-work-modal)
+    :is(.cc-sa-error, .cc-signing-error) {
+        background: rgba(248, 113, 113, 0.12);
+        color: #fca5a5;
+        border-color: rgba(248, 113, 113, 0.3);
+    }
+
+    html :is(.active-orders, .completion-work-modal)
+    :is(.cc-sa-success, .cc-signing-success) {
+        background: rgba(74, 222, 128, 0.12);
+        color: #86efac;
+        border-color: rgba(74, 222, 128, 0.3);
+    }
+
+    html :is(.active-orders, .completion-work-modal)
+    .cc-sa-notice {
+        background: rgba(251, 191, 36, 0.12);
+        color: #fcd34d;
+        border-color: rgba(251, 191, 36, 0.3);
+    }
+
+    /* ============================================
+       15. ОЧЕРЕДЬ ПОДПИСАНИЯ АКТОВ
+       ============================================ */
+
+    html .active-orders .completion-signing-queue {
+        background: #223147;
+        border-color: #40516a;
+        color: #f1f5f9;
+    }
+
+    html .active-orders .completion-signing-queue__item {
+        background: #26364b;
+        color: #f1f5f9;
+    }
+
+    html .active-orders .completion-signing-queue__item small,
+    html .active-orders .completion-signing-queue p {
+        color: #a8b7ca;
+    }
+
+    html .active-orders .cc-verified-contracts-alert {
+        background: #393022;
+        border-color: rgba(251, 191, 36, 0.3);
+        color: #fcd34d;
+    }
+
+    html .active-orders .cc-verified-contracts-alert button {
+        background: #304157;
+        border-color: #64748b;
+        color: #f1f5f9;
+    }
+
+    /* ============================================
+       16. ДОПОЛНИТЕЛЬНЫЕ РАБОТЫ
+       OrderChangePanel использует inline styles.
+       ============================================ */
+
+    html .active-orders .order-details section[style] {
+        background: #223147;
+        border-color: #40516a !important;
+        color: #f1f5f9;
+    }
+
+    html .active-orders .order-details
+    section[style] > div[style*="background"] {
+        background: #26364b !important;
+        color: #f1f5f9;
+    }
+
+    html .active-orders .order-details
+    section[style] p[style] {
+        color: #a8b7ca !important;
+    }
+
+    html .active-orders .order-details
+    section[style] :is(input, textarea) {
+        background: #142238;
+        border: 1px solid #40516a;
+        border-radius: 10px;
+        color: #f1f5f9;
+        color-scheme: dark;
+    }
+
+    html .active-orders .order-details
+    section[style] button {
+        background: #304157;
+        border: 1px solid #475569;
+        border-radius: 10px;
+        color: #f1f5f9;
+        padding: 9px 12px;
+    }
+
+    /* ============================================
+       17. ОКНО ОТКРЫТИЯ СПОРА
+       React Modal — вне .active-orders.
+       ============================================ */
+
+    html .custom-modal.dispute-modal {
+        background: #1b2636;
+        border: 1px solid #40516a;
+        color: #f1f5f9;
+        color-scheme: dark;
+    }
+
+    html .dispute-modal .dispute-modal-title,
+    html .dispute-modal .dispute-form-group label {
+        color: #f1f5f9;
+    }
+
+    html .dispute-modal .dispute-order-info {
+        color: #a8b7ca;
+    }
+
+    html .dispute-modal
+    :is(.dispute-input, .dispute-textarea) {
+        background: #142238;
+        border-color: #40516a;
+        color: #f1f5f9;
+        color-scheme: dark;
+    }
+
+    html .dispute-modal
+    :is(.dispute-input, .dispute-textarea):focus {
+        background: #1d2c43;
+        border-color: #60a5fa;
+    }
+
+    html .dispute-modal
+    :is(.dispute-input, .dispute-textarea)::placeholder {
+        color: #94a3b8;
+    }
+
+    html .dispute-modal .dispute-cancel-button {
+        background: #304157;
+        border-color: #475569;
+        color: #f1f5f9;
+    }
+
+    html .dispute-modal .dispute-submit-button {
+        background: rgba(248, 113, 113, 0.15);
+        border-color: rgba(248, 113, 113, 0.35);
+        color: #fca5a5;
+    }
+
+    html .dispute-modal .custom-close-button {
+        background: #304157;
+        border-color: #475569;
+        color: #f1f5f9;
+    }
+
+    /* Фото-доказательства: компонент с inline styles */
+
+    html .dispute-modal-content > div[style] > p[style] {
+        color: #a8b7ca !important;
+    }
+
+    html .dispute-modal-content > div[style] > label[style] {
+        color: #93c5fd !important;
+        border-color: #60a5fa !important;
+        background: #26364b;
+    }
+
+    /* ============================================
+       18. ОКНА ЗАВЕРШЕНИЯ И ПОДПИСАНИЯ
+       ============================================ */
+
+    html .completion-work-modal {
+        background: #1b2636;
+        border-color: #40516a;
+        color: #f1f5f9;
+        color-scheme: dark;
+        box-shadow: 0 24px 65px rgba(0, 0, 0, 0.38);
+    }
+
+    html .completion-work-modal__title {
+        color: #f1f5f9;
+    }
+
+    html .completion-work-modal__order,
+    html .completion-work-modal__content > p {
+        color: #a8b7ca;
+    }
+
+    html .completion-work-modal__close,
+    html .completion-work-modal__cancel {
+        background: #304157;
+        border-color: #475569;
+        color: #f1f5f9;
+        box-shadow: none;
+    }
+
+    html .completion-work-modal__submit {
+        background:
+                linear-gradient(135deg, #2854a2, #1e4081);
+
+        border-color: #3b72d0;
+        color: #ffffff;
+        box-shadow: none;
+    }
+
+    html .completion-work-modal__text,
+    html .completion-work-summary {
+        background: #26364b;
+        border-color: #40516a;
+        color: #cbd5e1;
+        box-shadow: none;
+    }
+
+    html .completion-work-summary__row {
+        border-bottom-color: #40516a;
+    }
+
+    html .completion-work-summary__row span {
+        color: #a8b7ca;
+    }
+
+    html .completion-work-summary__row strong {
+        color: #f1f5f9;
+    }
+
+    html .completion-work-summary__row--main,
+    html .completion-work-summary__row--price-total {
+        background: #223e65;
+        border-color: #5275a3;
+        box-shadow: none;
+    }
+
+    html .completion-work-summary__row--main span,
+    html .completion-work-summary__row--price-total span {
+        color: #bfdbfe;
+    }
+
+    html .completion-work-summary__row--main strong,
+    html .completion-work-summary__row--price-total strong {
+        color: #f1f5f9;
+    }
+
+    html .completion-work-summary__notice,
+    html .completion-remarks-box {
+        background: #393022;
+        border-color: rgba(251, 191, 36, 0.3);
+        color: #fde68a;
+    }
+
+    /* ============================================
+       19. ПОЛЯ ПОДТВЕРЖДЕНИЯ И ЗАМЕЧАНИЙ
+       ============================================ */
+
+    html .completion-confirmation-fields fieldset,
+    html .completion-correction-choices {
+        background: #223147;
+        border-color: #40516a;
+        color: #f1f5f9;
+    }
+
+    html .completion-confirmation-fields legend,
+    html .completion-correction-choices legend,
+    html .completion-confirmation-fields label,
+    html .completion-correction-choices label {
+        color: #f1f5f9;
+    }
+
+    html .completion-confirmation-fields
+    :is(textarea, input[type="text"]),
+    html .completion-work-modal__content textarea {
+        background: #142238;
+        border-color: #40516a;
+        color: #f1f5f9;
+        color-scheme: dark;
+    }
+
+    html .completion-work-modal
+    :is(input[type="radio"], input[type="checkbox"]) {
+        accent-color: #60a5fa;
+    }
+
+    html .completion-guarantee-info,
+    html .completion-signing-details {
+        background: #223e65;
+        border-color: #5275a3;
+        color: #dbeafe;
+    }
+
+    html .completion-signing-details small {
+        color: #a8b7ca;
+    }
+
+    /* ============================================
+       20. ПРОСМОТР ФОТОГРАФИЙ
+       ============================================ */
+
+    /*
+       Не меняем размеры и расположение
+       полноэкранного просмотра фотографий.
+    */
+
+    html .custom-modal-overlay .custom-close-button {
+        background: #304157;
+        color: #f1f5f9;
+        border-color: #475569;
+    }
+}
