@@ -58,6 +58,18 @@ module.exports = (sequelize) => {
                 allowNull: true,
                 field: "reservation_ready_at",
             },
+            commissionAmountKopecks: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+                defaultValue: 0,
+                field: "commission_amount_kopecks",
+            },
+
+            commissionAccruedAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+                field: "commission_accrued_at",
+            },
             creatorId: { type: DataTypes.INTEGER, allowNull: false },
             completedBy: { type: DataTypes.JSON, allowNull: false, defaultValue: [] },
             images: {

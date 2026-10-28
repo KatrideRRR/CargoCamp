@@ -26,6 +26,9 @@ const generateContractPDF = require('../utils/generateContractPDF');
 const {createVerifiedAssignmentIfEligible,} = require("../services/verifiedContractService");
 const {createVerifiedCompletionActIfEligible,} = require("../services/verifiedCompletionActService");
 const yooKassa = require('../config/yookassaClient');
+const {
+    accrueOrderCommissionOnce,
+} = require("../services/orderCommissionService");
 const uploadExecutorBefore = buildOrderPhotoUploader("executor_before");
 const uploadExecutorAfter = buildOrderPhotoUploader("executor_after");
 const uploadCustomerBefore = buildOrderPhotoUploader("customer_before");
@@ -2859,33 +2862,42 @@ module.exports = (io) => {
                 message: "",
             };
 
-            if (commissionKopecks > 0) {
-                /**
-                 * ВАЖНО:
-                 * Сначала начисляем долг.
-                 * Потом пробуем списать.
-                 * Если списание пройдет, webhook payment.succeeded уменьшит долг.
-                 * Если денег не хватит или payment.canceled — долг останется.
-                 */
-                finalDebtKopecks = Number(executor.debt || 0) + commissionKopecks;
+// Начисляем комиссию не больше одного раза на заказ.
+            const commissionAccrual = await accrueOrderCommissionOnce({
+                orderId: order.id,
+                executorId: normalizedExecutorId,
+                amountKopecks: commissionKopecks,
+            });
 
-                await executor.update({
-                    debt: finalDebtKopecks,
-                    commissionDebtOrderId: order.id,
-                });
+            finalDebtKopecks = commissionAccrual.debtKopecks;
 
+// Автоматическое списание пытаемся выполнить только
+// при ПЕРВОМ успешном начислении комиссии.
+//
+// При повторной обработке не отправляем в YooKassa
+// ещё один запрос на списание.
+            if (
+                commissionKopecks > 0 &&
+                commissionAccrual.newlyAccrued
+            ) {
                 commissionPayment = await tryPayCommissionFromSavedCard({
                     req,
                     executor,
                     order,
                     amountKopecks: commissionKopecks,
                 });
-            } else {
-                /**
-                 * ВАЖНО:
-                 * НЕ ОБНУЛЯЕМ старый долг.
-                 */
-                finalDebtKopecks = Number(executor.debt || 0);
+            }
+
+            if (!commissionAccrual.newlyAccrued) {
+                console.warn(
+                    "Комиссия по заказу уже обработана:",
+                    {
+                        orderId: order.id,
+                        executorId: normalizedExecutorId,
+                        amountKopecks:
+                        commissionAccrual.amountKopecks,
+                    }
+                );
             }
 
             await req.logAction({
