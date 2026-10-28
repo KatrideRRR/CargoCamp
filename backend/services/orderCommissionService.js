@@ -12,6 +12,7 @@ async function accrueOrderCommissionOnce({
                                              orderId,
                                              executorId,
                                              amountKopecks,
+                                             transaction: existingTransaction = null,
                                          }) {
     const normalizedOrderId = Number(orderId);
     const normalizedExecutorId = Number(executorId);
@@ -28,8 +29,7 @@ async function accrueOrderCommissionOnce({
         throw new Error("Некорректные данные комиссии");
     }
 
-    return sequelize.transaction(async (transaction) => {
-        // Блокируем исполнителя, чтобы два начисления
+    const performAccrual = async (transaction) => {        // Блокируем исполнителя, чтобы два начисления
         // не перезаписали друг другу сумму задолженности.
         const executor = await User.findByPk(
             normalizedExecutorId,
@@ -124,7 +124,11 @@ async function accrueOrderCommissionOnce({
             debtKopecks: newDebt,
             chargeAttemptId,
         };
-    });
+    };
+
+    return existingTransaction
+        ? performAccrual(existingTransaction)
+        : sequelize.transaction(performAccrual);
 }
 
 module.exports = {

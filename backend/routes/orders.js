@@ -30,6 +30,9 @@ const {
     accrueOrderCommissionOnce,
 } = require("../services/orderCommissionService");
 const {
+    assignCashRegularOrder,
+} = require("../services/regularOrderAssignmentService");
+const {
     startCommissionAutoCharge,
 } = require("../services/commissionAutoChargeService");
 const uploadExecutorBefore = buildOrderPhotoUploader("executor_before");
@@ -2559,72 +2562,54 @@ module.exports = (io) => {
                 }
             }
 
-            if (isReservationActivation) {
-                const activatedAt = new Date();
+            let cashAssignment = null;
 
-                const [updatedCount] = await Order.update(
-                    {
-                        status: "active",
-                        reservationReadyAt: activatedAt,
-                    },
-                    {
-                        where: {
-                            id: order.id,
-                            status: "reserved",
-                            executorId: normalizedExecutorId,
-                        },
-                    }
+            if (order.paymentType === "cash") {
+                // Для наличных заказов используем одну
+                // транзакцию: назначение + комиссия.
+                cashAssignment = await assignCashRegularOrder({
+                    orderId: order.id,
+                    actorUserId: Number(req.user.id),
+                    executorId: normalizedExecutorId,
+                    activation: isReservationActivation,
+                });
+
+                // Обновляем экземпляр Sequelize, поскольку
+                // запись изменена внутри отдельного сервиса.
+                await order.reload();
+            } else {
+                // Существующее поведение остальных типов
+                // оплаты сохраняем. Гарантийную систему
+                // в этой задаче не переделываем.
+
+                order.executorId = normalizedExecutorId;
+                order.proposedSum = Math.round(approvedSum);
+
+                order.finalPriceKopecks = Math.max(
+                    0,
+                    Math.round(approvedSum * 100)
                 );
 
-                if (updatedCount !== 1) {
-                    return res.status(409).json({
-                        message:
-                            "Бронирование уже активировано или отменено",
-                    });
+                if (order.paymentType === "guarantee") {
+                    order.status = "active";
+
+                    if (
+                        !order.dealStatus ||
+                        order.dealStatus === "none"
+                    ) {
+                        order.dealStatus = "waiting_payment";
+                    }
+                } else {
+                    order.status = "active";
+                    order.dealStatus = "none";
                 }
 
-                order.reservationReadyAt = activatedAt;
-            }
-
-            // Назначаем исполнителя
-            order.executorId = normalizedExecutorId;
-            order.proposedSum = Math.round(approvedSum);
-            order.finalPriceKopecks = Math.max(0, Math.round(approvedSum * 100));
-
-            // Статус / сделка
-            if (order.paymentType === "cash") {
-                order.status = "active";
-                order.dealStatus = "none";
-            } else if (order.paymentType === "guarantee") {
-                // если у тебя дальше отдельная логика холда - подстрой под неё
-                order.status = "active";
-                if (!order.dealStatus || order.dealStatus === "none") {
-                    order.dealStatus = "waiting_payment";
-                }
-            } else if (order.paymentType === "installment" || order.paymentType === "installments") {
-                order.status = "active";
-                order.dealStatus = "none";
-            } else {
-                order.status = "active";
-            }
-
-// Очищаем список запросов после назначения исполнителя.
-            order.requestedExecutors = JSON.stringify([]);
-            order.requests = JSON.stringify([]);
-
-            if (isReservationActivation) {
-                // Для брони переход reserved -> active
-                // уже был защищён условным обновлением выше.
-                await order.save();
-            } else {
-                // Обычное одобрение:
-                // назначаем исполнителя только если заказ
-                // до сих пор свободен и ожидает назначения.
                 const [updatedCount] = await Order.update(
                     {
                         executorId: normalizedExecutorId,
                         proposedSum: order.proposedSum,
-                        finalPriceKopecks: order.finalPriceKopecks,
+                        finalPriceKopecks:
+                        order.finalPriceKopecks,
                         status: order.status,
                         dealStatus: order.dealStatus,
                         requestedExecutors: JSON.stringify([]),
@@ -2634,7 +2619,10 @@ module.exports = (io) => {
                         where: {
                             id: order.id,
                             status: {
-                                [Op.in]: ["pending", "pending_payment"],
+                                [Op.in]: [
+                                    "pending",
+                                    "pending_payment",
+                                ],
                             },
                             executorId: null,
                         },
@@ -2644,23 +2632,28 @@ module.exports = (io) => {
                 if (updatedCount !== 1) {
                     return res.status(409).json({
                         message:
-                            "Этот заказ уже назначен другому исполнителю. Обновите страницу.",
+                            "Заказ уже назначен другому исполнителю. " +
+                            "Обновите страницу.",
                     });
                 }
             }
 
-            const cleanedOrderIds = await removeExecutorFromOtherPendingOrders(
-                Order,
-                normalizedExecutorId,
-                order.id
-            );
+            let cleanedOrderIds = [];
 
-            if (req.logAction) {
-                await req.logAction({
+            try {
+                cleanedOrderIds =
+                    await removeExecutorFromOtherPendingOrders(
+                        Order,
+                        normalizedExecutorId,
+                        order.id
+                    );
+
+                await req.logAction?.({
                     req,
                     actorUserId: req.user.id,
                     actorRole: "user",
-                    actionType: "order_executor_requests_cleaned",
+                    actionType:
+                        "order_executor_requests_cleaned",
                     entityType: "order",
                     entityId: order.id,
                     orderId: order.id,
@@ -2669,8 +2662,16 @@ module.exports = (io) => {
                         removedFromOrderIds: cleanedOrderIds,
                     },
                 });
+            } catch (cleanupError) {
+                console.error(
+                    "Не удалось очистить старые отклики:",
+                    {
+                        orderId: order.id,
+                        executorId: normalizedExecutorId,
+                        error: cleanupError,
+                    }
+                );
             }
-
             const executor = await User.findByPk(normalizedExecutorId);
 
             if (!executor) {
@@ -2694,10 +2695,15 @@ module.exports = (io) => {
                 });
             }
 
-            const isPremium =
-                executor.subscription_type === "premium" &&
-                executor.subscription_expires_at &&
-                new Date(executor.subscription_expires_at) > new Date();
+            const isPremium = cashAssignment
+                ? cashAssignment.isPremium
+                : Boolean(
+                    executor.subscription_type === "premium" &&
+                    executor.subscription_expires_at &&
+                    new Date(
+                        executor.subscription_expires_at
+                    ) > new Date()
+                );
 
             const isCash = order.paymentType === "cash";
             const isRecommended = Boolean(order.is_recommended);
@@ -2708,8 +2714,9 @@ module.exports = (io) => {
                 .trim()
                 .toLowerCase();
 
-            const isPensionerCreator =
-                creatorStatus === "pensioner";
+            const isPensionerCreator = cashAssignment
+                ? cashAssignment.isPensionerCreator
+                : creatorStatus === "pensioner";
 
 // Базовая комиссия:
 // обычный заказ — 200 ₽
@@ -2724,10 +2731,13 @@ module.exports = (io) => {
 
 // Premium или безналичная сделка через гарантию —
 // комиссию в задолженность не начисляем.
-            const commissionKopecks =
-                !isPremium && isCash
-                    ? Math.round(feeRub * 100)
-                    : 0;
+            const commissionKopecks = cashAssignment
+                ? cashAssignment.commissionKopecks
+                : (
+                    !isPremium && isCash
+                        ? Math.round(feeRub * 100)
+                        : 0
+                );
 
             let finalDebtKopecks = Number(executor.debt || 0);
 
@@ -2741,11 +2751,13 @@ module.exports = (io) => {
             };
 
 // Начисляем комиссию не больше одного раза на заказ.
-            const commissionAccrual = await accrueOrderCommissionOnce({
-                orderId: order.id,
-                executorId: normalizedExecutorId,
-                amountKopecks: commissionKopecks,
-            });
+            const commissionAccrual = cashAssignment
+                ? cashAssignment.commissionAccrual
+                : await accrueOrderCommissionOnce({
+                    orderId: order.id,
+                    executorId: normalizedExecutorId,
+                    amountKopecks: commissionKopecks,
+                });
 
             finalDebtKopecks = commissionAccrual.debtKopecks;
 
@@ -2777,7 +2789,9 @@ module.exports = (io) => {
                 );
             }
 
-            await req.logAction({
+            try {
+
+                await req.logAction({
                 req,
                 actorUserId: req.user.id,
                 actorRole: "user",
@@ -2808,6 +2822,13 @@ module.exports = (io) => {
                     autoPaymentId: commissionPayment.paymentId,
                 },
             });
+            } catch (logError) {
+                console.error(
+                    "Не удалось записать назначение в ActionLog:",
+                    order.id,
+                    logError
+                );
+            }
 
             // ✅ грузим полный заказ с ассоциациями для PDF
             const fullOrder = await Order.findByPk(order.id, {
@@ -2975,7 +2996,9 @@ module.exports = (io) => {
                     "Ваш запрос одобрен! У вас активен Premium — комиссия не требуется.";
             }
 
-            await notifyUser({
+            try {
+
+                await notifyUser({
                 userId: fullOrder.executorId,
                 type: "order_request_approved",
                 title: "Вас выбрали исполнителем",
@@ -3017,6 +3040,13 @@ module.exports = (io) => {
                     autoPaymentStatus: commissionPayment.autoPaymentStatus,
                 },
             });
+            } catch (notificationError) {
+                console.error(
+                    "Не удалось отправить уведомление об одобрении:",
+                    order.id,
+                    notificationError
+                );
+            }
 
             io.to(`user_${fullOrder.creatorId}`).emit("orderApproved", {
                 orderId: fullOrder.id,
