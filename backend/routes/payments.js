@@ -2,6 +2,9 @@ const { v4: uuidv4 } = require("uuid");
 const express = require("express");
 const router = express.Router();
 const { Order, User } = require('../models'); // sequelize models
+const {
+    applyConfirmedPayment,
+} = require("../services/paymentReceiptService");
 const db = require("../models");
 const authenticateToken = require('../middlewares/userAuth'); // если нужен
 const { randomUUID } = require('crypto');
@@ -174,30 +177,18 @@ router.post('/premium/create', authenticateToken, async (req, res) => {
              * активируем Premium сразу, не дожидаясь webhook.
              */
             if (payment.status === "succeeded") {
-                if (user.premium_last_payment_id !== payment.id) {
-                    const now = new Date();
+                const result = await applyConfirmedPayment({
+                    provider: "yookassa",
+                    paymentId: payment.id,
+                    userId,
+                    purpose: "premium",
+                    duration,
+                    amountKopecks: Math.round(
+                        Number(amountValue) * 100
+                    ),
+                });
 
-                    const currentExp = user.subscription_expires_at
-                        ? new Date(user.subscription_expires_at)
-                        : null;
-
-                    const base =
-                        user.subscription_type === "premium" &&
-                        currentExp &&
-                        currentExp > now
-                            ? currentExp
-                            : now;
-
-                    const newExp = new Date(
-                        base.getTime() + addDays * 24 * 60 * 60 * 1000
-                    );
-
-                    await user.update({
-                        subscription_type: "premium",
-                        subscription_expires_at: newExp,
-                        premium_last_payment_id: payment.id,
-                    });
-
+                if (!result.duplicate) {
                     await req.logAction?.({
                         req,
                         actorUserId: userId,
@@ -210,8 +201,6 @@ router.post('/premium/create', authenticateToken, async (req, res) => {
                         meta: {
                             provider: "yookassa",
                             duration,
-                            addDays,
-                            subscriptionExpiresAt: newExp,
                             activatedBy: "saved_card_payment",
                         },
                     });
@@ -1271,10 +1260,40 @@ router.post("/yookassa/webhook", async (req, res) => {
             return res.sendStatus(200);
         }
 
-        const payment = event.object;
-        const meta = payment?.metadata || {};
-        const paymentStatus = payment?.status;
+        let payment = event.object;
+        let meta = payment?.metadata || {};
+        let paymentStatus = payment?.status;
         const eventName = event.event;
+
+// Для операций, изменяющих баланс или Premium,
+// проверяем фактический статус через ЮKassa.
+        if (
+            eventName === "payment.succeeded" &&
+            ["premium", "debt"].includes(meta.type)
+        ) {
+            if (!payment?.id) {
+                throw new Error("Отсутствует paymentId");
+            }
+
+            const verified = await yooKassa.getPayment(
+                payment.id
+            );
+
+            if (
+                String(verified?.id) !== String(payment.id) ||
+                verified?.status !== "succeeded" ||
+                verified?.amount?.currency !== "RUB" ||
+                verified?.metadata?.type !== meta.type
+            ) {
+                throw new Error(
+                    "Не удалось подтвердить платёж ЮKassa"
+                );
+            }
+
+            payment = verified;
+            meta = verified.metadata || {};
+            paymentStatus = verified.status;
+        }
 
         /*
  * Передаём подтверждённую
@@ -1383,74 +1402,35 @@ router.post("/yookassa/webhook", async (req, res) => {
                 return res.sendStatus(200);
             }
 
-            const userId = Number(meta.userId);
-            const duration = meta.duration;
-
-            const addDays =
-                duration === "7d"
-                    ? 7
-                    : duration === "30d"
-                        ? 30
-                        : 0;
-
-            if (!userId || !addDays) {
-                return res.sendStatus(200);
-            }
-
-            const user = await User.findByPk(userId);
-
-            if (!user) {
-                return res.sendStatus(200);
-            }
-
-            /**
-             * ✅ Защита от двойной активации:
-             * если этот payment.id уже применяли — ничего не делаем.
-             */
-            if (user.premium_last_payment_id === payment.id) {
-                return res.sendStatus(200);
-            }
-
-            const now = new Date();
-
-            const currentExp = user.subscription_expires_at
-                ? new Date(user.subscription_expires_at)
-                : null;
-
-            const base =
-                user.subscription_type === "premium" &&
-                currentExp &&
-                currentExp > now
-                    ? currentExp
-                    : now;
-
-            const newExp = new Date(
-                base.getTime() + addDays * 24 * 60 * 60 * 1000
-            );
-
-            await user.update({
-                subscription_type: "premium",
-                subscription_expires_at: newExp,
-                premium_last_payment_id: payment.id,
-            });
-
-            await req.logAction?.({
-                req,
-                actorUserId: userId,
-                actorRole: "webhook",
-                actionType: "premium_activated",
-                entityType: "user",
-                entityId: userId,
+            const result = await applyConfirmedPayment({
+                provider: "yookassa",
                 paymentId: payment.id,
-                severity: "info",
-                meta: {
-                    provider: "yookassa",
-                    duration,
-                    addDays,
-                    subscriptionExpiresAt: newExp,
-                    activatedBy: "webhook",
-                },
+                userId: meta.userId,
+                purpose: "premium",
+                duration: meta.duration,
+                amountKopecks: Math.round(
+                    Number(payment.amount.value) * 100
+                ),
             });
+
+            if (!result.duplicate) {
+                await req.logAction?.({
+                    req,
+                    actorUserId: Number(meta.userId),
+                    actorRole: "webhook",
+                    actionType: "premium_activated",
+                    entityType: "user",
+                    entityId: Number(meta.userId),
+                    paymentId: payment.id,
+                    severity: "info",
+                    meta: {
+                        provider: "yookassa",
+                        duration: meta.duration,
+                        subscriptionExpiresAt:
+                        result.subscriptionExpiresAt,
+                    },
+                });
+            }
 
             return res.sendStatus(200);
         }
@@ -1517,40 +1497,34 @@ router.post("/yookassa/webhook", async (req, res) => {
                 return res.sendStatus(200);
             }
 
-            const paidKopecks = Math.round(
-                parseFloat(payment.amount.value) * 100
-            );
-
-            const currentDebt = Number(user.debt || 0);
-
-            if (currentDebt <= 0) {
-                return res.sendStatus(200);
-            }
-
-            const newDebt = Math.max(0, currentDebt - paidKopecks);
-
-            await user.update({
-                debt: newDebt,
-                commissionDebtOrderId:
-                    newDebt === 0 ? null : user.commissionDebtOrderId,
-            });
-
-            await req.logAction?.({
-                req,
-                actorUserId: userId,
-                actorRole: "webhook",
-                actionType: "debt_payment_succeeded",
-                entityType: "payment",
+            const result = await applyConfirmedPayment({
+                provider: "yookassa",
                 paymentId: payment.id,
-                orderId,
-                severity: "info",
-                meta: {
-                    provider: "yookassa",
-                    paidKopecks,
-                    oldDebt: currentDebt,
-                    newDebt,
-                },
+                userId,
+                purpose: "debt",
+                amountKopecks: Math.round(
+                    Number(payment.amount.value) * 100
+                ),
             });
+
+            if (!result.duplicate) {
+                await req.logAction?.({
+                    req,
+                    actorUserId: userId,
+                    actorRole: "webhook",
+                    actionType: "debt_payment_succeeded",
+                    entityType: "payment",
+                    paymentId: payment.id,
+                    orderId,
+                    severity: "info",
+                    meta: {
+                        provider: "yookassa",
+                        appliedKopecks:
+                        result.appliedKopecks,
+                        newDebt: result.debtKopecks,
+                    },
+                });
+            }
 
             return res.sendStatus(200);
         }
@@ -1775,8 +1749,14 @@ router.post("/yookassa/webhook", async (req, res) => {
                 .join("\n"),
         });
 
-        return res.sendStatus(200);
-    }
+        const paymentType =
+            req.body?.object?.metadata?.type;
+
+        if (["premium", "debt"].includes(paymentType)) {
+            return res.sendStatus(500);
+        }
+
+        return res.sendStatus(200);    }
 });
 
 router.get("/card/bind/status", authenticateToken, async (req, res) => {

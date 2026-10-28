@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const { Order, User } = require("../models");
+const {
+    applyConfirmedPayment,
+} = require("../services/paymentReceiptService");
 const db = require("../models");
 const authenticateToken = require("../middlewares/userAuth");
 const { requestTBank, verifyNotificationToken } = require("../config/tbankClient");
@@ -511,26 +514,15 @@ router.post("/webhook", async (req, res) => {
          * debt_1_1777460981363
          * promo_123_1777460981363
          */
-        const data = body.DATA || body.Data || {};
+// Вложенный DATA не участвует в расчёте
+// подписи Т-Банка. Для определения пользователя
+// используем подписанный OrderId.
         const parsed = parseTBankOrderId(body.OrderId);
 
-        const type = data.type || parsed.type;
-
-        const parsedId = parsed.id;
-
-        const userId = Number(
-            data.userId ||
-            data.user_id ||
-            parsedId
-        );
-
-        const orderId = Number(
-            data.orderId ||
-            data.order_id ||
-            parsedId
-        );
-
-        const duration = data.duration || parsed.extra;
+        const type = parsed.type;
+        const userId = Number(parsed.id);
+        const orderId = Number(parsed.id);
+        const duration = parsed.extra;
 
         await req.logAction?.({
             req,
@@ -728,111 +720,84 @@ router.post("/webhook", async (req, res) => {
             });
         }
 
-        // ====== 1) Premium ======
-        if (type === "premium") {
-            const addDays =
-                duration === "7d"
-                    ? 7
-                    : duration === "30d"
-                        ? 30
-                        : 0;
-
-            if (!userId || !addDays) {
-                console.warn("⚠️ TBank premium webhook: не хватает userId или duration", {
-                    body,
-                    userId,
-                    duration,
-                });
-
-                return res.status(200).send("OK");
+// ====== Premium / Debt ======
+        if (type === "premium" || type === "debt") {
+            if (
+                !Number.isSafeInteger(userId) ||
+                userId <= 0 ||
+                !paymentId ||
+                !Number.isSafeInteger(amountKopecks) ||
+                amountKopecks <= 0
+            ) {
+                throw new Error(
+                    "Некорректные данные платежа Т-Банка"
+                );
             }
 
-            const user = await User.findByPk(userId);
-            if (!user) return res.status(200).send("OK");
-
-            const now = new Date();
-
-            const currentExp = user.subscription_expires_at
-                ? new Date(user.subscription_expires_at)
-                : null;
-
-            const base =
-                user.subscription_type === "premium" &&
-                currentExp &&
-                currentExp > now
-                    ? currentExp
-                    : now;
-
-            const newExp = new Date(
-                base.getTime() + addDays * 24 * 60 * 60 * 1000
+            // Подпись webhook уже проверена выше.
+            // Дополнительно сверяем платёж с API банка.
+            const verified = await requestTBank(
+                "GetState",
+                {
+                    PaymentId: paymentId,
+                }
             );
 
-            await user.update({
-                subscription_type: "premium",
-                subscription_expires_at: newExp,
-            });
+            if (
+                String(verified.PaymentId) !== paymentId ||
+                String(verified.OrderId) !== String(body.OrderId) ||
+                verified.Status !== "CONFIRMED" ||
+                Number(verified.Amount) !== amountKopecks ||
+                String(verified.TerminalKey) !==
+                String(process.env.TBANK_TERMINAL_KEY)
+            ) {
+                throw new Error(
+                    "Не удалось подтвердить платёж Т-Банка"
+                );
+            }
 
-            await req.logAction?.({
-                req,
-                actorUserId: userId,
-                actorRole: "webhook",
-                actionType: "premium_activated",
-                entityType: "user",
+            const result = await applyConfirmedPayment({
+                provider: "tbank",
                 paymentId,
-                severity: "info",
-                meta: {
-                    provider: "tbank",
-                    duration,
-                    newExpiresAt: newExp,
-                },
+                userId,
+                purpose: type,
+                duration:
+                    type === "premium" ? duration : null,
+                amountKopecks,
             });
 
-            return res.status(200).send("OK");
-        }
-
-        // ====== 2) Debt ======
-        if (type === "debt") {
-            if (!userId) {
-                console.warn("⚠️ TBank debt webhook: не хватает userId", {
-                    body,
-                    userId,
+            if (!result.duplicate) {
+                await req.logAction?.({
+                    req,
+                    actorUserId: userId,
+                    actorRole: "webhook",
+                    actionType:
+                        type === "premium"
+                            ? "premium_activated"
+                            : "debt_paid",
+                    entityType:
+                        type === "premium"
+                            ? "user"
+                            : "payment",
+                    entityId:
+                        type === "premium"
+                            ? userId
+                            : null,
+                    paymentId,
+                    severity: "info",
+                    meta: {
+                        provider: "tbank",
+                        duration:
+                            type === "premium"
+                                ? duration
+                                : null,
+                        appliedKopecks:
+                        result.appliedKopecks,
+                        subscriptionExpiresAt:
+                        result.subscriptionExpiresAt,
+                    },
                 });
-
-                return res.status(200).send("OK");
             }
-
-            const user = await User.findByPk(userId);
-            if (!user) return res.status(200).send("OK");
-
-            const currentDebt = Number(user.debt || 0);
-
-            if (currentDebt <= 0) {
-                return res.status(200).send("OK");
-            }
-
-            const newDebt = Math.max(0, currentDebt - amountKopecks);
-
-            await user.update({
-                debt: newDebt,
-                commissionDebtOrderId:
-                    newDebt === 0 ? null : user.commissionDebtOrderId,
-            });
-
-            await req.logAction?.({
-                req,
-                actorUserId: userId,
-                actorRole: "webhook",
-                actionType: "debt_paid",
-                entityType: "user",
-                paymentId,
-                severity: "info",
-                meta: {
-                    provider: "tbank",
-                    amount: kopecksToRubString(amountKopecks),
-                    oldDebt: currentDebt,
-                    newDebt,
-                },
-            });
 
             return res.status(200).send("OK");
         }
@@ -953,8 +918,18 @@ router.post("/webhook", async (req, res) => {
                 .join("\n"),
         });
 
-        return res.status(200).send("OK");
-    }
+        const paymentType = parseTBankOrderId(
+            req.body?.OrderId
+        ).type;
+
+        if (
+            paymentType === "premium" ||
+            paymentType === "debt"
+        ) {
+            return res.status(500).send("ERROR");
+        }
+
+        return res.status(200).send("OK");    }
 });
 
 module.exports = router;
