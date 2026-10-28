@@ -4,6 +4,10 @@ const {
     User,
 } = require("../models");
 
+const {
+    prepareCommissionChargeAttempt,
+} = require("./commissionAutoChargeService");
+
 async function accrueOrderCommissionOnce({
                                              orderId,
                                              executorId,
@@ -103,10 +107,22 @@ async function accrueOrderCommissionOnce({
             { transaction }
         );
 
+        const chargeAttemptId =
+            normalizedAmount > 0
+                ? await prepareCommissionChargeAttempt({
+                    transaction,
+                    user: executor,
+                    sourceType: "regular",
+                    sourceId: order.id,
+                    amountKopecks: normalizedAmount,
+                })
+                : null;
+
         return {
             newlyAccrued: true,
             amountKopecks: normalizedAmount,
             debtKopecks: newDebt,
+            chargeAttemptId,
         };
     });
 }

@@ -29,6 +29,9 @@ const yooKassa = require('../config/yookassaClient');
 const {
     accrueOrderCommissionOnce,
 } = require("../services/orderCommissionService");
+const {
+    startCommissionAutoCharge,
+} = require("../services/commissionAutoChargeService");
 const uploadExecutorBefore = buildOrderPhotoUploader("executor_before");
 const uploadExecutorAfter = buildOrderPhotoUploader("executor_after");
 const uploadCustomerBefore = buildOrderPhotoUploader("customer_before");
@@ -538,134 +541,6 @@ const notifyAdminsAboutNewOrder = async ({order, category, subcategory, creatorI
         );
     }
 };
-
-async function tryPayCommissionFromSavedCard({ req, executor, order, amountKopecks }) {
-    if (
-        executor.autoCommissionProvider !== "yookassa" ||
-        !executor.yookassa_payment_method_id
-    ) {
-        return {
-            autoPaymentTried: false,
-            autoPaymentPaid: false,
-            autoPaymentProcessing: false,
-            autoPaymentStatus: null,
-            paymentId: null,
-            message: "Карта не привязана.",
-        };
-    }
-
-    const amountValue = (Number(amountKopecks || 0) / 100).toFixed(2);
-
-    try {
-        const payment = await yooKassa.createPayment(
-            {
-                amount: {
-                    value: amountValue,
-                    currency: "RUB",
-                },
-                capture: true,
-                payment_method_id: executor.yookassa_payment_method_id,
-                description: `Комиссия CargoCamp за заказ #${order.id}`,
-                metadata: {
-                    type: "debt",
-                    userId: String(executor.id),
-                    orderId: String(order.id),
-                    expectedKopecks: String(amountKopecks),
-                    source: "order_approve_auto",
-                },
-                receipt: {
-                    customer: {
-                        phone: cleanPhoneForPayment(executor.phone),
-                    },
-                    items: [
-                        {
-                            description: `Комиссия CargoCamp за заказ #${order.id}`,
-                            quantity: 1,
-                            amount: {
-                                value: amountValue,
-                                currency: "RUB",
-                            },
-                            vat_code: 1,
-                            payment_mode: "full_payment",
-                            payment_subject: "service",
-                        },
-                    ],
-                    tax_system_code: 2,
-                },
-            },
-            uuidv4()
-        );
-
-        await req.logAction?.({
-            req,
-            actorUserId: executor.id,
-            actorRole: "user",
-            actionType: "commission_auto_payment_create",
-            entityType: "payment",
-            paymentId: payment.id,
-            orderId: order.id,
-            severity: payment.status === "canceled" ? "warn" : "info",
-            meta: {
-                provider: "yookassa",
-                type: "debt",
-                source: "order_approve_auto",
-                amount: amountValue,
-                status: payment.status,
-            },
-        });
-
-        if (payment.status === "canceled") {
-            return {
-                autoPaymentTried: true,
-                autoPaymentPaid: false,
-                autoPaymentProcessing: false,
-                autoPaymentStatus: payment.status,
-                paymentId: payment.id,
-                message:
-                    "Автоматическое списание не прошло. Комиссия осталась в задолженности.",
-            };
-        }
-
-        return {
-            autoPaymentTried: true,
-            autoPaymentPaid: payment.status === "succeeded",
-            autoPaymentProcessing: payment.status !== "succeeded",
-            autoPaymentStatus: payment.status,
-            paymentId: payment.id,
-            message:
-                payment.status === "succeeded"
-                    ? "Комиссия списана с привязанной карты."
-                    : "Пробуем списать комиссию с привязанной карты.",
-        };
-    } catch (e) {
-        console.error("commission auto payment error:", e);
-
-        await req.logAction?.({
-            req,
-            actorUserId: executor.id,
-            actorRole: "user",
-            actionType: "commission_auto_payment_error",
-            entityType: "payment",
-            orderId: order.id,
-            severity: "warn",
-            meta: {
-                provider: "yookassa",
-                amount: amountValue,
-                error: e?.message,
-            },
-        });
-
-        return {
-            autoPaymentTried: true,
-            autoPaymentPaid: false,
-            autoPaymentProcessing: false,
-            autoPaymentStatus: "error",
-            paymentId: null,
-            message:
-                "Автоматическое списание не удалось. Комиссия осталась в задолженности.",
-        };
-    }
-}
 
 module.exports = (io) => {
 
@@ -2881,14 +2756,13 @@ module.exports = (io) => {
 // ещё один запрос на списание.
             if (
                 commissionKopecks > 0 &&
-                commissionAccrual.newlyAccrued
+                commissionAccrual.newlyAccrued &&
+                commissionAccrual.chargeAttemptId
             ) {
-                commissionPayment = await tryPayCommissionFromSavedCard({
-                    req,
-                    executor,
-                    order,
-                    amountKopecks: commissionKopecks,
-                });
+                commissionPayment =
+                    await startCommissionAutoCharge(
+                        commissionAccrual.chargeAttemptId
+                    );
             }
 
             if (!commissionAccrual.newlyAccrued) {

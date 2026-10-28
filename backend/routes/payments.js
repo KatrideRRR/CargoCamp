@@ -1510,6 +1510,8 @@ router.post("/yookassa/webhook", async (req, res) => {
                 amountKopecks: Math.round(
                     Number(payment.amount.value) * 100
                 ),
+                commissionAttemptId:
+                    meta.autoAttemptId || null,
             });
 
             if (!result.duplicate) {

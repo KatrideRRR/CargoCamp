@@ -537,6 +537,16 @@ router.post("/webhook", async (req, res) => {
         const orderId = Number(parsed.id);
         const duration = parsed.extra;
 
+        const autoChargeMatch =
+            /^auto([0-9]+)$/.exec(
+                String(parsed.extra || "")
+            );
+
+        const commissionAttemptId =
+            autoChargeMatch
+                ? Number(autoChargeMatch[1])
+                : null;
+
         await req.logAction?.({
             req,
             actorUserId: null,
@@ -777,6 +787,10 @@ router.post("/webhook", async (req, res) => {
                 duration:
                     type === "premium" ? duration : null,
                 amountKopecks,
+                commissionAttemptId:
+                    type === "debt"
+                        ? commissionAttemptId
+                        : null,
             });
 
             if (!result.duplicate) {

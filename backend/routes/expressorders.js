@@ -2,8 +2,10 @@ const express = require("express");
 const router = express.Router();
 const { Op } = require("sequelize");
 const authenticateToken = require("../middlewares/userAuth");
-const { v4: uuidv4 } = require("uuid");
-const yooKassa = require("../config/yookassaClient");
+const {
+    prepareCommissionChargeAttempt,
+    startCommissionAutoCharge,
+} = require("../services/commissionAutoChargeService");
 const { sequelize, ExpressOrder, ExpressSavedAddress, User, Order } = require("../models");
 const { notifyUser, notifyMany } = require("../services/notificationService");
 const { notifyNearbyExpressExecutors } = require("../services/expressPushService");
@@ -2109,160 +2111,38 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
                         0.10
                     );
 
-            let paidBySavedCard =
-                false;
-
-            let debtAdded =
-                false;
+            let paidBySavedCard = false;
+            let debtAdded = false;
 
             let commissionStatus =
-                premiumActive
-                    ? "waived"
-                    : "none";
+                premiumActive ? "waived" : "none";
+
+            let chargeAttemptId = null;
 
             if (feeKopecks > 0) {
-                if (
-                    executor.autoCommissionProvider === "yookassa" &&
-                    executor.yookassa_payment_method_id
-                ) {
-                    try {
-                        const amountValue =
-                            (
-                                feeKopecks /
-                                100
-                            ).toFixed(2);
+                // Сначала начисляем задолженность.
+                // Здесь НЕТ обращения к платёжному провайдеру.
+                executor.debt =
+                    Number(executor.debt || 0) +
+                    feeKopecks;
 
-                        const payment =
-                            await yooKassa
-                                .createPayment(
-                                    {
-                                        amount: {
-                                            value:
-                                            amountValue,
+                await executor.save({
+                    transaction: t,
+                });
 
-                                            currency:
-                                                "RUB",
-                                        },
+                debtAdded = true;
+                commissionStatus = "debt";
 
-                                        capture:
-                                            true,
-
-                                        payment_method_id:
-                                        executor
-                                            .yookassa_payment_method_id,
-
-                                        description:
-                                            `Комиссия за завершённый экспресс-заказ #${order.id}`,
-
-                                        metadata: {
-                                            type:
-                                                "debt",
-
-                                            userId:
-                                                String(
-                                                    executorId
-                                                ),
-
-                                            expectedKopecks:
-                                                String(
-                                                    feeKopecks
-                                                ),
-
-                                            expressOrderId:
-                                                String(
-                                                    order.id
-                                                ),
-
-                                            reason:
-                                                "express_complete_fee",
-                                        },
-
-                                        receipt: {
-                                            customer: {
-                                                phone:
-                                                    String(
-                                                        executor.phone ||
-                                                        ""
-                                                    ).replace(
-                                                        /[^\d+]/g,
-                                                        ""
-                                                    ),
-                                            },
-
-                                            items: [
-                                                {
-                                                    description:
-                                                        `Комиссия за экспресс-заказ #${order.id}`,
-
-                                                    quantity:
-                                                        1,
-
-                                                    amount: {
-                                                        value:
-                                                        amountValue,
-
-                                                        currency:
-                                                            "RUB",
-                                                    },
-
-                                                    vat_code:
-                                                        1,
-
-                                                    payment_mode:
-                                                        "full_payment",
-
-                                                    payment_subject:
-                                                        "service",
-                                                },
-                                            ],
-
-                                            tax_system_code:
-                                                2,
-                                        },
-                                    },
-
-                                    uuidv4()
-                                );
-
-                        paidBySavedCard =
-                            payment
-                                ?.status ===
-                            "succeeded";
-                    } catch (
-                        paymentError
-                        ) {
-                        console.error(
-                            "express complete fee autopay error:",
-                            paymentError
-                                ?.message ||
-                            paymentError
-                        );
-                    }
-                }
-
-                if (
-                    paidBySavedCard
-                ) {
-                    commissionStatus =
-                        "paid";
-                } else {
-                    executor.debt =
-                        Number(
-                            executor.debt ||
-                            0
-                        ) +
-                        feeKopecks;
-
-                    await executor.save({
+                // Попытку списания сохраняем в той же
+                // транзакции, что и завершение заказа.
+                chargeAttemptId =
+                    await prepareCommissionChargeAttempt({
                         transaction: t,
+                        user: executor,
+                        sourceType: "express",
+                        sourceId: order.id,
+                        amountKopecks: feeKopecks,
                     });
-
-                    debtAdded =
-                        true;
-
-                    commissionStatus =
-                        "debt";
-                }
             }
 
             const from =
@@ -2331,6 +2211,30 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
             });
 
             await t.commit();
+
+            // Обращаемся к банку только ПОСЛЕ COMMIT.
+// Если результат неизвестен, новый платёж
+// автоматически не создаём.
+            if (chargeAttemptId) {
+                try {
+                    const chargeResult =
+                        await startCommissionAutoCharge(
+                            chargeAttemptId
+                        );
+
+                    paidBySavedCard =
+                        chargeResult.autoPaymentPaid === true;
+
+                    if (paidBySavedCard) {
+                        commissionStatus = "paid";
+                    }
+                } catch (error) {
+                    console.error(
+                        "Express commission charge error:",
+                        error
+                    );
+                }
+            }
 
             const io =
                 req.app.locals.io;

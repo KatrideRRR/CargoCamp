@@ -4,6 +4,7 @@ const {
     sequelize,
     User,
     ActionLog,
+    ExpressOrder,
 } = require("../models");
 
 const PREMIUM_PRICES = {
@@ -18,6 +19,7 @@ async function applyConfirmedPayment({
                                          purpose,
                                          amountKopecks,
                                          duration = null,
+                                         commissionAttemptId = null,
                                      }) {
     const id = String(paymentId || "").trim();
     const uid = Number(userId);
@@ -58,6 +60,94 @@ async function applyConfirmedPayment({
             throw new Error("Пользователь не найден");
         }
 
+        async function markCommissionAttemptPaid() {
+            if (
+                purpose !== "debt" ||
+                !commissionAttemptId
+            ) {
+                return;
+            }
+
+            const attemptId = Number(
+                commissionAttemptId
+            );
+
+            if (
+                !Number.isSafeInteger(attemptId) ||
+                attemptId <= 0
+            ) {
+                throw new Error(
+                    "Некорректный ID попытки списания"
+                );
+            }
+
+            const attempts = await sequelize.query(
+                `
+        SELECT *
+        FROM commission_charge_attempts
+        WHERE id = :attemptId
+        FOR UPDATE
+        `,
+                {
+                    replacements: { attemptId },
+                    transaction,
+                    type: QueryTypes.SELECT,
+                }
+            );
+
+            const attempt = attempts[0];
+
+            if (
+                !attempt ||
+                attempt.provider !== provider ||
+                Number(attempt.user_id) !== uid ||
+                Number(attempt.amount_kopecks) !== amount ||
+                (
+                    attempt.provider_payment_id &&
+                    String(attempt.provider_payment_id) !== id
+                )
+            ) {
+                throw new Error(
+                    "Платёж не соответствует попытке списания"
+                );
+            }
+
+            await sequelize.query(
+                `
+        UPDATE commission_charge_attempts
+        SET
+            status = 'succeeded',
+            provider_payment_id = :paymentId
+        WHERE id = :attemptId
+        `,
+                {
+                    replacements: {
+                        attemptId,
+                        paymentId: id,
+                    },
+                    transaction,
+                }
+            );
+
+            if (attempt.source_type === "express") {
+                await ExpressOrder.update(
+                    {
+                        commissionStatus: "paid",
+                    },
+                    {
+                        where: {
+                            id: attempt.source_id,
+                            executorId: uid,
+                            status: "completed",
+                            commissionStatus: "debt",
+                            commissionKopecks: amount,
+                        },
+                        transaction,
+                    }
+                );
+            }
+        }
+
         const receipts = await sequelize.query(
             `
             SELECT user_id, purpose, amount_kopecks
@@ -88,6 +178,8 @@ async function applyConfirmedPayment({
                     "Конфликт данных ранее обработанного платежа"
                 );
             }
+
+            await markCommissionAttemptPaid();
 
             return { duplicate: true };
         }
@@ -221,6 +313,8 @@ async function applyConfirmedPayment({
                 transaction,
             }
         );
+
+        await markCommissionAttemptPaid();
 
         return {
             duplicate: previouslyProcessed,
