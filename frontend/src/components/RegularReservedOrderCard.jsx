@@ -4,6 +4,7 @@ export default function RegularReservedOrderCard({
                                                      order,
                                                      isBusy,
                                                      onOpenChat,
+                                                     onCancel,
                                                  }) {
     const availableAt = order.reservationAvailableAt
         ? new Date(order.reservationAvailableAt)
@@ -69,6 +70,18 @@ export default function RegularReservedOrderCard({
                         onClick={() => onOpenChat(order.id)}
                     >
                         Открыть чат
+                    </button>
+
+                    <button
+                        type="button"
+                        className="cc-reserved-chat"
+                        onClick={onCancel}
+                        style={{
+                            marginLeft: 8,
+                            background: "#64748b",
+                        }}
+                    >
+                        Отменить бронь
                     </button>
                 </div>
             </details>

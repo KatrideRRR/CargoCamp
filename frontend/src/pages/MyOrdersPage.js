@@ -366,6 +366,55 @@ const MyOrdersPage = () => {
         }
     };
 
+    const reserveExecutor = async (order, executor) => {
+        if (approving) return;
+
+        const availableAt = new Date(executor.availableAt);
+
+        if (!Number.isFinite(availableAt.getTime())) {
+            alert("Некорректное время освобождения исполнителя");
+            return;
+        }
+
+        const timeText = availableAt.toLocaleString("ru-RU", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+
+        const confirmed = window.confirm(
+            `Исполнитель заканчивает предыдущий заказ ` +
+            `и планирует приступить ${timeText}.\n\n` +
+            `Вы согласны подождать и закрепить заказ за ним?`
+        );
+
+        if (!confirmed) return;
+
+        setApproving(true);
+
+        try {
+            await axiosInstance.post(
+                `/orders/${order.id}/reserve`,
+                {
+                    executorId: executor.id,
+                }
+            );
+
+            navigate(
+                `/active-orders?view=created&orderId=${order.id}&orderType=regular&reason=reserved`
+            );
+        } catch (error) {
+            alert(
+                error.response?.data?.message ||
+                "Не удалось забронировать заказ"
+            );
+        } finally {
+            setApproving(false);
+        }
+    };
+
     const hideMyOrder = async (order) => {
         if (!order?.id) return;
 
@@ -975,6 +1024,24 @@ const MyOrdersPage = () => {
                                                                                 >
                                                                                     {approving ? "..." : "Одобрить"}
                                                                                 </button>
+
+                                                                                {order.paymentType === "cash" &&
+                                                                                    executor.sourceOrderId &&
+                                                                                    executor.availableAt && (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            disabled={approving}
+                                                                                            className={styles.ghostBtn}
+                                                                                            onClick={() =>
+                                                                                                reserveExecutor(order, executor)
+                                                                                            }
+                                                                                        >
+                                                                                            {approving
+                                                                                                ? "..."
+                                                                                                : "Одобрить с ожиданием"}
+                                                                                        </button>
+                                                                                    )}
+
                                                                             </div>
                                                                         </div>
                                                                     );

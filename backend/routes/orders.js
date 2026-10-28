@@ -4,6 +4,10 @@ const router = express.Router();
 const NodeGeocoder = require('node-geocoder');
 const db = require('../models');
 const { notifyUser, notifyMany } = require("../services/notificationService");
+const {
+    reserveRegularOrder,
+    cancelRegularReservation,
+} = require("../services/regularReservationService");
 const authenticateToken = require('../middlewares/userAuth');
 const { Op } = require('sequelize');
 const fs = require("fs");
@@ -2401,6 +2405,103 @@ module.exports = (io) => {
         }
     });
 
+    router.post("/:id/reserve", authenticateToken, async (req, res) => {
+        try {
+            const reservation = await reserveRegularOrder({
+                orderId: Number(req.params.id),
+                creatorId: Number(req.user.id),
+                executorId: Number(req.body.executorId),
+            });
+
+            io.emit("orderUpdated");
+            io.emit("activeOrdersUpdated");
+
+            try {
+                await notifyUser({
+                    userId: reservation.executorId,
+                    type: "order_request_approved",
+                    title: "Ваш следующий заказ забронирован",
+                    body:
+                        `Заказчик согласился подождать. ` +
+                        `Заказ №${reservation.id} ожидает вашего освобождения.`,
+                    orderId: reservation.id,
+                    orderType: "regular",
+                });
+            } catch (notificationError) {
+                console.error(
+                    "Не удалось отправить уведомление о брони:",
+                    notificationError
+                );
+            }
+
+            return res.json({
+                success: true,
+                reservation,
+            });
+        } catch (error) {
+            console.error("Ошибка бронирования:", error);
+
+            return res.status(error.httpStatus || 500).json({
+                message:
+                    error.httpStatus
+                        ? error.message
+                        : "Не удалось забронировать заказ",
+            });
+        }
+    });
+
+    router.post(
+        "/:id/cancel-reservation",
+        authenticateToken,
+        async (req, res) => {
+            try {
+                const result = await cancelRegularReservation({
+                    orderId: Number(req.params.id),
+                    userId: Number(req.user.id),
+                });
+
+                io.emit("orderUpdated");
+                io.emit("activeOrdersUpdated");
+
+                try {
+                    const otherUserId =
+                        Number(req.user.id) ===
+                        Number(result.creatorId)
+                            ? result.executorId
+                            : result.creatorId;
+
+                    await notifyUser({
+                        userId: otherUserId,
+                        type: "order_request",
+                        title: "Бронирование отменено",
+                        body: `Предварительное бронирование заказа №${result.id} отменено.`,
+                        orderId: result.id,
+                        orderType: "regular",
+                    });
+                } catch (notificationError) {
+                    console.error(
+                        "Не удалось отправить уведомление об отмене:",
+                        notificationError
+                    );
+                }
+
+                return res.json({
+                    success: true,
+                    result,
+                });
+            } catch (error) {
+                console.error("Ошибка отмены бронирования:", error);
+
+                return res.status(error.httpStatus || 500).json({
+                    message:
+                        error.httpStatus
+                            ? error.message
+                            : "Не удалось отменить бронирование",
+                });
+            }
+        }
+    );
+
     router.post("/:id/approve", authenticateToken, async (req, res) => {
         const { id } = req.params;
         const { executorId } = req.body;
@@ -2415,6 +2516,15 @@ module.exports = (io) => {
             const order = await Order.findByPk(id);
             if (!order) {
                 return res.status(404).json({ message: "Заказ не найден" });
+            }
+
+            if (
+                !["pending", "pending_payment"].includes(order.status) ||
+                order.executorId
+            ) {
+                return res.status(409).json({
+                    message: "Заказ уже назначен или недоступен",
+                });
             }
 
             if (Number(order.creatorId) !== Number(req.user.id)) {
@@ -3251,6 +3361,13 @@ module.exports = (io) => {
                     return res.status(404).json({
                         message:
                             "Заказ не найден",
+                    });
+                }
+
+                if (order.status !== "active") {
+                    return res.status(409).json({
+                        message:
+                            "Начать можно только активный заказ. Забронированный заказ сначала должен быть активирован.",
                     });
                 }
 

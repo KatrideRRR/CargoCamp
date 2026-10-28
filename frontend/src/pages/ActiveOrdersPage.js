@@ -2387,6 +2387,28 @@ const ActiveOrdersPage = () => {
                                                 onOpenChat={(orderId) =>
                                                     handleOpenChat(orderId, "regular")
                                                 }
+
+                                                onCancel={async () => {
+                                                    const confirmed = window.confirm(
+                                                        `Отменить бронирование заказа №${order.id}?`
+                                                    );
+
+                                                    if (!confirmed) return;
+
+                                                    try {
+                                                        await axiosInstance.post(
+                                                            `/orders/${order.id}/cancel-reservation`,
+                                                            {}
+                                                        );
+
+                                                        await fetchActiveOrders();
+                                                    } catch (error) {
+                                                        alert(
+                                                            error.response?.data?.message ||
+                                                            "Не удалось отменить бронирование"
+                                                        );
+                                                    }
+                                                }}
                                             />
                                         ))}
 
