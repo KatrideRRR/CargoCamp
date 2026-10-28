@@ -7,6 +7,7 @@ import OrderServiceDetails from "../components/OrderServiceDetails";
 import { getOrderServiceDetails } from "../utils/orderServiceDetails";
 import TaxiVehicleGateModal from "../components/TaxiVehicleGateModal";
 import "../styles/OrdersPage.css";
+import "../styles/OrdersPageDark.css";
 import Modal from "react-modal";
 import {
     FaCreditCard,

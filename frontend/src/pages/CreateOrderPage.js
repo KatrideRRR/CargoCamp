@@ -5,6 +5,7 @@ import {getCurrentLocation, getLocationErrorMessage} from "../utils/getCurrentLo
 import "react-datepicker/dist/react-datepicker.css";
 import {useNavigate} from "react-router-dom";
 import "../styles/CreateOrderPage.css";
+import "../styles/CreateOrderPageDark.css";
 import imageCompression from "browser-image-compression";
 import PromotionOptions, {PROMOTION_PRICES} from "../components/PromotionOptions";
 import YandexMapModal from "../components/YandexMapModal";

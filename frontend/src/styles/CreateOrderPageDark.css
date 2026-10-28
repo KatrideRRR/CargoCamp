@@ -1,0 +1,800 @@
+/* =============================================
+   CARGOCAMP — CREATE ORDER DARK THEME
+   ============================================= */
+
+@media (prefers-color-scheme: dark) {
+
+    /* ==========================================
+       1. ОСНОВНАЯ СТРАНИЦА
+       ========================================== */
+
+    html .create-page {
+        --bg1: #101824;
+        --bg2: #172338;
+
+        --text: #f1f5f9;
+        --muted: #a8b7ca;
+
+        --glass: rgba(30, 42, 60, 0.96);
+        --glass-border: rgba(148, 163, 184, 0.18);
+
+        --shadow: 0 12px 32px rgba(0, 0, 0, 0.23);
+
+        --primary: #93c5fd;
+        --primary-soft: rgba(96, 165, 250, 0.16);
+
+        --danger: #fca5a5;
+
+        background:
+                linear-gradient(
+                        160deg,
+                        #101824,
+                        #172338
+                );
+
+        color: var(--text);
+        color-scheme: dark;
+    }
+
+    /* ==========================================
+       2. КАРТОЧКИ И СЕКЦИИ
+       ========================================== */
+
+    html .create-page .glass,
+    html .create-page .header-card,
+    html .create-page .bottomActions {
+        background: rgba(30, 42, 60, 0.96);
+
+        border-color: rgba(148, 163, 184, 0.18);
+
+        box-shadow:
+                0 12px 32px rgba(0, 0, 0, 0.2);
+    }
+
+    html .create-page .field,
+    html .create-page .promoBox,
+    html .create-page .total {
+        background: rgba(19, 32, 49, 0.8);
+
+        border-color: rgba(148, 163, 184, 0.18);
+
+        box-shadow: none;
+    }
+
+    /* ==========================================
+       3. ЗАГОЛОВКИ И ТЕКСТ
+       ========================================== */
+
+    html .create-page .header-title,
+    html .create-page .section-title,
+    html .create-page .miniValue,
+    html .create-page .timeChipValue,
+    html .create-page .muted-strong,
+    html .create-page .totalTitle {
+        color: #f1f5f9;
+    }
+
+    html .create-page .header-sub,
+    html .create-page .section-sub,
+    html .create-page .label,
+    html .create-page .miniLabel,
+    html .create-page .miniSub,
+    html .create-page .miniChevron,
+    html .create-page .timeChipLabel,
+    html .create-page .hint,
+    html .create-page .muted,
+    html .create-page .totalSub {
+        color: #a8b7ca;
+    }
+
+    html .create-page .miniValue.danger {
+        color: #fca5a5;
+    }
+
+    /* ==========================================
+       4. ПОЛЯ ВВОДА
+       ========================================== */
+
+    html .create-page .control,
+    html .create-page input.control,
+    html .create-page select.control,
+    html .create-page textarea.control {
+        background: #142238;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow: none;
+
+        color-scheme: dark;
+    }
+
+    html .create-page .control:focus {
+        background: #1c2c43;
+
+        border-color: #60a5fa;
+
+        box-shadow:
+                0 0 0 3px rgba(96, 165, 250, 0.14);
+    }
+
+    html .create-page .control::placeholder {
+        color: #8293aa;
+        opacity: 1;
+    }
+
+    html .create-page select.control option {
+        background: #1b293d;
+        color: #f1f5f9;
+    }
+
+    html .create-page input[type="radio"],
+    html .create-page input[type="checkbox"] {
+        accent-color: #60a5fa;
+    }
+
+    /* ==========================================
+       5. АДРЕС И ВРЕМЯ
+       ========================================== */
+
+    html .create-page .miniCard,
+    html .create-page .timeChip {
+        background: #223147;
+
+        border-color: #3b4b62;
+
+        box-shadow: none;
+    }
+
+    html .create-page .miniCardBtn {
+        color: #f1f5f9;
+    }
+
+    html .create-page .miniCardBtn:hover {
+        background: rgba(96, 165, 250, 0.08);
+    }
+
+    html .create-page .miniDrop {
+        border-top-color: #3b4b62;
+    }
+
+    html .create-page .toggle {
+        background: #40516a;
+
+        border-color: #526680;
+
+        box-shadow: none;
+    }
+
+    html .create-page .toggle:hover {
+        background: #4b607d;
+    }
+
+    html .create-page .toggle.on {
+        background: #2563eb;
+
+        border-color: #60a5fa;
+
+        box-shadow:
+                0 0 0 3px rgba(96, 165, 250, 0.12);
+    }
+
+    html .create-page .toggleKnob {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+    }
+
+    /* ==========================================
+       6. ПОДСКАЗКИ АДРЕСОВ
+       ========================================== */
+
+    html .create-page .suggestions,
+    html .create-page .dynamicAddressSuggestions {
+        background: #223147;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow:
+                0 12px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    html .create-page .suggestions li,
+    html .create-page .dynamicAddressSuggestion {
+        background: #26364b;
+        color: #f1f5f9;
+    }
+
+    html .create-page .suggestions li:hover,
+    html .create-page .dynamicAddressSuggestion:hover,
+    html .create-page .dynamicAddressSuggestion:focus-visible {
+        background: #344760;
+        border-color: #526680;
+    }
+
+    html .create-page .dynamicAddressSelected {
+        background: #19372f;
+        border-color: rgba(74, 222, 128, 0.4);
+    }
+
+    html .create-page .dynamicAddressSelected:focus {
+        background: #214336;
+    }
+
+    html .create-page .dynamicAddressConfirmed,
+    html .create-page .dynamicAddressCheck {
+        color: #86efac;
+    }
+
+    /* ==========================================
+       7. КНОПКИ ВЫБОРА АДРЕСА
+       ========================================== */
+
+    html .create-page .chip-btn {
+        background: #26364b;
+
+        border-color: #40516a;
+
+        color: #cbd5e1;
+
+        box-shadow: none;
+    }
+
+    html .create-page .chip-btn:hover {
+        background: #304157;
+        border-color: #526680;
+    }
+
+    html .create-page .chip-btn.active {
+        background: rgba(37, 99, 235, 0.23);
+
+        border-color: #60a5fa;
+
+        color: #bfdbfe;
+    }
+
+    /* ==========================================
+       8. ПОИСК УСЛУГ
+       ========================================== */
+
+    html .create-page .serviceSuggestionPanel {
+        background: #223147;
+
+        border-color: #40516a;
+
+        box-shadow:
+                0 14px 35px rgba(0, 0, 0, 0.3);
+    }
+
+    html .create-page .serviceSuggestionItem {
+        background: #26364b;
+
+        border-color: transparent;
+
+        color: #f1f5f9;
+    }
+
+    html .create-page .serviceSuggestionItem:hover {
+        background: #344760;
+
+        border-color: #526680;
+    }
+
+    html .create-page .serviceSuggestionTitle,
+    html .create-page .serviceSuggestionCategory,
+    html .create-page .serviceSuggestionEmpty {
+        color: #a8b7ca;
+    }
+
+    html .create-page .serviceSuggestionName {
+        color: #f1f5f9;
+    }
+
+    html .create-page .serviceSuggestionType.subcategory {
+        color: #93c5fd;
+
+        background: rgba(96, 165, 250, 0.14);
+    }
+
+    html .create-page .serviceSuggestionType.category {
+        color: #cbd5e1;
+
+        background: rgba(148, 163, 184, 0.14);
+    }
+
+    html .create-page .serviceSearchClear {
+        background: #344760;
+
+        color: #e2e8f0;
+    }
+
+    html .create-page .serviceSearchClear:hover {
+        background: #40516a;
+    }
+
+    /* ==========================================
+       9. ВЫБРАННАЯ УСЛУГА
+       ========================================== */
+
+    html .create-page .selectedServiceCard {
+        background: rgba(34, 197, 94, 0.1);
+
+        border-color: rgba(74, 222, 128, 0.25);
+    }
+
+    html .create-page .selectedServiceName {
+        color: #f1f5f9;
+    }
+
+    html .create-page .selectedServiceCategory {
+        color: #a8b7ca;
+    }
+
+    html .create-page .selectedServiceCheck {
+        color: #86efac;
+        background: rgba(74, 222, 128, 0.16);
+    }
+
+    html .create-page .selectedServiceChange {
+        color: #93c5fd;
+    }
+
+    /* ==========================================
+       10. ДИНАМИЧЕСКИЕ ПОЛЯ
+       ========================================== */
+
+    html .create-page .dynamicBooleanField {
+        background: #223147;
+
+        border-color: #40516a;
+
+        box-shadow: none;
+    }
+
+    html .create-page .dynamicBooleanText {
+        color: #f1f5f9;
+    }
+
+    /* ==========================================
+       11. ФОТОГРАФИИ
+       ========================================== */
+
+    html .create-page .upload {
+        background: #223147;
+
+        border-color: #5275a3;
+
+        color: #93c5fd;
+
+        box-shadow: none;
+    }
+
+    html .create-page .upload:hover {
+        background: #2c405b;
+    }
+
+    html .create-page .doc {
+        background: #26364b;
+
+        border-color: #40516a;
+    }
+
+    html .create-page .docName {
+        color: #cbd5e1;
+    }
+
+    /* ==========================================
+       12. РЕКОМЕНДУЕМАЯ ЦЕНА
+       ========================================== */
+
+    html .create-page .recommendedPriceCard {
+        background:
+                linear-gradient(
+                        135deg,
+                        #203754,
+                        #242c48
+                );
+
+        border-color: rgba(96, 165, 250, 0.3);
+
+        box-shadow: none;
+    }
+
+    html .create-page .recommendedPriceTitle,
+    html .create-page .recommendedPriceHint {
+        color: #a8b7ca;
+    }
+
+    html .create-page .recommendedPriceRange {
+        color: #93c5fd;
+    }
+
+    html .create-page .recommendedPriceApply {
+        background: #304d75;
+
+        border-color: #5275a3;
+
+        color: #bfdbfe;
+    }
+
+    html .create-page .recommendedPriceApply:hover {
+        background: #3a5b87;
+    }
+
+    html .create-page .recommendedPriceBreakdownRow {
+        color: #a8b7ca;
+    }
+
+    html .create-page .recommendedPriceBreakdownRow strong {
+        color: #f1f5f9;
+    }
+
+    /* ==========================================
+       13. ГРУЗОПЕРЕВОЗКИ — ПОЧАСОВОЙ РАСЧЁТ
+       ========================================== */
+
+    html .create-page .cargoHourlySummary {
+        background: #223147;
+
+        border-color: #40516a;
+    }
+
+    html .create-page .cargoHourlySummaryRow {
+        color: #a8b7ca;
+    }
+
+    html .create-page .cargoHourlySummaryRow strong {
+        color: #93c5fd;
+    }
+
+    html .create-page .cargoHourlyNotice {
+        background: #393022;
+
+        border-color: rgba(251, 191, 36, 0.28);
+    }
+
+    html .create-page .cargoHourlyNotice strong {
+        color: #fcd34d;
+    }
+
+    html .create-page .cargoHourlyNotice span {
+        color: #fde68a;
+    }
+
+    /* ==========================================
+       14. ПРОДВИЖЕНИЕ ЗАКАЗА
+       ========================================== */
+
+    html .create-page .promoOptionsTitle,
+    html .create-page .promoOptionLabel {
+        color: #f1f5f9;
+    }
+
+    html .create-page .promoOptionsSub {
+        color: #a8b7ca;
+    }
+
+    html .create-page .promoOptionsTotal,
+    html .create-page .promoOptionPrice {
+        color: #93c5fd;
+    }
+
+    html .create-page .promoOption {
+        background: #223147;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+    }
+
+    html .create-page .promoOption:hover {
+        background: #2c405b;
+    }
+
+    html .create-page .promoOption.active {
+        background: #223e65;
+
+        border-color: #60a5fa;
+
+        box-shadow:
+                0 0 0 3px rgba(96, 165, 250, 0.09);
+    }
+
+    html .create-page .promoOptionIcon {
+        background: rgba(96, 165, 250, 0.14);
+
+        border-color: rgba(96, 165, 250, 0.25);
+
+        color: #93c5fd;
+    }
+
+    html .create-page .promoOptionCheck {
+        background: #172338;
+
+        border-color: #64748b;
+    }
+
+    html .create-page .promoOption.active .promoOptionCheck {
+        background: #2563eb;
+
+        border-color: #60a5fa;
+
+        color: #ffffff;
+    }
+
+    /* ==========================================
+       15. СПОСОБЫ ОПЛАТЫ ЮKASSA / Т-БАНК
+       ========================================== */
+
+    html .create-page .payment-provider-title {
+        color: #f1f5f9;
+    }
+
+    html .create-page .payment-provider-card {
+        background: #223147;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+    }
+
+    html .create-page .payment-provider-card.active {
+        background: #223e65;
+
+        border-color: #60a5fa;
+    }
+
+    html .create-page .payment-provider-info b,
+    html .create-page .payment-provider-short {
+        color: #f1f5f9;
+    }
+
+    html .create-page .payment-provider-info small {
+        color: #a8b7ca;
+    }
+
+    html .create-page .payment-provider-icon.yookassa {
+        background: rgba(96, 165, 250, 0.18);
+
+        color: #93c5fd;
+    }
+
+    html .create-page .payment-provider-icon.tbank {
+        background: #fef08a;
+
+        color: #111827;
+    }
+
+    /* ==========================================
+       16. ИТОГОВАЯ СУММА
+       ========================================== */
+
+    html .create-page .total {
+        background: #223147;
+
+        border-color: #40516a;
+    }
+
+    html .create-page .totalAmount {
+        background: rgba(96, 165, 250, 0.16);
+
+        border-color: rgba(96, 165, 250, 0.3);
+
+        color: #93c5fd;
+    }
+
+    /* ==========================================
+       17. КНОПКИ ДЕЙСТВИЙ
+       ========================================== */
+
+    html .create-page .action-btn {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #f1f5f9;
+
+        box-shadow: none;
+    }
+
+    html .create-page .action-btn:hover {
+        background: #3b506c;
+    }
+
+    html .create-page .action-btn.subtle {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #e2e8f0;
+    }
+
+    html .create-page .action-btn.primary {
+        background:
+                linear-gradient(
+                        135deg,
+                        #2563eb,
+                        #1d4ed8
+                );
+
+        border-color: #3b82f6;
+
+        color: #ffffff;
+
+        box-shadow:
+                0 8px 20px rgba(37, 99, 235, 0.2);
+    }
+
+    html .create-page .action-btn.primary:hover {
+        background:
+                linear-gradient(
+                        135deg,
+                        #3b82f6,
+                        #2563eb
+                );
+    }
+
+    /* ==========================================
+       18. ОШИБКИ
+       ========================================== */
+
+    html .create-page .alert-danger,
+    html .create-page .inline-error {
+        background: rgba(248, 113, 113, 0.1);
+
+        border-color: rgba(248, 113, 113, 0.3);
+
+        color: #fca5a5;
+    }
+
+    html .create-page .alert-text {
+        color: #fca5a5;
+    }
+
+    /* ==========================================
+       19. КАЛЕНДАРЬ REACT-DATEPICKER
+       Отдельный портал вне .create-page
+       ========================================== */
+
+    html #date-picker-portal .react-datepicker {
+        background: #1b293d;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+    }
+
+    html #date-picker-portal .react-datepicker__header,
+    html #date-picker-portal .react-datepicker__time-container,
+    html #date-picker-portal .react-datepicker__time-box,
+    html #date-picker-portal .react-datepicker__time-list {
+        background: #223147;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+    }
+
+    html #date-picker-portal .react-datepicker__current-month,
+    html #date-picker-portal .react-datepicker__day-name,
+    html #date-picker-portal .react-datepicker__day,
+    html #date-picker-portal .react-datepicker__time-name,
+    html #date-picker-portal .react-datepicker-time__header,
+    html #date-picker-portal .react-datepicker__time-list-item {
+        color: #f1f5f9;
+    }
+
+    html #date-picker-portal .react-datepicker__day:hover,
+    html #date-picker-portal .react-datepicker__time-list-item:hover {
+        background: #40516a;
+        color: #ffffff;
+    }
+
+    html #date-picker-portal .react-datepicker__day--selected,
+    html #date-picker-portal .react-datepicker__day--keyboard-selected,
+    html #date-picker-portal
+    .react-datepicker__time-list-item--selected {
+        background: #2563eb;
+        color: #ffffff;
+    }
+
+    html #date-picker-portal .react-datepicker__day--disabled {
+        color: #64748b;
+    }
+
+    /* ==========================================
+       20. ЯНДЕКС-КАРТА
+       Окно создаётся через React Portal
+       ========================================== */
+
+    html .yandex-map-modal-overlay .glass-modal {
+        background: #1b2636;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        color-scheme: dark;
+    }
+
+    html .yandex-map-modal-overlay .glass-modal-head {
+        border-bottom-color: #40516a;
+    }
+
+    html .yandex-map-modal-overlay .glass-modal-title,
+    html .yandex-map-modal-overlay .glass-picked-value {
+        color: #f1f5f9;
+    }
+
+    html .yandex-map-modal-overlay .glass-modal-subtitle,
+    html .yandex-map-modal-overlay .glass-picked-label {
+        color: #a8b7ca;
+    }
+
+    html .yandex-map-modal-overlay .glass-modal-footer,
+    html .yandex-map-modal-overlay .glass-picked {
+        background: #223147;
+
+        border-color: #40516a;
+
+        box-shadow: none;
+    }
+
+    html .yandex-map-modal-overlay .glass-icon-btn,
+    html .yandex-map-modal-overlay .glass-actions .btn {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #f1f5f9;
+
+        box-shadow: none;
+    }
+
+    html .yandex-map-modal-overlay
+    .glass-actions .btn.btn-primary {
+        background: #2563eb;
+
+        border-color: #2563eb;
+
+        color: #ffffff;
+    }
+
+    html .yandex-map-modal-overlay .glass-map-loading {
+        background: #26364b;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+    }
+
+    /* ==========================================
+       21. ВСПЛЫВАЮЩАЯ ОШИБКА
+       ========================================== */
+
+    html .createOrderErrorToast {
+        background: #39252b;
+
+        border-color: rgba(248, 113, 113, 0.35);
+
+        box-shadow:
+                0 15px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    html .createOrderErrorToast__title {
+        color: #fecaca;
+    }
+
+    html .createOrderErrorToast__message {
+        color: #fca5a5;
+    }
+
+    html .createOrderErrorToast__icon,
+    html .createOrderErrorToast__close {
+        color: #fca5a5;
+
+        background: rgba(248, 113, 113, 0.12);
+    }
+}
