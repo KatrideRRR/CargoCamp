@@ -2727,11 +2727,46 @@ module.exports = (io) => {
                 order.status = "active";
             }
 
-            // чистим список запросов
+// Очищаем список запросов после назначения исполнителя.
             order.requestedExecutors = JSON.stringify([]);
             order.requests = JSON.stringify([]);
 
-            await order.save();
+            if (isReservationActivation) {
+                // Для брони переход reserved -> active
+                // уже был защищён условным обновлением выше.
+                await order.save();
+            } else {
+                // Обычное одобрение:
+                // назначаем исполнителя только если заказ
+                // до сих пор свободен и ожидает назначения.
+                const [updatedCount] = await Order.update(
+                    {
+                        executorId: normalizedExecutorId,
+                        proposedSum: order.proposedSum,
+                        finalPriceKopecks: order.finalPriceKopecks,
+                        status: order.status,
+                        dealStatus: order.dealStatus,
+                        requestedExecutors: JSON.stringify([]),
+                        requests: JSON.stringify([]),
+                    },
+                    {
+                        where: {
+                            id: order.id,
+                            status: {
+                                [Op.in]: ["pending", "pending_payment"],
+                            },
+                            executorId: null,
+                        },
+                    }
+                );
+
+                if (updatedCount !== 1) {
+                    return res.status(409).json({
+                        message:
+                            "Этот заказ уже назначен другому исполнителю. Обновите страницу.",
+                    });
+                }
+            }
 
             const cleanedOrderIds = await removeExecutorFromOtherPendingOrders(
                 Order,

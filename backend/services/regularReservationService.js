@@ -283,6 +283,22 @@ async function cancelRegularReservation({
         const previousExecutorId = order.executorId;
         const creatorId = order.creatorId;
 
+// Убираем отклик исполнителя, чья бронь отменена.
+// Предложения остальных исполнителей сохраняем.
+        const remainingRequests = asArray(order.requests).filter(
+            (item) =>
+                Number(item.executorId) !==
+                Number(previousExecutorId)
+        );
+
+        const remainingExecutors = asArray(
+            order.requestedExecutors
+        ).filter(
+            (id) =>
+                Number(id) !==
+                Number(previousExecutorId)
+        );
+
         order.status = "pending";
         order.executorId = null;
         order.finalPriceKopecks = 0;
@@ -291,6 +307,11 @@ async function cancelRegularReservation({
         order.reservationAvailableAt = null;
         order.reservationApprovedAt = null;
         order.reservationReadyAt = null;
+
+        order.requests = JSON.stringify(remainingRequests);
+        order.requestedExecutors = JSON.stringify(
+            remainingExecutors
+        );
 
         await order.save({ transaction });
 
