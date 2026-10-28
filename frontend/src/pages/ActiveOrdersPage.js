@@ -2378,15 +2378,39 @@ const ActiveOrdersPage = () => {
                                             <RegularReservedOrderCard
                                                 key={`reserved-${order.id}`}
                                                 order={order}
-                                                isBusy={orders.some(
-                                                    (current) =>
-                                                        Number(current.executorId) ===
-                                                        Number(order.executorId) &&
-                                                        current.status === "active"
-                                                )}
+                                                isBusy={order.reservationSourceCompleted !== true}
+                                                isExecutor={
+                                                    Number(order.executorId) === Number(user.id)
+                                                }
                                                 onOpenChat={(orderId) =>
                                                     handleOpenChat(orderId, "regular")
                                                 }
+
+                                                onActivate={async () => {
+                                                    const confirmed = window.confirm(
+                                                        `Активировать заказ №${order.id}?\n\n` +
+                                                        "После активации заказ станет выполняемым. " +
+                                                        "Будет применена обычная комиссия CargoCamp."
+                                                    );
+
+                                                    if (!confirmed) return;
+
+                                                    try {
+                                                        await axiosInstance.post(
+                                                            `/orders/${order.id}/activate-reservation`,
+                                                            {}
+                                                        );
+
+                                                        await fetchActiveOrders();
+
+                                                        alert("Заказ успешно активирован!");
+                                                    } catch (error) {
+                                                        alert(
+                                                            error.response?.data?.message ||
+                                                            "Не удалось активировать заказ"
+                                                        );
+                                                    }
+                                                }}
 
                                                 onCancel={async () => {
                                                     const confirmed = window.confirm(

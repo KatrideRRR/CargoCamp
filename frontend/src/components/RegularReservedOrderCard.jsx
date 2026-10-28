@@ -3,8 +3,10 @@ import React from "react";
 export default function RegularReservedOrderCard({
                                                      order,
                                                      isBusy,
+                                                     isExecutor,
                                                      onOpenChat,
                                                      onCancel,
+                                                     onActivate,
                                                  }) {
     const availableAt = order.reservationAvailableAt
         ? new Date(order.reservationAvailableAt)
@@ -63,6 +65,22 @@ export default function RegularReservedOrderCard({
                             ? "Исполнитель заканчивает предыдущий заказ."
                             : "Предыдущий заказ завершён. Ожидается активация следующего."}
                     </p>
+
+                    {!isBusy && isExecutor && (
+                        <button
+                            type="button"
+                            className="cc-reserved-chat"
+                            onClick={onActivate}
+                            style={{
+                                display: "block",
+                                width: "100%",
+                                marginBottom: 12,
+                                background: "#16a34a",
+                            }}
+                        >
+                            Активировать заказ
+                        </button>
+                    )}
 
                     <button
                         type="button"

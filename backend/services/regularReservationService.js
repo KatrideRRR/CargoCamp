@@ -303,7 +303,77 @@ async function cancelRegularReservation({
     });
 }
 
+async function assertReservationActivationAllowed({
+                                                      order,
+                                                      executorId,
+                                                      approvedSum,
+                                                  }) {
+    if (
+        order.status !== "reserved" ||
+        Number(order.executorId) !== Number(executorId)
+    ) {
+        throw reservationError(
+            409,
+            "Заказ не забронирован за вами"
+        );
+    }
+
+    if (order.paymentType !== "cash") {
+        throw reservationError(
+            409,
+            "Активация этой брони недоступна"
+        );
+    }
+
+    const sourceOrderId = Number(
+        order.reservationSourceOrderId
+    );
+
+    if (
+        !Number.isSafeInteger(sourceOrderId) ||
+        sourceOrderId <= 0
+    ) {
+        throw reservationError(
+            409,
+            "Не найден предыдущий заказ исполнителя"
+        );
+    }
+
+    const sourceOrder = await Order.findByPk(sourceOrderId, {
+        attributes: [
+            "id",
+            "status",
+            "executorId",
+        ],
+    });
+
+    if (
+        !sourceOrder ||
+        Number(sourceOrder.executorId) !==
+        Number(executorId) ||
+        sourceOrder.status !== "completed"
+    ) {
+        throw reservationError(
+            409,
+            "Сначала полностью завершите предыдущий заказ"
+        );
+    }
+
+    if (
+        Math.round(Number(approvedSum) * 100) !==
+        Number(order.finalPriceKopecks)
+    ) {
+        throw reservationError(
+            409,
+            "Цена бронирования отличается от согласованной"
+        );
+    }
+
+    return true;
+}
+
 module.exports = {
     reserveRegularOrder,
     cancelRegularReservation,
+    assertReservationActivationAllowed,
 };

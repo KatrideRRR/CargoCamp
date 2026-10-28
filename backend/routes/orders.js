@@ -7,6 +7,7 @@ const { notifyUser, notifyMany } = require("../services/notificationService");
 const {
     reserveRegularOrder,
     cancelRegularReservation,
+    assertReservationActivationAllowed,
 } = require("../services/regularReservationService");
 const authenticateToken = require('../middlewares/userAuth');
 const { Op } = require('sequelize');
@@ -1987,6 +1988,23 @@ module.exports = (io) => {
                             ? "reserved"
                             : await getCompletionPhase(order);
 
+                    let reservationSourceCompleted = false;
+
+                    if (
+                        order.status === "reserved" &&
+                        order.reservationSourceOrderId
+                    ) {
+                        const sourceOrder = await Order.findByPk(
+                            order.reservationSourceOrderId,
+                            {
+                                attributes: ["status"],
+                            }
+                        );
+
+                        reservationSourceCompleted =
+                            sourceOrder?.status === "completed";
+                    }
+
                     let completionRemarks = null;
 
                     if (
@@ -2015,6 +2033,7 @@ module.exports = (io) => {
                         ...order.toJSON(),
                         completionPhase: phase,
                         completionRemarks,
+                        reservationSourceCompleted,
                     };
                 })
             );
@@ -2502,12 +2521,16 @@ module.exports = (io) => {
         }
     );
 
-    router.post("/:id/approve", authenticateToken, async (req, res) => {
+    const approveRegularOrder = async (req, res) => {
         const { id } = req.params;
-        const { executorId } = req.body;
+
+        const isReservationActivation =
+            req.path.endsWith("/activate-reservation");
 
         try {
-            const normalizedExecutorId = Number(executorId);
+            const normalizedExecutorId = isReservationActivation
+                ? Number(req.user.id)
+                : Number(req.body?.executorId);
 
             if (!Number.isFinite(normalizedExecutorId) || normalizedExecutorId <= 0) {
                 return res.status(400).json({ message: "Некорректный executorId" });
@@ -2518,17 +2541,30 @@ module.exports = (io) => {
                 return res.status(404).json({ message: "Заказ не найден" });
             }
 
-            if (
-                !["pending", "pending_payment"].includes(order.status) ||
-                order.executorId
-            ) {
-                return res.status(409).json({
-                    message: "Заказ уже назначен или недоступен",
-                });
-            }
+            if (isReservationActivation) {
+                if (
+                    order.status !== "reserved" ||
+                    Number(order.executorId) !== normalizedExecutorId
+                ) {
+                    return res.status(409).json({
+                        message: "Этот заказ не забронирован за вами",
+                    });
+                }
+            } else {
+                if (
+                    !["pending", "pending_payment"].includes(order.status) ||
+                    order.executorId
+                ) {
+                    return res.status(409).json({
+                        message: "Заказ уже назначен или недоступен",
+                    });
+                }
 
-            if (Number(order.creatorId) !== Number(req.user.id)) {
-                return res.status(403).json({ message: "Вы не можете одобрить этот заказ" });
+                if (Number(order.creatorId) !== Number(req.user.id)) {
+                    return res.status(403).json({
+                        message: "Вы не можете одобрить этот заказ",
+                    });
+                }
             }
 
             // requestedExecutors -> array
@@ -2583,6 +2619,14 @@ module.exports = (io) => {
                 });
             }
 
+            if (isReservationActivation) {
+                await assertReservationActivationAllowed({
+                    order,
+                    executorId: normalizedExecutorId,
+                    approvedSum,
+                });
+            }
+
             const executorBusyRegular = await hasBusyRegularOrder(Order, normalizedExecutorId, order.id);
             const executorBusyTaxi = await hasBusyExpressOrder(
                 ExpressOrder,
@@ -2634,6 +2678,32 @@ module.exports = (io) => {
                 }
             }
 
+            if (isReservationActivation) {
+                const activatedAt = new Date();
+
+                const [updatedCount] = await Order.update(
+                    {
+                        status: "active",
+                        reservationReadyAt: activatedAt,
+                    },
+                    {
+                        where: {
+                            id: order.id,
+                            status: "reserved",
+                            executorId: normalizedExecutorId,
+                        },
+                    }
+                );
+
+                if (updatedCount !== 1) {
+                    return res.status(409).json({
+                        message:
+                            "Бронирование уже активировано или отменено",
+                    });
+                }
+
+                order.reservationReadyAt = activatedAt;
+            }
 
             // Назначаем исполнителя
             order.executorId = normalizedExecutorId;
@@ -2948,8 +3018,11 @@ module.exports = (io) => {
 
 
             io.emit("orderUpdated");
+            io.emit("activeOrdersUpdated");
 
-            let executorMessage = "Ваш запрос на выполнение заказа одобрен!";
+            let executorMessage = isReservationActivation
+                ? "Забронированный заказ активирован!"
+                : "Ваш запрос на выполнение заказа одобрен!";
 
             if (commissionKopecks > 0) {
                 const commissionRub =
@@ -3035,9 +3108,26 @@ module.exports = (io) => {
             });
         } catch (error) {
             console.error("❌ Ошибка при одобрении заказа:", error);
-            return res.status(500).json({ message: "Ошибка сервера" });
+
+            return res.status(error.httpStatus || 500).json({
+                message: error.httpStatus
+                    ? error.message
+                    : "Ошибка сервера",
+            });
         }
-    });
+    };
+
+    router.post(
+        "/:id/approve",
+        authenticateToken,
+        approveRegularOrder
+    );
+
+    router.post(
+        "/:id/activate-reservation",
+        authenticateToken,
+        approveRegularOrder
+    );
 
     router.get('/completed/:userId', async (req, res) => {
         const { userId } = req.params;
