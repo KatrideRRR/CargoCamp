@@ -97,6 +97,41 @@ module.exports = (sequelize) => {
                 type: DataTypes.DATE,
                 allowNull: true,
             },
+
+            tbankRebillId: {
+                type: DataTypes.STRING(128),
+                allowNull: true,
+                field: "tbank_rebill_id",
+            },
+
+            tbankCardId: {
+                type: DataTypes.STRING(128),
+                allowNull: true,
+                field: "tbank_card_id",
+            },
+
+            tbankCardMask: {
+                type: DataTypes.STRING(32),
+                allowNull: true,
+                field: "tbank_card_mask",
+            },
+
+            tbankCardBoundAt: {
+                type: DataTypes.DATE,
+                allowNull: true,
+                field: "tbank_card_bound_at",
+            },
+
+            autoCommissionProvider: {
+                type: DataTypes.ENUM(
+                    "none",
+                    "yookassa",
+                    "tbank"
+                ),
+                allowNull: false,
+                defaultValue: "none",
+                field: "auto_commission_provider",
+            },
             locationAddress: {
                 type: DataTypes.TEXT,
                 allowNull: true,
