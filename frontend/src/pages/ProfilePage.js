@@ -8,6 +8,7 @@ import axios from "axios";
 import axiosInstance from "../utils/axiosInstance";
 import {FaHeadset, FaLightbulb, FaTrophy, FaPaperPlane,} from "react-icons/fa";
 import "../styles/ProfilePage.css";
+import "../styles/ProfilePageDark.css";
 import UserBenefitsSection from "../components/UserBenefitsSection";
 import UserIdentityVerification from "../components/UserIdentityVerification";
 import AgreementModal from "../components/AgreementModal";

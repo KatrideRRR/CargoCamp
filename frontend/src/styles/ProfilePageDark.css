@@ -1,0 +1,971 @@
+/* ============================================
+   CARGOCAMP — PROFILE DARK THEME
+   Автоматическая системная тёмная тема
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+
+    /* ========================================
+       1. ОСНОВНЫЕ ПЕРЕМЕННЫЕ
+       ======================================== */
+
+    html .profile-page {
+        --profile-bg: #101824;
+        --profile-card: #1b2636;
+        --profile-card-solid: #1b2636;
+
+        --profile-text: #f1f5f9;
+        --profile-muted: #94a3b8;
+        --profile-soft-text: #cbd5e1;
+
+        --profile-border: rgba(148, 163, 184, 0.2);
+        --profile-border-strong: rgba(148, 163, 184, 0.35);
+
+        --profile-primary: #93c5fd;
+        --profile-primary-dark: #60a5fa;
+        --profile-primary-soft: rgba(96, 165, 250, 0.16);
+        --profile-primary-softer: rgba(96, 165, 250, 0.09);
+
+        --profile-danger: #f87171;
+        --profile-danger-bg: rgba(248, 113, 113, 0.12);
+        --profile-danger-border: rgba(248, 113, 113, 0.3);
+
+        --profile-success: #4ade80;
+        --profile-success-bg: rgba(74, 222, 128, 0.12);
+        --profile-success-border: rgba(74, 222, 128, 0.3);
+
+        --profile-warning: #fbbf24;
+        --profile-warning-bg: rgba(251, 191, 36, 0.12);
+        --profile-warning-border: rgba(251, 191, 36, 0.3);
+
+        --profile-shadow-card:
+                0 12px 35px rgba(0, 0, 0, 0.24);
+
+        --profile-shadow-soft:
+                0 6px 20px rgba(0, 0, 0, 0.2);
+
+        color: var(--profile-text);
+        color-scheme: dark;
+
+        background:
+                radial-gradient(
+                        circle at 18% 4%,
+                        rgba(37, 99, 235, 0.1),
+                        transparent 32%
+                ),
+                linear-gradient(
+                        180deg,
+                        #101824,
+                        #172338
+                );
+    }
+
+    html .profile-page--android {
+        background: #101824;
+    }
+
+    /* ========================================
+       2. ОСНОВНЫЕ КАРТОЧКИ
+       ======================================== */
+
+    html .profile-page .glass,
+    html .profile-page .profile-header,
+    html .profile-page .profile-card,
+    html .profile-page .profile-actions {
+        background:
+                linear-gradient(
+                        180deg,
+                        rgba(34, 48, 69, 0.98),
+                        rgba(24, 35, 52, 0.98)
+                );
+
+        border-color: rgba(148, 163, 184, 0.18);
+
+        box-shadow:
+                0 12px 32px rgba(0, 0, 0, 0.22);
+
+        color: var(--profile-text);
+    }
+
+    html .profile-page .profile-header::before,
+    html .profile-page .profile-card::before,
+    html .profile-page .profile-actions::before {
+        display: none;
+    }
+
+    /* ========================================
+       3. АВАТАР И ЛИЧНЫЕ ДАННЫЕ
+       ======================================== */
+
+    html .profile-page .profile-avatar {
+        background: #26364b;
+        border-color: #40516a;
+        box-shadow: none;
+    }
+
+    html .profile-page .profile-avatar-placeholder {
+        background:
+                linear-gradient(145deg, #304765, #20334e);
+
+        color: #93c5fd;
+    }
+
+    html .profile-page .avatar-upload-btn {
+        background: #304157;
+        border-color: #475569;
+        color: #bfdbfe;
+        box-shadow: none;
+    }
+
+    html .profile-page .identity-pill,
+    html .profile-page .header-mini-pill {
+        background: #2a3a50;
+        border-color: #40516a;
+        color: #cbd5e1;
+        box-shadow: none;
+    }
+
+    html .profile-page .header-mini-name,
+    html .profile-page .identity-name {
+        color: #f1f5f9;
+    }
+
+    /* ========================================
+       4. БЫСТРЫЕ ДЕЙСТВИЯ
+       ======================================== */
+
+    html .profile-page .profile-quick-action {
+        background: #25354a;
+        border-color: #40516a;
+        color: #f1f5f9;
+        box-shadow: none;
+    }
+
+    html .profile-page .profile-quick-action-content small {
+        color: #a8b7ca;
+    }
+
+    html .profile-page .profile-quick-action-support {
+        background: #203954;
+        border-color: rgba(96, 165, 250, 0.4);
+        color: #93c5fd;
+    }
+
+    html .profile-page
+    .profile-quick-action-support
+    .profile-quick-action-icon {
+        background: rgba(96, 165, 250, 0.16);
+        color: #93c5fd;
+    }
+
+    html .profile-page .profile-quick-action-idea {
+        background: #353024;
+        border-color: rgba(251, 191, 36, 0.32);
+        color: #fcd34d;
+    }
+
+    html .profile-page
+    .profile-quick-action-idea
+    .profile-quick-action-icon {
+        background: rgba(251, 191, 36, 0.12);
+        color: #fcd34d;
+    }
+
+    html .profile-page .profile-quick-action-disabled {
+        background: #202b3b;
+        border-color: #344155;
+        color: #94a3b8;
+    }
+
+    html .profile-page .profile-quick-action-disabled
+    .profile-quick-action-icon {
+        background: #2a374a;
+        border-color: #40516a;
+        color: #94a3b8;
+    }
+
+    html .profile-page .profile-coming-soon {
+        background: #304157;
+        border-color: #475569;
+        color: #cbd5e1;
+    }
+
+    /* ========================================
+       5. СТРОКИ ИНФОРМАЦИИ
+       ======================================== */
+
+    html .profile-page .card-row {
+        background: rgba(15, 23, 42, 0.35);
+        border-color: rgba(148, 163, 184, 0.17);
+        box-shadow: none;
+    }
+
+    html .profile-page .card-strong,
+    html .profile-page .card-title {
+        color: #f1f5f9;
+    }
+
+    html .profile-page .card-muted,
+    html .profile-page .card-subtitle {
+        color: #a8b7ca;
+    }
+
+    html .profile-page .status-verified {
+        color: #86efac;
+    }
+
+    html .profile-page .status-pensioner {
+        color: #4ade80;
+    }
+
+    html .profile-page .status-unknown,
+    html .profile-page .status-not_verified,
+    html .profile-page .status-not-verified {
+        color: #fcd34d;
+    }
+
+    /* ========================================
+       6. КНОПКИ
+       ======================================== */
+
+    html .profile-page .btn,
+    html .profile-page a.btn,
+    html .profile-page .profile-chip {
+        background: #304157;
+        border-color: #475569;
+        color: #e2e8f0;
+        box-shadow: none;
+    }
+
+    html .profile-page .btn.btn-primary {
+        background:
+                linear-gradient(135deg, #2854a2, #1e4081);
+
+        border-color: #3b72d0;
+        color: #ffffff;
+    }
+
+    html .profile-page .btn.btn-primary:active {
+        background: #1d4ed8;
+        color: #ffffff;
+    }
+
+    html .profile-page .btn.btn-ghost,
+    html .profile-page .btn.btn-ghost:active {
+        background: #304157;
+        border-color: #475569;
+        color: #cbd5e1;
+    }
+
+    html .profile-page .btn.btn-danger,
+    html .profile-page .btn.btn-ghost-danger {
+        background: rgba(248, 113, 113, 0.12);
+        border-color: rgba(248, 113, 113, 0.32);
+        color: #fca5a5;
+    }
+
+    html .profile-page .profile-chip {
+        background: rgba(96, 165, 250, 0.15);
+        border-color: rgba(96, 165, 250, 0.32);
+        color: #93c5fd;
+    }
+
+    /* ========================================
+       7. ФИНАНСЫ, PREMIUM, ЗАДОЛЖЕННОСТЬ
+       ======================================== */
+
+    html .profile-page .profile-finance-section {
+        background: #223147;
+        border-color: #40516a;
+        box-shadow: none;
+    }
+
+    html .profile-page .profile-finance-premium {
+        background:
+                linear-gradient(145deg, #203954, #252d49);
+
+        border-color: rgba(96, 165, 250, 0.34);
+    }
+
+    html .profile-page .profile-finance-section-title {
+        color: #f1f5f9;
+    }
+
+    html .profile-page .profile-finance-section-subtitle,
+    html .profile-page .profile-finance-premium-description {
+        color: #a8b7ca;
+    }
+
+    html .profile-page .profile-finance-section-icon {
+        background: rgba(96, 165, 250, 0.16);
+        color: #93c5fd;
+    }
+
+    html .profile-page
+    .profile-finance-section-icon.premium {
+        background:
+                linear-gradient(135deg, #304d75, #34385d);
+
+        color: #bfdbfe;
+    }
+
+    html .profile-page .profile-finance-badge {
+        background: #304157;
+        border-color: #475569;
+        color: #cbd5e1;
+    }
+
+    html .profile-page .profile-finance-badge.active {
+        background: rgba(74, 222, 128, 0.14);
+        border-color: rgba(74, 222, 128, 0.3);
+        color: #86efac;
+    }
+
+    html .profile-page .card-demo-note {
+        background: rgba(96, 165, 250, 0.12);
+        border-color: rgba(96, 165, 250, 0.3);
+        color: #bfdbfe;
+    }
+
+    html .profile-page .alert-danger {
+        background: rgba(248, 113, 113, 0.12);
+        border-color: rgba(248, 113, 113, 0.3);
+    }
+
+    html .profile-page .alert-title,
+    html .profile-page .alert-text {
+        color: #fca5a5;
+    }
+
+    /* ========================================
+       8. ЮKASSA / Т-БАНК
+       ======================================== */
+
+    html .profile-page .payment-provider-title {
+        color: #f1f5f9;
+    }
+
+    html .profile-page .payment-provider-card {
+        background: #26364b;
+        border-color: #40516a;
+        color: #f1f5f9;
+    }
+
+    html .profile-page .payment-provider-card.active {
+        background: #223e65;
+        border-color: #60a5fa;
+    }
+
+    html .profile-page .payment-provider-info b,
+    html .profile-page .payment-provider-short {
+        color: #f1f5f9;
+    }
+
+    html .profile-page .payment-provider-info small {
+        color: #a8b7ca;
+    }
+
+    html .profile-page .payment-provider-icon.yookassa {
+        background: rgba(96, 165, 250, 0.18);
+        color: #93c5fd;
+    }
+
+    html .profile-page .payment-provider-icon.tbank {
+        background: #fef08a;
+        color: #111827;
+    }
+
+    /* ========================================
+       9. ПРОФЕССИИ И КАТЕГОРИИ
+       ======================================== */
+
+    html .profile-page .cat-pill {
+        background: #304157;
+        border-color: #475569;
+        color: #cbd5e1;
+        box-shadow: none;
+    }
+
+    html .profile-page .cat-pill.active {
+        background: rgba(96, 165, 250, 0.2);
+        border-color: #60a5fa;
+        color: #bfdbfe;
+    }
+
+    /* ========================================
+       10. МЕСТОПОЛОЖЕНИЕ
+       ======================================== */
+
+    html .profile-page .loc-input,
+    html .profile-page .form-control {
+        background: #142238;
+        border-color: #40516a;
+        color: #f1f5f9;
+        box-shadow: none;
+        color-scheme: dark;
+    }
+
+    html .profile-page .loc-input:focus,
+    html .profile-page .form-control:focus {
+        background: #1d2c43;
+        border-color: #60a5fa;
+    }
+
+    html .profile-page input::placeholder,
+    html .profile-page textarea::placeholder {
+        color: #94a3b8;
+    }
+
+    html .profile-page .loc-suggestions {
+        background: #223147;
+        border-color: #40516a;
+        box-shadow: 0 14px 35px rgba(0, 0, 0, 0.3);
+    }
+
+    html .profile-page .loc-suggestions li {
+        color: #f1f5f9;
+    }
+
+    html .profile-page .loc-suggestions li:active {
+        background: #344760;
+    }
+
+    html .profile-page .gps-confirm {
+        background: #26364b;
+        border-color: #40516a;
+    }
+
+    html .profile-page .gps-title {
+        color: #f1f5f9;
+    }
+
+    html .profile-page .gps-sub,
+    html .profile-page .loc-meta {
+        color: #a8b7ca;
+    }
+
+    html .profile-page .loc-error {
+        color: #fca5a5;
+    }
+
+    /* ========================================
+       11. ДОКУМЕНТЫ И ФОТОГРАФИИ
+       ======================================== */
+
+    html .profile-page .upload-glass {
+        background: #263a56;
+        border-color: #5275a3;
+        color: #93c5fd;
+        box-shadow: none;
+    }
+
+    html .profile-page .docs-block,
+    html .profile-page .doc-tile {
+        background: #223147;
+        border-color: #40516a;
+        box-shadow: none;
+    }
+
+    html .profile-page .doc-pdf {
+        background: #26364b;
+    }
+
+    html .profile-page .docs-count,
+    html .profile-page .doc-pdf-badge {
+        background: #304157;
+        border-color: #475569;
+        color: #bfdbfe;
+    }
+
+    html .profile-page .doc-name,
+    html .profile-page .docs-empty {
+        color: #a8b7ca;
+    }
+
+    /* ========================================
+       12. ВЕРИФИКАЦИЯ ЛИЧНОСТИ И АВТОМОБИЛЯ
+       ======================================== */
+
+    html .profile-page .verification-panel {
+        background: #223147;
+        border-color: #40516a;
+        box-shadow: none;
+    }
+
+    html .profile-page .verification-panel-target {
+        border-color: #60a5fa;
+    }
+
+    html .profile-page .verification-panel-head {
+        color: #f1f5f9;
+    }
+
+    html .profile-page .verification-panel-title {
+        color: #f1f5f9;
+    }
+
+    html .profile-page .verification-panel-subtitle {
+        color: #a8b7ca;
+    }
+
+    html .profile-page .verification-panel-icon {
+        background: #304765;
+        border-color: #5275a3;
+        color: #93c5fd;
+        box-shadow: none;
+    }
+
+    html .profile-page .verification-panel-icon-car {
+        background: #244638;
+        border-color: rgba(74, 222, 128, 0.3);
+        color: #86efac;
+    }
+
+    html .profile-page .verification-panel-content {
+        border-top-color: #40516a;
+    }
+
+    html .profile-page .verification-info-box,
+    html .profile-page .vehicle-verification-intro {
+        background: #26364b;
+        border-color: #40516a;
+        color: #cbd5e1;
+    }
+
+    html .profile-page .verification-info-box strong,
+    html .profile-page .vehicle-verification-intro strong {
+        color: #f1f5f9;
+    }
+
+    html .profile-page .vehicle-field span,
+    html .profile-page .vehicle-photo-hint {
+        color: #a8b7ca;
+    }
+
+    html .profile-page .vehicle-field input {
+        background: #142238;
+        border-color: #40516a;
+        color: #f1f5f9;
+        color-scheme: dark;
+        box-shadow: none;
+    }
+
+    html .profile-page .vehicle-field input:focus {
+        background: #1d2c43;
+        border-color: #60a5fa;
+    }
+
+    html .profile-page .vehicle-photo-preview {
+        background: #26364b;
+        border-color: #40516a;
+        box-shadow: none;
+    }
+
+    /* Статусы автомобиля */
+
+    html .profile-page .vehicle-status-none,
+    html .profile-page .verification-summary-status.empty {
+        background: rgba(251, 191, 36, 0.12);
+        color: #fcd34d;
+        border-color: rgba(251, 191, 36, 0.28);
+    }
+
+    html .profile-page .vehicle-status-pending,
+    html .profile-page .verification-summary-status.pending {
+        background: rgba(251, 191, 36, 0.13);
+        color: #fcd34d;
+        border-color: rgba(251, 191, 36, 0.3);
+    }
+
+    html .profile-page .vehicle-status-verified,
+    html .profile-page .verification-summary-status.verified {
+        background: rgba(74, 222, 128, 0.13);
+        color: #86efac;
+        border-color: rgba(74, 222, 128, 0.3);
+    }
+
+    html .profile-page .vehicle-status-rejected,
+    html .profile-page .verification-summary-status.rejected {
+        background: rgba(248, 113, 113, 0.13);
+        color: #fca5a5;
+        border-color: rgba(248, 113, 113, 0.3);
+    }
+
+    html .profile-page .vehicle-rejected-note {
+        background: rgba(248, 113, 113, 0.12);
+        border-color: rgba(248, 113, 113, 0.3);
+        color: #fca5a5;
+    }
+
+    html .profile-page .vehicle-pending-note {
+        background: rgba(251, 191, 36, 0.12);
+        border-color: rgba(251, 191, 36, 0.3);
+        color: #fcd34d;
+    }
+
+    html .profile-page .vehicle-verified-note {
+        background: rgba(74, 222, 128, 0.12);
+        border-color: rgba(74, 222, 128, 0.3);
+        color: #86efac;
+    }
+
+    /* ========================================
+       13. IDENTITY — ПРОВЕРКА ДОКУМЕНТОВ
+       ======================================== */
+
+    html .profile-page .cc-identity-status-detail,
+    html .profile-page .cc-identity-confirm {
+        background: #26364b;
+        border-color: #40516a;
+        color: #cbd5e1;
+    }
+
+    html .profile-page .cc-identity-status-detail strong {
+        color: #f1f5f9;
+    }
+
+    html .profile-page .cc-identity-status-detail p,
+    html .profile-page .cc-identity-confirm span,
+    html .profile-page .cc-identity-field,
+    html .profile-page .cc-identity-field-title,
+    html .profile-page .cc-identity-note {
+        color: #a8b7ca;
+    }
+
+    html .profile-page .cc-identity-field select {
+        background: #142238;
+        border-color: #40516a;
+        color: #f1f5f9;
+        color-scheme: dark;
+    }
+
+    html .profile-page .cc-identity-file-picker,
+    html .profile-page .cc-identity-refresh {
+        background: #304157;
+        border-color: #5275a3;
+        color: #bfdbfe;
+        box-shadow: none;
+    }
+
+    html .profile-page .cc-identity-file-row {
+        background: #26364b;
+        border-color: #40516a;
+    }
+
+    html .profile-page .cc-identity-file-row span {
+        color: #e2e8f0;
+    }
+
+    html .profile-page .cc-identity-file-row button {
+        background: rgba(248, 113, 113, 0.12);
+        border-color: rgba(248, 113, 113, 0.3);
+        color: #fca5a5;
+    }
+
+    html .profile-page .cc-identity-form {
+        border-top-color: #40516a;
+    }
+
+    html .profile-page .cc-identity-reason,
+    html .profile-page .cc-identity-error {
+        background: rgba(248, 113, 113, 0.12);
+        color: #fca5a5;
+        border-color: rgba(248, 113, 113, 0.3);
+    }
+
+    html .profile-page .cc-identity-success {
+        background: rgba(74, 222, 128, 0.12);
+        color: #86efac;
+        border-color: rgba(74, 222, 128, 0.3);
+    }
+
+    html .profile-page .cc-identity-legacy {
+        background: rgba(96, 165, 250, 0.12);
+        color: #bfdbfe;
+        border-color: rgba(96, 165, 250, 0.3);
+    }
+
+    /* ========================================
+       14. ЛЬГОТЫ
+       ======================================== */
+
+    html .profile-page .cc-benefits-content {
+        border-top-color: #40516a;
+    }
+
+    html .profile-page .cc-benefit-item,
+    html .profile-page .cc-benefits-summary span {
+        background: #26364b;
+        border-color: #40516a;
+        color: #cbd5e1;
+    }
+
+    html .profile-page .cc-benefit-details strong,
+    html .profile-page .cc-benefits-summary strong {
+        color: #f1f5f9;
+    }
+
+    html .profile-page .cc-benefit-details small,
+    html .profile-page .cc-benefit-description,
+    html .profile-page .cc-benefit-date,
+    html .profile-page .cc-benefits-intro,
+    html .profile-page .cc-benefits-footer p,
+    html .profile-page .cc-benefit-file-hint {
+        color: #a8b7ca;
+    }
+
+    html .profile-page .cc-benefit-file-label {
+        color: #e2e8f0;
+    }
+
+    html .profile-page .cc-benefits-toggle,
+    html .profile-page .cc-benefit-file-picker,
+    html .profile-page .cc-benefits-footer button {
+        background: #304157;
+        border-color: #5275a3;
+        color: #bfdbfe;
+        box-shadow: none;
+    }
+
+    html .profile-page .cc-benefit-filename {
+        background: #26364b;
+        color: #bfdbfe;
+    }
+
+    html .profile-page .cc-benefit-upload,
+    html .profile-page .cc-benefits-footer {
+        border-top-color: #40516a;
+    }
+
+    html .profile-page .cc-benefit-status,
+    html .profile-page .cc-benefits-header-status {
+        background: #304157;
+        border-color: #475569;
+        color: #cbd5e1;
+    }
+
+    html .profile-page .cc-benefit-status--verified,
+    html .profile-page .cc-benefits-header-status.is-verified {
+        background: rgba(74, 222, 128, 0.12);
+        color: #86efac;
+        border-color: rgba(74, 222, 128, 0.3);
+    }
+
+    html .profile-page .cc-benefit-status--pending,
+    html .profile-page .cc-benefit-status--expired,
+    html .profile-page .cc-benefits-header-status.is-pending {
+        background: rgba(251, 191, 36, 0.12);
+        color: #fcd34d;
+        border-color: rgba(251, 191, 36, 0.3);
+    }
+
+    html .profile-page .cc-benefit-status--rejected,
+    html .profile-page .cc-benefit-status--revoked {
+        background: rgba(248, 113, 113, 0.12);
+        color: #fca5a5;
+        border-color: rgba(248, 113, 113, 0.3);
+    }
+
+    html .profile-page .cc-benefits-error {
+        background: rgba(248, 113, 113, 0.12);
+        color: #fca5a5;
+    }
+
+    html .profile-page .cc-benefits-success {
+        background: rgba(74, 222, 128, 0.12);
+        color: #86efac;
+    }
+
+    html .profile-page .cc-benefits-legacy {
+        background: rgba(96, 165, 250, 0.12);
+        color: #bfdbfe;
+    }
+
+    /* ========================================
+       15. МОДАЛЬНЫЕ ОКНА ПРОФИЛЯ
+       ======================================== */
+
+    html .profile-page .modal-window {
+        background: #1b2636;
+        border-color: #40516a;
+        color: #f1f5f9;
+        color-scheme: dark;
+    }
+
+    html .profile-page .modal-window h3 {
+        color: #f1f5f9;
+    }
+
+    html .profile-page .modal-content {
+        color: #cbd5e1;
+    }
+
+    html .profile-page .warning {
+        background: rgba(251, 191, 36, 0.12);
+        border-color: rgba(251, 191, 36, 0.3);
+        color: #fcd34d;
+    }
+
+    /* ========================================
+       16. ПРЕДЛОЖИТЬ УЛУЧШЕНИЕ
+       ======================================== */
+
+    html .profile-page .profile-suggestion-close {
+        background: #304157;
+        border-color: #475569;
+        color: #f1f5f9;
+    }
+
+    html .profile-page .profile-suggestion-icon {
+        background: #393022;
+        border-color: rgba(251, 191, 36, 0.3);
+        color: #fcd34d;
+        box-shadow: none;
+    }
+
+    html .profile-page .profile-suggestion-reward {
+        background: #393022;
+        border-color: rgba(251, 191, 36, 0.3);
+        color: #fcd34d;
+    }
+
+    html .profile-page .profile-suggestion-textarea {
+        background: #142238;
+        border-color: #40516a;
+        color: #f1f5f9;
+        box-shadow: none;
+        color-scheme: dark;
+    }
+
+    html .profile-page .profile-suggestion-textarea:focus {
+        background: #1d2c43;
+        border-color: #60a5fa;
+    }
+
+    html .profile-page .profile-suggestion-note {
+        background: #26364b;
+        border-color: #40516a;
+        color: #a8b7ca;
+    }
+
+    /* ========================================
+       17. СОГЛАШЕНИЕ ОБ ОПЛАТЕ
+       ======================================== */
+
+    html .profile-page .agreement-modal {
+        background: #1b2636;
+        border-color: #40516a;
+        color: #f1f5f9;
+        color-scheme: dark;
+    }
+
+    html .profile-page .agreement-head,
+    html .profile-page .agreement-check {
+        border-color: #40516a;
+    }
+
+    html .profile-page .agreement-title {
+        color: #f1f5f9;
+    }
+
+    html .profile-page .agreement-body {
+        color: #cbd5e1;
+    }
+
+    html .profile-page .agreement-check {
+        background: #223147;
+        color: #f1f5f9;
+    }
+
+    html .profile-page .agreement-close {
+        background: #304157;
+        border-color: #475569;
+        color: #f1f5f9;
+    }
+
+    html .profile-page .agreement-button:disabled {
+        background: #304157;
+        border-color: #475569;
+        color: #94a3b8;
+    }
+
+    /* ========================================
+       18. ЯНДЕКС-КАРТА
+       React Portal находится вне .profile-page
+       ======================================== */
+
+    html body:has(.profile-page)
+    .yandex-map-modal-overlay .glass-modal {
+        background: #1b2636;
+        border-color: #40516a;
+        color: #f1f5f9;
+        color-scheme: dark;
+    }
+
+    html body:has(.profile-page)
+    .yandex-map-modal-overlay .glass-modal-title,
+    html body:has(.profile-page)
+    .yandex-map-modal-overlay .glass-picked-value {
+        color: #f1f5f9;
+    }
+
+    html body:has(.profile-page)
+    .yandex-map-modal-overlay .glass-modal-subtitle,
+    html body:has(.profile-page)
+    .yandex-map-modal-overlay .glass-picked-label {
+        color: #a8b7ca;
+    }
+
+    html body:has(.profile-page)
+    .yandex-map-modal-overlay .glass-modal-head {
+        border-bottom-color: #40516a;
+    }
+
+    html body:has(.profile-page)
+    .yandex-map-modal-overlay .glass-modal-footer,
+    html body:has(.profile-page)
+    .yandex-map-modal-overlay .glass-picked {
+        background: #223147;
+        border-color: #40516a;
+        box-shadow: none;
+    }
+
+    html body:has(.profile-page)
+    .yandex-map-modal-overlay .glass-icon-btn,
+    html body:has(.profile-page)
+    .yandex-map-modal-overlay .glass-actions .btn {
+        background: #304157;
+        border-color: #475569;
+        color: #f1f5f9;
+        box-shadow: none;
+    }
+
+    html body:has(.profile-page)
+    .yandex-map-modal-overlay .glass-actions .btn.btn-primary {
+        background: #2563eb;
+        border-color: #2563eb;
+        color: #ffffff;
+    }
+
+    html body:has(.profile-page)
+    .yandex-map-modal-overlay .glass-map-loading {
+        background: #26364b;
+        border-color: #40516a;
+        color: #f1f5f9;
+    }
+
+    /* ========================================
+       19. ЗАГРУЗКА ПРОФИЛЯ
+       ======================================== */
+
+    html .profile-loading {
+        background:
+                linear-gradient(180deg, #101824, #172338);
+
+        color: #cbd5e1;
+    }
+
+    html .profile-error {
+        color: #fca5a5;
+    }
+}
