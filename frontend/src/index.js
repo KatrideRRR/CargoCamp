@@ -19,6 +19,7 @@ import {resyncPushRegistration,} from "./utils/pushNotifications";
 import { disconnectSocket } from "./socketClient";
 import "./utils/axiosInstance";
 import "./styles/global.css";
+import "./styles/darkTheme.css";
 
 Modal.setAppElement('#root');
 

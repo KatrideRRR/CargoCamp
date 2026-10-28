@@ -1,0 +1,262 @@
+/* ============================================
+   CARGOCAMP — DARK THEME
+   Автоматическое переключение по теме устройства
+   ============================================ */
+
+/* Общие цвета для будущих страниц */
+
+:root {
+    --cc-bg: #f4f5f7;
+    --cc-surface: #ffffff;
+    --cc-surface-soft: #f8fafc;
+    --cc-text: #0f172a;
+    --cc-muted: #64748b;
+    --cc-border: #e2e8f0;
+    --cc-primary: #2563eb;
+}
+
+/* ============================================
+   DARK MODE
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+
+    /* ОСНОВНЫЕ ПЕРЕМЕННЫЕ */
+
+    html:root {
+        --cc-bg: #101824;
+        --cc-surface: #1b2636;
+        --cc-surface-soft: #243247;
+
+        --cc-text: #f1f5f9;
+        --cc-muted: #94a3b8;
+        --cc-border: #334155;
+        --cc-primary: #60a5fa;
+
+        --app-system-bar-background: #101824;
+
+        /* Стартовая страница */
+
+        --start-bg-1: #101824;
+        --start-bg-2: #172338;
+
+        --start-text: #f1f5f9;
+        --start-muted: #94a3b8;
+
+        --start-card: rgba(30, 41, 59, 0.94);
+        --start-card-border: rgba(148, 163, 184, 0.16);
+
+        --start-shadow-soft:
+                0 6px 20px rgba(0, 0, 0, 0.22);
+
+        --start-shadow-hover:
+                0 10px 28px rgba(0, 0, 0, 0.3);
+
+        /* Нижнее меню */
+
+        --bm-text: #cbd5e1;
+        --bm-muted: #94a3b8;
+
+        --bm-active: #60a5fa;
+        --bm-active-soft: rgba(96, 165, 250, 0.15);
+
+        --bm-bg: rgba(24, 34, 49, 0.96);
+        --bm-border: rgba(148, 163, 184, 0.17);
+    }
+
+    /* ========================================
+       СИСТЕМНЫЙ ФОН
+       ======================================== */
+
+    html.start-page-open,
+    html body.start-page-open {
+        background: #101824;
+    }
+
+    html .app-loading {
+        color: var(--cc-text);
+    }
+
+    /* ========================================
+       СТАРТОВАЯ СТРАНИЦА
+       ======================================== */
+
+    html .start-page-container {
+        color: var(--start-text);
+        color-scheme: dark;
+    }
+
+    html .start-page-role-button {
+        color: var(--start-text);
+    }
+
+    html .start-page-role-button-soft {
+        background: #202d40;
+    }
+
+    html .start-page-emoji {
+        background: #2b3b51;
+    }
+
+    html .start-page-download-section {
+        border-top-color: rgba(148, 163, 184, 0.18);
+    }
+
+    html .start-page-download-note {
+        color: #94a3b8;
+    }
+
+    /* ========================================
+       НИЖНЕЕ МЕНЮ
+       ======================================== */
+
+    html .bottom-menu {
+        color: var(--bm-text);
+        color-scheme: dark;
+    }
+
+    html .bottom-menu__shell,
+    html .bottom-menu--ios .bottom-menu__shell,
+    html .bottom-menu--android .bottom-menu__shell {
+        background: rgba(24, 34, 49, 0.96);
+
+        border-color: rgba(148, 163, 184, 0.17);
+
+        box-shadow:
+                0 -8px 26px rgba(0, 0, 0, 0.25),
+                0 8px 24px rgba(0, 0, 0, 0.2);
+
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+    }
+
+    html .bottom-menu__center {
+        color: #60a5fa;
+
+        background:
+                linear-gradient(
+                        180deg,
+                        #2a3d59 0%,
+                        #1a2b43 100%
+                );
+
+        border-color: rgba(96, 165, 250, 0.35);
+
+        box-shadow:
+                0 10px 25px rgba(0, 0, 0, 0.3),
+                0 4px 12px rgba(37, 99, 235, 0.12);
+    }
+
+    html .bottom-menu__center::after {
+        background:
+                linear-gradient(
+                        180deg,
+                        #304765,
+                        #213652
+                );
+
+        border-color: rgba(96, 165, 250, 0.2);
+
+        box-shadow: none;
+    }
+
+    html .bottom-menu__center.is-active {
+        color: #93c5fd;
+
+        background:
+                linear-gradient(
+                        180deg,
+                        #304a6c,
+                        #203a5a
+                );
+
+        border-color: rgba(96, 165, 250, 0.5);
+    }
+
+    html .bottom-menu__center-icon {
+        color: #93c5fd;
+        filter: none;
+    }
+
+    html .bottom-menu__center-shine {
+        background:
+                linear-gradient(
+                        180deg,
+                        rgba(255, 255, 255, 0.12),
+                        transparent
+                );
+    }
+
+    html .bottom-menu__badge {
+        border-color: #182231;
+    }
+
+    /* ========================================
+       МОДАЛЬНОЕ ОКНО СТАРТОВОЙ СТРАНИЦЫ
+       ======================================== */
+
+    html .start-page-ios-modal {
+        color-scheme: dark;
+
+        background:
+                linear-gradient(
+                        180deg,
+                        #25354a,
+                        #172338
+                );
+
+        border-color: rgba(148, 163, 184, 0.2);
+
+        color: #f1f5f9;
+    }
+
+    html .start-page-ios-modal-title,
+    html .start-page-ios-step-title {
+        color: #f1f5f9;
+    }
+
+    html .start-page-ios-modal-description,
+    html .start-page-ios-step-text {
+        color: #a8b7ca;
+    }
+
+    html .start-page-ios-modal-close {
+        background: #304157;
+        color: #f1f5f9;
+
+        border-color: #475569;
+    }
+
+    html .start-page-ios-modal-icon {
+        background: #304157;
+        color: #f1f5f9;
+
+        border-color: #475569;
+    }
+
+    html .start-page-ios-step {
+        background: #202f44;
+        border-color: #374860;
+
+        box-shadow: none;
+    }
+
+    html .start-page-ios-step-number {
+        background: rgba(96, 165, 250, 0.15);
+        color: #93c5fd;
+    }
+
+    html .start-page-ios-modal-button-secondary {
+        background: #304157;
+        color: #f1f5f9;
+
+        border-color: #475569;
+    }
+
+    html .start-page-ios-modal-note {
+        background: #202f44;
+        color: #a8b7ca;
+
+        border-color: #374860;
+    }
+}
