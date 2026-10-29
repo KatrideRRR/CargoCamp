@@ -1,0 +1,718 @@
+/* ================================================
+   CARGOCAMP — CREATE EXPRESS ORDER DARK THEME
+
+   Такси / Курьер
+   Карта / Маршрут / Стоимость
+   ================================================ */
+
+@media (prefers-color-scheme: dark) {
+
+    /* ============================================
+       1. ОСНОВНАЯ СТРАНИЦА
+       ============================================ */
+
+    html .exo-page {
+        --exo-bg1: #101824;
+        --exo-bg2: #172338;
+
+        --exo-text: #f1f5f9;
+        --exo-muted: #a8b7ca;
+
+        --exo-glass: #1b293d;
+        --exo-border: rgba(148, 163, 184, 0.2);
+
+        --exo-shadow:
+                0 12px 32px rgba(0, 0, 0, 0.24);
+
+        --exo-primary: #93c5fd;
+
+        background:
+                radial-gradient(
+                        circle at 12% 8%,
+                        rgba(37, 99, 235, 0.14),
+                        transparent 36%
+                ),
+                linear-gradient(
+                        180deg,
+                        #101824,
+                        #172338
+                );
+
+        color: var(--exo-text);
+        color-scheme: dark;
+    }
+
+    /* ============================================
+       2. ОСНОВНЫЕ КАРТОЧКИ
+       ============================================ */
+
+    html .exo-page .exo-glass {
+        background:
+                linear-gradient(
+                        180deg,
+                        #223147,
+                        #1b2636
+                );
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow: var(--exo-shadow);
+    }
+
+    html .exo-page .exo-glass::before {
+        background:
+                linear-gradient(
+                        180deg,
+                        rgba(96, 165, 250, 0.06),
+                        transparent
+                );
+
+        opacity: 1;
+    }
+
+    html .exo-page .exo-header {
+        background: #223147;
+    }
+
+    /* ============================================
+       3. ЗАГОЛОВКИ
+       ============================================ */
+
+    html .exo-page .exo-title,
+    html .exo-page .exo-cardTitle {
+        color: #f1f5f9;
+    }
+
+    html .exo-page .exo-subtitle,
+    html .exo-page .exo-cardSub {
+        color: #a8b7ca;
+    }
+
+    /* ============================================
+       4. ИНФОРМАЦИОННЫЕ ЗНАЧКИ
+       ============================================ */
+
+    html .exo-page .exo-pill {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #e2e8f0;
+
+        box-shadow: none;
+    }
+
+    /* ============================================
+       5. ПЕРЕКЛЮЧАТЕЛЬ ТАКСИ / КУРЬЕР
+       ============================================ */
+
+    html .exo-page .exo-typeBtn {
+        background: #26364b;
+
+        border-color: #40516a;
+
+        color: #e2e8f0;
+
+        box-shadow: none;
+    }
+
+    html .exo-page .exo-typeBtn:hover {
+        background: #304157;
+
+        box-shadow: none;
+    }
+
+    html .exo-page .exo-typeBtn.isActive {
+        background:
+                linear-gradient(
+                        135deg,
+                        #284569,
+                        #203e62
+                );
+
+        border-color: #60a5fa;
+
+        color: #bfdbfe;
+
+        box-shadow:
+                0 0 0 3px rgba(96, 165, 250, 0.12);
+    }
+
+    html .exo-page .exo-typeIcon {
+        color: inherit;
+    }
+
+    /* ============================================
+       6. ПОЛЯ МАРШРУТА
+       ============================================ */
+
+    html .exo-page .exo-field {
+        background: #26364b;
+
+        border-color: #40516a;
+
+        box-shadow: none;
+    }
+
+    html .exo-page .exo-label {
+        color: #cbd5e1;
+    }
+
+    html .exo-page .exo-control {
+        background: #142238;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow: none;
+
+        color-scheme: dark;
+    }
+
+    html .exo-page .exo-control:focus {
+        background: #1d2c43;
+
+        border-color: #60a5fa;
+
+        box-shadow:
+                0 0 0 3px rgba(96, 165, 250, 0.13);
+    }
+
+    html .exo-page .exo-control::placeholder {
+        color: #94a3b8;
+        opacity: 1;
+    }
+
+    /* ============================================
+       7. КНОПКИ GPS / КАРТА
+       ============================================ */
+
+    html .exo-page .exo-miniBtn {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #e2e8f0;
+
+        box-shadow: none;
+    }
+
+    html .exo-page .exo-miniBtn:hover {
+        background: #40516a;
+
+        box-shadow: none;
+    }
+
+    html .exo-page .exo-miniBtn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* ============================================
+       8. ПОДСКАЗКИ АДРЕСОВ
+       ============================================ */
+
+    html .exo-page .suggestions {
+        background: #1b293d;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow:
+                0 10px 28px rgba(0, 0, 0, 0.24);
+    }
+
+    html .exo-page .suggestions li {
+        color: #e2e8f0;
+
+        border-bottom-color: #35465d;
+    }
+
+    html .exo-page .suggestions li:hover {
+        background: #304157;
+
+        color: #ffffff;
+    }
+
+    /* ============================================
+       9. СТАТУС МАРШРУТА
+       ============================================ */
+
+    html .exo-page .exo-note,
+    html .exo-page .exo-hint {
+        color: #a8b7ca;
+    }
+
+    /* ============================================
+       10. РЕКОМЕНДУЕМАЯ СТОИМОСТЬ
+       ============================================ */
+
+    html .exo-page .exo-recoMini {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #bfdbfe;
+    }
+
+    html .exo-page .exo-priceCalculation {
+        background: #223e65;
+
+        border-color: #5275a3;
+    }
+
+    html .exo-page .exo-priceCalculationRow {
+        color: #cbd5e1;
+    }
+
+    html .exo-page .exo-priceCalculationRow strong {
+        color: #f1f5f9;
+    }
+
+    html .exo-page .exo-priceCalculationRow.total {
+        color: #bfdbfe;
+
+        border-top-color: #5275a3;
+    }
+
+    html .exo-page .exo-priceCalculationRow.total strong {
+        color: #bfdbfe;
+    }
+
+    html .exo-page .exo-priceRouteInfo {
+        color: #a8b7ca;
+    }
+
+    /* ============================================
+       11. СРАВНЕНИЕ ЦЕНЫ С РЕКОМЕНДАЦИЕЙ
+       ============================================ */
+
+    html .exo-page .exo-priceDifference--low {
+        background: rgba(248, 113, 113, 0.12);
+
+        border-color: rgba(248, 113, 113, 0.3);
+
+        color: #fca5a5;
+    }
+
+    html .exo-page .exo-priceDifference--high {
+        background: rgba(251, 191, 36, 0.12);
+
+        border-color: rgba(251, 191, 36, 0.3);
+
+        color: #fcd34d;
+    }
+
+    html .exo-page .exo-priceDifference--normal {
+        background: rgba(74, 222, 128, 0.12);
+
+        border-color: rgba(74, 222, 128, 0.3);
+
+        color: #86efac;
+    }
+
+    /* ============================================
+       12. ДОПОЛНИТЕЛЬНЫЕ ОПЦИИ
+       ============================================ */
+
+    html .exo-page .exo-chipsTitle {
+        color: #cbd5e1;
+    }
+
+    html .exo-page .exo-chip {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #e2e8f0;
+
+        box-shadow: none;
+    }
+
+    html .exo-page .exo-chip:hover {
+        background: #40516a;
+    }
+
+    html .exo-page .exo-chip.selected {
+        background: #284569;
+
+        border-color: #60a5fa;
+
+        color: #bfdbfe;
+
+        box-shadow:
+                0 0 0 3px rgba(96, 165, 250, 0.1);
+    }
+
+    html .exo-page .exo-chipText {
+        color: inherit;
+    }
+
+    /* ============================================
+       13. ДРУГИЕ КАРТОЧКИ И ВАРИАНТЫ ОПЛАТЫ
+       ============================================ */
+
+    html .exo-page
+    :is(
+        .exo-pickedTag,
+        .exo-payTile,
+        .exo-subcatBtn
+    ) {
+        background: #26364b;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow: none;
+    }
+
+    html .exo-page
+    :is(
+        .exo-payTile.selected,
+        .exo-subcatBtn.selected
+    ) {
+        background: #284569;
+
+        border-color: #60a5fa;
+
+        color: #bfdbfe;
+    }
+
+    html .exo-page
+    :is(
+        .exo-subcatLabel,
+        .exo-payLabel
+    ) {
+        color: #e2e8f0;
+    }
+
+    /* ============================================
+       14. ОШИБКИ
+       ============================================ */
+
+    html .exo-page .exo-glass.exo-alert,
+    html .exo-page .exo-alert {
+        background: #412832;
+
+        border-color: rgba(248, 113, 113, 0.35);
+
+        color: #fca5a5;
+    }
+
+    html .exo-page .exo-alertText {
+        color: #fca5a5;
+    }
+
+    /* ============================================
+       15. КНОПКИ СОЗДАНИЯ
+       ============================================ */
+
+    html .exo-page .exo-btn {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #f1f5f9;
+
+        box-shadow: none;
+    }
+
+    html .exo-page .exo-btn.exo-btnPrimary {
+        background:
+                linear-gradient(
+                        135deg,
+                        #2563eb,
+                        #1d4ed8
+                );
+
+        border-color: #3b72d0;
+
+        color: #ffffff;
+
+        box-shadow:
+                0 6px 18px rgba(37, 99, 235, 0.18);
+    }
+
+    html .exo-page .exo-btn:disabled {
+        opacity: 0.5;
+    }
+
+    /* ============================================
+       16. ПРОСМОТР МАРШРУТА A → B
+       React Modal находится вне .exo-page.
+       ============================================ */
+
+    html .exo-overlay {
+        background: rgba(3, 8, 18, 0.78);
+    }
+
+    html .exo-modal {
+        background:
+                linear-gradient(
+                        180deg,
+                        #223147,
+                        #1b2636
+                );
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow:
+                0 24px 65px rgba(0, 0, 0, 0.4);
+
+        color-scheme: dark;
+    }
+
+    html .exo-modalTitle {
+        color: #f1f5f9;
+    }
+
+    html .exo-modalSub {
+        color: #a8b7ca;
+    }
+
+    html .exo-x {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #f1f5f9;
+    }
+
+    /* Адреса маршрута */
+
+    html .exo-modal .exo-previewRow {
+        background: #26364b;
+
+        border-color: #40516a;
+    }
+
+    html .exo-modal .exo-previewLabel {
+        color: #a8b7ca;
+    }
+
+    html .exo-modal .exo-previewText {
+        color: #f1f5f9;
+    }
+
+    /* Карта маршрута */
+
+    html .exo-modal .exo-routeMapWrap {
+        background: #142238;
+
+        border-color: #40516a;
+    }
+
+    html .exo-modal .exo-routeLoading {
+        background: rgba(20, 34, 56, 0.82);
+
+        color: #f1f5f9;
+    }
+
+    /* Статистика маршрута */
+
+    html .exo-modal .exo-routeStats {
+        color: #cbd5e1;
+    }
+
+    html .exo-modal .exo-routeStats b {
+        color: #f1f5f9;
+    }
+
+    /* Ошибки построения маршрута */
+
+    html .exo-modal .exo-alert {
+        background: #412832;
+
+        border-color: rgba(248, 113, 113, 0.35);
+
+        color: #fca5a5;
+    }
+
+    html .exo-modal .exo-alertText {
+        color: #fca5a5;
+    }
+
+    /* Кнопки модального окна */
+
+    html .exo-modal .exo-btn {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #f1f5f9;
+
+        box-shadow: none;
+    }
+
+    html .exo-modal .exo-btn.exo-btnPrimary {
+        background:
+                linear-gradient(
+                        135deg,
+                        #2563eb,
+                        #1d4ed8
+                );
+
+        border-color: #3b72d0;
+
+        color: #ffffff;
+    }
+
+    html .exo-modal .exo-btn:disabled {
+        opacity: 0.5;
+    }
+
+    /* ============================================
+       17. ЯНДЕКС.КАРТА — ВЫБОР ТОЧКИ
+       Модальное окно создаётся в document.body.
+
+       :has(.exo-page) ограничивает правила
+       страницей создания экспресс-заказа.
+       ============================================ */
+
+    html body:has(.exo-page)
+    .yandex-map-modal-overlay {
+        background: rgba(3, 8, 18, 0.78);
+    }
+
+    html body:has(.exo-page)
+    .yandex-map-modal-overlay .glass-modal {
+        background:
+                linear-gradient(
+                        180deg,
+                        #223147,
+                        #1b2636
+                );
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow:
+                0 24px 65px rgba(0, 0, 0, 0.4);
+
+        color-scheme: dark;
+    }
+
+    /* Шапка карты */
+
+    html body:has(.exo-page)
+    .yandex-map-modal-overlay .glass-modal-head {
+        border-bottom-color: #40516a;
+    }
+
+    html body:has(.exo-page)
+    .yandex-map-modal-overlay .glass-modal-title {
+        color: #f1f5f9;
+    }
+
+    html body:has(.exo-page)
+    .yandex-map-modal-overlay .glass-modal-subtitle {
+        color: #a8b7ca;
+    }
+
+    html body:has(.exo-page)
+    .yandex-map-modal-overlay .glass-icon-btn {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #f1f5f9;
+
+        box-shadow: none;
+    }
+
+    /* Область карты */
+
+    html body:has(.exo-page)
+    .yandex-map-modal-overlay .glass-map {
+        background: #142238;
+
+        border-color: #40516a;
+
+        box-shadow: none;
+    }
+
+    html body:has(.exo-page)
+    .yandex-map-modal-overlay .glass-map-loading {
+        background: #26364b;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+    }
+
+    /* Ошибка геокодирования */
+
+    html body:has(.exo-page)
+    .yandex-map-modal-overlay .glass-error {
+        background: #412832;
+
+        border-color: rgba(248, 113, 113, 0.35);
+
+        color: #fca5a5;
+    }
+
+    /* Нижняя панель карты */
+
+    html body:has(.exo-page)
+    .yandex-map-modal-overlay .glass-modal-footer {
+        background: #1b2636;
+
+        border-top-color: #40516a;
+    }
+
+    html body:has(.exo-page)
+    .yandex-map-modal-overlay .glass-picked {
+        background: #26364b;
+
+        border-color: #40516a;
+
+        box-shadow: none;
+    }
+
+    html body:has(.exo-page)
+    .yandex-map-modal-overlay .glass-picked-label {
+        color: #a8b7ca;
+    }
+
+    html body:has(.exo-page)
+    .yandex-map-modal-overlay .glass-picked-value {
+        color: #f1f5f9;
+    }
+
+    /* Кнопки карты */
+
+    html body:has(.exo-page)
+    .yandex-map-modal-overlay .btn.btn-ghost {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #f1f5f9;
+
+        box-shadow: none;
+    }
+
+    html body:has(.exo-page)
+    .yandex-map-modal-overlay .btn.btn-primary {
+        background:
+                linear-gradient(
+                        135deg,
+                        #2563eb,
+                        #1d4ed8
+                );
+
+        border-color: #3b72d0;
+
+        color: #ffffff;
+
+        box-shadow: none;
+    }
+}
