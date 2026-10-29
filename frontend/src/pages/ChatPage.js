@@ -5,6 +5,7 @@ import DisputeEvidenceInput from "../components/DisputeEvidenceInput";
 import axiosInstance from "../utils/axiosInstance";
 import { useParams, useNavigate } from "react-router-dom";
 import "../styles/ChatPage.css";
+import "../styles/ChatPageDark.css";
 import { useUser } from "../utils/userContext";
 import { socket } from "../socketClient";
 import Modal from "react-modal";

@@ -1,0 +1,517 @@
+/* ============================================
+   CARGOCAMP — CHAT DARK THEME
+
+   Автоматическая тёмная тема
+   для сайта, iOS и Android.
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+
+    /* ========================================
+       1. ОСНОВНЫЕ ЦВЕТА
+       ======================================== */
+
+    html .chat-page {
+        --chat-bg: #101824;
+        --chat-surface: #1b2636;
+        --chat-surface-soft: #243247;
+
+        --chat-text: #f1f5f9;
+        --chat-muted: #94a3b8;
+
+        --chat-border: rgba(148, 163, 184, 0.2);
+
+        --chat-primary: #60a5fa;
+        --chat-success: #4ade80;
+        --chat-warning: #fbbf24;
+        --chat-danger: #f87171;
+
+        background: var(--chat-bg);
+        color: var(--chat-text);
+        color-scheme: dark;
+    }
+
+    html .chat-page--web {
+        background:
+                radial-gradient(
+                        circle at 15% 8%,
+                        rgba(37, 99, 235, 0.12),
+                        transparent 38%
+                ),
+                #101824;
+    }
+
+    html .chat-page .chat-container,
+    html .chat-page--android .chat-container {
+        background: #121e2d;
+        color: var(--chat-text);
+    }
+
+    /* ========================================
+       2. ШАПКА ЧАТА
+       ======================================== */
+
+    html .chat-page .chat-header,
+    html .chat-page--ios .chat-header {
+        background: rgba(27, 38, 54, 0.97);
+
+        border-bottom-color: var(--chat-border);
+
+        color: var(--chat-text);
+    }
+
+    html .chat-page--android .chat-header {
+        border-bottom-color: var(--chat-border);
+    }
+
+    html .chat-page .chat-back-button {
+        background: #304157;
+        color: #e2e8f0;
+        box-shadow: none;
+    }
+
+    html .chat-page .chat-header-title {
+        color: #f1f5f9;
+    }
+
+    html .chat-page .chat-header-subtitle {
+        color: #94a3b8;
+    }
+
+    /* ========================================
+       3. АВАТАРЫ
+       ======================================== */
+
+    html .chat-page .chat-avatar,
+    html .chat-page .chat-message-avatar {
+        background: #304157;
+        border-color: #40516a;
+    }
+
+    html .chat-page .chat-avatar-placeholder {
+        background:
+                linear-gradient(
+                        145deg,
+                        #304765,
+                        #20334e
+                );
+
+        color: #bfdbfe;
+    }
+
+    /* ========================================
+       4. КАРТОЧКА ЗАКАЗА
+       ======================================== */
+
+    html .chat-page .chat-order-card {
+        background:
+                linear-gradient(
+                        180deg,
+                        #223147,
+                        #1b293d
+                );
+
+        border-color: #40516a;
+
+        box-shadow:
+                0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    html .chat-page .chat-order-main {
+        background: transparent;
+        color: #f1f5f9;
+    }
+
+    html .chat-page .chat-order-title {
+        color: #f1f5f9;
+    }
+
+    /* ========================================
+       5. СТАТУСЫ ЗАКАЗА
+       ======================================== */
+
+    html .chat-page .chat-order-status {
+        background: #304157;
+        color: #cbd5e1;
+    }
+
+    html .chat-page
+    :is(.status-active, .status-completed) {
+        background: rgba(74, 222, 128, 0.14);
+        color: #86efac;
+    }
+
+    html .chat-page .status-pending {
+        background: rgba(96, 165, 250, 0.14);
+        color: #93c5fd;
+    }
+
+    html .chat-page .status-pending_payment {
+        background: rgba(251, 191, 36, 0.14);
+        color: #fcd34d;
+    }
+
+    html .chat-page .status-expired {
+        background: rgba(248, 113, 113, 0.14);
+        color: #fca5a5;
+    }
+
+    /* ========================================
+       6. КНОПКИ ЗАКАЗА
+       ======================================== */
+
+    html .chat-page .chat-order-btn.route {
+        background: rgba(96, 165, 250, 0.16);
+        color: #93c5fd;
+    }
+
+    html .chat-page .chat-order-btn.call {
+        background: rgba(74, 222, 128, 0.14);
+        color: #86efac;
+    }
+
+    html .chat-page .chat-order-btn.dispute {
+        background: rgba(251, 191, 36, 0.14);
+        color: #fcd34d;
+    }
+
+    html .chat-page .chat-order-btn.dispute.opened {
+        background: rgba(248, 113, 113, 0.14);
+        color: #fca5a5;
+    }
+
+    /*
+       Сохраняем существующие размеры,
+       центрирование и сетку кнопок.
+    */
+
+    /* ========================================
+       7. ОБЛАСТЬ ПЕРЕПИСКИ
+       ======================================== */
+
+    html .chat-page .chat-messages {
+        background:
+                radial-gradient(
+                        circle at 80% 10%,
+                        rgba(37, 99, 235, 0.07),
+                        transparent 35%
+                ),
+                #121e2d;
+
+        color: #f1f5f9;
+
+        scrollbar-color: #40516a transparent;
+    }
+
+    html .chat-page
+    .chat-messages::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    html .chat-page
+    .chat-messages::-webkit-scrollbar-thumb {
+        background: #40516a;
+        border-radius: 999px;
+    }
+
+    /* ========================================
+       8. РАЗДЕЛИТЕЛЬ ДАТ
+       ======================================== */
+
+    html .chat-page .chat-date-pill {
+        background: rgba(48, 65, 87, 0.92);
+
+        border-color: #40516a;
+
+        color: #cbd5e1;
+
+        box-shadow: none;
+    }
+
+    /* ========================================
+       9. МОИ СООБЩЕНИЯ
+       ======================================== */
+
+    html .chat-page .chat-message-sent {
+        background:
+                linear-gradient(
+                        145deg,
+                        #2855a0,
+                        #20457f
+                );
+
+        color: #ffffff;
+
+        box-shadow:
+                0 5px 16px rgba(0, 0, 0, 0.16);
+    }
+
+    html .chat-page .chat-message-sent p {
+        color: #ffffff;
+    }
+
+    html .chat-page
+    .chat-message-sent .chat-message-time {
+        color: #bfdbfe;
+    }
+
+    html .chat-page
+    .chat-message-sent .chat-checks {
+        color: #93c5fd;
+    }
+
+    /* ========================================
+       10. СООБЩЕНИЯ СОБЕСЕДНИКА
+       ======================================== */
+
+    html .chat-page .chat-message-received {
+        background: #26364b;
+
+        color: #f1f5f9;
+
+        border: 1px solid
+        rgba(148, 163, 184, 0.14);
+
+        box-shadow:
+                0 5px 16px rgba(0, 0, 0, 0.12);
+    }
+
+    html .chat-page .chat-message-received p {
+        color: #f1f5f9;
+    }
+
+    html .chat-page
+    .chat-message-received .chat-message-time {
+        color: #94a3b8;
+    }
+
+    /* ========================================
+       11. ПУСТОЙ ЧАТ И ЗАГРУЗКА
+       ======================================== */
+
+    html .chat-page
+    :is(.chat-empty, .chat-loading, .chat-error) {
+        color: #cbd5e1;
+    }
+
+    html .chat-page .chat-empty small {
+        color: #94a3b8;
+    }
+
+    html .chat-page .chat-error {
+        color: #fca5a5;
+    }
+
+    /* ========================================
+       12. НИЖНЯЯ ПАНЕЛЬ
+       ======================================== */
+
+    html .chat-page .chat-input-container,
+    html .chat-page--ios .chat-input-container {
+        background: rgba(27, 38, 54, 0.97);
+
+        border-top-color: #40516a;
+
+        color: #f1f5f9;
+
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+    }
+
+    /*
+       Не изменяем высоту, safe-area,
+       отступы и поведение клавиатуры.
+    */
+
+    /* ========================================
+       13. ПОЛЕ ВВОДА
+       ======================================== */
+
+    html .chat-page .chat-input {
+        background: #142238;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow: none;
+
+        color-scheme: dark;
+    }
+
+    html .chat-page .chat-input:focus {
+        background: #1c2c43;
+
+        border-color: #60a5fa;
+
+        box-shadow:
+                0 0 0 3px rgba(96, 165, 250, 0.12);
+    }
+
+    html .chat-page .chat-input::placeholder {
+        color: #94a3b8;
+        opacity: 1;
+    }
+
+    /* ========================================
+       14. КНОПКА ОТПРАВКИ
+       ======================================== */
+
+    html .chat-page .chat-send-button {
+        background:
+                linear-gradient(
+                        135deg,
+                        #2563eb,
+                        #1d4ed8
+                );
+
+        color: #ffffff;
+
+        box-shadow:
+                0 6px 18px rgba(37, 99, 235, 0.2);
+    }
+
+    html .chat-page .chat-send-button:disabled {
+        background: #304157;
+
+        color: #94a3b8;
+
+        opacity: 0.7;
+
+        box-shadow: none;
+    }
+
+    /* ========================================
+       15. ОКНО СПОРА
+       React Modal вне .chat-page
+       ======================================== */
+
+    html .chat-dispute-overlay {
+        background: rgba(3, 8, 18, 0.75);
+    }
+
+    html .chat-dispute-modal {
+        background: #1b2636;
+
+        border: 1px solid #40516a;
+
+        color: #f1f5f9;
+
+        color-scheme: dark;
+
+        box-shadow:
+                0 24px 70px rgba(0, 0, 0, 0.4);
+    }
+
+    html .chat-dispute-content {
+        color: #f1f5f9;
+    }
+
+    html .chat-dispute-close {
+        background: #304157;
+        color: #f1f5f9;
+    }
+
+    html .chat-dispute-title {
+        color: #f1f5f9;
+    }
+
+    html .chat-dispute-order {
+        color: #a8b7ca;
+    }
+
+    html .chat-dispute-group label {
+        color: #e2e8f0;
+    }
+
+    /* ========================================
+       16. ПОЛЯ СПОРА
+       ======================================== */
+
+    html .chat-dispute-input,
+    html .chat-dispute-textarea {
+        background: #142238;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        color-scheme: dark;
+    }
+
+    html .chat-dispute-input:focus,
+    html .chat-dispute-textarea:focus {
+        background: #1c2c43;
+        border-color: #60a5fa;
+
+        box-shadow:
+                0 0 0 3px rgba(96, 165, 250, 0.12);
+    }
+
+    html .chat-dispute-input::placeholder,
+    html .chat-dispute-textarea::placeholder {
+        color: #94a3b8;
+    }
+
+    html .chat-dispute-input option {
+        background: #1b293d;
+        color: #f1f5f9;
+    }
+
+    /* ========================================
+       17. ФОТОГРАФИИ-ДОКАЗАТЕЛЬСТВА
+       ======================================== */
+
+    /*
+       DisputeEvidenceInput использует inline
+       стили — переопределяем только текст
+       и кнопку выбора фото внутри окна спора.
+    */
+
+    html .chat-dispute-content
+    > div[style] > p[style] {
+        color: #a8b7ca !important;
+    }
+
+    html .chat-dispute-content
+    > div[style] > label[style] {
+        background: #26364b;
+
+        border-color: #60a5fa !important;
+
+        color: #93c5fd !important;
+    }
+
+    html .chat-dispute-content
+    > div[style] small {
+        color: #cbd5e1;
+    }
+
+    /* ========================================
+       18. КНОПКИ СПОРА
+       ======================================== */
+
+    html .chat-dispute-cancel {
+        background: #304157;
+        color: #f1f5f9;
+    }
+
+    html .chat-dispute-submit {
+        background:
+                linear-gradient(
+                        135deg,
+                        #2563eb,
+                        #1d4ed8
+                );
+
+        color: #ffffff;
+
+        box-shadow:
+                0 8px 20px rgba(37, 99, 235, 0.2);
+    }
+
+    html .chat-dispute-submit:disabled,
+    html .chat-dispute-cancel:disabled {
+        opacity: 0.55;
+    }
+}
