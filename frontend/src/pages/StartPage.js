@@ -4,6 +4,8 @@ import { Capacitor } from "@capacitor/core";
 
 import "../styles/StartPage.css";
 
+import StartSupportCallout from "../components/StartSupportCallout";
+
 const ANDROID_DOWNLOAD_URL =
     "https://cargocamp.ru/downloads/cargocamp-latest.apk";
 
@@ -105,6 +107,8 @@ export default function StartPage() {
                         Что вы хотите сделать?
                     </p>
                 </div>
+
+                <StartSupportCallout />
 
                 <div className="start-page-button-group">
                     <button
