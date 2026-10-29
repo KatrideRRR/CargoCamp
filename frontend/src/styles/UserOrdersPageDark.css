@@ -1,0 +1,114 @@
+/* ============================================
+   CARGOCAMP — USER ORDERS DARK THEME
+
+   Дополняет существующий OrdersPageDark.css
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+
+    /* 1. Страница */
+
+    html .user-orders-page {
+        color: #f1f5f9;
+        color-scheme: dark;
+    }
+
+    /* 2. Шапка */
+
+    html .user-orders-page .orders-title {
+        color: #f1f5f9;
+    }
+
+    html .user-orders-page .orders-subtitle {
+        color: #a8b7ca;
+    }
+
+    html .user-orders-page .orders-subtitle b {
+        color: #f1f5f9;
+    }
+
+    /* 3. Карточки заказов */
+
+    html .user-orders-page .order-card {
+        color: #f1f5f9;
+    }
+
+    html .user-orders-page .order-card::before {
+        background: rgba(96, 165, 250, 0.06);
+    }
+
+    html .user-orders-page .order-number {
+        color: #f1f5f9;
+    }
+
+    html .user-orders-page .order-meta,
+    html .user-orders-page .muted {
+        color: #a8b7ca;
+    }
+
+    /* 4. Стоимость */
+
+    html .user-orders-page .pay-price {
+        color: #bfdbfe;
+    }
+
+    html .user-orders-page .pay-type {
+        color: #a8b7ca;
+    }
+
+    /* 5. Подробности заказа */
+
+    html .user-orders-page .kv .k {
+        color: #94a3b8;
+    }
+
+    html .user-orders-page .kv .v {
+        color: #f1f5f9;
+    }
+
+    html .user-orders-page .order-desc {
+        color: #f1f5f9;
+    }
+
+    /* 6. Ошибка и загрузка */
+
+    html .user-orders-loading {
+        min-height: 100dvh;
+        background: #101824;
+        color: #93c5fd;
+    }
+
+    html .user-orders-error {
+        min-height: 100dvh;
+        background: #101824;
+        color: #fca5a5;
+    }
+
+    /* 7. Просмотр фотографий */
+
+    html body:has(.user-orders-page) .custom-modal {
+        background: #1b2636;
+
+        border: 1px solid #40516a;
+
+        color: #f1f5f9;
+        color-scheme: dark;
+
+        box-shadow:
+                0 24px 65px rgba(0, 0, 0, 0.4);
+    }
+
+    html body:has(.user-orders-page) .custom-close-button,
+    html body:has(.user-orders-page) .custom-nav-button {
+        background: #304157;
+
+        border-color: #475569;
+        color: #f1f5f9;
+
+        box-shadow: none;
+    }
+
+    html body:has(.user-orders-page) .custom-modal-image {
+        background: #142238;
+    }
+}

@@ -1,0 +1,448 @@
+/* ============================================
+   CARGOCAMP — MY ORDERS DARK THEME
+
+   Страница использует CSS Modules.
+   Селекторы _имя__ соответствуют
+   именованию классов в текущей CRA-сборке.
+
+   Все правила ограничены .cc-my-orders.
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+
+    /* 1. Страница и основные цвета */
+
+    html .cc-my-orders {
+        --bg1: #101824;
+        --bg2: #172338;
+
+        --text: #f1f5f9;
+        --muted: #94a3b8;
+
+        --glass: #1b2636;
+        --glass-strong: #243247;
+        --glass-border: rgba(148, 163, 184, 0.2);
+
+        --shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+
+        --primary: #93c5fd;
+        --primary-soft: rgba(96, 165, 250, 0.15);
+
+        --danger: #fca5a5;
+        --danger-soft: rgba(248, 113, 113, 0.12);
+
+        --warn: #fcd34d;
+        --warn-soft: rgba(251, 191, 36, 0.12);
+
+        --success: #86efac;
+        --success-soft: rgba(74, 222, 128, 0.12);
+
+        background:
+                linear-gradient(
+                        180deg,
+                        #101824,
+                        #172338
+                );
+
+        color: var(--text);
+        color-scheme: dark;
+    }
+
+    /* 2. Шапка, карточки, пустой список */
+
+    html .cc-my-orders
+    :is(
+        [class*="_topBar__"],
+        [class*="_orderCard__"],
+        [class*="_noOrders__"]
+    ) {
+        background:
+                linear-gradient(
+                        180deg,
+                        #223147,
+                        #1b2636
+                );
+
+        border-color: #40516a;
+        color: #f1f5f9;
+
+        box-shadow: var(--shadow);
+    }
+
+    html .cc-my-orders
+    [class*="_orderCard__"]:hover {
+        background: #243247;
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+    }
+
+    /* Экспресс-заказы */
+
+    html .cc-my-orders [class*="_orderCardExpress__"],
+    html .cc-my-orders
+    [class*="_orderCardExpress__"]:hover {
+        background:
+                linear-gradient(
+                        180deg,
+                        #20372f,
+                        #1a2c35
+                );
+
+        border-color: rgba(74, 222, 128, 0.3);
+    }
+
+    /* 3. Заголовки и подписи */
+
+    html .cc-my-orders
+    :is(
+        [class*="_pageTitle__"],
+        [class*="_orderId__"],
+        [class*="_orderType__"],
+        [class*="_sectionTitle__"],
+        [class*="_execName__"]
+    ) {
+        color: #f1f5f9;
+    }
+
+    html .cc-my-orders
+    :is(
+        [class*="_pageSub__"],
+        [class*="_orderDate__"],
+        [class*="_execMeta__"],
+        [class*="_mutedText__"],
+        [class*="_stateText__"]
+    ) {
+        color: #a8b7ca;
+    }
+
+    html .cc-my-orders [class*="_orderTypeExpress__"] {
+        color: #86efac;
+    }
+
+    /* 4. Кнопки создания заказов */
+
+    html .cc-my-orders [class*="_createButton__"] {
+        background: rgba(96, 165, 250, 0.16);
+
+        border-color: rgba(96, 165, 250, 0.3);
+        color: #bfdbfe;
+
+        box-shadow: none;
+    }
+
+    html .cc-my-orders [class*="_createButton__"]:hover {
+        background: rgba(96, 165, 250, 0.23);
+    }
+
+    html .cc-my-orders [class*="_newRequest__"] {
+        background: rgba(251, 191, 36, 0.16);
+
+        border-color: rgba(251, 191, 36, 0.35);
+        color: #fcd34d;
+    }
+
+    html .cc-my-orders [class*="_expressButton__"] {
+        background: rgba(74, 222, 128, 0.14);
+
+        border-color: rgba(74, 222, 128, 0.3);
+        color: #86efac;
+
+        box-shadow: none;
+    }
+
+    html .cc-my-orders [class*="_expressButton__"]:hover {
+        background: rgba(74, 222, 128, 0.2);
+    }
+
+    /* 5. Статусы */
+
+    html .cc-my-orders [class*="_statusPill__"] {
+        background: #304157;
+
+        border-color: #475569;
+        color: #e2e8f0;
+
+        box-shadow: none;
+    }
+
+    html .cc-my-orders [class*="_status_warn__"] {
+        background: rgba(251, 191, 36, 0.13);
+
+        border-color: rgba(251, 191, 36, 0.3);
+        color: #fcd34d;
+    }
+
+    html .cc-my-orders [class*="_status_ok__"] {
+        background: rgba(74, 222, 128, 0.13);
+
+        border-color: rgba(74, 222, 128, 0.3);
+        color: #86efac;
+    }
+
+    html .cc-my-orders [class*="_statusExpress__"] {
+        box-shadow: none;
+    }
+
+    /* 6. Стоимость и способ оплаты */
+
+    html .cc-my-orders [class*="_financeBadge__"] {
+        background: #26364b;
+
+        border-color: #40516a;
+        color: #f1f5f9;
+
+        box-shadow: none;
+    }
+
+    html .cc-my-orders [class*="_financePrice__"] {
+        color: #93c5fd;
+    }
+
+    html .cc-my-orders [class*="_financeType__"] {
+        color: #cbd5e1;
+    }
+
+    html .cc-my-orders [class*="_financeBadgeExpress__"] {
+        background: rgba(74, 222, 128, 0.12);
+
+        border-color: rgba(74, 222, 128, 0.3);
+    }
+
+    html .cc-my-orders
+    [class*="_financeBadgeExpress__"]
+    [class*="_financePrice__"] {
+        color: #86efac;
+    }
+
+    /* 7. Информация о заказе */
+
+    html .cc-my-orders
+    :is(
+        [class*="_metaItem__"],
+        [class*="_routeBox__"],
+        [class*="_section__"],
+        [class*="_execCard__"]
+    ) {
+        background: #26364b;
+
+        border-color: #40516a;
+        box-shadow: none;
+    }
+
+    html .cc-my-orders
+    :is(
+        [class*="_metaLabel__"],
+        [class*="_routeLabel__"],
+        [class*="_k__"]
+    ) {
+        color: #94a3b8;
+    }
+
+    html .cc-my-orders
+    :is(
+        [class*="_metaValue__"],
+        [class*="_routeValue__"],
+        [class*="_v__"],
+        [class*="_descText__"]
+    ) {
+        color: #f1f5f9;
+    }
+
+    html .cc-my-orders [class*="_routeValueExpress__"] {
+        color: #86efac;
+    }
+
+    /* 8. Время выполнения */
+
+    html .cc-my-orders [class*="_orderTimeBox__"] {
+        background: #26364b;
+        border-color: #40516a;
+    }
+
+    html .cc-my-orders [class*="_orderTimeIcon__"] {
+        background: #304157;
+        border-color: #475569;
+    }
+
+    html .cc-my-orders [class*="_orderTimeLabel__"] {
+        color: #a8b7ca;
+    }
+
+    html .cc-my-orders [class*="_orderTimeValue__"] {
+        color: #f1f5f9;
+    }
+
+    html .cc-my-orders [class*="_orderTimeAsap__"] {
+        background: rgba(251, 191, 36, 0.12);
+        border-color: rgba(251, 191, 36, 0.3);
+    }
+
+    html .cc-my-orders
+    [class*="_orderTimeAsap__"]
+    [class*="_orderTimeValue__"] {
+        color: #fcd34d;
+    }
+
+    html .cc-my-orders [class*="_orderTimeScheduled__"] {
+        background: rgba(96, 165, 250, 0.13);
+        border-color: rgba(96, 165, 250, 0.3);
+    }
+
+    html .cc-my-orders
+    [class*="_orderTimeScheduled__"]
+    [class*="_orderTimeValue__"] {
+        color: #bfdbfe;
+    }
+
+    /* 9. Фотографии */
+
+    html .cc-my-orders [class*="_thumb__"],
+    html .cc-my-orders [class*="_moreThumb__"] {
+        background: #304157;
+        border-color: #475569;
+        box-shadow: none;
+    }
+
+    html .cc-my-orders [class*="_moreThumb__"] {
+        color: #f1f5f9;
+    }
+
+    /* 10. Кнопки внутри карточки */
+
+    html .cc-my-orders
+    :is(
+        [class*="_linkButton__"],
+        [class*="_primaryBtn__"],
+        [class*="_ghostBtn__"],
+        [class*="_countPill__"]
+    ) {
+        background: rgba(96, 165, 250, 0.13);
+
+        border-color: rgba(96, 165, 250, 0.28);
+        color: #bfdbfe;
+
+        box-shadow: none;
+    }
+
+    html .cc-my-orders [class*="_ghostBtnDanger__"],
+    html .cc-my-orders [class*="_deleteOrderBtn__"] {
+        background: rgba(248, 113, 113, 0.12);
+
+        border-color: rgba(248, 113, 113, 0.3);
+        color: #fca5a5;
+    }
+
+    html .cc-my-orders [class*="_pillWarn__"] {
+        background: rgba(251, 191, 36, 0.13);
+
+        border-color: rgba(251, 191, 36, 0.3);
+        color: #fcd34d;
+    }
+
+    /* 11. Исполнители и верификация */
+
+    html .cc-my-orders [class*="_verificationBadge__"] {
+        background: #304157;
+        border-color: #475569;
+        color: #cbd5e1;
+        box-shadow: none;
+    }
+
+    html .cc-my-orders
+    [class*="_verificationBadgeVerified__"] {
+        background: rgba(74, 222, 128, 0.12);
+
+        border-color: rgba(74, 222, 128, 0.3);
+        color: #86efac;
+    }
+
+    html .cc-my-orders
+    [class*="_verificationBadgePensioner__"] {
+        background: rgba(251, 146, 60, 0.12);
+
+        border-color: rgba(251, 146, 60, 0.3);
+        color: #fdba74;
+    }
+
+    html .cc-my-orders
+    [class*="_verificationBadgeUnverified__"] {
+        background: #304157;
+
+        border-color: #475569;
+        color: #cbd5e1;
+    }
+
+    /* 12. Ошибки */
+
+    html .cc-my-orders [class*="_errorMessage__"] {
+        background: rgba(248, 113, 113, 0.12);
+
+        border-color: rgba(248, 113, 113, 0.3);
+        color: #fca5a5;
+    }
+
+    /* 13. Детали услуги */
+
+    html .cc-my-orders .order-service-details {
+        background: #223147;
+        border-color: #40516a;
+        box-shadow: none;
+    }
+
+    html .cc-my-orders .order-service-detail {
+        background: #26364b;
+        border-color: #40516a;
+        box-shadow: none;
+    }
+
+    html .cc-my-orders
+    :is(
+        .order-service-details__title,
+        .order-service-detail__value,
+        .order-pricing-details__title,
+        .order-pricing-details__row strong,
+        .order-pricing-details__total
+    ) {
+        color: #f1f5f9;
+    }
+
+    html .cc-my-orders
+    :is(
+        .order-service-details__subtitle,
+        .order-service-details__range span,
+        .order-service-detail__label,
+        .order-service-details__more,
+        .order-pricing-details__row,
+        .order-pricing-details__notice
+    ) {
+        color: #a8b7ca;
+    }
+
+    html .cc-my-orders
+    :is(
+        .order-service-details__range strong,
+        .order-pricing-details__total strong
+    ) {
+        color: #93c5fd;
+    }
+
+    /* 14. Просмотр фотографий
+       React Modal находится вне контейнера страницы */
+
+    html body:has(.cc-my-orders) .custom-modal {
+        background: #1b2636;
+        border: 1px solid #40516a;
+        color: #f1f5f9;
+        color-scheme: dark;
+    }
+
+    html body:has(.cc-my-orders) .custom-close-button,
+    html body:has(.cc-my-orders) .custom-nav-button {
+        background: #304157;
+        border-color: #475569;
+        color: #f1f5f9;
+    }
+
+    html body:has(.cc-my-orders) .custom-modal-image {
+        background: #142238;
+    }
+}

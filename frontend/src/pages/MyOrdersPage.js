@@ -4,6 +4,7 @@ import axiosInstance from "../utils/axiosInstance";
 import { socket } from "../socketClient";
 import OrderServiceDetails from "../components/OrderServiceDetails";
 import styles from "../styles/MyOrdersPage.module.css";
+import "../styles/MyOrdersPageDark.css";
 import { AuthContext } from "../utils/authContext";
 import Modal from "react-modal";
 import { FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity } from "react-icons/fa";
@@ -601,7 +602,7 @@ const MyOrdersPage = () => {
     };
 
     return (
-        <div className={`${styles.container} ${platform === "ios" ? styles.iosContainer : ""}`}>
+        <div className={`cc-my-orders ${styles.container} ${platform === "ios" ? styles.iosContainer : ""}`}>
             <div className={styles.ordersWrapper}>
                 {/* Top bar */}
                 <div className={styles.topBar}>

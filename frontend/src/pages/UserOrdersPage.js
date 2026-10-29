@@ -27,6 +27,7 @@ import OrderServiceDetails from "../components/OrderServiceDetails";
 import { socket } from "../socketClient";
 
 import "../styles/OrdersPage.css";
+import "../styles/UserOrdersPageDark.css";
 
 const apiUrl =
     process.env.REACT_APP_API_URL || "";
@@ -420,7 +421,7 @@ const UserOrdersPage = () => {
 
     if (loading) {
         return (
-            <div className="loading">
+            <div className="loading user-orders-loading">
                 Загрузка заказов...
             </div>
         );
@@ -428,14 +429,14 @@ const UserOrdersPage = () => {
 
     if (error) {
         return (
-            <div className="error-message">
+            <div className="error-message user-orders-error">
                 {error}
             </div>
         );
     }
 
     return (
-        <div className="orders-page">
+        <div className="orders-page user-orders-page">
             <div className="orders-shell">
                 <header className="orders-top">
                     <div className="orders-top-left">
