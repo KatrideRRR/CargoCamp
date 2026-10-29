@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import "../styles/InfoPage.css";
+import "../styles/InfoPageDark.css";
 
 export default function InfoPage() {
     const navigate = useNavigate();

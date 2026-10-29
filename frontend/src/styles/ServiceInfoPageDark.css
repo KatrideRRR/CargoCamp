@@ -1,0 +1,185 @@
+/* ==============================================
+   CARGOCAMP — SERVICE INFO DARK THEME
+   /services
+   ============================================== */
+
+@media (prefers-color-scheme: dark) {
+
+    /* 1. Основной фон */
+
+    html .info-page-container {
+        background:
+                radial-gradient(
+                        circle at 15% 5%,
+                        rgba(37, 99, 235, 0.12),
+                        transparent 38%
+                ),
+                linear-gradient(
+                        180deg,
+                        #101824,
+                        #172338
+                );
+
+        color: #f1f5f9;
+
+        color-scheme: dark;
+    }
+
+    /* 2. Основная карточка */
+
+    html .info-page-container .info-page-card {
+        background:
+                linear-gradient(
+                        180deg,
+                        #223147,
+                        #1b2636
+                );
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow:
+                0 14px 38px rgba(0, 0, 0, 0.25);
+    }
+
+    /* Убираем светлый декоративный блик */
+
+    html .info-page-container .info-page-card::after {
+        background:
+                linear-gradient(
+                        180deg,
+                        rgba(96, 165, 250, 0.06),
+                        transparent
+                );
+
+        opacity: 1;
+    }
+
+    /* 3. Заголовок и описание */
+
+    html .info-page-container .info-title {
+        color: #f1f5f9;
+    }
+
+    html .info-page-container .info-subtitle {
+        color: #a8b7ca;
+    }
+
+    /* 4. Разделы */
+
+    html .info-page-container .info-section {
+        border-top-color: #40516a;
+    }
+
+    html .info-page-container .info-section-title {
+        color: #f1f5f9;
+    }
+
+    html .info-page-container .info-subhead {
+        color: #e2e8f0;
+    }
+
+    /* 5. Обычный текст */
+
+    html .info-page-container .info-text,
+    html .info-page-container .info-list {
+        color: #cbd5e1;
+    }
+
+    html .info-page-container .info-text b,
+    html .info-page-container .info-list b,
+    html .info-page-container .info-text strong,
+    html .info-page-container .info-list strong {
+        color: #f1f5f9;
+    }
+
+    /* 6. Карточки тарифов */
+
+    html .info-page-container .tariff-item {
+        background:
+                linear-gradient(
+                        180deg,
+                        #26364b,
+                        #223147
+                );
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow:
+                0 8px 24px rgba(0, 0, 0, 0.16);
+    }
+
+    html .info-page-container .tariff-item::after {
+        background:
+                linear-gradient(
+                        180deg,
+                        rgba(96, 165, 250, 0.05),
+                        transparent
+                );
+
+        opacity: 1;
+    }
+
+    html .info-page-container .tariff-item:hover {
+        background: #304157;
+
+        box-shadow:
+                0 12px 28px rgba(0, 0, 0, 0.22);
+    }
+
+    /* 7. Названия тарифов */
+
+    html .info-page-container .tariff-name {
+        color: #f1f5f9;
+    }
+
+    /* 8. Стоимость */
+
+    html .info-page-container .tariff-price {
+        background:
+                linear-gradient(
+                        135deg,
+                        #2563eb,
+                        #1d4ed8
+                );
+
+        border-color: #3b82f6;
+
+        color: #ffffff;
+
+        box-shadow:
+                0 6px 20px rgba(37, 99, 235, 0.17);
+    }
+
+    /* 9. Описания тарифов */
+
+    html .info-page-container .tariff-desc {
+        color: #cbd5e1;
+    }
+
+    /* 10. Выделение технических терминов */
+
+    html .info-page-container code {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #bfdbfe;
+    }
+
+    /* 11. Примечание внизу страницы */
+
+    html .info-page-container .info-note {
+        color: #a8b7ca;
+    }
+
+    /* 12. Выделение текста */
+
+    html .info-page-container ::selection {
+        background: #2563eb;
+        color: #ffffff;
+    }
+}

@@ -1,0 +1,190 @@
+/* ==============================================
+   CARGOCAMP — INFO PAGE DARK THEME
+   /info
+   ============================================== */
+
+@media (prefers-color-scheme: dark) {
+
+    /* 1. Основная страница */
+
+    html .info-page {
+        background:
+                radial-gradient(
+                        circle at 15% 5%,
+                        rgba(37, 99, 235, 0.12),
+                        transparent 38%
+                ),
+                linear-gradient(
+                        180deg,
+                        #101824,
+                        #172338
+                );
+
+        color: #f1f5f9;
+        color-scheme: dark;
+    }
+
+    /* 2. Кнопка назад */
+
+    html .info-page .info-back {
+        background: #304157;
+        border-color: #475569;
+        color: #f1f5f9;
+        box-shadow: none;
+    }
+
+    html .info-page .info-back:hover {
+        background: #40516a;
+        box-shadow: none;
+    }
+
+    /* 3. Заголовок */
+
+    html .info-page .info-title {
+        color: #f1f5f9;
+    }
+
+    html .info-page .info-subtitle {
+        color: #a8b7ca;
+    }
+
+    /* 4. Основные карточки */
+
+    html .info-page .info-card,
+    html .info-page .info-footer-card {
+        background:
+                linear-gradient(
+                        180deg,
+                        #223147,
+                        #1b2636
+                );
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow:
+                0 12px 32px rgba(0, 0, 0, 0.22);
+    }
+
+    /* Убираем светлые декоративные блики */
+
+    html .info-page .info-card::after {
+        background:
+                linear-gradient(
+                        180deg,
+                        rgba(96, 165, 250, 0.06),
+                        transparent
+                );
+
+        opacity: 1;
+    }
+
+    html .info-page .info-card:hover {
+        background: #26364b;
+
+        box-shadow:
+                0 16px 36px rgba(0, 0, 0, 0.25);
+    }
+
+    /* 5. Названия и описания разделов */
+
+    html .info-page .info-card-title {
+        color: #f1f5f9;
+    }
+
+    html .info-page .info-card-text {
+        color: #a8b7ca;
+    }
+
+    /* 6. Значки «Открыть» и «Коротко» */
+
+    html .info-page .info-pill {
+        background:
+                linear-gradient(
+                        135deg,
+                        #2563eb,
+                        #1d4ed8
+                );
+
+        border-color: #3b82f6;
+
+        color: #ffffff;
+
+        box-shadow:
+                0 6px 18px rgba(37, 99, 235, 0.17);
+    }
+
+    html .info-page .info-pill--soft {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #cbd5e1;
+
+        box-shadow: none;
+    }
+
+    /* 7. Список «Как работает» */
+
+    html .info-page .info-list {
+        color: #cbd5e1;
+    }
+
+    /* 8. Раскрывающиеся документы */
+
+    html .info-page .info-summary {
+        color: #f1f5f9;
+    }
+
+    html .info-page .info-chevron {
+        color: #93c5fd;
+    }
+
+    html .info-page .info-details[open] {
+        border-color: #5275a3;
+    }
+
+    /* 9. Содержимое документов */
+
+    html .info-page .info-doc {
+        border-top-color: #40516a;
+
+        color: #cbd5e1;
+    }
+
+    html .info-page .info-doc h4 {
+        color: #f1f5f9;
+    }
+
+    html .info-page .info-doc p,
+    html .info-page .info-doc li {
+        color: #cbd5e1;
+    }
+
+    html .info-page .info-doc strong,
+    html .info-page .info-doc b {
+        color: #f1f5f9;
+    }
+
+    /* 10. Контактные данные и реквизиты */
+
+    html .info-page .info-footer-row {
+        border-bottom-color: #40516a;
+    }
+
+    html .info-page .info-footer-row .k {
+        color: #94a3b8;
+    }
+
+    html .info-page .info-footer-row .v {
+        color: #f1f5f9;
+    }
+
+    /* 11. Выделение текста */
+
+    html .info-page ::selection {
+        background: #2563eb;
+        color: #ffffff;
+    }
+}

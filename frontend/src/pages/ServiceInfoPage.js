@@ -1,5 +1,6 @@
 import React from 'react';
 import '../styles/ServiceInfoPage.css';
+import '../styles/ServiceInfoPageDark.css';
 
 export default function ServiceInfoPage() {
     return (
