@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import "../styles/ReviewModal.css";
+import "../styles/ReviewModalDark.css";
 
 export default function ReviewModal({
                                         isOpen,

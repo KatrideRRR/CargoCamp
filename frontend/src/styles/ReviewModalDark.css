@@ -1,0 +1,186 @@
+/* ============================================
+   CARGOCAMP — REVIEW MODAL DARK THEME
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+
+    /* ========================================
+       1. ЗАТЕМНЕНИЕ ФОНА
+       ======================================== */
+
+    html .reviewModalOverlay {
+        background: rgba(3, 8, 18, 0.78);
+    }
+
+    /* ========================================
+       2. ОСНОВНОЕ ОКНО
+       ======================================== */
+
+    html .reviewModal {
+        background:
+                linear-gradient(
+                        180deg,
+                        #25354a,
+                        #1b2636
+                );
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow:
+                0 24px 65px rgba(0, 0, 0, 0.4);
+
+        color-scheme: dark;
+    }
+
+    /* ========================================
+       3. ЗАГОЛОВКИ
+       ======================================== */
+
+    html .reviewModal .reviewModalTitle {
+        color: #f1f5f9;
+    }
+
+    html .reviewModal .reviewModalSubtitle {
+        color: #a8b7ca;
+    }
+
+    /* ========================================
+       4. КНОПКА ЗАКРЫТИЯ
+       ======================================== */
+
+    html .reviewModal .reviewModalClose {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #f1f5f9;
+
+        box-shadow: none;
+    }
+
+    html .reviewModal .reviewModalClose:hover {
+        background: #40516a;
+
+        box-shadow: none;
+    }
+
+    /* ========================================
+       5. БЛОК ОЦЕНКИ
+       ======================================== */
+
+    html .reviewModal .reviewStars {
+        background: #26364b;
+
+        border-color: #40516a;
+
+        box-shadow: none;
+    }
+
+    /* Не выбранные звёзды */
+
+    html .reviewModal .reviewStar {
+        color: #64748b;
+    }
+
+    /* Выбранные звёзды */
+
+    html .reviewModal .reviewStar.active {
+        color: #fbbf24;
+
+        text-shadow:
+                0 0 12px rgba(251, 191, 36, 0.22);
+    }
+
+    /* ========================================
+       6. КОММЕНТАРИЙ
+       ======================================== */
+
+    html .reviewModal .reviewTextarea {
+        background: #142238;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow: none;
+
+        color-scheme: dark;
+    }
+
+    html .reviewModal .reviewTextarea:focus {
+        background: #1d2c43;
+
+        border-color: #60a5fa;
+
+        box-shadow:
+                0 0 0 3px rgba(96, 165, 250, 0.13);
+    }
+
+    html .reviewModal .reviewTextarea::placeholder {
+        color: #94a3b8;
+        opacity: 1;
+    }
+
+    /* ========================================
+       7. КНОПКА «ПОЗЖЕ»
+       ======================================== */
+
+    html .reviewModal .reviewBtn.ghost {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #f1f5f9;
+
+        box-shadow: none;
+    }
+
+    html .reviewModal .reviewBtn.ghost:hover {
+        background: #40516a;
+    }
+
+    /* ========================================
+       8. КНОПКА «ОТПРАВИТЬ»
+       ======================================== */
+
+    html .reviewModal .reviewBtn.primary {
+        background:
+                linear-gradient(
+                        135deg,
+                        #2563eb,
+                        #1d4ed8
+                );
+
+        border-color: #3b72d0;
+
+        color: #ffffff;
+
+        box-shadow:
+                0 8px 20px rgba(37, 99, 235, 0.18);
+    }
+
+    html .reviewModal
+    .reviewBtn.primary:hover:not(:disabled) {
+        box-shadow:
+                0 10px 24px rgba(37, 99, 235, 0.25);
+    }
+
+    /* ========================================
+       9. ЗАБЛОКИРОВАННЫЕ КНОПКИ
+       ======================================== */
+
+    html .reviewModal .reviewBtn:disabled {
+        opacity: 0.48;
+        cursor: not-allowed;
+    }
+
+    /* ========================================
+       10. ПОДСКАЗКА
+       ======================================== */
+
+    html .reviewModal .reviewHint {
+        color: #a8b7ca;
+    }
+}

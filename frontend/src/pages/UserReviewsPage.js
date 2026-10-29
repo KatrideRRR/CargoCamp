@@ -3,6 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import axiosInstance from "../utils/axiosInstance";
 import "../styles/UserReviewsPage.css";
+import "../styles/UserReviewsPageDark.css";
 
 const Stars = ({ value = 0 }) => {
     const v = Math.max(0, Math.min(5, Number(value) || 0));
