@@ -1,0 +1,254 @@
+/* ============================================
+   CARGOCAMP — LOGIN DARK THEME
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+
+    /* Основная страница */
+
+    html .login-page {
+        --auth-page-bg: #101824;
+        --auth-text: #f1f5f9;
+        --auth-muted: #94a3b8;
+        --auth-soft: #243247;
+
+        --auth-primary: #93c5fd;
+        --auth-primary-dark: #60a5fa;
+        --auth-primary-soft: rgba(96, 165, 250, 0.15);
+
+        --auth-danger: #fca5a5;
+        --auth-danger-soft: rgba(248, 113, 113, 0.12);
+
+        --auth-success: #86efac;
+        --auth-success-soft: rgba(74, 222, 128, 0.12);
+
+        --auth-border: rgba(148, 163, 184, 0.24);
+        --auth-glass: rgba(27, 38, 54, 0.96);
+        --auth-glass-border: rgba(148, 163, 184, 0.18);
+
+        --auth-shadow-card:
+                0 16px 45px rgba(0, 0, 0, 0.28);
+
+        --auth-shadow-soft:
+                0 8px 24px rgba(0, 0, 0, 0.18);
+
+        background:
+                radial-gradient(
+                        circle at 18% 10%,
+                        rgba(37, 99, 235, 0.15),
+                        transparent 35%
+                ),
+                linear-gradient(
+                        180deg,
+                        #101824,
+                        #172338
+                );
+
+        color: var(--auth-text);
+        color-scheme: dark;
+    }
+
+    /* Android */
+
+    html .login-page.auth-page--android {
+        background: #101824;
+    }
+
+    /* Декоративные элементы */
+
+    html .login-page .auth-bg--one {
+        background: rgba(37, 99, 235, 0.12);
+    }
+
+    html .login-page .auth-bg--two {
+        background: rgba(96, 165, 250, 0.08);
+    }
+
+    /* Основная карточка */
+
+    html .login-page .login-card,
+    html .login-page.auth-page--ios .login-card,
+    html .login-page.auth-page--android .login-card {
+        background:
+                linear-gradient(
+                        180deg,
+                        #223147,
+                        #1b2636
+                );
+
+        border-color: rgba(148, 163, 184, 0.2);
+
+        box-shadow:
+                0 16px 45px rgba(0, 0, 0, 0.26);
+
+        color: #f1f5f9;
+    }
+
+    html .login-page .login-card::before {
+        background:
+                linear-gradient(
+                        180deg,
+                        rgba(96, 165, 250, 0.07),
+                        transparent
+                );
+    }
+
+    /* Заголовки */
+
+    html .login-page .login-title {
+        color: #f1f5f9;
+    }
+
+    html .login-page .login-subtitle {
+        color: #a8b7ca;
+    }
+
+    /* Поля ввода */
+
+    html .login-page .label {
+        color: #cbd5e1;
+    }
+
+    html .login-page .input {
+        background: #142238;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow: none;
+
+        color-scheme: dark;
+    }
+
+    html .login-page .input:focus {
+        background: #1d2c43;
+
+        border-color: #60a5fa;
+
+        box-shadow:
+                0 0 0 3px rgba(96, 165, 250, 0.13);
+    }
+
+    html .login-page .input::placeholder {
+        color: #94a3b8;
+        opacity: 1;
+    }
+
+    /* Автозаполнение браузера */
+
+    html .login-page .input:-webkit-autofill {
+        -webkit-text-fill-color: #f1f5f9;
+
+        -webkit-box-shadow:
+                0 0 0 1000px #142238 inset;
+
+        caret-color: #f1f5f9;
+    }
+
+    /* Переключатель способа входа */
+
+    html .login-page .modeRow {
+        background: #18283d;
+        border-color: #35465d;
+    }
+
+    html .login-page .btn.btn-seg {
+        background: #26364b;
+
+        border-color: #40516a;
+
+        color: #cbd5e1;
+
+        box-shadow: none;
+    }
+
+    html .login-page .btn.btn-seg-active {
+        background:
+                linear-gradient(
+                        135deg,
+                        #284569,
+                        #203e62
+                );
+
+        border-color: #60a5fa;
+
+        color: #bfdbfe;
+
+        box-shadow: none;
+    }
+
+    /* Основные кнопки */
+
+    html .login-page .btn.btn-primary {
+        background:
+                linear-gradient(
+                        135deg,
+                        #2563eb,
+                        #1d4ed8
+                );
+
+        border-color: #3b72d0;
+
+        color: #ffffff;
+
+        box-shadow:
+                0 6px 18px rgba(37, 99, 235, 0.18);
+    }
+
+    html .login-page .btn.btn-primary:hover {
+        box-shadow:
+                0 8px 20px rgba(37, 99, 235, 0.25);
+    }
+
+    html .login-page .btn.btn-ghost {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #f1f5f9;
+
+        box-shadow: none;
+    }
+
+    /* Ошибки */
+
+    html .login-page .login-error {
+        background: rgba(248, 113, 113, 0.12);
+
+        border-color: rgba(248, 113, 113, 0.3);
+
+        color: #fca5a5;
+    }
+
+    /* Успешные сообщения */
+
+    html .login-page .login-success {
+        background: rgba(74, 222, 128, 0.12);
+
+        border-color: rgba(74, 222, 128, 0.3);
+
+        color: #86efac;
+    }
+
+    /* Подсказка восстановления пароля */
+
+    html .login-page .hintText {
+        background: #26364b;
+
+        border-color: #40516a;
+
+        color: #cbd5e1;
+    }
+
+    /* Ссылки */
+
+    html .login-page .linkButton,
+    html .login-page .registerLink {
+        color: #93c5fd;
+    }
+
+    html .login-page .registerText {
+        color: #a8b7ca;
+    }
+}

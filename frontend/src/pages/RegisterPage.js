@@ -4,6 +4,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import ReCAPTCHA from "react-google-recaptcha";
 import "../styles/RegisterPage.css";
+import "../styles/RegisterPageDark.css";
 import InputMask from "react-input-mask";
 import { useAuth } from "../utils/authContext";
 import { useUser } from "../utils/userContext";

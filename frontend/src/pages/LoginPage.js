@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../utils/authContext";
 import { useUser } from "../utils/userContext";
 import "../styles/LoginPage.css";
+import "../styles/LoginPageDark.css";
 import { postUserAuth } from "../utils/userSession";
 
 const apiUrl = process.env.REACT_APP_API_URL;
