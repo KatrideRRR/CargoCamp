@@ -14,6 +14,7 @@ import UserIdentityVerification from "../components/UserIdentityVerification";
 import AgreementModal from "../components/AgreementModal";
 import YandexMapModal from "../components/YandexMapModal";
 import PaymentProviderSelect from "../components/PaymentProviderSelect";
+import SupportPhoneLink from "../components/SupportPhoneLink";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -1695,6 +1696,13 @@ const ProfilePage = () => {
                                 </div>
 
                                 <div className="profile-quick-actions">
+                                    <div className="profile-support-call-row">
+    <span className="profile-support-call-label">
+        Нужна помощь? Позвоните нам
+    </span>
+
+                                        <SupportPhoneLink showIcon />
+                                    </div>
                                     <button
                                         type="button"
                                         className="profile-quick-action profile-quick-action-support"

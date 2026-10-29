@@ -1,6 +1,7 @@
 import React from 'react';
 import '../styles/ServiceInfoPage.css';
 import '../styles/ServiceInfoPageDark.css';
+import SupportPhoneLink from "../components/SupportPhoneLink";
 
 export default function ServiceInfoPage() {
     return (
@@ -151,7 +152,9 @@ export default function ServiceInfoPage() {
                     </p>
                     <ul className="info-list">
                         <li>Email: <b>partner@cargocamp.ru</b></li>
-                        <li>Телефон: <b>+7 (978) 686-41-18</b></li>
+                        <li>
+                            Телефон: <SupportPhoneLink />
+                        </li>
                         <li>ИП: Аджиаметов Аким Ибришевич</li>
                         <li>ИНН: 9109 0845 7603</li>
                         <li>ОГРНИП: 325911200109660</li>

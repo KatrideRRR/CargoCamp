@@ -1,10 +1,9 @@
 import React from "react";
-import { FaHeadset, FaPhoneAlt } from "react-icons/fa";
+import { FaHeadset } from "react-icons/fa";
+
+import SupportPhoneLink from "./SupportPhoneLink";
 
 import "../styles/StartSupportCallout.css";
-
-const SUPPORT_PHONE = "+79790199979";
-const SUPPORT_PHONE_DISPLAY = "+7 (979) 019-99-79";
 
 export default function StartSupportCallout() {
     return (
@@ -18,14 +17,10 @@ export default function StartSupportCallout() {
                     <span>Помощь с заказом</span>
                 </div>
 
-                <a
+                <SupportPhoneLink
                     className="start-support-callout-phone"
-                    href={`tel:${SUPPORT_PHONE}`}
-                    aria-label={`Позвонить в поддержку: ${SUPPORT_PHONE_DISPLAY}`}
-                >
-                    <FaPhoneAlt aria-hidden="true" />
-                    <span>{SUPPORT_PHONE_DISPLAY}</span>
-                </a>
+                    showIcon
+                />
             </div>
 
             <p className="start-support-callout-description">

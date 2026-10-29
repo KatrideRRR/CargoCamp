@@ -5,6 +5,7 @@ import { socket } from "../socketClient";
 import { useAuth } from "../utils/authContext";
 import "../styles/SupportChatPage.css";
 import "../styles/SupportChatPageDark.css";
+import SupportPhoneLink from "../components/SupportPhoneLink";
 
 import {
     FaArrowLeft,
@@ -195,7 +196,15 @@ const SupportChatPage = () => {
 
                 <div className="support-header-info">
                     <h1>Поддержка CargoCamp</h1>
-                    <p>Поможем с заказами, оплатой и работой приложения</p>
+
+                    <p>
+                        Поможем с заказами, оплатой и работой приложения
+                    </p>
+
+                    <SupportPhoneLink
+                        className="support-chat-phone"
+                        showIcon
+                    />
                 </div>
             </header>
 

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import "../styles/InfoPage.css";
 import "../styles/InfoPageDark.css";
+import SupportPhoneLink from "../components/SupportPhoneLink";
 
 export default function InfoPage() {
     const navigate = useNavigate();
@@ -121,7 +122,9 @@ export default function InfoPage() {
 
                             <h4>8. Контакты по вопросам данных</h4>
                             <p>Email: partner@cargocamp.ru</p>
-                            <p>Телефон: +7 (978) 686 41 18</p>
+                            <p>
+                                Телефон: <SupportPhoneLink />
+                            </p>
                         </div>
                     </details>
 
@@ -225,7 +228,10 @@ export default function InfoPage() {
                         </div>
                         <div className="info-footer-row">
                             <span className="k">Телефон</span>
-                            <span className="v">+7 (978) 686 41 18</span>
+                            <span className="v">
+    <SupportPhoneLink />
+</span>
+
                         </div>
                         <div className="info-footer-row">
                             <span className="k">ИП</span>
