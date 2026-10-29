@@ -1,0 +1,335 @@
+/* ============================================
+   CARGOCAMP — SUPPORT CHAT DARK THEME
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+
+    /* ========================================
+       1. ОСНОВНАЯ СТРАНИЦА
+       ======================================== */
+
+    html .support-chat-page {
+        background: #101824;
+
+        color: #f1f5f9;
+
+        color-scheme: dark;
+    }
+
+    /* ========================================
+       2. ШАПКА ЧАТА
+       ======================================== */
+
+    html .support-chat-page .support-chat-header {
+        background: rgba(27, 38, 54, 0.96);
+
+        border-bottom-color: #40516a;
+    }
+
+    html .support-chat-page .support-back-button {
+        background: #304157;
+
+        color: #93c5fd;
+
+        border: 1px solid #40516a;
+    }
+
+    html .support-chat-page .support-back-button:hover {
+        background: #40516a;
+    }
+
+    html .support-chat-page .support-header-avatar {
+        background:
+                linear-gradient(
+                        135deg,
+                        #2563eb,
+                        #0891b2
+                );
+
+        color: #ffffff;
+
+        box-shadow:
+                0 6px 20px rgba(37, 99, 235, 0.18);
+    }
+
+    html .support-chat-page .support-header-info h1 {
+        color: #f1f5f9;
+    }
+
+    html .support-chat-page .support-header-info p {
+        color: #a8b7ca;
+    }
+
+    /* ========================================
+       3. ОБЛАСТЬ СООБЩЕНИЙ
+       ======================================== */
+
+    html .support-chat-page .support-chat-body {
+        background:
+                radial-gradient(
+                        circle at 50% 0%,
+                        rgba(37, 99, 235, 0.06),
+                        transparent 55%
+                ),
+                #101824;
+    }
+
+    /* ========================================
+       4. ИНФОРМАЦИОННАЯ КАРТОЧКА
+       ======================================== */
+
+    html .support-chat-page .support-info-card {
+        background: #223147;
+
+        border-color: #40516a;
+
+        color: #cbd5e1;
+
+        box-shadow:
+                0 6px 20px rgba(0, 0, 0, 0.16);
+    }
+
+    html .support-chat-page .support-info-card strong {
+        color: #f1f5f9;
+    }
+
+    /* ========================================
+       5. ЗАГРУЗКА
+       ======================================== */
+
+    html .support-chat-page .support-state {
+        background: #223147;
+
+        border: 1px solid #40516a;
+
+        color: #a8b7ca;
+
+        box-shadow: none;
+    }
+
+    /* ========================================
+       6. ОШИБКА
+       ======================================== */
+
+    html .support-chat-page .support-error {
+        background: #412832;
+
+        border-color: rgba(248, 113, 113, 0.35);
+
+        color: #fca5a5;
+
+        box-shadow: none;
+    }
+
+    /* ========================================
+       7. ПУСТОЙ ЧАТ
+       ======================================== */
+
+    html .support-chat-page .support-empty {
+        background: #223147;
+
+        border: 1px solid #40516a;
+
+        color: #a8b7ca;
+
+        box-shadow:
+                0 8px 25px rgba(0, 0, 0, 0.18);
+    }
+
+    html .support-chat-page .support-empty svg {
+        color: #93c5fd;
+    }
+
+    html .support-chat-page .support-empty h2 {
+        color: #f1f5f9;
+    }
+
+    html .support-chat-page .support-empty p {
+        color: #a8b7ca;
+    }
+
+    /* ========================================
+       8. АВАТАР ПОДДЕРЖКИ
+       ======================================== */
+
+    html .support-chat-page .support-message-avatar {
+        background: #284569;
+
+        color: #bfdbfe;
+
+        border: 1px solid #40516a;
+    }
+
+    /* ========================================
+       9. СООБЩЕНИЯ ПОЛЬЗОВАТЕЛЯ
+       ======================================== */
+
+    html .support-chat-page
+    .support-message-row.mine
+    .support-message-bubble {
+        background:
+                linear-gradient(
+                        135deg,
+                        #254a78,
+                        #203e62
+                );
+
+        color: #f1f5f9;
+
+        border: 1px solid #39659b;
+
+        box-shadow:
+                0 5px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    /* ========================================
+       10. СООБЩЕНИЯ АДМИНИСТРАТОРА
+       ======================================== */
+
+    html .support-chat-page
+    .support-message-row.admin
+    .support-message-bubble {
+        background: #26364b;
+
+        color: #f1f5f9;
+
+        border: 1px solid #40516a;
+
+        box-shadow:
+                0 5px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    /* ========================================
+       11. ИМЯ ОТПРАВИТЕЛЯ
+       ======================================== */
+
+    html .support-chat-page .support-message-author {
+        color: #93c5fd;
+    }
+
+    /* ========================================
+       12. ТЕКСТ СООБЩЕНИЙ
+       ======================================== */
+
+    html .support-chat-page .support-message-text {
+        color: #f1f5f9;
+    }
+
+    /* ========================================
+       13. ВРЕМЯ И ОТМЕТКИ
+       ======================================== */
+
+    html .support-chat-page .support-message-meta {
+        color: #a8b7ca;
+    }
+
+    html .support-chat-page .support-message-meta svg {
+        color: #93c5fd;
+    }
+
+    /* ========================================
+       14. НИЖНЯЯ ПАНЕЛЬ
+       ======================================== */
+
+    html .support-chat-page .support-chat-input-wrap {
+        background: rgba(27, 38, 54, 0.98);
+
+        border-top-color: #40516a;
+    }
+
+    /* ========================================
+       15. ПОЛЕ ВВОДА
+       ======================================== */
+
+    html .support-chat-page .support-chat-input {
+        background: #142238;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow: none;
+
+        color-scheme: dark;
+    }
+
+    html .support-chat-page .support-chat-input:focus {
+        background: #1d2c43;
+
+        border-color: #60a5fa;
+
+        box-shadow:
+                0 0 0 3px rgba(96, 165, 250, 0.13);
+    }
+
+    html .support-chat-page
+    .support-chat-input::placeholder {
+        color: #94a3b8;
+
+        opacity: 1;
+    }
+
+    html .support-chat-page .support-chat-input:disabled {
+        opacity: 0.65;
+    }
+
+    /* ========================================
+       16. КНОПКА ОТПРАВКИ
+       ======================================== */
+
+    html .support-chat-page .support-send-button {
+        background:
+                linear-gradient(
+                        135deg,
+                        #2563eb,
+                        #1d4ed8
+                );
+
+        color: #ffffff;
+
+        box-shadow:
+                0 6px 18px rgba(37, 99, 235, 0.2);
+    }
+
+    html .support-chat-page
+    .support-send-button:not(:disabled):hover {
+        background:
+                linear-gradient(
+                        135deg,
+                        #3b82f6,
+                        #2563eb
+                );
+    }
+
+    html .support-chat-page .support-send-button:disabled {
+        background: #304157;
+
+        color: #94a3b8;
+
+        box-shadow: none;
+
+        opacity: 0.7;
+    }
+
+    /* ========================================
+       17. ПОЛОСА ПРОКРУТКИ
+       Не меняем высоту и скролл.
+       ======================================== */
+
+    html .support-chat-page
+    .support-chat-body::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    html .support-chat-page
+    .support-chat-body::-webkit-scrollbar-thumb {
+        background: #40516a;
+
+        border-radius: 999px;
+    }
+
+    html .support-chat-page
+    .support-chat-body::-webkit-scrollbar-track {
+        background: transparent;
+    }
+}

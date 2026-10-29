@@ -4,6 +4,7 @@ import axiosInstance from "../utils/axiosInstance";
 import { socket } from "../socketClient";
 import { useAuth } from "../utils/authContext";
 import "../styles/SupportChatPage.css";
+import "../styles/SupportChatPageDark.css";
 
 import {
     FaArrowLeft,
