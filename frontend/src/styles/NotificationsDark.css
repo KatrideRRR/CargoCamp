@@ -1,0 +1,231 @@
+/* ============================================
+   CARGOCAMP — NOTIFICATIONS DARK THEME
+   Toastify + системные модальные уведомления
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+
+    /* ========================================
+       1. ВСПЛЫВАЮЩИЕ УВЕДОМЛЕНИЯ
+       React Toastify
+       ======================================== */
+
+    html .Toastify__toast-container {
+        --toastify-color-light: #1b2636;
+        --toastify-text-color-light: #f1f5f9;
+
+        --toastify-color-info: #60a5fa;
+        --toastify-color-success: #4ade80;
+        --toastify-color-warning: #fbbf24;
+        --toastify-color-error: #f87171;
+
+        --toastify-color-progress-light: #60a5fa;
+        --toastify-color-progress-bgo: 0.2;
+    }
+
+    html .Toastify__toast-container
+    .Toastify__toast {
+        background: #1b2636;
+        color: #f1f5f9;
+
+        border: 1px solid #40516a;
+
+        box-shadow:
+                0 12px 35px rgba(0, 0, 0, 0.35);
+
+        color-scheme: dark;
+    }
+
+    html .Toastify__toast-container
+    .Toastify__toast-body {
+        color: #f1f5f9;
+    }
+
+    html .Toastify__toast-container
+    .Toastify__close-button {
+        color: #cbd5e1;
+        opacity: 0.85;
+    }
+
+    html .Toastify__toast-container
+    .Toastify__close-button:hover {
+        opacity: 1;
+    }
+
+    /* Информационные сообщения */
+
+    html .Toastify__toast--info {
+        border-left: 3px solid #60a5fa;
+    }
+
+    /* Успешные действия */
+
+    html .Toastify__toast--success {
+        border-left: 3px solid #4ade80;
+    }
+
+    /* Предупреждения */
+
+    html .Toastify__toast--warning {
+        border-left: 3px solid #fbbf24;
+    }
+
+    /* Ошибки */
+
+    html .Toastify__toast--error {
+        border-left: 3px solid #f87171;
+    }
+
+    /* ========================================
+       2. ОБЩИЕ МОДАЛЬНЫЕ УВЕДОМЛЕНИЯ
+       ModalProvider / modalContext
+       ======================================== */
+
+    html .modal-overlay > .modal {
+        background:
+                linear-gradient(
+                        180deg,
+                        #25354a,
+                        #1b2636
+                );
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow:
+                0 24px 65px rgba(0, 0, 0, 0.4);
+
+        color-scheme: dark;
+    }
+
+    html .modal-overlay > .modal
+    :is(.modal-title, h2) {
+        color: #f1f5f9;
+    }
+
+    html .modal-overlay > .modal
+    :is(.modal-text, p) {
+        color: #cbd5e1;
+    }
+
+    /* ========================================
+       3. ИКОНКИ
+       ======================================== */
+
+    html .modal-overlay > .modal .modal-icon {
+        background: rgba(96, 165, 250, 0.15);
+
+        border-color: rgba(96, 165, 250, 0.3);
+
+        color: #93c5fd;
+    }
+
+    html .modal-overlay > .modal .modal-close {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #f1f5f9;
+    }
+
+    html .modal-overlay > .modal .modal-close:hover {
+        background: #40516a;
+    }
+
+    /* ========================================
+       4. ИНФОРМАЦИОННЫЕ БЛОКИ
+       ======================================== */
+
+    html .modal-overlay > .modal .modal-note {
+        background: #26364b;
+
+        border-color: #40516a;
+
+        color: #cbd5e1;
+    }
+
+    html .modal-overlay > .modal
+    .modal-note-success {
+        background: rgba(74, 222, 128, 0.12);
+
+        border-color: rgba(74, 222, 128, 0.3);
+
+        color: #86efac;
+    }
+
+    /* ========================================
+       5. КНОПКИ
+       ======================================== */
+
+    html .modal-overlay > .modal
+    .modal-btn-primary {
+        background:
+                linear-gradient(
+                        135deg,
+                        #2854a2,
+                        #1e4081
+                );
+
+        border-color: #3b72d0;
+
+        color: #ffffff;
+
+        box-shadow: none;
+    }
+
+    html .modal-overlay > .modal
+    .modal-btn-ghost {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #e2e8f0;
+
+        box-shadow: none;
+    }
+
+    html .modal-overlay > .modal
+    .modal-btn-ghost:hover {
+        background: #40516a;
+    }
+
+    /* ========================================
+       6. ЗАВЕРШЕНИЕ ЗАКАЗА
+       ======================================== */
+
+    html .modal-overlay > .modal .modal-summary {
+        background: #223147;
+
+        border-color: #40516a;
+
+        box-shadow: none;
+    }
+
+    html .modal-overlay > .modal
+    .modal-summary-row {
+        color: #cbd5e1;
+    }
+
+    html .modal-overlay > .modal
+    .modal-summary-row b {
+        color: #f1f5f9;
+    }
+
+    html .modal-overlay > .modal
+    .modal-summary-row + .modal-summary-row {
+        border-top-color: #40516a;
+    }
+
+    /* ========================================
+       7. ОЦЕНКА УЧАСТНИКА
+       ======================================== */
+
+    html .modal-overlay > .modal .star {
+        color: #64748b;
+    }
+
+    html .modal-overlay > .modal .star.selected {
+        color: #fbbf24;
+    }
+}

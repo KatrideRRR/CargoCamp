@@ -20,6 +20,7 @@ import { disconnectSocket } from "./socketClient";
 import "./utils/axiosInstance";
 import "./styles/global.css";
 import "./styles/darkTheme.css";
+import "./styles/NotificationsDark.css";
 
 Modal.setAppElement('#root');
 

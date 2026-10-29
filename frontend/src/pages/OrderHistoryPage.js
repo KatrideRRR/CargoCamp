@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import axiosInstance from "../utils/axiosInstance";
 import OrderServiceDetails from "../components/OrderServiceDetails";
 import "../styles/OrderHistotyPage.css";
+import "../styles/OrderHistoryPageDark.css";
 import {FiCheckCircle, FiFileText, FiMapPin, FiNavigation, FiPackage, FiStar,} from "react-icons/fi";
 import {FaCarSide, FaRegMoneyBillAlt,} from "react-icons/fa";
 import {downloadLegacyContract,} from "../utils/downloadLegacyContract";

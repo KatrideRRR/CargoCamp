@@ -1,0 +1,726 @@
+/* ============================================
+   CARGOCAMP — ORDER HISTORY DARK THEME
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+
+    /* ========================================
+       1. ОСНОВНАЯ СТРАНИЦА
+       ======================================== */
+
+    html .oh-page {
+        --oh-bg: #101824;
+        --oh-card: #1b2636;
+        --oh-surface: #26364b;
+        --oh-text: #f1f5f9;
+        --oh-muted: #a8b7ca;
+        --oh-border: #40516a;
+        --oh-primary: #93c5fd;
+
+        background:
+                linear-gradient(
+                        180deg,
+                        #101824,
+                        #172338
+                );
+
+        color: var(--oh-text);
+        color-scheme: dark;
+    }
+
+    /* ========================================
+       2. КАРТОЧКИ
+       ======================================== */
+
+    html .oh-page .glass {
+        background:
+                linear-gradient(
+                        180deg,
+                        #223147,
+                        #1b2636
+                );
+
+        border-color: rgba(148, 163, 184, 0.18);
+
+        box-shadow:
+                0 12px 32px rgba(0, 0, 0, 0.22);
+    }
+
+    html .oh-page .oh-card--express {
+        background:
+                linear-gradient(
+                        180deg,
+                        #20372f,
+                        #1a2c35
+                );
+
+        border-color: rgba(74, 222, 128, 0.3);
+    }
+
+    /* ========================================
+       3. ЗАГОЛОВОК И СЧЁТЧИКИ
+       ======================================== */
+
+    html .oh-page .oh-title,
+    html .oh-page .oh-order-num {
+        color: var(--oh-text);
+    }
+
+    html .oh-page .oh-subtitle,
+    html .oh-page .oh-muted {
+        color: var(--oh-muted);
+    }
+
+    html .oh-page .oh-count {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #f1f5f9;
+    }
+
+    html .oh-page .oh-history-summary__item {
+        background: #26364b;
+
+        border-color: #40516a;
+
+        color: #cbd5e1;
+    }
+
+    html .oh-page
+    .oh-history-summary__item strong {
+        color: #f1f5f9;
+    }
+
+    html .oh-page
+    .oh-history-summary__item--express {
+        background: rgba(74, 222, 128, 0.12);
+
+        border-color: rgba(74, 222, 128, 0.3);
+
+        color: #86efac;
+    }
+
+    html .oh-page
+    .oh-history-summary__item--express strong {
+        color: #86efac;
+    }
+
+    /* ========================================
+       4. ТИПЫ И СТАТУСЫ ЗАКАЗОВ
+       ======================================== */
+
+    html .oh-page .oh-pill {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #cbd5e1;
+    }
+
+    html .oh-page .oh-pill--done {
+        background: rgba(74, 222, 128, 0.13);
+
+        border-color: rgba(74, 222, 128, 0.3);
+
+        color: #86efac;
+    }
+
+    html .oh-page .oh-pill--muted {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #a8b7ca;
+    }
+
+    html .oh-page .oh-order-type-badge--regular {
+        background: rgba(96, 165, 250, 0.15);
+
+        border-color: rgba(96, 165, 250, 0.3);
+
+        color: #93c5fd;
+    }
+
+    html .oh-page .oh-order-type-badge--express {
+        background: rgba(74, 222, 128, 0.13);
+
+        border-color: rgba(74, 222, 128, 0.3);
+
+        color: #86efac;
+    }
+
+    html .oh-page .oh-dot {
+        color: #64748b;
+    }
+
+    /* ========================================
+       5. СТОИМОСТЬ
+       ======================================== */
+
+    html .oh-page .oh-price {
+        background: rgba(96, 165, 250, 0.15);
+
+        border-color: rgba(96, 165, 250, 0.3);
+
+        color: #bfdbfe;
+    }
+
+    html .oh-page
+    .oh-card--express .oh-price {
+        background: rgba(74, 222, 128, 0.13);
+
+        border-color: rgba(74, 222, 128, 0.3);
+
+        color: #86efac;
+    }
+
+    /* ========================================
+       6. ИНФОРМАЦИЯ О ЗАКАЗЕ
+       ======================================== */
+
+    html .oh-page .oh-k {
+        color: #94a3b8;
+    }
+
+    html .oh-page .oh-v {
+        color: #f1f5f9;
+    }
+
+    html .oh-page .oh-description-box {
+        background: #26364b;
+
+        border-color: #40516a;
+    }
+
+    html .oh-page .oh-link-btn {
+        color: #93c5fd;
+    }
+
+    /* ========================================
+       7. МАРШРУТ ЭКСПРЕСС-ЗАКАЗА
+       ======================================== */
+
+    html .oh-page .oh-express-route {
+        background: #26364b;
+
+        border-color: #40516a;
+    }
+
+    html .oh-page .oh-route-point__icon--from {
+        background: rgba(96, 165, 250, 0.16);
+
+        border-color: rgba(96, 165, 250, 0.3);
+
+        color: #93c5fd;
+    }
+
+    html .oh-page .oh-route-point__icon--to {
+        background: rgba(74, 222, 128, 0.13);
+
+        border-color: rgba(74, 222, 128, 0.3);
+
+        color: #86efac;
+    }
+
+    html .oh-page .oh-route-divider {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #cbd5e1;
+    }
+
+    /* ========================================
+       8. КНОПКИ
+       ======================================== */
+
+    html .oh-page .btn.btn-primary {
+        background:
+                linear-gradient(
+                        135deg,
+                        #2563eb,
+                        #1d4ed8
+                );
+
+        color: #ffffff;
+
+        box-shadow: none;
+    }
+
+    html .oh-page .btn.btn-ghost {
+        background: #304157;
+
+        border: 1px solid #475569;
+
+        color: #e2e8f0;
+    }
+
+    html .oh-page .btn.btn-ghost:hover {
+        background: #40516a;
+    }
+
+    /* ========================================
+       9. ПОДРОБНОСТИ УСЛУГИ
+       ======================================== */
+
+    html .oh-page .order-service-details {
+        background: #223147;
+
+        border-color: #40516a;
+
+        box-shadow: none;
+    }
+
+    html .oh-page .order-service-detail {
+        background: #26364b;
+
+        border-color: #40516a;
+
+        box-shadow: none;
+    }
+
+    html .oh-page
+    :is(
+        .order-service-details__title,
+        .order-service-detail__value,
+        .order-pricing-details__title,
+        .order-pricing-details__row strong,
+        .order-pricing-details__total
+    ) {
+        color: #f1f5f9;
+    }
+
+    html .oh-page
+    :is(
+        .order-service-details__subtitle,
+        .order-service-details__range span,
+        .order-service-detail__label,
+        .order-service-details__more,
+        .order-pricing-details__row,
+        .order-pricing-details__notice
+    ) {
+        color: #a8b7ca;
+    }
+
+    html .oh-page
+    :is(
+        .order-service-details__range strong,
+        .order-pricing-details__total strong
+    ) {
+        color: #93c5fd;
+    }
+
+    html .oh-page .order-pricing-details,
+    html .oh-page .order-pricing-details__total {
+        border-color: #40516a;
+    }
+
+    /* ========================================
+       10. ДОГОВОРЫ И АКТЫ
+       ======================================== */
+
+    html .oh-page .cc-verified-assignment {
+        background: #223147;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        box-shadow: none;
+    }
+
+    html .oh-page .cc-va-icon {
+        background: #304765;
+    }
+
+    html .oh-page .cc-va-heading small,
+    html .oh-page .cc-va-document p,
+    html .oh-page .cc-va-footnote,
+    html .oh-page .cc-va-details span {
+        color: #a8b7ca;
+    }
+
+    html .oh-page .cc-va-document,
+    html .oh-page .cc-va-details > div {
+        background: #26364b;
+
+        border-color: #40516a;
+    }
+
+    html .oh-page .cc-va-details strong {
+        color: #f1f5f9;
+    }
+
+    html .oh-page .cc-va-status.draft {
+        background: rgba(251, 191, 36, 0.12);
+
+        color: #fcd34d;
+
+        border-color: rgba(251, 191, 36, 0.3);
+    }
+
+    html .oh-page .cc-va-status.pending {
+        background: rgba(96, 165, 250, 0.14);
+
+        color: #93c5fd;
+
+        border-color: rgba(96, 165, 250, 0.3);
+    }
+
+    html .oh-page .cc-va-status.signed {
+        background: rgba(74, 222, 128, 0.12);
+
+        color: #86efac;
+
+        border-color: rgba(74, 222, 128, 0.3);
+    }
+
+    html .oh-page .cc-va-error {
+        background: rgba(248, 113, 113, 0.12);
+
+        color: #fca5a5;
+
+        border-color: rgba(248, 113, 113, 0.3);
+    }
+
+    /*
+       Предыдущая версия акта имеет
+       встроенный светлый стиль.
+    */
+
+    html .oh-page .cc-va-download[style] {
+        background: #304157 !important;
+
+        border-color: #5275a3;
+
+        color: #bfdbfe !important;
+    }
+
+    /* ========================================
+       11. ПРИЁМКА ВЫПОЛНЕННЫХ РАБОТ
+       ======================================== */
+
+    html .oh-page .cc-act-acceptance {
+        background: #223147;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+    }
+
+    html .oh-page .cc-act-acceptance h4 {
+        color: #f1f5f9;
+    }
+
+    html .oh-page .cc-act-option,
+    html .oh-page .cc-act-acceptance-note {
+        background: #26364b;
+
+        border-color: #40516a;
+
+        color: #cbd5e1;
+    }
+
+    html .oh-page
+    .cc-act-option:has(input:checked) {
+        background: #223e65;
+
+        border-color: #60a5fa;
+    }
+
+    html .oh-page .cc-act-option span,
+    html .oh-page .cc-act-confirm span,
+    html .oh-page .cc-act-comment span {
+        color: #cbd5e1;
+    }
+
+    html .oh-page .cc-act-comment textarea {
+        background: #142238;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        color-scheme: dark;
+    }
+
+    html .oh-page .cc-act-acceptance-result {
+        background: #223e65;
+
+        border-color: #5275a3;
+    }
+
+    html .oh-page .cc-act-acceptance-result strong {
+        color: #bfdbfe;
+    }
+
+    html .oh-page .cc-act-acceptance-result p,
+    html .oh-page .cc-act-acceptance-result small {
+        color: #cbd5e1;
+    }
+
+    /* ========================================
+       12. ИСПРАВЛЕНИЕ ЗАМЕЧАНИЙ
+       ======================================== */
+
+    html .oh-page .cc-remediation {
+        background: #223147;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+    }
+
+    html .oh-page .cc-remediation h4 {
+        color: #f1f5f9;
+    }
+
+    html .oh-page .cc-remediation label {
+        color: #cbd5e1;
+    }
+
+    html .oh-page .cc-remediation textarea {
+        background: #142238;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        color-scheme: dark;
+    }
+
+    html .oh-page .cc-remediation-note {
+        background: #26364b;
+        color: #cbd5e1;
+    }
+
+    html .oh-page .cc-remediation-warning {
+        background: rgba(251, 191, 36, 0.12);
+        color: #fcd34d;
+    }
+
+    html .oh-page .cc-remediation-error {
+        background: rgba(248, 113, 113, 0.12);
+        color: #fca5a5;
+    }
+
+    html .oh-page .cc-remediation-success {
+        background: rgba(74, 222, 128, 0.12);
+        color: #86efac;
+    }
+
+    /* ========================================
+       13. ПЭП И SMS-ПОДПИСАНИЕ
+       ======================================== */
+
+    html .oh-page
+    :is(.cc-signature-agreement, .cc-signing) {
+        background: #223147;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+    }
+
+    html .oh-page
+    :is(.cc-sa-toggle, .cc-signing-toggle) {
+        background: #26364b;
+
+        color: #f1f5f9;
+    }
+
+    html .oh-page
+    :is(.cc-sa-content, .cc-signing-content) {
+        border-top-color: #40516a;
+    }
+
+    html .oh-page
+    :is(
+        .cc-sa-toggle small,
+        .cc-signing-toggle small,
+        .cc-sa-intro,
+        .cc-sa-footer,
+        .cc-sa-accept label span,
+        .cc-signing-consent,
+        .cc-signing-code-label
+    ) {
+        color: #a8b7ca;
+    }
+
+    html .oh-page
+    :is(.cc-sa-policy-text, .cc-signing-note) {
+        background: #1b293d;
+
+        border-color: #40516a;
+
+        color: #cbd5e1;
+    }
+
+    html .oh-page .cc-signing-code-label input {
+        background: #142238;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        color-scheme: dark;
+    }
+
+    html .oh-page
+    :is(.cc-sa-history, .cc-sa-history details) {
+        border-color: #40516a;
+    }
+
+    html .oh-page
+    :is(
+        .cc-sa-history > button,
+        .cc-signing-refresh
+    ) {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #bfdbfe;
+    }
+
+    html .oh-page .cc-sa-history details p {
+        color: #a8b7ca;
+    }
+
+    html .oh-page
+    :is(.cc-sa-error, .cc-signing-error) {
+        background: rgba(248, 113, 113, 0.12);
+
+        border-color: rgba(248, 113, 113, 0.3);
+
+        color: #fca5a5;
+    }
+
+    html .oh-page
+    :is(.cc-sa-success, .cc-signing-success) {
+        background: rgba(74, 222, 128, 0.12);
+
+        border-color: rgba(74, 222, 128, 0.3);
+
+        color: #86efac;
+    }
+
+    html .oh-page .cc-sa-notice {
+        background: rgba(251, 191, 36, 0.12);
+
+        border-color: rgba(251, 191, 36, 0.3);
+
+        color: #fcd34d;
+    }
+
+    /* ========================================
+       14. ПРЕДУПРЕЖДЕНИЯ О ДОГОВОРАХ
+       ======================================== */
+
+    html .oh-page .cc-verified-contracts-alert {
+        background: #393022;
+
+        border-color: rgba(251, 191, 36, 0.3);
+
+        color: #fcd34d;
+    }
+
+    html .oh-page
+    .cc-verified-contracts-alert button {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #f1f5f9;
+    }
+
+    /* ========================================
+       15. ПУСТАЯ ИСТОРИЯ
+       ======================================== */
+
+    html .oh-page .oh-empty-title {
+        color: #f1f5f9;
+    }
+
+    html .oh-page .oh-empty-sub {
+        color: #a8b7ca;
+    }
+
+    /* ========================================
+       16. ОКНО ОТЗЫВА
+       ======================================== */
+
+    html .oh-page .oh-modal-overlay {
+        background: rgba(3, 8, 18, 0.76);
+    }
+
+    html .oh-page .oh-modal {
+        background: #1b2636;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        color-scheme: dark;
+
+        box-shadow:
+                0 24px 65px rgba(0, 0, 0, 0.4);
+    }
+
+    html .oh-page .oh-modal-title {
+        color: #f1f5f9;
+    }
+
+    html .oh-page .oh-star {
+        background: #304157;
+
+        border-color: #475569;
+
+        color: #94a3b8;
+    }
+
+    html .oh-page .oh-star.selected {
+        background: rgba(251, 191, 36, 0.18);
+
+        border-color: rgba(251, 191, 36, 0.45);
+
+        color: #fcd34d;
+    }
+
+    html .oh-page .oh-textarea {
+        background: #142238;
+
+        border-color: #40516a;
+
+        color: #f1f5f9;
+
+        color-scheme: dark;
+    }
+
+    html .oh-page .oh-textarea:focus {
+        background: #1d2c43;
+
+        border-color: #60a5fa;
+    }
+
+    html .oh-page .oh-textarea::placeholder {
+        color: #94a3b8;
+    }
+
+    /* ========================================
+       17. ЗАГРУЗКА И ОШИБКИ
+       ======================================== */
+
+    html .oh-state {
+        min-height: 100dvh;
+
+        background: #101824;
+
+        color: #93c5fd;
+    }
+
+    html .oh-state--error {
+        color: #fca5a5;
+    }
+}
