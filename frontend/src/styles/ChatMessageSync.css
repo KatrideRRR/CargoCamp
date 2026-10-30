@@ -1,0 +1,64 @@
+/* CargoCamp — состояние синхронизации */
+
+.chat-page .chat-sync-notice {
+    flex-shrink: 0;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+
+    padding: 9px 12px;
+
+    background: #fff7ed;
+    border-bottom: 1px solid #fed7aa;
+
+    color: #9a3412;
+
+    font-size: 12px;
+    line-height: 1.4;
+    font-weight: 650;
+}
+
+.chat-page .chat-sync-notice span {
+    min-width: 0;
+}
+
+.chat-page .chat-sync-notice button {
+    flex-shrink: 0;
+
+    min-height: 36px;
+    padding: 7px 11px;
+
+    border: 1px solid #fdba74;
+    border-radius: 10px;
+
+    background: #ffedd5;
+    color: #9a3412;
+
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.chat-page .chat-sync-notice button:hover {
+    background: #fed7aa;
+}
+
+@media (prefers-color-scheme: dark) {
+    html .chat-page .chat-sync-notice {
+        background: #392a1e;
+        border-bottom-color: #74512c;
+        color: #fcd34d;
+    }
+
+    html .chat-page .chat-sync-notice button {
+        background: #57402b;
+        border-color: #926a35;
+        color: #fde68a;
+    }
+
+    html .chat-page .chat-sync-notice button:hover {
+        background: #674b30;
+    }
+}

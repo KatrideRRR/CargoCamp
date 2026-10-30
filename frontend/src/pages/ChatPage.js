@@ -6,8 +6,9 @@ import axiosInstance from "../utils/axiosInstance";
 import { useParams, useNavigate } from "react-router-dom";
 import "../styles/ChatPage.css";
 import "../styles/ChatPageDark.css";
+import "../styles/ChatMessageSync.css";
 import { useUser } from "../utils/userContext";
-import { socket } from "../socketClient";
+import useOrderChatSync from "../hooks/useOrderChatSync";
 import Modal from "react-modal";
 import { openOrderRoute } from "../utils/orderNavigation";
 import ReliableChatComposer from "../components/ReliableChatComposer";
@@ -104,7 +105,6 @@ const ChatPage = () => {
         return "web";
     }, []);
 
-    const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [selectedUser, setSelectedUser] = useState(null);
@@ -120,6 +120,19 @@ const ChatPage = () => {
     const [orderDispute, setOrderDispute] = useState(null);
 
     const messagesContainerRef = useRef(null);
+    const shouldAutoScrollRef = useRef(true);
+
+    const {
+        messages,
+        addMessage,
+        refreshMessages,
+        loadingMessages,
+        syncError: messageSyncError,
+    } = useOrderChatSync({
+        userId: currentUser?.id,
+        orderId,
+        orderType,
+    });
 
     const selectedUserAvatar = getAvatarUrl(selectedUser);
 
@@ -132,97 +145,25 @@ const ChatPage = () => {
         }
     }, []);
 
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages, scrollToBottom]);
+    const handleMessagesScroll = useCallback((event) => {
+        const element = event.currentTarget;
+
+        const distanceFromBottom =
+            element.scrollHeight -
+            element.scrollTop -
+            element.clientHeight;
+
+        shouldAutoScrollRef.current =
+            distanceFromBottom < 100;
+    }, []);
 
     useEffect(() => {
-        if (!currentUser?.id || !orderId) {
+        if (!shouldAutoScrollRef.current) {
             return;
         }
 
-        const joinCurrentChat = () => {
-            socket.emit(
-                "joinChat",
-                {
-                    userId: currentUser.id,
-                    orderId,
-                    orderType,
-                },
-                (result) => {
-                    if (result?.ok === false) {
-                        console.warn(
-                            "Chat subscription denied:",
-                            result.message
-                        );
-                    }
-                }
-            );
-        };
-
-        const handleReceiveMessage = (message) => {
-            if (
-                String(message.orderId) !==
-                String(orderId)
-            ) {
-                return;
-            }
-
-            if (
-                String(message.orderType || "regular") !==
-                String(orderType)
-            ) {
-                return;
-            }
-
-            setMessages((prev) => {
-                const exists = prev.some(
-                    (msg) =>
-                        String(msg.id) ===
-                        String(message.id)
-                );
-
-                if (exists) return prev;
-
-                return [...prev, message];
-            });
-        };
-
-        /*
-         * Повторная подписка после восстановления
-         * интернета или обновления JWT.
-         */
-        socket.on("connect", joinCurrentChat);
-
-        socket.on(
-            "receiveMessage",
-            handleReceiveMessage
-        );
-
-        if (socket.connected) {
-            joinCurrentChat();
-        }
-
-        return () => {
-            socket.off(
-                "connect",
-                joinCurrentChat
-            );
-
-            socket.off(
-                "receiveMessage",
-                handleReceiveMessage
-            );
-
-            if (socket.connected) {
-                socket.emit("leaveChat");
-            }
-        };
-    }, [
-        currentUser?.id,
-        orderId,
-        orderType,
-    ]);
+        scrollToBottom("auto");
+    }, [messages, scrollToBottom]);
 
     const fetchChatData = useCallback(
         async ({ silent = false } = {}) => {
@@ -277,21 +218,13 @@ const ChatPage = () => {
 
                 setSelectedUser(user);
 
-                const { data: messagesData } = await axiosInstance.get(
-                    `/messages/${orderType}/${orderId}`
-                );
-
-                setMessages(Array.isArray(messagesData) ? messagesData : []);
-
-                socket.emit("markAsRead", {
-                    userId: currentUser.id,
-                    orderId,
-                    orderType,
-                });
-
                 requestAnimationFrame(() => scrollToBottom("auto"));
             } catch (err) {
                 console.error(err);
+
+                if (silent) {
+                    return;
+                }
 
                 if (err?.response?.status === 401) {
                     setError("Сессия устарела. Выполните вход заново.");
@@ -495,7 +428,10 @@ const ChatPage = () => {
                     return;
                 }
 
-                await fetchChatData({ silent: true });
+                await Promise.allSettled([
+                    fetchChatData({ silent: true }),
+                    refreshMessages(),
+                ]);
             } finally {
                 e.detail?.done?.();
             }
@@ -506,7 +442,7 @@ const ChatPage = () => {
         return () => {
             window.removeEventListener("appPullToRefresh", onPullToRefresh);
         };
-    }, [fetchChatData]);
+    }, [fetchChatData, refreshMessages]);
 
     if (loading) {
         return (
@@ -615,7 +551,27 @@ const ChatPage = () => {
                     </div>
                 </section>
 
-                <div className="chat-messages" ref={messagesContainerRef}>
+                {messageSyncError && (
+                    <div
+                        className="chat-sync-notice"
+                        role="alert"
+                    >
+                        <span>{messageSyncError}</span>
+
+                        <button
+                            type="button"
+                            onClick={refreshMessages}
+                        >
+                            Повторить
+                        </button>
+                    </div>
+                )}
+
+                <div
+                    className="chat-messages"
+                    ref={messagesContainerRef}
+                    onScroll={handleMessagesScroll}
+                >
                     {groupedMessages.length > 0 ? (
                         groupedMessages.map((msg) => {
                             const isMine = String(msg.senderId) === String(currentUser.id);
@@ -667,6 +623,14 @@ const ChatPage = () => {
                                 </React.Fragment>
                             );
                         })
+                    ) : loadingMessages ? (
+                        <div className="chat-loading">
+                            Загрузка переписки...
+                        </div>
+                    ) : messageSyncError ? (
+                        <div className="chat-error">
+                            Пока не удалось загрузить историю.
+                        </div>
                     ) : (
                         <div className="chat-empty">
                             <div className="chat-empty-icon">💬</div>
@@ -685,22 +649,7 @@ const ChatPage = () => {
                     orderType={orderType}
 
                     messages={messages}
-
-                    onConfirmed={(message) => {
-                        setMessages((previous) => {
-                            const exists = previous.some(
-                                (item) =>
-                                    String(item.id) ===
-                                    String(message.id)
-                            );
-
-                            if (exists) {
-                                return previous;
-                            }
-
-                            return [...previous, message];
-                        });
-                    }}
+                    onConfirmed={addMessage}
                 />
 
                 <Modal

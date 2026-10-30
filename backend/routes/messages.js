@@ -378,6 +378,108 @@ async function getChatHistory(
 }
 
 /**
+ * GET /api/messages/sync/:orderType/:orderId?afterId=0
+ *
+ * Возвращает следующие 100 сообщений после afterId.
+ * Проверка участия в заказе обязательна.
+ *
+ * Старые маршруты истории не меняем.
+ */
+router.get(
+    "/sync/:orderType/:orderId",
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const rawAfterId =
+                req.query.afterId ?? "0";
+
+            if (
+                typeof rawAfterId !== "string" ||
+                !/^(0|[1-9]\d*)$/.test(rawAfterId)
+            ) {
+                return res.status(400).json({
+                    message: "Некорректный afterId",
+                });
+            }
+
+            const afterId = Number(rawAfterId);
+
+            if (!Number.isSafeInteger(afterId)) {
+                return res.status(400).json({
+                    message: "Некорректный afterId",
+                });
+            }
+
+            const access =
+                await requireChatOrderAccess({
+                    orderId: req.params.orderId,
+                    orderType: req.params.orderType,
+                    userId: req.user.id,
+                });
+
+            const limit = 100;
+
+            const messages = await Message.findAll({
+                where: {
+                    orderId: access.orderId,
+                    orderType: access.orderType,
+
+                    id: {
+                        [Op.gt]: afterId,
+                    },
+
+                    [Op.or]: [
+                        {
+                            senderId: access.userId,
+                        },
+                        {
+                            receiverId: access.userId,
+                        },
+                    ],
+                },
+
+                include: [
+                    {
+                        model: User,
+                        as: "sender",
+                        attributes: [
+                            "id",
+                            "username",
+                            "avatar",
+                        ],
+                    },
+                    {
+                        model: User,
+                        as: "receiver",
+                        attributes: [
+                            "id",
+                            "username",
+                            "avatar",
+                        ],
+                    },
+                ],
+
+                order: [["id", "ASC"]],
+
+                limit,
+            });
+
+            const nextCursor = messages.length
+                ? Number(messages[messages.length - 1].id)
+                : afterId;
+
+            return res.json({
+                messages,
+                nextCursor,
+                hasMore: messages.length === limit,
+            });
+        } catch (error) {
+            return handleChatError(res, error);
+        }
+    }
+);
+
+/**
  * Основной маршрут.
  *
  * GET /api/messages/regular/:orderId
