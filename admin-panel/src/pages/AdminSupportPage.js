@@ -99,7 +99,20 @@ const AdminSupportPage = () => {
     }, [selectedUserId]);
 
     useEffect(() => {
-        socket.emit("subscribeAdminSupport");
+        const subscribeAdminSupport = () => {
+            socket.emit("subscribeAdminSupport");
+        };
+
+        socket.on(
+            "connect",
+            subscribeAdminSupport
+        );
+
+        if (socket.connected) {
+            subscribeAdminSupport();
+        } else {
+            socket.connect();
+        }
 
         const handleNewUserMessage = async (payload) => {
             const userId = payload?.userId;
@@ -172,8 +185,22 @@ const AdminSupportPage = () => {
         socket.on("support:admin_reply", handleAdminReply);
 
         return () => {
-            socket.off("support:new_message", handleNewUserMessage);
-            socket.off("support:admin_reply", handleAdminReply);
+            socket.off(
+                "support:new_message",
+                handleNewUserMessage
+            );
+
+            socket.off(
+                "support:admin_reply",
+                handleAdminReply
+            );
+
+            socket.off(
+                "connect",
+                subscribeAdminSupport
+            );
+
+            socket.disconnect();
         };
     }, [selectedUserId]);
 

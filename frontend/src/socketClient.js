@@ -1,20 +1,52 @@
 import { io } from "socket.io-client";
 
+import {
+    ensureUserAccessToken,
+} from "./utils/userSession";
+
 const socketUrl =
     process.env.REACT_APP_SOCKET_URL ||
     process.env.REACT_APP_API_URL;
 
+let currentSocketUserId = null;
+
 export const socket = io(socketUrl, {
     autoConnect: false,
+
     withCredentials: true,
-    transports: ["websocket", "polling"],
+
+    transports: [
+        "websocket",
+        "polling",
+    ],
+
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
-});
 
-let currentSocketUserId = null;
+    /*
+     * На каждое новое соединение получаем
+     * действующий access-token.
+     *
+     * Важно для iOS/Android после простоя,
+     * когда предыдущий JWT мог истечь.
+     */
+    auth: (callback) => {
+        ensureUserAccessToken()
+            .then((token) => {
+                callback({ token });
+            })
+            .catch((error) => {
+                console.warn(
+                    "Socket authentication unavailable:",
+                    error.message
+                );
+
+                callback({ token: "" });
+            });
+    },
+});
 
 function registerCurrentUser() {
     if (!currentSocketUserId) return;
@@ -35,8 +67,6 @@ export function connectSocket(userId) {
 
     const nextUserId = String(userId);
 
-    // При смене аккаунта отключаем прежнее
-    // соединение вместе с его комнатами.
     if (
         currentSocketUserId &&
         currentSocketUserId !== nextUserId
@@ -56,9 +86,48 @@ export function connectSocket(userId) {
 export function disconnectSocket() {
     currentSocketUserId = null;
 
-    if (socket.connected) {
-        socket.disconnect();
-    }
+    socket.disconnect();
 }
 
 socket.on("connect", registerCurrentUser);
+
+/*
+ * Если сервер отключил старое соединение,
+ * повторно подключаемся с актуальным JWT.
+ */
+socket.on("disconnect", (reason) => {
+    if (
+        reason === "io server disconnect" &&
+        currentSocketUserId
+    ) {
+        socket.connect();
+    }
+});
+
+socket.on("connect_error", (error) => {
+    console.warn(
+        "CargoCamp socket connection error:",
+        error.message
+    );
+});
+
+/*
+ * При обновлении пользовательского JWT
+ * пересоздаём соединение с новым токеном.
+ */
+if (typeof window !== "undefined") {
+    window.addEventListener(
+        "cargocamp:auth-changed",
+        () => {
+            if (!currentSocketUserId) {
+                return;
+            }
+
+            if (socket.connected) {
+                socket.disconnect();
+            }
+
+            socket.connect();
+        }
+    );
+}

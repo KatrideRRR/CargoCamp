@@ -60,10 +60,6 @@ const BottomMenu = () => {
 
         fetchDebt();
 
-        if (!socket.connected) {
-            socket.connect();
-        }
-
         const subscribe = () => {
             socket.emit("register", user.id);
             socket.emit("subscribeToNotifications", user.id);

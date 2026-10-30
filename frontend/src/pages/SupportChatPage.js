@@ -73,8 +73,18 @@ const SupportChatPage = () => {
     useEffect(() => {
         if (!currentUserId) return;
 
-        socket.emit("subscribeSupportChat", currentUserId);
-        socket.emit("subscribeToNotifications", currentUserId);
+        const subscribeSupport = () => {
+            socket.emit(
+                "subscribeSupportChat",
+                currentUserId
+            );
+        };
+
+        socket.on("connect", subscribeSupport);
+
+        if (socket.connected) {
+            subscribeSupport();
+        }
 
         const handleSupportReply = async (payload) => {
             const message = payload?.message;
@@ -111,6 +121,11 @@ const SupportChatPage = () => {
         return () => {
             socket.off("support:reply", handleSupportReply);
             socket.off("support:new_message", handleSupportNewMessage);
+            socket.off("connect", subscribeSupport);
+
+            if (socket.connected) {
+                socket.emit("unsubscribeSupportChat");
+            }
         };
     }, [currentUserId]);
 

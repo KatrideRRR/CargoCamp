@@ -196,16 +196,20 @@ router.post(
              * Защита самих Socket.IO-комнат —
              * следующий подэтап.
              */
-            const io = req.app.locals.io;
+            /*
+             * Сообщение получают только два участника,
+             * определённые сервером.
+             *
+             * Не рассылаем сообщения в общую комнату
+             * заказа: её состав мог устареть после
+             * изменения исполнителя.
+             */
 
-            if (io) {
-                io.to(
-                    `chat_${access.orderType}_${access.orderId}`
-                ).emit(
-                    "receiveMessage",
-                    fullMessage
-                );
-            }
+            sendToUser(
+                access.userId,
+                "receiveMessage",
+                fullMessage
+            );
 
             sendToUser(
                 access.otherUserId,

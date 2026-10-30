@@ -138,30 +138,92 @@ const ChatPage = () => {
     }, [messages, scrollToBottom]);
 
     useEffect(() => {
-        if (!currentUser?.id) return;
+        if (!currentUser?.id || !orderId) {
+            return;
+        }
 
-        socket.emit("joinChat", {
-            userId: currentUser.id,
-            orderId,
-            orderType,
-        });
+        const joinCurrentChat = () => {
+            socket.emit(
+                "joinChat",
+                {
+                    userId: currentUser.id,
+                    orderId,
+                    orderType,
+                },
+                (result) => {
+                    if (result?.ok === false) {
+                        console.warn(
+                            "Chat subscription denied:",
+                            result.message
+                        );
+                    }
+                }
+            );
+        };
 
         const handleReceiveMessage = (message) => {
-            if (String(message.orderId) !== String(orderId)) return;
+            if (
+                String(message.orderId) !==
+                String(orderId)
+            ) {
+                return;
+            }
+
+            if (
+                String(message.orderType || "regular") !==
+                String(orderType)
+            ) {
+                return;
+            }
 
             setMessages((prev) => {
-                const exists = prev.some((msg) => String(msg.id) === String(message.id));
+                const exists = prev.some(
+                    (msg) =>
+                        String(msg.id) ===
+                        String(message.id)
+                );
+
                 if (exists) return prev;
+
                 return [...prev, message];
             });
         };
 
-        socket.on("receiveMessage", handleReceiveMessage);
+        /*
+         * Повторная подписка после восстановления
+         * интернета или обновления JWT.
+         */
+        socket.on("connect", joinCurrentChat);
+
+        socket.on(
+            "receiveMessage",
+            handleReceiveMessage
+        );
+
+        if (socket.connected) {
+            joinCurrentChat();
+        }
 
         return () => {
-            socket.off("receiveMessage", handleReceiveMessage);
+            socket.off(
+                "connect",
+                joinCurrentChat
+            );
+
+            socket.off(
+                "receiveMessage",
+                handleReceiveMessage
+            );
+
+            if (socket.connected) {
+                socket.emit("leaveChat");
+            }
         };
-    }, [currentUser?.id, orderId, orderType]);
+    }, [
+        currentUser?.id,
+        orderId,
+        orderType,
+    ]);
 
     const fetchChatData = useCallback(
         async ({ silent = false } = {}) => {
