@@ -1,0 +1,51 @@
+/* ==========================================
+   CargoCamp — надёжная отправка сообщений
+   ========================================== */
+
+.chat-input-container .chat-send-status {
+    grid-column: 1 / -1;
+
+    width: 100%;
+
+    margin-top: -2px;
+    padding: 5px 8px;
+
+    border-radius: 9px;
+
+    color: #2563eb;
+
+    background: rgba(37, 99, 235, 0.07);
+
+    font-size: 11px;
+    line-height: 1.4;
+    font-weight: 650;
+
+    text-align: left;
+}
+
+.chat-input-container
+.chat-send-status--error {
+    color: #b45309;
+
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.chat-input-container
+.chat-input:disabled {
+    opacity: 0.75;
+    cursor: wait;
+}
+
+@media (prefers-color-scheme: dark) {
+    html .chat-page
+    .chat-send-status {
+        color: #bfdbfe;
+        background: rgba(96, 165, 250, 0.1);
+    }
+
+    html .chat-page
+    .chat-send-status--error {
+        color: #fcd34d;
+        background: rgba(251, 191, 36, 0.12);
+    }
+}

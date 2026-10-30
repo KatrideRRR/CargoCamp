@@ -5,6 +5,10 @@ module.exports = (sequelize, DataTypes) => {
         content: { type: DataTypes.TEXT, allowNull: false },
         senderId: { type: DataTypes.INTEGER, allowNull: false },
         receiverId: { type: DataTypes.INTEGER, allowNull: false },
+        clientMessageId: {
+            type: DataTypes.STRING(36),
+            allowNull: true,
+        },
         orderId: { type: DataTypes.INTEGER, allowNull: false },
         orderType: {
             type: DataTypes.ENUM("regular", "express"),

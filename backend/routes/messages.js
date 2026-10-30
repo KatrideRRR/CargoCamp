@@ -26,6 +26,13 @@ const {
     parsePositiveId,
 } = require("../services/chatOrderAccess");
 
+const {
+    normalizeClientMessageId,
+    getFullChatMessage,
+    findExistingChatMessage,
+    isDuplicateKeyError,
+} = require("../services/chatMessageIdempotency");
+
 /**
  * Унифицированная обработка ошибок.
  */
@@ -61,7 +68,11 @@ router.post(
                 receiverId,
                 orderId,
                 orderType = "regular",
+                clientMessageId: rawClientMessageId,
             } = req.body || {};
+
+            const clientMessageId =
+                normalizeClientMessageId(rawClientMessageId);
 
             if (typeof content !== "string") {
                 return res.status(400).json({
@@ -124,18 +135,63 @@ router.post(
             }
 
             /**
-             * Отправитель берётся исключительно
-             * из проверенной сервером сессии.
+             * Сначала проверяем повторную отправку.
+             * Существующее сообщение возвращаем
+             * без новых Socket.IO-событий и уведомлений.
              */
-            const message = await Message.create({
-                content: cleanContent,
+            const existingMessage =
+                await findExistingChatMessage({
+                    access,
+                    clientMessageId,
+                    content: cleanContent,
+                });
 
-                senderId: access.userId,
-                receiverId: access.otherUserId,
+            if (existingMessage) {
+                return res.status(200).json(existingMessage);
+            }
 
-                orderId: access.orderId,
-                orderType: access.orderType,
-            });
+            let message;
+
+            try {
+                message = await Message.create({
+                    content: cleanContent,
+
+                    senderId: access.userId,
+                    receiverId: access.otherUserId,
+
+                    clientMessageId,
+
+                    orderId: access.orderId,
+                    orderType: access.orderType,
+                });
+            } catch (createError) {
+                /*
+                 * Два одинаковых запроса могли прийти
+                 * одновременно.
+                 *
+                 * Уникальный индекс MySQL пропустит
+                 * только один из них.
+                 */
+                if (
+                    clientMessageId &&
+                    isDuplicateKeyError(createError)
+                ) {
+                    const savedMessage =
+                        await findExistingChatMessage({
+                            access,
+                            clientMessageId,
+                            content: cleanContent,
+                        });
+
+                    if (savedMessage) {
+                        return res.status(200).json(
+                            savedMessage
+                        );
+                    }
+                }
+
+                throw createError;
+            }
 
             /**
              * Ошибка журнала не должна превращать
@@ -168,26 +224,8 @@ router.post(
             }
 
             const fullMessage =
-                (await Message.findByPk(message.id, {
-                    include: [
-                        {
-                            model: User,
-                            as: "sender",
-                            attributes: [
-                                "id",
-                                "username",
-                            ],
-                        },
-                        {
-                            model: User,
-                            as: "receiver",
-                            attributes: [
-                                "id",
-                                "username",
-                            ],
-                        },
-                    ],
-                })) || message;
+                (await getFullChatMessage(message.id)) ||
+                message;
 
             /**
              * Событие оставляем совместимым

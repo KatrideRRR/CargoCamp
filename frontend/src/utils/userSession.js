@@ -310,6 +310,29 @@ export async function clearUserSessionLocal() {
     localStorage.removeItem("currentUser");
 
     try {
+        const keys = Object.keys(
+            window.sessionStorage
+        );
+
+        keys.forEach((key) => {
+            if (
+                key.startsWith(
+                    "cc:chat:pending:v1:"
+                )
+            ) {
+                window.sessionStorage.removeItem(
+                    key
+                );
+            }
+        });
+    } catch (error) {
+        console.warn(
+            "Не удалось очистить временные сообщения:",
+            error
+        );
+    }
+
+    try {
         await removeNativeRefreshToken();
     } catch (error) {
         console.error(

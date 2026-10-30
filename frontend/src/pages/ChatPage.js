@@ -10,6 +10,7 @@ import { useUser } from "../utils/userContext";
 import { socket } from "../socketClient";
 import Modal from "react-modal";
 import { openOrderRoute } from "../utils/orderNavigation";
+import ReliableChatComposer from "../components/ReliableChatComposer";
 
 
 const apiUrl = process.env.REACT_APP_API_URL;
@@ -104,7 +105,6 @@ const ChatPage = () => {
     }, []);
 
     const [messages, setMessages] = useState([]);
-    const [newMessage, setNewMessage] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [selectedUser, setSelectedUser] = useState(null);
@@ -120,7 +120,6 @@ const ChatPage = () => {
     const [orderDispute, setOrderDispute] = useState(null);
 
     const messagesContainerRef = useRef(null);
-    const textareaRef = useRef(null);
 
     const selectedUserAvatar = getAvatarUrl(selectedUser);
 
@@ -314,61 +313,6 @@ const ChatPage = () => {
             fetchChatData();
         }
     }, [orderId, currentUser?.id, fetchChatData]);
-
-    const handleSendMessage = useCallback(async () => {
-        if (!newMessage.trim() || !currentUser || !orderId || !selectedUser) return;
-
-        try {
-            const messageData = {
-                content: newMessage.trim(),
-                receiverId: selectedUser.id,
-                orderId,
-                orderType,
-            };
-
-            const { data } = await axiosInstance.post("/messages", messageData);
-
-            setMessages((prev) => {
-                const exists = prev.some((msg) => String(msg.id) === String(data.id));
-                if (exists) return prev;
-                return [...prev, data];
-            });
-
-            setNewMessage("");
-
-            if (textareaRef.current) {
-                textareaRef.current.style.height = "44px";
-            }
-
-            requestAnimationFrame(() => scrollToBottom());
-        } catch (err) {
-            console.error(err);
-
-            if (err?.response?.status === 401) {
-                setError("Сессия устарела. Выполните вход заново.");
-                return;
-            }
-
-            setError("Не удалось отправить сообщение.");
-        }
-    }, [newMessage, currentUser, orderId, selectedUser, orderType, scrollToBottom]);
-
-    const handleInputChange = (e) => {
-        setNewMessage(e.target.value);
-
-        const textarea = textareaRef.current;
-        if (!textarea) return;
-
-        textarea.style.height = "auto";
-        textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
-    };
-
-    const handleKeyDown = (e) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            handleSendMessage();
-        }
-    };
 
     const handleBack = () => {
         navigate(-1);
@@ -709,8 +653,15 @@ const ChatPage = () => {
                                             <p>{msg.content}</p>
                                             <span className="chat-message-time">
                                             {msg.timeLabel}
-                                                {isMine && <span className="chat-checks"> ✓✓</span>}
-                                        </span>
+                                                {isMine && (
+                                                    <span
+                                                        className="chat-checks"
+                                                        title="Сохранено на сервере"
+                                                    >
+        {" ✓"}
+    </span>
+                                                )}
+                                            </span>
                                         </div>
                                     </div>
                                 </React.Fragment>
@@ -725,26 +676,32 @@ const ChatPage = () => {
                     )}
                 </div>
 
-                <div className="chat-input-container">
-                <textarea
-                    ref={textareaRef}
-                    value={newMessage}
-                    onChange={handleInputChange}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Введите сообщение..."
-                    className="chat-input"
-                    rows="1"
-                />
+                <ReliableChatComposer
+                    key={`${currentUser.id}:${orderType}:${orderId}`}
 
-                    <button
-                        onClick={handleSendMessage}
-                        className="chat-send-button"
-                        disabled={!newMessage.trim()}
-                        aria-label="Отправить сообщение"
-                    >
-                        ➤
-                    </button>
-                </div>
+                    userId={currentUser.id}
+                    receiverId={selectedUser?.id}
+                    orderId={orderId}
+                    orderType={orderType}
+
+                    messages={messages}
+
+                    onConfirmed={(message) => {
+                        setMessages((previous) => {
+                            const exists = previous.some(
+                                (item) =>
+                                    String(item.id) ===
+                                    String(message.id)
+                            );
+
+                            if (exists) {
+                                return previous;
+                            }
+
+                            return [...previous, message];
+                        });
+                    }}
+                />
 
                 <Modal
                     appElement={document.getElementById("root")}
