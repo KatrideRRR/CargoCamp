@@ -1,143 +1,378 @@
 const express = require("express");
 const router = express.Router();
-const { Message, User, Notification } = require("../models");
-const authenticateToken = require("../middlewares/userAuth");
-const { sendNotifications, sendToUser } = require("../socket");
-const { notifyUser } = require("../services/notificationService");
 
-router.post("/", authenticateToken, async (req, res) => {
-    const { content, receiverId, orderId, orderType = "regular" } = req.body;
+const { Op } = require("sequelize");
 
-    const normalizedOrderType = ["regular", "express"].includes(orderType)
-        ? orderType
-        : "regular";
+const {
+    Message,
+    User,
+    Notification,
+} = require("../models");
 
-    if (!content || !receiverId || !orderId) {
-        return res.status(400).json({
-            message: "Content, receiverId and orderId are required.",
+const authenticateToken =
+    require("../middlewares/userAuth");
+
+const {
+    sendNotifications,
+    sendToUser,
+} = require("../socket");
+
+const {
+    notifyUser,
+} = require("../services/notificationService");
+
+const {
+    requireChatOrderAccess,
+    parsePositiveId,
+} = require("../services/chatOrderAccess");
+
+/**
+ * Унифицированная обработка ошибок.
+ */
+function handleChatError(res, error) {
+    if (error.status) {
+        return res.status(error.status).json({
+            message: error.message,
         });
     }
 
-    const orderIdInt = parseInt(orderId, 10);
-    if (isNaN(orderIdInt)) {
-        return res.status(400).json({ message: "Invalid orderId" });
-    }
+    console.error(
+        "Chat API error:",
+        error
+    );
 
-    try {
-        const message = await Message.create({
-            content,
-            senderId: req.user.id,
-            receiverId,
-            orderId: orderIdInt,
-            orderType: normalizedOrderType,
-        });
+    return res.status(500).json({
+        message: "Ошибка работы с сообщениями",
+    });
+}
 
-        await req.logAction({
-            req,
-            actorUserId: req.user.id,
-            actorRole: "user",
-            actionType: "message_sent",
-            entityType: "message",
-            entityId: message.id,
-            orderId: orderIdInt,
-            meta: {
+/**
+ * POST /api/messages
+ *
+ * Отправка сообщения по заказу.
+ */
+router.post(
+    "/",
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const {
+                content,
                 receiverId,
-                contentLen: String(content).length,
-            },
-        });
+                orderId,
+                orderType = "regular",
+            } = req.body || {};
 
-        const fullMessage = await Message.findByPk(message.id, {
-            include: [
-                { model: User, as: "sender", attributes: ["id", "username"] },
-                { model: User, as: "receiver", attributes: ["id", "username"] },
-            ],
-        });
+            if (typeof content !== "string") {
+                return res.status(400).json({
+                    message: "Некорректный текст сообщения",
+                });
+            }
 
-        const io = req.app.locals.io;
+            const cleanContent = content.trim();
 
-        io.to(`chat_${normalizedOrderType}_${orderIdInt}`).emit("receiveMessage", fullMessage);
-        sendToUser(receiverId, "receiveMessage", fullMessage);
+            if (!cleanContent) {
+                return res.status(400).json({
+                    message: "Сообщение не может быть пустым",
+                });
+            }
 
-        const existingNotification = await Notification.findOne({
-            where: {
-                userId: receiverId,
-                messageId: message.id,
-            },
-        });
+            if (cleanContent.length > 10000) {
+                return res.status(400).json({
+                    message:
+                        "Сообщение слишком длинное. Максимум 10000 символов.",
+                });
+            }
 
-        if (!existingNotification) {
-            await notifyUser({
-                userId: receiverId,
-                type: "new_message",
-                title: "Новое сообщение",
-                body: String(content).slice(0, 120),
-                orderId: orderIdInt,
-                orderType: normalizedOrderType,
-                messageId: message.id,
-                data: {
-                    senderId: req.user.id,
-                    receiverId,
-                },
+            const access = await requireChatOrderAccess({
+                orderId,
+                orderType,
+                userId: req.user.id,
             });
 
-            await sendNotifications(receiverId);
+            /**
+             * Нельзя отправлять сообщения,
+             * пока у заказа нет второго участника.
+             */
+            if (!access.otherUserId) {
+                return res.status(409).json({
+                    message:
+                        "Собеседник по заказу ещё не назначен",
+                });
+            }
+
+            /**
+             * Старый фронтенд передаёт receiverId.
+             *
+             * Проверяем его, но не доверяем ему.
+             * Настоящий получатель определяется
+             * сервером по участникам заказа.
+             */
+            if (receiverId !== undefined) {
+                const requestedReceiverId =
+                    parsePositiveId(receiverId);
+
+                if (
+                    requestedReceiverId !==
+                    access.otherUserId
+                ) {
+                    return res.status(403).json({
+                        message:
+                            "Получатель не является участником заказа",
+                    });
+                }
+            }
+
+            /**
+             * Отправитель берётся исключительно
+             * из проверенной сервером сессии.
+             */
+            const message = await Message.create({
+                content: cleanContent,
+
+                senderId: access.userId,
+                receiverId: access.otherUserId,
+
+                orderId: access.orderId,
+                orderType: access.orderType,
+            });
+
+            /**
+             * Ошибка журнала не должна превращать
+             * сохранённое сообщение в ошибку отправки.
+             */
+            try {
+                await req.logAction({
+                    req,
+
+                    actorUserId: access.userId,
+                    actorRole: "user",
+
+                    actionType: "message_sent",
+                    entityType: "message",
+                    entityId: message.id,
+
+                    orderId: access.orderId,
+
+                    meta: {
+                        receiverId: access.otherUserId,
+                        contentLen: cleanContent.length,
+                        orderType: access.orderType,
+                    },
+                });
+            } catch (logError) {
+                console.error(
+                    "Chat action log error:",
+                    logError
+                );
+            }
+
+            const fullMessage =
+                (await Message.findByPk(message.id, {
+                    include: [
+                        {
+                            model: User,
+                            as: "sender",
+                            attributes: [
+                                "id",
+                                "username",
+                            ],
+                        },
+                        {
+                            model: User,
+                            as: "receiver",
+                            attributes: [
+                                "id",
+                                "username",
+                            ],
+                        },
+                    ],
+                })) || message;
+
+            /**
+             * Событие оставляем совместимым
+             * с текущим фронтендом.
+             *
+             * Защита самих Socket.IO-комнат —
+             * следующий подэтап.
+             */
+            const io = req.app.locals.io;
+
+            if (io) {
+                io.to(
+                    `chat_${access.orderType}_${access.orderId}`
+                ).emit(
+                    "receiveMessage",
+                    fullMessage
+                );
+            }
+
+            sendToUser(
+                access.otherUserId,
+                "receiveMessage",
+                fullMessage
+            );
+
+            /**
+             * Создание уведомления не должно
+             * отменять уже сохранённое сообщение.
+             */
+            try {
+                const existingNotification =
+                    await Notification.findOne({
+                        where: {
+                            userId: access.otherUserId,
+                            messageId: message.id,
+                        },
+                    });
+
+                if (!existingNotification) {
+                    await notifyUser({
+                        userId: access.otherUserId,
+
+                        type: "new_message",
+                        title: "Новое сообщение",
+
+                        body: cleanContent.slice(0, 120),
+
+                        orderId: access.orderId,
+                        orderType: access.orderType,
+
+                        messageId: message.id,
+
+                        data: {
+                            senderId: access.userId,
+                            receiverId: access.otherUserId,
+                        },
+                    });
+
+                    await sendNotifications(
+                        access.otherUserId
+                    );
+                }
+            } catch (notificationError) {
+                console.error(
+                    "Chat notification error:",
+                    notificationError
+                );
+            }
+
+            return res.status(201).json(
+                fullMessage
+            );
+
+        } catch (error) {
+            return handleChatError(res, error);
         }
-
-        res.status(201).json(fullMessage);
-    } catch (error) {
-        console.error("Error sending message:", error);
-        res.status(500).json({ message: "Server error." });
     }
-});
+);
 
-router.get("/:orderType/:orderId", authenticateToken, async (req, res) => {
-    const { orderType, orderId } = req.params;
-
-    const normalizedOrderType = ["regular", "express"].includes(orderType)
-        ? orderType
-        : "regular";
-
+/**
+ * Общий обработчик получения истории.
+ *
+ * Возвращаем только сообщения, в которых
+ * текущий пользователь был участником.
+ */
+async function getChatHistory(
+    req,
+    res,
+    orderType,
+    orderId
+) {
     try {
-        const messages = await Message.findAll({
-            where: {
-                orderId,
-                orderType: normalizedOrderType,
-            },
-            include: [
-                { model: User, as: "sender", attributes: ["id", "username", "avatar"] },
-                { model: User, as: "receiver", attributes: ["id", "username", "avatar"] },
-            ],
-            order: [["createdAt", "ASC"]],
+        const access = await requireChatOrderAccess({
+            orderId,
+            orderType,
+            userId: req.user.id,
         });
 
-        res.json(messages);
-    } catch (error) {
-        console.error("Error fetching messages:", error);
-        res.status(500).json({ message: "Server error." });
-    }
-});
-
-router.get("/:orderId", authenticateToken, async (req, res) => {
-    const { orderId } = req.params;
-
-    try {
         const messages = await Message.findAll({
             where: {
-                orderId,
-                orderType: "regular",
+                orderId: access.orderId,
+                orderType: access.orderType,
+
+                [Op.or]: [
+                    {
+                        senderId: access.userId,
+                    },
+                    {
+                        receiverId: access.userId,
+                    },
+                ],
             },
+
             include: [
-                { model: User, as: "sender", attributes: ["id", "username", "avatar"] },
-                { model: User, as: "receiver", attributes: ["id", "username", "avatar"] },
+                {
+                    model: User,
+                    as: "sender",
+                    attributes: [
+                        "id",
+                        "username",
+                        "avatar",
+                    ],
+                },
+                {
+                    model: User,
+                    as: "receiver",
+                    attributes: [
+                        "id",
+                        "username",
+                        "avatar",
+                    ],
+                },
             ],
-            order: [["createdAt", "ASC"]],
+
+            order: [
+                ["createdAt", "ASC"],
+                ["id", "ASC"],
+            ],
         });
 
-        res.json(messages);
+        return res.json(messages);
+
     } catch (error) {
-        console.error("Error fetching messages:", error);
-        res.status(500).json({ message: "Server error." });
+        return handleChatError(res, error);
     }
-});
+}
+
+/**
+ * Основной маршрут.
+ *
+ * GET /api/messages/regular/:orderId
+ * GET /api/messages/express/:orderId
+ */
+router.get(
+    "/:orderType/:orderId",
+    authenticateToken,
+    async (req, res) => {
+        return getChatHistory(
+            req,
+            res,
+            req.params.orderType,
+            req.params.orderId
+        );
+    }
+);
+
+/**
+ * Старый маршрут сохраняем
+ * ради обратной совместимости.
+ *
+ * GET /api/messages/:orderId
+ *
+ * По умолчанию обычный заказ.
+ */
+router.get(
+    "/:orderId",
+    authenticateToken,
+    async (req, res) => {
+        return getChatHistory(
+            req,
+            res,
+            "regular",
+            req.params.orderId
+        );
+    }
+);
 
 module.exports = router;
