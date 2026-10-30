@@ -9,6 +9,10 @@ import {
     removeNativeRefreshToken,
 } from "./userRefreshStorage";
 
+import {
+    clearAllChatOffline,
+} from "./chatOfflineCache";
+
 const API_URL = process.env.REACT_APP_API_URL;
 
 const http = axios.create({
@@ -310,24 +314,39 @@ export async function clearUserSessionLocal() {
     localStorage.removeItem("currentUser");
 
     try {
-        const keys = Object.keys(
-            window.sessionStorage
-        );
+        const prefixes = [
+            "cc:chat:pending:v1:",
+            "cc:chat:draft:v1:",
+        ];
 
-        keys.forEach((key) => {
-            if (
-                key.startsWith(
-                    "cc:chat:pending:v1:"
-                )
-            ) {
-                window.sessionStorage.removeItem(
-                    key
-                );
-            }
-        });
+        for (const storage of [
+            window.localStorage,
+            window.sessionStorage,
+        ]) {
+            const keys = Object.keys(storage);
+
+            keys.forEach((key) => {
+                if (
+                    prefixes.some((prefix) =>
+                        key.startsWith(prefix)
+                    )
+                ) {
+                    storage.removeItem(key);
+                }
+            });
+        }
     } catch (error) {
         console.warn(
-            "Не удалось очистить временные сообщения:",
+            "Не удалось очистить черновики:",
+            error
+        );
+    }
+
+    try {
+        await clearAllChatOffline();
+    } catch (error) {
+        console.warn(
+            "Не удалось очистить локальную историю:",
             error
         );
     }

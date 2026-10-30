@@ -10,6 +10,8 @@ import "../styles/ReliableChatComposer.css";
 
 const STORAGE_PREFIX = "cc:chat:pending:v1:";
 
+const DRAFT_PREFIX = "cc:chat:draft:v1:";
+
 function createMessageId() {
     if (window.crypto?.randomUUID) {
         return window.crypto.randomUUID();
@@ -43,7 +45,9 @@ function createMessageId() {
 
 function readPending(key) {
     try {
-        const raw = sessionStorage.getItem(key);
+        const raw =
+            localStorage.getItem(key) ||
+            sessionStorage.getItem(key);
 
         if (!raw) return null;
 
@@ -65,15 +69,24 @@ function readPending(key) {
 
 function savePending(key, message) {
     try {
-        sessionStorage.setItem(
+        localStorage.setItem(
             key,
             JSON.stringify(message)
         );
     } catch (error) {
         console.warn(
-            "Не удалось сохранить неотправленное сообщение:",
+            "Не удалось сохранить отправку:",
             error
         );
+
+        try {
+            sessionStorage.setItem(
+                key,
+                JSON.stringify(message)
+            );
+        } catch {
+            // Продолжаем работу в памяти.
+        }
     }
 }
 
@@ -82,13 +95,41 @@ function removePending(key, clientMessageId) {
         const saved = readPending(key);
 
         if (
-            saved?.clientMessageId ===
+            saved?.clientMessageId !==
             clientMessageId
         ) {
-            sessionStorage.removeItem(key);
+            return;
         }
+
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
     } catch {
-        // Состояние в памяти остаётся доступным.
+        // Ошибка локального хранилища
+        // не влияет на серверное сообщение.
+    }
+}
+
+function readDraft(key) {
+    try {
+        return localStorage.getItem(key);
+    } catch {
+        return null;
+    }
+}
+
+function saveDraft(key, text) {
+    try {
+        if (!text) {
+            localStorage.removeItem(key);
+            return;
+        }
+
+        localStorage.setItem(key, text);
+    } catch (error) {
+        console.warn(
+            "Не удалось сохранить черновик:",
+            error
+        );
     }
 }
 
@@ -107,12 +148,22 @@ export default function ReliableChatComposer({
         orderId,
     ].join(":");
 
+    const draftKey = [
+        DRAFT_PREFIX,
+        userId,
+        orderType,
+        orderId,
+    ].join(":");
+
     const [pending, setPending] = useState(
         () => readPending(storageKey)
     );
 
     const [text, setText] = useState(
-        () => readPending(storageKey)?.content || ""
+        () =>
+            readPending(storageKey)?.content ??
+            readDraft(draftKey) ??
+            ""
     );
 
     const [sending, setSending] = useState(false);
@@ -127,6 +178,18 @@ export default function ReliableChatComposer({
     const inFlightRef = useRef(false);
 
     const confirmedIdsRef = useRef(new Set());
+
+    useEffect(() => {
+        saveDraft(draftKey, text);
+    }, [draftKey, text]);
+
+    useEffect(() => {
+        const saved = readPending(storageKey);
+
+        if (saved) {
+            savePending(storageKey, saved);
+        }
+    }, [storageKey]);
 
     const canSend =
         Boolean(text.trim()) &&

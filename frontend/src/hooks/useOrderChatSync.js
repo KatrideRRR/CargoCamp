@@ -8,6 +8,11 @@ import {
 import axiosInstance from "../utils/axiosInstance";
 import { socket } from "../socketClient";
 
+import {
+    readChatOffline,
+    saveChatOffline,
+} from "../utils/chatOfflineCache";
+
 const PAGE_SIZE = 100;
 
 /**
@@ -73,9 +78,36 @@ export default function useOrderChatSync({
         messages: [],
         loading: true,
         error: "",
+        cursor: 0,
+        cacheReady: false,
     });
 
     const syncRef = useRef(null);
+
+    useEffect(() => {
+        if (
+            state.key !== scopeKey ||
+            !state.cacheReady
+        ) {
+            return;
+        }
+
+        saveChatOffline(scopeKey, {
+            messages: state.messages,
+            cursor: state.cursor,
+        }).catch((error) => {
+            console.warn(
+                "Не удалось сохранить историю чата:",
+                error
+            );
+        });
+    }, [
+        scopeKey,
+        state.key,
+        state.cacheReady,
+        state.cursor,
+        state.messages,
+    ]);
 
     const messages =
         state.key === scopeKey
@@ -147,6 +179,7 @@ export default function useOrderChatSync({
          * пришедшие раньше по времени.
          */
         let cursor = 0;
+        let cacheInitialized = false;
 
         let inFlight = null;
         let rerunRequested = false;
@@ -156,6 +189,8 @@ export default function useOrderChatSync({
             messages: [],
             loading: true,
             error: "",
+            cursor: 0,
+            cacheReady: false,
         });
 
         const updateState = (updater) => {
@@ -232,6 +267,8 @@ export default function useOrderChatSync({
                         previous.messages,
                         batch
                     ),
+
+                    cursor: nextCursor,
                 }));
 
                 cursor = nextCursor;
@@ -256,6 +293,12 @@ export default function useOrderChatSync({
          */
         const synchronize = () => {
             if (disposed) {
+                return Promise.resolve();
+            }
+
+            if (!cacheInitialized) {
+                rerunRequested = true;
+
                 return Promise.resolve();
             }
 
@@ -459,7 +502,45 @@ export default function useOrderChatSync({
          * даже при отключённом Socket.IO,
          * если HTTP уже работает.
          */
-        synchronize();
+        const initializeChat = async () => {
+            let cached = null;
+
+            try {
+                cached = await readChatOffline(
+                    scopeKey
+                );
+            } catch (error) {
+                console.warn(
+                    "Не удалось загрузить локальную историю:",
+                    error
+                );
+            }
+
+            if (disposed) return;
+
+            cursor = cached?.cursor || 0;
+
+            updateState((previous) => ({
+                ...previous,
+
+                messages: mergeMessages(
+                    cached?.messages || [],
+                    previous.messages
+                ),
+
+                cursor,
+
+                cacheReady: true,
+
+                loading: !cached?.messages?.length,
+            }));
+
+            cacheInitialized = true;
+
+            synchronize();
+        };
+
+        initializeChat();
 
         if (socket.connected) {
             joinCurrentChat();

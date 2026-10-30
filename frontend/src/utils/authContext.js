@@ -26,10 +26,29 @@ export const AuthProvider = ({ children }) => {
                 await clearUserSessionLocal();
                 setUser(null);
             } else {
-                // Сетевая ошибка — не удаляем сессию.
-                setAuthError(
-                    "Не удалось подключиться к серверу CargoCamp."
-                );
+                /*
+                 * Сетевая ошибка.
+                 *
+                 * Если имеющийся JWT ещё действителен,
+                 * разрешаем открыть приложение и
+                 * сохранённую переписку.
+                 *
+                 * Истёкший JWT не принимаем.
+                 */
+                const cachedToken =
+                    localStorage.getItem("authToken");
+
+                const cachedUser =
+                    getJwtUser(cachedToken);
+
+                if (cachedUser) {
+                    setUser(cachedUser);
+                    setAuthError(null);
+                } else {
+                    setAuthError(
+                        "Не удалось подключиться к серверу CargoCamp."
+                    );
+                }
             }
         } finally {
             setLoading(false);

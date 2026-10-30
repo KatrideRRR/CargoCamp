@@ -170,9 +170,8 @@ const ChatPage = () => {
             try {
                 if (!silent) {
                     setLoading(true);
+                    setError("");
                 }
-
-                setError("");
 
                 const orderEndpoint =
                     orderType === "express"
@@ -217,7 +216,7 @@ const ChatPage = () => {
                 const { data: user } = await axiosInstance.get(`/auth/${otherUserId}`);
 
                 setSelectedUser(user);
-
+                setError("");
                 requestAnimationFrame(() => scrollToBottom("auto"));
             } catch (err) {
                 console.error(err);
@@ -240,6 +239,43 @@ const ChatPage = () => {
         },
         [orderId, orderType, currentUser?.id, scrollToBottom]
     );
+
+    useEffect(() => {
+        if (!currentUser?.id || !orderId) {
+            return;
+        }
+
+        const restoreOrderData = () => {
+            if (
+                error ||
+                !order ||
+                !selectedUser
+            ) {
+                fetchChatData({
+                    silent: true,
+                });
+            }
+        };
+
+        window.addEventListener(
+            "online",
+            restoreOrderData
+        );
+
+        return () => {
+            window.removeEventListener(
+                "online",
+                restoreOrderData
+            );
+        };
+    }, [
+        currentUser?.id,
+        orderId,
+        error,
+        order,
+        selectedUser,
+        fetchChatData,
+    ]);
 
     useEffect(() => {
         if (orderId && currentUser?.id) {
@@ -444,7 +480,7 @@ const ChatPage = () => {
         };
     }, [fetchChatData, refreshMessages]);
 
-    if (loading) {
+    if (loading && messages.length === 0) {
         return (
             <div className="chat-page">
                 <div className="chat-loading">Загрузка чата...</div>
@@ -452,7 +488,7 @@ const ChatPage = () => {
         );
     }
 
-    if (error) {
+    if (error && messages.length === 0) {
         return (
             <div className="chat-page">
                 <div className="chat-error">Ошибка: {error}</div>
@@ -561,6 +597,25 @@ const ChatPage = () => {
                         <button
                             type="button"
                             onClick={refreshMessages}
+                        >
+                            Повторить
+                        </button>
+                    </div>
+                )}
+
+                {error && messages.length > 0 && (
+                    <div
+                        className="chat-sync-notice"
+                        role="alert"
+                    >
+        <span>
+            Нет связи с сервером.
+            Показана сохранённая переписка.
+        </span>
+
+                        <button
+                            type="button"
+                            onClick={() => fetchChatData()}
                         >
                             Повторить
                         </button>
