@@ -44,10 +44,26 @@ function mergeMessages(previous, incoming) {
 
         const key = String(message.id);
 
-        byId.set(key, {
-            ...(byId.get(key) || {}),
+        const previousMessage = byId.get(key);
+
+        const mergedMessage = {
+            ...(previousMessage || {}),
             ...message,
-        });
+        };
+
+        /*
+         * Старый HTTP-ответ не должен
+         * удалять уже полученное подтверждение.
+         */
+        if (
+            previousMessage?.readAt &&
+            !message.readAt
+        ) {
+            mergedMessage.readAt =
+                previousMessage.readAt;
+        }
+
+        byId.set(key, mergedMessage);
     }
 
     return Array.from(byId.values()).sort((a, b) => {
@@ -205,6 +221,69 @@ export default function useOrderChatSync({
             });
         };
 
+        const applyReadReceipt = (receipt) => {
+            if (!receipt) return;
+
+            if (
+                String(receipt.orderId) !==
+                String(orderId) ||
+                String(receipt.orderType) !==
+                String(orderType)
+            ) {
+                return;
+            }
+
+            const throughId = Number(
+                receipt.lastReadMessageId
+            );
+
+            if (
+                !Number.isSafeInteger(throughId) ||
+                throughId <= 0 ||
+                !receipt.readerId ||
+                !receipt.readAt
+            ) {
+                return;
+            }
+
+            updateState((previous) => {
+                let changed = false;
+
+                const updatedMessages =
+                    previous.messages.map((message) => {
+                        const belongsToReceipt =
+                            String(message.senderId) ===
+                            String(userId) &&
+                            String(message.receiverId) ===
+                            String(receipt.readerId) &&
+                            Number(message.id) <= throughId;
+
+                        if (
+                            !belongsToReceipt ||
+                            message.readAt
+                        ) {
+                            return message;
+                        }
+
+                        changed = true;
+
+                        return {
+                            ...message,
+                            readAt: receipt.readAt,
+                        };
+                    });
+
+                if (!changed) {
+                    return previous;
+                }
+
+                return {
+                    ...previous,
+                    messages: updatedMessages,
+                };
+            });
+        };
+
         /*
          * Загрузка пропущенных сообщений
          * порциями по 100.
@@ -314,30 +393,37 @@ export default function useOrderChatSync({
                     try {
                         await loadMissingMessages();
 
+                        /*
+ * Подтверждение прочтения могло прийти,
+ * пока отправитель был без интернета.
+ *
+ * Сверяем состояние с сервером.
+ */
+                        try {
+                            const { data: readState } =
+                                await axiosInstance.get(
+                                    `/messages/read-state/${orderType}/${orderId}`
+                                );
+
+                            if (!disposed) {
+                                applyReadReceipt(readState);
+                            }
+                        } catch (receiptError) {
+                            /*
+                             * Неудачная загрузка галочек
+                             * не должна скрывать переписку.
+                             */
+                            console.warn(
+                                "Не удалось обновить статусы прочтения:",
+                                receiptError
+                            );
+                        }
+
                         updateState((previous) => ({
                             ...previous,
                             error: "",
                         }));
 
-                        /*
-                         * Уведомления можно отметить
-                         * прочитанными, только когда
-                         * пользователь реально смотрит
-                         * открытый чат.
-                         */
-                        if (
-                            !disposed &&
-                            socket.connected &&
-                            !document.hidden
-                        ) {
-                            socket.emit(
-                                "markAsRead",
-                                {
-                                    orderId,
-                                    orderType,
-                                }
-                            );
-                        }
                     } catch (error) {
                         if (disposed) return;
 
@@ -435,17 +521,6 @@ export default function useOrderChatSync({
                 ),
             }));
 
-            if (
-                String(message.receiverId) ===
-                String(userId) &&
-                socket.connected &&
-                !document.hidden
-            ) {
-                socket.emit("markAsRead", {
-                    orderId,
-                    orderType,
-                });
-            }
         };
 
         const handleConnect = () => {
@@ -475,6 +550,11 @@ export default function useOrderChatSync({
         socket.on(
             "receiveMessage",
             handleReceiveMessage
+        );
+
+        socket.on(
+            "chat:read",
+            applyReadReceipt
         );
 
         socket.on(
@@ -556,6 +636,11 @@ export default function useOrderChatSync({
             socket.off(
                 "receiveMessage",
                 handleReceiveMessage
+            );
+
+            socket.off(
+                "chat:read",
+                applyReadReceipt
             );
 
             socket.off(

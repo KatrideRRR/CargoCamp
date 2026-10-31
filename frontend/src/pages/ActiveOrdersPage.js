@@ -1367,11 +1367,6 @@ const ActiveOrdersPage = () => {
     };
 
     const handleOpenChat = (orderId, orderType = "regular") => {
-        socket.emit("markAsRead", {
-            userId: user.id,
-            orderId,
-            orderType,
-        });
 
         setUnreadOrders((prev) => {
             const updated = { ...prev };

@@ -12,7 +12,7 @@ import useOrderChatSync from "../hooks/useOrderChatSync";
 import Modal from "react-modal";
 import { openOrderRoute } from "../utils/orderNavigation";
 import ReliableChatComposer from "../components/ReliableChatComposer";
-
+import ChatReadTracker from "../components/ChatReadTracker";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -667,9 +667,13 @@ const ChatPage = () => {
                                                 {isMine && (
                                                     <span
                                                         className="chat-checks"
-                                                        title="Сохранено на сервере"
+                                                        title={
+                                                            msg.readAt
+                                                                ? "Прочитано собеседником"
+                                                                : "Сохранено на сервере"
+                                                        }
                                                     >
-        {" ✓"}
+        {msg.readAt ? " ✓✓" : " ✓"}
     </span>
                                                 )}
                                             </span>
@@ -694,6 +698,18 @@ const ChatPage = () => {
                         </div>
                     )}
                 </div>
+
+                <ChatReadTracker
+                    key={`${currentUser.id}:${orderType}:${orderId}`}
+
+                    userId={currentUser.id}
+                    orderId={orderId}
+                    orderType={orderType}
+
+                    messages={messages}
+
+                    containerRef={messagesContainerRef}
+                />
 
                 <ReliableChatComposer
                     key={`${currentUser.id}:${orderType}:${orderId}`}

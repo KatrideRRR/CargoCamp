@@ -18,6 +18,11 @@ const {
 } = require("../socket");
 
 const {
+    getChatReadState,
+    markChatMessagesRead,
+} = require("../services/chatReadReceipts");
+
+const {
     notifyUser,
 } = require("../services/notificationService");
 
@@ -475,6 +480,73 @@ router.get(
             });
         } catch (error) {
             return handleChatError(res, error);
+        }
+    }
+);
+
+/**
+ * GET /api/messages/read-state/:orderType/:orderId
+ *
+ * Узнаём, какие исходящие сообщения
+ * уже прочитал собеседник.
+ */
+router.get(
+    "/read-state/:orderType/:orderId",
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const result =
+                await getChatReadState({
+                    userId: req.user.id,
+
+                    orderId:
+                    req.params.orderId,
+
+                    orderType:
+                    req.params.orderType,
+                });
+
+            return res.json(result);
+        } catch (error) {
+            return handleChatError(
+                res,
+                error
+            );
+        }
+    }
+);
+
+/**
+ * POST /api/messages/read/:orderType/:orderId
+ *
+ * Подтверждение прочтения входящих
+ * сообщений до указанного ID.
+ */
+router.post(
+    "/read/:orderType/:orderId",
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const result =
+                await markChatMessagesRead({
+                    userId: req.user.id,
+
+                    orderId:
+                    req.params.orderId,
+
+                    orderType:
+                    req.params.orderType,
+
+                    throughId:
+                    req.body?.throughId,
+                });
+
+            return res.json(result);
+        } catch (error) {
+            return handleChatError(
+                res,
+                error
+            );
         }
     }
 );

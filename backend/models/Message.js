@@ -9,6 +9,10 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING(36),
             allowNull: true,
         },
+        readAt: {
+            type: DataTypes.DATE(3),
+            allowNull: true,
+        },
         orderId: { type: DataTypes.INTEGER, allowNull: false },
         orderType: {
             type: DataTypes.ENUM("regular", "express"),
