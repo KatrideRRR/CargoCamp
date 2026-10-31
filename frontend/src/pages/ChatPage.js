@@ -5,9 +5,12 @@ import DisputeEvidenceInput from "../components/DisputeEvidenceInput";
 import axiosInstance from "../utils/axiosInstance";
 import { useParams, useNavigate } from "react-router-dom";
 import useChatTyping from "../hooks/useChatTyping";
+import useChatReply from "../hooks/useChatReply";
+import ChatReplyQuote from "../components/ChatReplyQuote";
 import "../styles/ChatPage.css";
 import "../styles/ChatPageDark.css";
 import "../styles/ChatMessageSync.css";
+import "../styles/Chateply.css";
 import { useUser } from "../utils/userContext";
 import useOrderChatSync from "../hooks/useOrderChatSync";
 import Modal from "react-modal";
@@ -120,6 +123,7 @@ const ChatPage = () => {
     const [disputeLoading, setDisputeLoading] = useState(false);
     const [orderDispute, setOrderDispute] = useState(null);
 
+    const pendingReplyJumpRef = useRef(null);
     const messagesContainerRef = useRef(null);
     const shouldAutoScrollRef = useRef(true);
 
@@ -146,6 +150,16 @@ const ChatPage = () => {
         orderType,
     });
 
+    const {
+        replyTo,
+        selectReply,
+        clearReply,
+    } = useChatReply({
+        userId: currentUser?.id,
+        orderId,
+        orderType,
+    });
+
     const selectedUserAvatar = getAvatarUrl(selectedUser);
 
     const scrollToBottom = useCallback((behavior = "smooth") => {
@@ -168,6 +182,136 @@ const ChatPage = () => {
         shouldAutoScrollRef.current =
             distanceFromBottom < 100;
     }, []);
+
+    const scrollToChatMessage = useCallback(
+        (messageId) => {
+            const id = Number(messageId);
+
+            if (
+                !Number.isSafeInteger(id) ||
+                id <= 0
+            ) {
+                return false;
+            }
+
+            const container =
+                messagesContainerRef.current;
+
+            if (!container) {
+                return false;
+            }
+
+            const element = container.querySelector(
+                `[data-message-id="${id}"]`
+            );
+
+            if (!element) {
+                return false;
+            }
+
+            shouldAutoScrollRef.current = false;
+
+            element.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+            });
+
+            element.classList.add(
+                "chat-message-highlight"
+            );
+
+            window.setTimeout(() => {
+                element.classList.remove(
+                    "chat-message-highlight"
+                );
+            }, 1800);
+
+            return true;
+        },
+        []
+    );
+
+    const jumpToReplyMessage = useCallback(
+        async (messageId) => {
+            const id = Number(messageId);
+
+            if (
+                !Number.isSafeInteger(id) ||
+                id <= 0
+            ) {
+                return;
+            }
+
+            if (scrollToChatMessage(id)) {
+                return;
+            }
+
+            try {
+                /*
+                 * Исходного сообщения может
+                 * не быть в офлайн-кеше.
+                 *
+                 * Загружаем только его.
+                 */
+                const { data } =
+                    await axiosInstance.get(
+                        `/messages/item/${orderType}/${orderId}/${id}`
+                    );
+
+                if (!data?.id) {
+                    throw new Error(
+                        "Сообщение недоступно"
+                    );
+                }
+
+                shouldAutoScrollRef.current = false;
+
+                pendingReplyJumpRef.current = id;
+
+                addMessage(data);
+            } catch (error) {
+                console.error(
+                    "Ошибка перехода по цитате:",
+                    error
+                );
+
+                alert(
+                    "Не удалось открыть исходное сообщение."
+                );
+            }
+        },
+        [
+            orderId,
+            orderType,
+            addMessage,
+            scrollToChatMessage,
+        ]
+    );
+
+    useEffect(() => {
+        const id = pendingReplyJumpRef.current;
+
+        if (!id) return;
+
+        if (
+            !messages.some(
+                (message) =>
+                    Number(message.id) === id
+            )
+        ) {
+            return;
+        }
+
+        const frame = requestAnimationFrame(() => {
+            if (scrollToChatMessage(id)) {
+                pendingReplyJumpRef.current = null;
+            }
+        });
+
+        return () => {
+            cancelAnimationFrame(frame);
+        };
+    }, [messages, scrollToChatMessage]);
 
     useEffect(() => {
         if (!shouldAutoScrollRef.current) {
@@ -672,7 +816,10 @@ const ChatPage = () => {
                                         </div>
                                     )}
 
-                                    <div className={`chat-message-row ${isMine ? "mine" : "theirs"}`}>
+                                    <div
+                                        className={`chat-message-row ${isMine ? "mine" : "theirs"}`}
+                                        data-message-id={msg.id}
+                                    >
                                         {!isMine && (
                                             <div className="chat-message-avatar-space">
                                                 {selectedUserAvatar ? (
@@ -694,8 +841,32 @@ const ChatPage = () => {
                                                 isMine ? "chat-message-sent" : "chat-message-received"
                                             }`}
                                         >
+                                            {msg.replyToMessageId && (
+                                                <ChatReplyQuote
+                                                    message={msg.replyTo}
+                                                    currentUserId={currentUser.id}
+                                                    otherUserName={
+                                                        selectedUser?.username ||
+                                                        "Собеседник"
+                                                    }
+                                                    onClick={() =>
+                                                        jumpToReplyMessage(
+                                                            msg.replyToMessageId
+                                                        )
+                                                    }
+                                                />
+                                            )}
+
                                             <p>{msg.content}</p>
                                             <span className="chat-message-time">
+                                                <button
+                                                    type="button"
+                                                    className="chat-reply-action"
+                                                    onClick={() => selectReply(msg)}
+                                                    aria-label="Ответить на сообщение"
+                                                >
+    ↩ Ответить
+</button>
                                             {msg.timeLabel}
                                                 {isMine && (
                                                     <span
@@ -757,6 +928,12 @@ const ChatPage = () => {
 
                     onTypingChange={notifyTyping}
                     onTypingStop={stopTyping}
+                    replyTo={replyTo}
+                    onReplyCleared={clearReply}
+                    otherUserName={
+                        selectedUser?.username ||
+                        "Собеседник"
+                    }
                 />
 
                 <Modal

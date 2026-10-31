@@ -13,6 +13,10 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.DATE(3),
             allowNull: true,
         },
+        replyToMessageId: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+        },
         orderId: { type: DataTypes.INTEGER, allowNull: false },
         orderType: {
             type: DataTypes.ENUM("regular", "express"),
@@ -26,8 +30,25 @@ module.exports = (sequelize, DataTypes) => {
     });
 
     Message.associate = (models) => {
-        Message.belongsTo(models.User, { as: 'sender', foreignKey: 'senderId' });
-        Message.belongsTo(models.User, { as: 'receiver', foreignKey: 'receiverId' });
+        Message.belongsTo(models.User, {
+            as: "sender",
+            foreignKey: "senderId",
+        });
+
+        Message.belongsTo(models.User, {
+            as: "receiver",
+            foreignKey: "receiverId",
+        });
+
+        /*
+         * Сообщение, на которое пользователь ответил.
+         * Не загружаем вложенные ответы рекурсивно.
+         */
+        Message.belongsTo(models.Message, {
+            as: "replyTo",
+            foreignKey: "replyToMessageId",
+            constraints: false,
+        });
     };
 
     return Message;

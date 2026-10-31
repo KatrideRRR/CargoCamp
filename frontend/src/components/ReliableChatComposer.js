@@ -7,6 +7,7 @@ import React, {
 import axiosInstance from "../utils/axiosInstance";
 
 import "../styles/ReliableChatComposer.css";
+import ChatReplyQuote from "./ChatReplyQuote";
 
 const STORAGE_PREFIX = "cc:chat:pending:v1:";
 
@@ -142,6 +143,9 @@ export default function ReliableChatComposer({
                                                  onConfirmed,
                                                  onTypingChange,
                                                  onTypingStop,
+                                                 replyTo,
+                                                 onReplyCleared,
+                                                 otherUserName,
                                              }) {
     const storageKey = [
         STORAGE_PREFIX,
@@ -234,12 +238,18 @@ export default function ReliableChatComposer({
         setPending(null);
         setSendError("");
 
+        if (pending.replyToMessageId) {
+            onReplyCleared?.(
+                pending.replyToMessageId
+            );
+        }
+
         setText((previous) =>
             previous.trim() === pending.content
                 ? ""
                 : previous
         );
-    }, [messages, pending, storageKey]);
+    }, [messages, pending, storageKey, onReplyCleared]);
 
     const confirmMessage = (
         clientMessageId,
@@ -273,6 +283,11 @@ export default function ReliableChatComposer({
     const sendMessage = async () => {
         const content = text.trim();
 
+        const selectedReplyId =
+            replyTo?.id
+                ? Number(replyTo.id)
+                : null;
+
         if (
             !content ||
             !receiverId ||
@@ -285,6 +300,25 @@ export default function ReliableChatComposer({
             setSendError(
                 "Сообщение не может быть длиннее 10000 символов."
             );
+            return;
+        }
+
+        if (
+            pending &&
+            (
+                pending.content !== content ||
+                String(pending.receiverId) !==
+                String(receiverId) ||
+                Number(pending.replyToMessageId || 0) !==
+                Number(selectedReplyId || 0)
+            )
+        ) {
+            setSendError(
+                "Предыдущая отправка не подтверждена. " +
+                "Верните исходный текст и цитату для " +
+                "безопасного повтора."
+            );
+
             return;
         }
 
@@ -303,7 +337,9 @@ export default function ReliableChatComposer({
             pending &&
             pending.content === content &&
             String(pending.receiverId) ===
-            String(receiverId)
+            String(receiverId) &&
+            Number(pending.replyToMessageId || 0) ===
+            Number(selectedReplyId || 0)
         ) {
             outgoing = pending;
         } else {
@@ -318,6 +354,7 @@ export default function ReliableChatComposer({
                     orderId,
                     orderType,
                     userId,
+                    replyToMessageId: selectedReplyId,
                 };
             } catch (error) {
                 setSendError(error.message);
@@ -359,6 +396,8 @@ export default function ReliableChatComposer({
 
                         clientMessageId:
                         outgoing.clientMessageId,
+                        replyToMessageId:
+                        outgoing.replyToMessageId,
                     }
                 );
 
@@ -374,6 +413,12 @@ export default function ReliableChatComposer({
                 outgoing.clientMessageId,
                 outgoing.content
             );
+
+            if (outgoing.replyToMessageId) {
+                onReplyCleared?.(
+                    outgoing.replyToMessageId
+                );
+            }
         } catch (error) {
             console.error(
                 "Ошибка отправки сообщения:",
@@ -451,6 +496,25 @@ export default function ReliableChatComposer({
 
     return (
         <div className="chat-input-container">
+            {replyTo && (
+                <div className="chat-compose-reply">
+                    <ChatReplyQuote
+                        message={replyTo}
+                        currentUserId={userId}
+                        otherUserName={otherUserName}
+                    />
+
+                    <button
+                        type="button"
+                        className="chat-compose-reply-close"
+                        onClick={() => onReplyCleared?.()}
+                        aria-label="Отменить ответ"
+                        title="Отменить ответ"
+                    >
+                        ×
+                    </button>
+                </div>
+            )}
             <textarea
                 ref={textareaRef}
                 value={text}

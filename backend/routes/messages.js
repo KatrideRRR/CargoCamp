@@ -38,6 +38,12 @@ const {
     isDuplicateKeyError,
 } = require("../services/chatMessageIdempotency");
 
+const {
+    normalizeReplyToMessageId,
+    requireReplyTarget,
+    getChatMessageIncludes,
+} = require("../services/chatReplyService");
+
 /**
  * Унифицированная обработка ошибок.
  */
@@ -74,10 +80,16 @@ router.post(
                 orderId,
                 orderType = "regular",
                 clientMessageId: rawClientMessageId,
+                replyToMessageId: rawReplyToMessageId,
             } = req.body || {};
 
             const clientMessageId =
                 normalizeClientMessageId(rawClientMessageId);
+
+            const replyToMessageId =
+                normalizeReplyToMessageId(
+                    rawReplyToMessageId
+                );
 
             if (typeof content !== "string") {
                 return res.status(400).json({
@@ -149,11 +161,20 @@ router.post(
                     access,
                     clientMessageId,
                     content: cleanContent,
+                    replyToMessageId,
                 });
 
             if (existingMessage) {
                 return res.status(200).json(existingMessage);
             }
+
+            /*
+ * Нельзя отвечать на чужую переписку.
+ */
+            await requireReplyTarget({
+                access,
+                replyToMessageId,
+            });
 
             let message;
 
@@ -165,6 +186,7 @@ router.post(
                     receiverId: access.otherUserId,
 
                     clientMessageId,
+                    replyToMessageId,
 
                     orderId: access.orderId,
                     orderType: access.orderType,
@@ -186,6 +208,7 @@ router.post(
                             access,
                             clientMessageId,
                             content: cleanContent,
+                            replyToMessageId,
                         });
 
                     if (savedMessage) {
@@ -348,26 +371,7 @@ async function getChatHistory(
                 ],
             },
 
-            include: [
-                {
-                    model: User,
-                    as: "sender",
-                    attributes: [
-                        "id",
-                        "username",
-                        "avatar",
-                    ],
-                },
-                {
-                    model: User,
-                    as: "receiver",
-                    attributes: [
-                        "id",
-                        "username",
-                        "avatar",
-                    ],
-                },
-            ],
+            include: getChatMessageIncludes(),
 
             order: [
                 ["createdAt", "ASC"],
@@ -443,26 +447,7 @@ router.get(
                     ],
                 },
 
-                include: [
-                    {
-                        model: User,
-                        as: "sender",
-                        attributes: [
-                            "id",
-                            "username",
-                            "avatar",
-                        ],
-                    },
-                    {
-                        model: User,
-                        as: "receiver",
-                        attributes: [
-                            "id",
-                            "username",
-                            "avatar",
-                        ],
-                    },
-                ],
+                include: getChatMessageIncludes(),
 
                 order: [["id", "ASC"]],
 
@@ -547,6 +532,69 @@ router.post(
                 res,
                 error
             );
+        }
+    }
+);
+
+/**
+ * GET /api/messages/item/:orderType/:orderId/:messageId
+ *
+ * Загрузка конкретного сообщения для перехода
+ * по цитате. Только участникам переписки.
+ */
+router.get(
+    "/item/:orderType/:orderId/:messageId",
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const access =
+                await requireChatOrderAccess({
+                    userId: req.user.id,
+                    orderId: req.params.orderId,
+                    orderType: req.params.orderType,
+                });
+
+            const messageId = parsePositiveId(
+                req.params.messageId
+            );
+
+            if (!messageId) {
+                return res.status(400).json({
+                    message:
+                        "Некорректный ID сообщения",
+                });
+            }
+
+            const message = await Message.findOne({
+                where: {
+                    id: messageId,
+
+                    orderId: access.orderId,
+                    orderType: access.orderType,
+
+                    [Op.or]: [
+                        {
+                            senderId: access.userId,
+                        },
+                        {
+                            receiverId: access.userId,
+                        },
+                    ],
+                },
+
+                include: getChatMessageIncludes(),
+            });
+
+            if (!message) {
+                return res.status(404).json({
+                    message:
+                        "Сообщение не найдено",
+                });
+            }
+
+            return res.json(message);
+        } catch (error) {
+            return handleChatError(res, error);
         }
     }
 );

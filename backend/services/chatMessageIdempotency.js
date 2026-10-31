@@ -7,6 +7,10 @@ const {
     chatAccessError,
 } = require("./chatOrderAccess");
 
+const {
+    getChatMessageIncludes,
+} = require("./chatReplyService");
+
 const UUID_PATTERN =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -31,18 +35,7 @@ function normalizeClientMessageId(value) {
 
 async function getFullChatMessage(messageId) {
     return Message.findByPk(messageId, {
-        include: [
-            {
-                model: User,
-                as: "sender",
-                attributes: ["id", "username"],
-            },
-            {
-                model: User,
-                as: "receiver",
-                attributes: ["id", "username"],
-            },
-        ],
+        include: getChatMessageIncludes(),
     });
 }
 
@@ -57,6 +50,7 @@ async function findExistingChatMessage({
                                            access,
                                            clientMessageId,
                                            content,
+                                           replyToMessageId = null,
                                        }) {
     if (!clientMessageId) {
         return null;
@@ -77,7 +71,9 @@ async function findExistingChatMessage({
         Number(existing.orderId) === access.orderId &&
         existing.orderType === access.orderType &&
         Number(existing.receiverId) === access.otherUserId &&
-        existing.content === content;
+        existing.content === content &&
+        Number(existing.replyToMessageId || 0) ===
+        Number(replyToMessageId || 0);
 
     if (!isSameMessage) {
         throw chatAccessError(

@@ -1,0 +1,184 @@
+/* ==========================================
+   CargoCamp — Message Replies
+   ========================================== */
+
+/* Цитата внутри сообщения */
+
+.chat-page .chat-reply-quote {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+
+    width: 100%;
+    max-width: 100%;
+
+    margin-bottom: 7px;
+    padding: 7px 10px;
+
+    border: 0;
+    border-left: 3px solid #2563eb;
+    border-radius: 5px 10px 10px 5px;
+
+    background: rgba(37, 99, 235, 0.07);
+
+    color: inherit;
+    font: inherit;
+    text-align: left;
+
+    overflow: hidden;
+}
+
+.chat-page button.chat-reply-quote {
+    cursor: pointer;
+}
+
+.chat-page button.chat-reply-quote:hover {
+    background: rgba(37, 99, 235, 0.12);
+}
+
+.chat-page .chat-reply-quote-author {
+    display: block;
+    width: 100%;
+
+    color: #1d4ed8;
+
+    font-size: 12px;
+    font-weight: 800;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-page .chat-reply-quote-text {
+    display: -webkit-box;
+    width: 100%;
+
+    color: #475569;
+
+    font-size: 12px;
+    line-height: 1.4;
+
+    overflow: hidden;
+    overflow-wrap: anywhere;
+
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+/* Кнопка ответа */
+
+.chat-page .chat-reply-action {
+    display: block;
+
+    margin-top: 7px;
+    padding: 3px 0;
+
+    border: none;
+    background: transparent;
+
+    color: #2563eb;
+
+    font-size: 11px;
+    font-weight: 750;
+
+    cursor: pointer;
+}
+
+.chat-page .chat-reply-action:hover {
+    text-decoration: underline;
+}
+
+/* Выбранная цитата над полем ввода */
+
+.chat-page .chat-compose-reply {
+    grid-column: 1 / -1;
+
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    width: 100%;
+    min-width: 0;
+
+    padding: 2px 2px 5px;
+}
+
+.chat-page .chat-compose-reply
+.chat-reply-quote {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+
+    background: #eff6ff;
+}
+
+.chat-page .chat-compose-reply-close {
+    flex: 0 0 34px;
+
+    width: 34px;
+    height: 34px;
+
+    border: none;
+    border-radius: 50%;
+
+    background: #e2e8f0;
+    color: #64748b;
+
+    font-size: 23px;
+    line-height: 1;
+
+    cursor: pointer;
+}
+
+/* Подсветка оригинала после перехода */
+
+.chat-page .chat-message-highlight
+.chat-message {
+    outline: 2px solid #3b82f6;
+    outline-offset: 3px;
+}
+
+/* Тёмная тема */
+
+@media (prefers-color-scheme: dark) {
+    html .chat-page .chat-reply-quote {
+        background: rgba(96, 165, 250, 0.1);
+
+        border-left-color: #60a5fa;
+    }
+
+    html .chat-page
+    .chat-reply-quote-author {
+        color: #93c5fd;
+    }
+
+    html .chat-page
+    .chat-reply-quote-text {
+        color: #cbd5e1;
+    }
+
+    html .chat-page
+    .chat-reply-action {
+        color: #93c5fd;
+    }
+
+    html .chat-page
+    .chat-compose-reply-close {
+        background: #334155;
+        color: #cbd5e1;
+    }
+
+    html .chat-page
+    .chat-compose-reply
+    .chat-reply-quote {
+        background: #1e293b;
+    }
+
+    html .chat-page
+    .chat-message-highlight
+    .chat-message {
+        outline-color: #93c5fd;
+    }
+}

@@ -317,6 +317,7 @@ export async function clearUserSessionLocal() {
         const prefixes = [
             "cc:chat:pending:v1:",
             "cc:chat:draft:v1:",
+            "cc:chat:reply:v1:",
         ];
 
         for (const storage of [

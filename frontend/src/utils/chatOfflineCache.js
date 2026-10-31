@@ -150,6 +150,8 @@ function prepareMessage(message) {
         "createdAt",
         "updatedAt",
         "readAt",
+        "replyToMessageId",
+        "replyTo",
     ];
 
     const result = {};
