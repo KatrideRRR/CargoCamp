@@ -4,6 +4,7 @@ import axios from "axios";
 import DisputeEvidenceInput from "../components/DisputeEvidenceInput";
 import axiosInstance from "../utils/axiosInstance";
 import { useParams, useNavigate } from "react-router-dom";
+import useChatTyping from "../hooks/useChatTyping";
 import "../styles/ChatPage.css";
 import "../styles/ChatPageDark.css";
 import "../styles/ChatMessageSync.css";
@@ -130,6 +131,17 @@ const ChatPage = () => {
         syncError: messageSyncError,
     } = useOrderChatSync({
         userId: currentUser?.id,
+        orderId,
+        orderType,
+    });
+
+    const {
+        isOtherTyping,
+        notifyTyping,
+        stopTyping,
+    } = useChatTyping({
+        userId: currentUser?.id,
+        otherUserId: selectedUser?.id,
         orderId,
         orderType,
     });
@@ -528,8 +540,29 @@ const ChatPage = () => {
                             <div className="chat-header-title">
                                 {selectedUser?.username || "Собеседник"}
                             </div>
-                            <div className="chat-header-subtitle">
-                                Заказ #{order?.id || orderId}
+                            <div
+                                className={
+                                    "chat-header-subtitle" +
+                                    (isOtherTyping
+                                        ? " chat-header-subtitle--typing"
+                                        : "")
+                                }
+                                role="status"
+                                aria-live="polite"
+                            >
+                                {isOtherTyping ? (
+                                    <span className="chat-typing-label">
+            Печатает
+            <span
+                className="chat-typing-dots"
+                aria-hidden="true"
+            >
+                ...
+            </span>
+        </span>
+                                ) : (
+                                    <>Заказ #{order?.id || orderId}</>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -721,6 +754,9 @@ const ChatPage = () => {
 
                     messages={messages}
                     onConfirmed={addMessage}
+
+                    onTypingChange={notifyTyping}
+                    onTypingStop={stopTyping}
                 />
 
                 <Modal

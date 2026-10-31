@@ -16,6 +16,10 @@ const {
     requireChatOrderAccess,
 } = require("./services/chatOrderAccess");
 
+const {
+    registerChatTypingEvents,
+} = require("./services/chatTypingEvents");
+
 let io;
 
 function getIo() {
@@ -107,6 +111,14 @@ function initializeSocket(server) {
     io.on("connection", (socket) => {
         const userId = socket.data.userId;
         const scope = socket.data.scope;
+
+        const stopTyping =
+            registerChatTypingEvents({
+                socket,
+                userId,
+                scope,
+                sendToUser,
+            });
 
         /*
          * Личные комнаты определяются сервером.
@@ -276,6 +288,7 @@ function initializeSocket(server) {
                         previousRoom &&
                         previousRoom !== nextRoom
                     ) {
+                        stopTyping();
                         socket.leave(previousRoom);
                     }
 
@@ -305,6 +318,9 @@ function initializeSocket(server) {
          * Выход из комнаты открытого чата.
          */
         socket.on("leaveChat", () => {
+
+            stopTyping();
+
             const room =
                 socket.data.activeChatRoom;
 
@@ -370,6 +386,7 @@ function initializeSocket(server) {
         );
 
         socket.on("disconnect", () => {
+            stopTyping();
             clearInterval(sessionTimer);
         });
     });

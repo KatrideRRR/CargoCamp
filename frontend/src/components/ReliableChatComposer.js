@@ -140,6 +140,8 @@ export default function ReliableChatComposer({
                                                  orderType,
                                                  messages,
                                                  onConfirmed,
+                                                 onTypingChange,
+                                                 onTypingStop,
                                              }) {
     const storageKey = [
         STORAGE_PREFIX,
@@ -285,6 +287,9 @@ export default function ReliableChatComposer({
             );
             return;
         }
+
+        // Пользователь закончил набирать сообщение.
+        onTypingStop?.();
 
         /*
          * Если текст не менялся после неудачной
@@ -432,6 +437,8 @@ export default function ReliableChatComposer({
 
         setText(value);
 
+        onTypingChange?.(value);
+
         const textarea = textareaRef.current;
 
         if (!textarea) return;
@@ -449,6 +456,7 @@ export default function ReliableChatComposer({
                 value={text}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
+                onBlur={onTypingStop}
                 placeholder="Введите сообщение..."
                 className="chat-input"
                 rows={1}
