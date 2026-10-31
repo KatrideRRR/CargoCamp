@@ -23,6 +23,11 @@ module.exports = (sequelize, DataTypes) => {
                 allowNull: true,
             },
 
+            clientMessageId: {
+                type: DataTypes.STRING(36),
+                allowNull: true,
+            },
+
             attachments: {
                 type: DataTypes.JSON,
                 allowNull: true,

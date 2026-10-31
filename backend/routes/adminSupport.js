@@ -1,7 +1,10 @@
 const express = require("express");
 const router = express.Router();
-
+const { Op } = require("sequelize");
 const { authMiddleware, adminMiddleware } = require("../middlewares/adminAuth");
+const {
+    createSupportMessage,
+} = require("../services/supportMessageIdempotency");
 
 const {
     sequelize,
@@ -93,7 +96,10 @@ router.post("/chats/:userId/messages", authMiddleware, adminMiddleware, async (r
         const { userId } = req.params;
         const { text } = req.body;
 
-        if (!text || !text.trim()) {
+        if (
+            typeof text !== "string" ||
+            !text.trim()
+        ) {
             return res.status(400).json({
                 message: "Сообщение не может быть пустым",
             });
@@ -107,24 +113,22 @@ router.post("/chats/:userId/messages", authMiddleware, adminMiddleware, async (r
             });
         }
 
-        const message = await SupportMessage.create({
-            userId,
+        const result = await createSupportMessage({
+            userId: user.id,
             senderId: adminId,
             senderRole: "admin",
-            text: text.trim(),
-            isReadByUser: false,
-            isReadByAdmin: true,
+
+            text,
+            rawClientMessageId:
+            req.body?.clientMessageId,
         });
 
-        const fullMessage = await SupportMessage.findByPk(message.id, {
-            include: [
-                {
-                    model: User,
-                    as: "sender",
-                    attributes: ["id", "username", "avatar", "role"],
-                },
-            ],
-        });
+        const message = result.message;
+        const fullMessage = result.message;
+
+        if (!result.created) {
+            return res.status(200).json(fullMessage);
+        }
 
         await Notification.create({
             userId,
@@ -132,6 +136,7 @@ router.post("/chats/:userId/messages", authMiddleware, adminMiddleware, async (r
             title: "Ответ поддержки",
             body: text.trim().slice(0, 200),
             isRead: false,
+            messageId: message.id,
             data: {
                 support: true,
                 url: "/support",
@@ -191,30 +196,92 @@ router.post("/chats/:userId/messages", authMiddleware, adminMiddleware, async (r
  * Админ отметил сообщения пользователя прочитанными
  * PATCH /api/admin/support/chats/:userId/read
  */
-router.patch("/chats/:userId/read", authMiddleware, adminMiddleware, async (req, res) => {
-    try {
-        const { userId } = req.params;
+router.patch(
+    "/chats/:userId/read",
+    authMiddleware,
+    adminMiddleware,
+    async (req, res) => {
+        try {
+            const userId =
+                Number(req.params.userId);
 
-        await SupportMessage.update(
-            {
-                isReadByAdmin: true,
-            },
-            {
-                where: {
-                    userId,
-                    senderRole: "user",
-                    isReadByAdmin: false,
-                },
+            if (
+                !Number.isSafeInteger(userId) ||
+                userId <= 0
+            ) {
+                return res.status(400).json({
+                    message: "Некорректный пользователь",
+                });
             }
-        );
 
-        res.json({ success: true });
-    } catch (error) {
-        console.error("Ошибка отметки сообщений поддержки прочитанными админом:", error);
-        res.status(500).json({
-            message: "Ошибка отметки сообщений поддержки прочитанными",
-        });
+            const rawThroughId =
+                req.body?.throughId;
+
+            const throughId =
+                rawThroughId == null
+                    ? null
+                    : Number(rawThroughId);
+
+            if (
+                throughId !== null &&
+                (
+                    !Number.isSafeInteger(throughId) ||
+                    throughId <= 0
+                )
+            ) {
+                return res.status(400).json({
+                    message: "Некорректный throughId",
+                });
+            }
+
+            const [updated] =
+                await SupportMessage.update(
+                    {
+                        isReadByAdmin: true,
+                    },
+                    {
+                        where: {
+                            userId,
+                            senderRole: "user",
+                            isReadByAdmin: false,
+
+                            ...(throughId
+                                ? {
+                                    id: {
+                                        [Op.lte]: throughId,
+                                    },
+                                }
+                                : {}),
+                        },
+                    }
+                );
+
+            if (updated > 0) {
+                req.app.locals.io
+                    ?.to(`user_${userId}`)
+                    .emit("support:read", {
+                        userId,
+                        readerRole: "admin",
+                        throughId,
+                    });
+            }
+
+            return res.json({
+                success: true,
+                updated,
+                throughId,
+            });
+        } catch (error) {
+            console.error(
+                "Ошибка прочтения поддержки администратором:",
+                error
+            );
+
+            return res.status(500).json({
+                message: "Ошибка обновления прочтения",
+            });
+        }
     }
-});
+);
 
 module.exports = router;

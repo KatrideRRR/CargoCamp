@@ -16,6 +16,27 @@ export function clearAdminSession() {
     ].forEach((key) => {
         localStorage.removeItem(key);
     });
+
+    try {
+        const keys = Object.keys(
+            localStorage
+        );
+
+        keys.forEach((key) => {
+            if (
+                key.startsWith(
+                    "cc:support:admin:"
+                )
+            ) {
+                localStorage.removeItem(key);
+            }
+        });
+    } catch (error) {
+        console.warn(
+            "Не удалось очистить черновики поддержки:",
+            error
+        );
+    }
 }
 
 export function isAdminTokenValid(

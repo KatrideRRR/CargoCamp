@@ -1,9 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const {sendAdminNotification} = require("../services/adminNotificationService");
-
+const { Op } = require("sequelize");
 const authenticateToken = require("../middlewares/userAuth");
 const { SupportMessage, User, Notification, ActionLog } = require("../models");
+const {
+    createSupportMessage,
+} = require("../services/supportMessageIdempotency");
 
 /**
  * Получить свой чат поддержки
@@ -42,39 +45,39 @@ router.post("/messages", authenticateToken, async (req, res) => {
     try {
         const io = req.app.locals.io;
         const userId = req.user.id;
-        const { text } = req.body;
+        const {
+            text,
+            clientMessageId,
+        } = req.body || {};
 
-        const cleanText = String(text || "").trim();
+        const result = await createSupportMessage({
+            userId,
+            senderId: userId,
+            senderRole: "user",
 
-        if (!cleanText) {
-            return res.status(400).json({
-                message: "Сообщение не может быть пустым",
-            });
+            text,
+            rawClientMessageId: clientMessageId,
+        });
+
+        const message = result.message;
+        const fullMessage = result.message;
+        const cleanText = fullMessage.text;
+
+        /*
+         * Повторная отправка:
+         * запись уже существует.
+         *
+         * Не повторяем Telegram-уведомление,
+         * журнал действий и Socket.IO-события.
+         */
+        if (!result.created) {
+            return res.status(200).json(fullMessage);
         }
 
         const isPlatformSuggestion =
             cleanText.startsWith(
                 "💡 ПРЕДЛОЖЕНИЕ ПО РАЗВИТИЮ CARGOCAMP"
             );
-
-        const message = await SupportMessage.create({
-            userId,
-            senderId: userId,
-            senderRole: "user",
-            text: cleanText,
-            isReadByUser: true,
-            isReadByAdmin: false,
-        });
-
-        const fullMessage = await SupportMessage.findByPk(message.id, {
-            include: [
-                {
-                    model: User,
-                    as: "sender",
-                    attributes: ["id", "username", "avatar", "role"],
-                },
-            ],
-        });
 
         void sendAdminNotification({
             topic:
@@ -142,8 +145,12 @@ router.post("/messages", authenticateToken, async (req, res) => {
             error
         );
 
-        return res.status(500).json({
-            message: "Ошибка отправки сообщения в поддержку",
+        return res.status(
+            error.status || 500
+        ).json({
+            message: error.status
+                ? error.message
+                : "Ошибка отправки сообщения в поддержку",
         });
     }
 });
@@ -151,30 +158,119 @@ router.post("/messages", authenticateToken, async (req, res) => {
  * Пользователь отметил ответы поддержки прочитанными
  * PATCH /api/support/read
  */
-router.patch("/read", authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
+router.patch(
+    "/read",
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const userId = req.user.id;
 
-        await SupportMessage.update(
-            {
-                isReadByUser: true,
-            },
-            {
-                where: {
-                    userId,
-                    senderRole: "admin",
-                    isReadByUser: false,
-                },
+            const rawThroughId =
+                req.body?.throughId;
+
+            const throughId =
+                rawThroughId == null
+                    ? null
+                    : Number(rawThroughId);
+
+            if (
+                throughId !== null &&
+                (
+                    !Number.isSafeInteger(throughId) ||
+                    throughId <= 0
+                )
+            ) {
+                return res.status(400).json({
+                    message: "Некорректный throughId",
+                });
             }
-        );
 
-        res.json({ success: true });
-    } catch (error) {
-        console.error("Ошибка отметки сообщений поддержки прочитанными:", error);
-        res.status(500).json({
-            message: "Ошибка отметки сообщений поддержки прочитанными",
-        });
+            const where = {
+                userId,
+                senderRole: "admin",
+                isReadByUser: false,
+
+                ...(throughId
+                    ? {
+                        id: {
+                            [Op.lte]: throughId,
+                        },
+                    }
+                    : {}),
+            };
+
+            const [updated] =
+                await SupportMessage.update(
+                    {
+                        isReadByUser: true,
+                    },
+                    {
+                        where,
+                    }
+                );
+
+            /*
+             * Уведомления об ответах поддержки
+             * тоже должны становиться прочитанными.
+             */
+            const notificationWhere = {
+                userId,
+                type: "support_reply",
+                isRead: false,
+
+                ...(throughId
+                    ? {
+                        [Op.or]: [
+                            {
+                                messageId: {
+                                    [Op.lte]: throughId,
+                                },
+                            },
+                            {
+                                messageId: {
+                                    [Op.is]: null,
+                                },
+                            },
+                        ],
+                    }
+                    : {}),
+            };
+
+            await Notification.update(
+                {
+                    isRead: true,
+                },
+                {
+                    where: notificationWhere,
+                }
+            );
+
+            if (updated > 0) {
+                req.app.locals.io
+                    ?.to("admins")
+                    .emit("support:read", {
+                        userId,
+                        readerRole: "user",
+                        throughId,
+                    });
+            }
+
+            return res.json({
+                success: true,
+                updated,
+                throughId,
+            });
+        } catch (error) {
+            console.error(
+                "Ошибка отметки поддержки прочитанной:",
+                error
+            );
+
+            return res.status(500).json({
+                message: "Ошибка обновления прочтения",
+            });
+        }
     }
-});
+);
 
 module.exports = router;

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import axiosInstance from "../utils/axiosInstance";
 import { socket } from "../socketClient";
 import "../styles/AdminSupportPage.css";
-
+import { jwtDecode } from "jwt-decode";
 import {
     FaHeadset,
     FaPaperPlane,
@@ -11,6 +11,27 @@ import {
     FaSyncAlt,
     FaInbox,
 } from "react-icons/fa";
+
+function mergeSupportMessages(previous, incoming) {
+    const byId = new Map();
+
+    for (const message of previous) {
+        byId.set(String(message.id), message);
+    }
+
+    for (const message of incoming) {
+        const key = String(message.id);
+
+        byId.set(key, {
+            ...(byId.get(key) || {}),
+            ...message,
+        });
+    }
+
+    return [...byId.values()].sort(
+        (a, b) => Number(a.id) - Number(b.id)
+    );
+}
 
 const AdminSupportPage = () => {
     const [chats, setChats] = useState([]);
@@ -24,6 +45,28 @@ const AdminSupportPage = () => {
     const [error, setError] = useState("");
 
     const bottomRef = useRef(null);
+
+    const selectedUserRef = useRef(null);
+    const sendingRef = useRef(false);
+
+    const adminId = useMemo(() => {
+        try {
+            const token =
+                localStorage.getItem("authToken");
+
+            return jwtDecode(token)?.id || "unknown";
+        } catch {
+            return "unknown";
+        }
+    }, []);
+
+    const draftKeyFor = (userId) =>
+        `cc:support:admin:${adminId}:${userId}:draft`;
+
+    const pendingKeyFor = (userId) =>
+        `cc:support:admin:${adminId}:${userId}:pending`;
+
+    selectedUserRef.current = selectedUserId;
 
     const selectedChat = useMemo(() => {
         return chats.find((chat) => Number(chat.userId) === Number(selectedUserId));
@@ -48,9 +91,9 @@ const AdminSupportPage = () => {
 
             setChats(list);
 
-            if (!selectedUserId && list.length > 0) {
-                setSelectedUserId(list[0].userId);
-            }
+            setSelectedUserId((previous) =>
+                previous || list[0]?.userId || null
+            );
         } catch (err) {
             console.error("Ошибка загрузки чатов поддержки:", err);
             setError("Не удалось загрузить чаты поддержки");
@@ -59,32 +102,118 @@ const AdminSupportPage = () => {
         }
     };
 
-    const fetchMessages = async (userId) => {
+    const fetchMessages = async (
+        userId,
+        { silent = false } = {}
+    ) => {
         if (!userId) return;
 
+        const requestedUserId = Number(userId);
+
         try {
-            setLoadingMessages(true);
-            setError("");
+            if (!silent) {
+                setLoadingMessages(true);
+            }
 
-            const res = await axiosInstance.get(`/admin/support/chats/${userId}/messages`);
-            setMessages(Array.isArray(res.data) ? res.data : []);
+            const res = await axiosInstance.get(
+                `/admin/support/chats/${requestedUserId}/messages`
+            );
 
-            await axiosInstance.patch(`/admin/support/chats/${userId}/read`).catch(() => {});
+            /*
+             * Пока загружали историю, администратор
+             * мог открыть другой диалог.
+             */
+            if (
+                Number(selectedUserRef.current) !==
+                requestedUserId
+            ) {
+                return;
+            }
 
-            setChats((prev) =>
-                prev.map((chat) =>
-                    Number(chat.userId) === Number(userId)
-                        ? { ...chat, unreadCount: 0 }
-                        : chat
+            const incoming =
+                Array.isArray(res.data)
+                    ? res.data
+                    : [];
+
+            setMessages((previous) =>
+                mergeSupportMessages(
+                    previous,
+                    incoming
                 )
             );
 
-            scrollToBottom(false);
+            setError("");
+
+            if (!document.hidden) {
+                const lastUserMessageId =
+                    incoming
+                        .filter(
+                            (message) =>
+                                message.senderRole ===
+                                "user"
+                        )
+                        .reduce(
+                            (max, message) =>
+                                Math.max(
+                                    max,
+                                    Number(message.id)
+                                ),
+                            0
+                        );
+
+                if (lastUserMessageId > 0) {
+                    await axiosInstance.patch(
+                        `/admin/support/chats/${requestedUserId}/read`,
+                        {
+                            throughId:
+                            lastUserMessageId,
+                        }
+                    );
+
+                    if (
+                        Number(selectedUserRef.current) ===
+                        requestedUserId
+                    ) {
+                        setChats((previous) =>
+                            previous.map((chat) =>
+                                Number(chat.userId) ===
+                                requestedUserId
+                                    ? {
+                                        ...chat,
+                                        unreadCount: 0,
+                                    }
+                                    : chat
+                            )
+                        );
+                    }
+                }
+            }
+
+            if (!silent) {
+                scrollToBottom(false);
+            }
         } catch (err) {
-            console.error("Ошибка загрузки сообщений поддержки:", err);
-            setError("Не удалось загрузить сообщения");
+            console.error(
+                "Ошибка загрузки поддержки:",
+                err
+            );
+
+            if (
+                Number(selectedUserRef.current) ===
+                requestedUserId
+            ) {
+                setError(
+                    "Не удалось обновить переписку"
+                );
+            }
         } finally {
-            setLoadingMessages(false);
+            if (
+                !silent &&
+                Number(selectedUserRef.current) ===
+                requestedUserId
+            ) {
+                setLoadingMessages(false);
+            }
         }
     };
 
@@ -93,19 +222,208 @@ const AdminSupportPage = () => {
     }, []);
 
     useEffect(() => {
-        if (selectedUserId) {
-            fetchMessages(selectedUserId);
+        setMessages([]);
+
+        if (!selectedUserId) {
+            setNewMessage("");
+            return;
         }
+
+        try {
+            const pending = JSON.parse(
+                localStorage.getItem(
+                    pendingKeyFor(selectedUserId)
+                ) || "null"
+            );
+
+            const draft =
+                localStorage.getItem(
+                    draftKeyFor(selectedUserId)
+                );
+
+            setNewMessage(
+                pending?.text ||
+                draft ||
+                ""
+            );
+        } catch {
+            setNewMessage("");
+        }
+
+        fetchMessages(selectedUserId);
     }, [selectedUserId]);
 
     useEffect(() => {
         const subscribeAdminSupport = () => {
             socket.emit("subscribeAdminSupport");
+
+            fetchChats();
+
+            if (selectedUserRef.current) {
+                fetchMessages(
+                    selectedUserRef.current,
+                    {
+                        silent: true,
+                    }
+                );
+            }
+        };
+
+        const handleNewUserMessage = (payload) => {
+            const userId =
+                Number(payload?.userId);
+
+            const message =
+                payload?.message;
+
+            if (!userId || !message?.id) {
+                fetchChats();
+                return;
+            }
+
+            if (
+                Number(selectedUserRef.current) ===
+                userId
+            ) {
+                setMessages((previous) =>
+                    mergeSupportMessages(
+                        previous,
+                        [message]
+                    )
+                );
+
+                if (!document.hidden) {
+                    axiosInstance.patch(
+                        `/admin/support/chats/${userId}/read`,
+                        {
+                            throughId: message.id,
+                        }
+                    ).then(() => {
+                        fetchChats();
+                    }).catch((error) => {
+                        console.warn(
+                            "Не удалось подтвердить прочтение:",
+                            error
+                        );
+                    });
+                }
+            }
+
+            fetchChats();
+        };
+
+        const handleAdminReply = (payload) => {
+            const userId =
+                Number(payload?.userId);
+
+            const message =
+                payload?.message;
+
+            if (!userId || !message?.id) {
+                return;
+            }
+
+            if (
+                Number(selectedUserRef.current) ===
+                userId
+            ) {
+                setMessages((previous) =>
+                    mergeSupportMessages(
+                        previous,
+                        [message]
+                    )
+                );
+            }
+
+            fetchChats();
+        };
+
+        const handleRead = (payload) => {
+            if (
+                payload?.readerRole !== "user"
+            ) {
+                return;
+            }
+
+            if (
+                Number(payload?.userId) !==
+                Number(selectedUserRef.current)
+            ) {
+                return;
+            }
+
+            setMessages((previous) =>
+                previous.map((message) => {
+                    if (
+                        message.senderRole !==
+                        "admin"
+                    ) {
+                        return message;
+                    }
+
+                    if (
+                        payload.throughId != null &&
+                        Number(message.id) >
+                        Number(payload.throughId)
+                    ) {
+                        return message;
+                    }
+
+                    return {
+                        ...message,
+                        isReadByUser: true,
+                    };
+                })
+            );
+        };
+
+        const handleOnline = () => {
+            fetchChats();
+
+            if (selectedUserRef.current) {
+                fetchMessages(
+                    selectedUserRef.current,
+                    {
+                        silent: true,
+                    }
+                );
+            }
+        };
+
+        const handleVisibility = () => {
+            if (!document.hidden) {
+                handleOnline();
+            }
         };
 
         socket.on(
             "connect",
             subscribeAdminSupport
+        );
+
+        socket.on(
+            "support:new_message",
+            handleNewUserMessage
+        );
+
+        socket.on(
+            "support:admin_reply",
+            handleAdminReply
+        );
+
+        socket.on(
+            "support:read",
+            handleRead
+        );
+
+        window.addEventListener(
+            "online",
+            handleOnline
+        );
+
+        document.addEventListener(
+            "visibilitychange",
+            handleVisibility
         );
 
         if (socket.connected) {
@@ -114,77 +432,12 @@ const AdminSupportPage = () => {
             socket.connect();
         }
 
-        const handleNewUserMessage = async (payload) => {
-            const userId = payload?.userId;
-            const message = payload?.message;
-
-            if (!userId || !message) {
-                fetchChats();
-                return;
-            }
-
-            setChats((prev) => {
-                const exists = prev.some((chat) => Number(chat.userId) === Number(userId));
-
-                if (!exists) {
-                    fetchChats();
-                    return prev;
-                }
-
-                return prev
-                    .map((chat) => {
-                        if (Number(chat.userId) !== Number(userId)) return chat;
-
-                        const currentlyOpened = Number(selectedUserId) === Number(userId);
-
-                        return {
-                            ...chat,
-                            lastMessageAt: message.createdAt,
-                            unreadCount: currentlyOpened
-                                ? 0
-                                : Number(chat.unreadCount || 0) + 1,
-                        };
-                    })
-                    .sort((a, b) => {
-                        return new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0);
-                    });
-            });
-
-            if (Number(selectedUserId) === Number(userId)) {
-                setMessages((prev) => {
-                    const exists = prev.some((m) => m.id === message.id);
-                    if (exists) return prev;
-                    return [...prev, message];
-                });
-
-                await axiosInstance.patch(`/admin/support/chats/${userId}/read`).catch(() => {});
-                scrollToBottom();
-            }
-        };
-
-        const handleAdminReply = (payload) => {
-            const userId = payload?.userId;
-            const message = payload?.message;
-
-            if (!userId || !message) return;
-
-            if (Number(selectedUserId) === Number(userId)) {
-                setMessages((prev) => {
-                    const exists = prev.some((m) => m.id === message.id);
-                    if (exists) return prev;
-                    return [...prev, message];
-                });
-
-                scrollToBottom();
-            }
-
-            fetchChats();
-        };
-
-        socket.on("support:new_message", handleNewUserMessage);
-        socket.on("support:admin_reply", handleAdminReply);
-
         return () => {
+            socket.off(
+                "connect",
+                subscribeAdminSupport
+            );
+
             socket.off(
                 "support:new_message",
                 handleNewUserMessage
@@ -196,13 +449,23 @@ const AdminSupportPage = () => {
             );
 
             socket.off(
-                "connect",
-                subscribeAdminSupport
+                "support:read",
+                handleRead
+            );
+
+            window.removeEventListener(
+                "online",
+                handleOnline
+            );
+
+            document.removeEventListener(
+                "visibilitychange",
+                handleVisibility
             );
 
             socket.disconnect();
         };
-    }, [selectedUserId]);
+    }, []);
 
     useEffect(() => {
         scrollToBottom();
@@ -211,33 +474,136 @@ const AdminSupportPage = () => {
     const sendMessage = async () => {
         const text = newMessage.trim();
 
-        if (!text || !selectedUserId || sending) return;
+        const targetUserId =
+            Number(selectedUserId);
+
+        if (
+            !text ||
+            !targetUserId ||
+            sendingRef.current
+        ) {
+            return;
+        }
+
+        const pendingKey =
+            pendingKeyFor(targetUserId);
+
+        const draftKey =
+            draftKeyFor(targetUserId);
+
+        let pending = null;
 
         try {
-            setSending(true);
-            setError("");
-            setNewMessage("");
+            pending = JSON.parse(
+                localStorage.getItem(pendingKey) ||
+                "null"
+            );
+        } catch {
+            pending = null;
+        }
 
+        if (pending && pending.text !== text) {
+            setError(
+                "Предыдущая отправка не подтверждена. " +
+                "Повторите отправку исходного текста."
+            );
+            return;
+        }
+
+        if (!pending) {
+            if (!window.crypto?.randomUUID) {
+                setError(
+                    "Безопасная отправка недоступна"
+                );
+                return;
+            }
+
+            pending = {
+                text,
+                clientMessageId:
+                    window.crypto.randomUUID(),
+            };
+        }
+
+        try {
+            localStorage.setItem(
+                pendingKey,
+                JSON.stringify(pending)
+            );
+        } catch (error) {
+            setError(
+                "Не удалось сохранить попытку отправки"
+            );
+            return;
+        }
+
+        sendingRef.current = true;
+
+        setSending(true);
+        setError("");
+
+        try {
             const res = await axiosInstance.post(
-                `/admin/support/chats/${selectedUserId}/messages`,
-                { text }
+                `/admin/support/chats/${targetUserId}/messages`,
+                {
+                    text: pending.text,
+
+                    clientMessageId:
+                    pending.clientMessageId,
+                }
             );
 
-            if (res.data) {
-                setMessages((prev) => {
-                    const exists = prev.some((m) => m.id === res.data.id);
-                    if (exists) return prev;
-                    return [...prev, res.data];
-                });
+            if (!res.data?.id) {
+                throw new Error(
+                    "Сервер не подтвердил сообщение"
+                );
+            }
+
+            localStorage.removeItem(pendingKey);
+            localStorage.removeItem(draftKey);
+
+            /*
+             * Не добавляем ответ в чужой чат,
+             * если администратор уже переключился.
+             */
+            if (
+                Number(selectedUserRef.current) ===
+                targetUserId
+            ) {
+                setMessages((previous) =>
+                    mergeSupportMessages(
+                        previous,
+                        [res.data]
+                    )
+                );
+
+                setNewMessage((previous) =>
+                    previous.trim() === pending.text
+                        ? ""
+                        : previous
+                );
+
+                scrollToBottom();
             }
 
             fetchChats();
-            scrollToBottom();
         } catch (err) {
-            console.error("Ошибка отправки ответа поддержки:", err);
-            setError("Не удалось отправить ответ");
-            setNewMessage(text);
+            console.error(
+                "Ошибка ответа поддержки:",
+                err
+            );
+
+            if (
+                Number(selectedUserRef.current) ===
+                targetUserId
+            ) {
+                setError(
+                    "Нет подтверждения отправки. " +
+                    "Повторите отправку того же текста."
+                );
+            }
         } finally {
+            sendingRef.current = false;
             setSending(false);
         }
     };
@@ -447,6 +813,18 @@ const AdminSupportPage = () => {
 
                                                         <div className="admin-support-message-time">
                                                             {formatTime(message.createdAt)}
+                                                            {mine && (
+                                                                <span
+                                                                    title={
+                                                                        message.isReadByUser
+                                                                            ? "Прочитано пользователем"
+                                                                            : "Сохранено на сервере"
+                                                                    }
+                                                                >
+        {message.isReadByUser ? " ✓✓" : " ✓"}
+    </span>
+                                                            )}
+
                                                         </div>
                                                     </div>
                                                 </div>
@@ -464,7 +842,22 @@ const AdminSupportPage = () => {
                             >
                                 <textarea
                                     value={newMessage}
-                                    onChange={(e) => setNewMessage(e.target.value)}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+
+                                        setNewMessage(value);
+
+                                        if (selectedUserId) {
+                                            try {
+                                                localStorage.setItem(
+                                                    draftKeyFor(selectedUserId),
+                                                    value
+                                                );
+                                            } catch {
+                                                // Продолжаем работу в React.
+                                            }
+                                        }
+                                    }}
                                     onKeyDown={handleKeyDown}
                                     placeholder="Написать ответ пользователю..."
                                     disabled={sending}

@@ -318,6 +318,7 @@ export async function clearUserSessionLocal() {
             "cc:chat:pending:v1:",
             "cc:chat:draft:v1:",
             "cc:chat:reply:v1:",
+            "cc:support:user:",
         ];
 
         for (const storage of [
