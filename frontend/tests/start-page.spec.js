@@ -1,4 +1,7 @@
-import { test, expect } from "@playwright/test";
+const {
+    test,
+    expect,
+} = require("./fixtures/safeTest");
 
 const FRONT_URL = "http://localhost:3000";
 
@@ -44,6 +47,60 @@ async function setFakeAuth(page, user = testUser) {
 }
 
 async function setupStartPageMocks(page) {
+
+    /*
+ * Яндекс.Карты.
+ *
+ * На стартовой странице карта не нужна,
+ * поэтому возвращаем пустой JavaScript.
+ * Настоящий внешний API не вызывается.
+ */
+    await page.route(
+        "https://api-maps.yandex.ru/2.1/**",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/javascript",
+                body: "",
+            });
+        }
+    );
+
+    /*
+     * Google Fonts.
+     *
+     * В тестах используем системный шрифт.
+     * Запросы к Google не выполняются.
+     */
+    await page.route(
+        "https://fonts.googleapis.com/**",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "text/css",
+                body: "",
+            });
+        }
+    );
+
+    /*
+     * Проверка задолженности.
+     *
+     * Вымышленный пользователь
+     * не имеет задолженности.
+     */
+    await page.route(
+        "**/api/orders/me/status",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    debt: 0,
+                },
+            });
+        }
+    );
+
     page.on("pageerror", (error) => {
         console.log("[PAGE ERROR]", error.message);
     });
@@ -90,7 +147,7 @@ async function openStartPage(page) {
         throw new Error("StartPage редиректит на /login. Fake JWT не применился или стартовый роут другой.");
     }
 
-    await expect(page.locator(".title")).toHaveText("CargoCamp", {
+    await expect(page.locator(".start-page-title")).toHaveText("CargoCamp", {
         timeout: 15000,
     });
 }
@@ -104,12 +161,12 @@ test.describe("StartPage", () => {
         await expect(page.locator(".start-page-container")).toBeVisible();
         await expect(page.locator(".start-page-content")).toBeVisible();
 
-        await expect(page.locator(".title")).toHaveText("CargoCamp");
-        await expect(page.locator(".subtitle")).toHaveText("Что вы хотите сделать?");
+        await expect(page.locator(".start-page-title")).toHaveText("CargoCamp");
+        await expect(page.locator(".start-page-subtitle")).toHaveText("Что вы хотите сделать?");
     });
 
     test("отображает три основные кнопки действий", async ({ page }) => {
-        await expect(page.locator(".role-button")).toHaveCount(3);
+        await expect(page.locator(".start-page-role-button")).toHaveCount(3);
 
         await expect(page.getByRole("button", { name: /Создать заказ/i })).toBeVisible();
         await expect(page.getByRole("button", { name: /Такси \/ Курьер/i })).toBeVisible();
@@ -135,7 +192,7 @@ test.describe("StartPage", () => {
         await expect(button).toBeVisible();
         await expect(button).toContainText("🚕");
         await expect(button).toContainText("Такси / Курьер");
-        await expect(button).toContainText("Быстрый заказ “здесь и сейчас”");
+        await expect(button).toContainText("Быстрый заказ «здесь и сейчас»");
     });
 
     test("отображает кнопку Все заказы", async ({ page }) => {
@@ -144,7 +201,7 @@ test.describe("StartPage", () => {
         });
 
         await expect(button).toBeVisible();
-        await expect(button).toHaveClass(/role-button-soft/);
+        await expect(button).toHaveClass(/start-page-role-button-soft/);
         await expect(button).toContainText("📋");
         await expect(button).toContainText("Все заказы");
         await expect(button).toContainText("Найти заказ и откликнуться");
@@ -169,7 +226,7 @@ test.describe("StartPage", () => {
     });
 
     test("кнопки имеют type button и не являются submit", async ({ page }) => {
-        const buttons = page.locator(".role-button");
+        const buttons = page.locator(".start-page-role-button");
 
         await expect(buttons.nth(0)).toHaveAttribute("type", "button");
         await expect(buttons.nth(1)).toHaveAttribute("type", "button");
