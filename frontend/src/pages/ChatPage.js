@@ -10,7 +10,7 @@ import ChatReplyQuote from "../components/ChatReplyQuote";
 import "../styles/ChatPage.css";
 import "../styles/ChatPageDark.css";
 import "../styles/ChatMessageSync.css";
-import "../styles/Chateply.css";
+import "../styles/ChatReply.css";
 import { useUser } from "../utils/userContext";
 import useOrderChatSync from "../hooks/useOrderChatSync";
 import Modal from "react-modal";

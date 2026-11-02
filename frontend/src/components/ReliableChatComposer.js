@@ -438,10 +438,51 @@ export default function ReliableChatComposer({
                 return;
             }
 
-            const status =
-                error.response?.status;
+            const status = error.response?.status;
 
-            if (status === 401) {
+            /*
+             * Сервер однозначно отклонил запрос.
+             * Сообщение не было сохранено.
+             *
+             * Освобождаем pending, чтобы пользователь
+             * мог исправить текст и отправить заново.
+             */
+            const isDefinitiveRejection = [
+                400,
+                401,
+                403,
+                404,
+                409,
+                422,
+            ].includes(status);
+
+            if (isDefinitiveRejection) {
+                removePending(
+                    storageKey,
+                    outgoing.clientMessageId
+                );
+
+                setPending((previous) =>
+                    previous?.clientMessageId ===
+                    outgoing.clientMessageId
+                        ? null
+                        : previous
+                );
+            }
+
+            /*
+             * При ошибке сети или 5xx pending
+             * НЕ удаляем.
+             *
+             * Повтор должен использовать прежний UUID,
+             * чтобы не создать дублирующее сообщение.
+             */
+            if (status === 400 || status === 422) {
+                setSendError(
+                    error.response?.data?.message ||
+                    "Сообщение отклонено. Исправьте текст и попробуйте снова."
+                );
+            } else if (status === 401) {
                 setSendError(
                     "Сессия завершена. Войдите снова."
                 );
@@ -451,6 +492,7 @@ export default function ReliableChatComposer({
                 );
             } else if (status === 409) {
                 setSendError(
+                    error.response?.data?.message ||
                     "Отправка отклонена. Проверьте сообщение и собеседника."
                 );
             } else {
