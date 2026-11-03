@@ -729,6 +729,219 @@ test.describe("ChatPage", () => {
         await expect(input).toHaveValue("");
     });
 
+    test("после перезагрузки сохраняет UUID неподтверждённого сообщения", async ({ page }) => {
+        const requests = await mockChatSendAfterFailure(page, {
+            firstStatus: 500,
+            firstMessage: "Временная ошибка сервера",
+            messageId: 1004,
+        });
+
+        const message = "Сообщение с восстановлением после перезагрузки";
+
+        const input = page.locator(".chat-input");
+
+        const sendButton = page.getByRole("button", {
+            name: "Отправить сообщение",
+        });
+
+        // Первая попытка заканчивается ошибкой 500.
+        await input.fill(message);
+        await sendButton.click();
+
+        await expect.poll(() => requests.length).toBe(1);
+
+        await expect(
+            page.locator(".chat-send-status--error")
+        ).toContainText("Нет подтверждения отправки");
+
+        const originalId = requests[0].clientMessageId;
+
+        // Проверяем, что сообщение сохранено локально.
+        const saved = await page.evaluate(() => {
+            const key = Object.keys(localStorage).find(
+                (item) => item.startsWith("cc:chat:pending:v1:")
+            );
+
+            return {
+                key,
+                value: key
+                    ? JSON.parse(localStorage.getItem(key))
+                    : null,
+            };
+        });
+
+        expect(saved.key).toBeTruthy();
+        expect(saved.value).toMatchObject({
+            content: message,
+            clientMessageId: originalId,
+            orderId: "101",
+            orderType: "regular",
+        });
+
+        // Пользователь перезагружает страницу.
+        await page.reload({
+            waitUntil: "domcontentloaded",
+        });
+
+        // Текст должен восстановиться.
+        await expect(input).toHaveValue(message);
+
+        await expect(
+            page.locator(".chat-send-status--error")
+        ).toContainText("Есть сообщение без подтверждения отправки");
+
+        // Повторяем отправку.
+        await expect(sendButton).toBeEnabled();
+        await sendButton.click();
+
+        await expect.poll(() => requests.length).toBe(2);
+
+        // UUID не должен измениться.
+        expect(requests[1].clientMessageId).toBe(originalId);
+
+        expect(requests[1]).toMatchObject({
+            content: message,
+            receiverId: customerUser.id,
+            orderId: "101",
+            orderType: "regular",
+            replyToMessageId: null,
+        });
+
+        // Сообщение отображается только один раз.
+        await expect(
+            page.locator(".chat-message-sent").filter({
+                hasText: message,
+            })
+        ).toHaveCount(1);
+
+        await expect(input).toHaveValue("");
+
+        // После подтверждения неподтверждённая копия удаляется.
+        await expect.poll(() =>
+            page.evaluate((key) => {
+                return localStorage.getItem(key);
+            }, saved.key)
+        ).toBeNull();
+
+        await expect(
+            page.locator(".chat-send-status--error")
+        ).not.toBeVisible();
+    });
+
+    test("двойное нажатие Отправить создаёт только один запрос", async ({ page }) => {
+        const requests = [];
+
+        // Искусственно задерживаем ответ сервера.
+        let releaseResponse;
+
+        const responseGate = new Promise((resolve) => {
+            releaseResponse = resolve;
+        });
+
+        await page.route("**/api/messages", async (route) => {
+            const request = route.request();
+
+            if (request.method() !== "POST") {
+                await route.fulfill({
+                    status: 405,
+                    json: {
+                        message: "Метод не поддерживается",
+                    },
+                });
+                return;
+            }
+
+            const body = request.postDataJSON();
+
+            requests.push(body);
+
+            // Ответ пока не возвращаем.
+            await responseGate;
+
+            await route.fulfill({
+                status: 201,
+                json: {
+                    id: 1005,
+                    content: body.content,
+                    senderId: testUser.id,
+                    receiverId: customerUser.id,
+                    orderId: 101,
+                    orderType: "regular",
+                    clientMessageId: body.clientMessageId,
+                    replyToMessageId: body.replyToMessageId,
+                    createdAt: "2026-07-01T10:30:00.000Z",
+                    readAt: null,
+                },
+            });
+        });
+
+        const message = "Проверка двойной отправки";
+
+        const input = page.locator(".chat-input");
+
+        const sendButton = page.getByRole("button", {
+            name: "Отправить сообщение",
+        });
+
+        await input.fill(message);
+
+        await expect(sendButton).toBeEnabled();
+
+        // Два нажатия в одном цикле JavaScript.
+        // Это проверяет защиту ещё до обновления React.
+        await page.evaluate(() => {
+            const button = document.querySelector(
+                ".chat-send-button"
+            );
+
+            if (!button) {
+                throw new Error("Кнопка отправки не найдена");
+            }
+
+            button.click();
+            button.click();
+        });
+
+        try {
+            await expect.poll(() => requests.length).toBe(1);
+
+            // Пока запрос выполняется, кнопка заблокирована.
+            await expect(sendButton).toBeDisabled();
+
+            expect(requests).toHaveLength(1);
+
+            expect(requests[0]).toMatchObject({
+                content: message,
+                receiverId: customerUser.id,
+                orderId: "101",
+                orderType: "regular",
+                replyToMessageId: null,
+            });
+
+            expect(requests[0].clientMessageId).toMatch(
+                /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+            );
+        } finally {
+            // Разрешаем серверу ответить,
+            // даже если проверка завершилась ошибкой.
+            releaseResponse();
+        }
+
+        // После ответа сообщение появляется на экране.
+        await expect(
+            page.locator(".chat-message-sent").filter({
+                hasText: message,
+            })
+        ).toHaveCount(1);
+
+        await expect(input).toHaveValue("");
+
+        await expect(sendButton).toBeDisabled();
+
+        // Проверяем, что второго запроса не было.
+        expect(requests).toHaveLength(1);
+    });
+
     test("кнопка Позвонить содержит корректную tel-ссылку", async ({ page }) => {
         const callLink = page.getByRole("link", {
             name: /Позвонить/i,
