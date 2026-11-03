@@ -1,4 +1,11 @@
-import { test, expect } from "@playwright/test";
+const {
+    test,
+    expect,
+} = require("./fixtures/safeTest");
+
+const {
+    mockSuccessfulChatSend,
+} = require("./utils/mockChatSend");
 
 const FRONT_URL = "http://localhost:3000";
 
@@ -6,14 +13,14 @@ const testUser = {
     id: 1,
     username: "executor",
     role: "executor",
-    phone: "+79786864118",
+    phone: "+79990000001",
 };
 
 const customerUser = {
     id: 2,
     username: "Заказчик",
     rating: 4.5,
-    phone: "+79780032978",
+    phone: "+79990000002",
     avatar: null,
 };
 
@@ -111,6 +118,43 @@ async function setupChatMocks(page, options = {}) {
         dispute = null,
     } = options;
 
+    // Яндекс.Карты не загружаем из интернета.
+    await page.route(
+        "https://api-maps.yandex.ru/2.1/**",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/javascript",
+                body: "",
+            });
+        }
+    );
+
+    // Google Fonts также заменяем локальным ответом.
+    await page.route(
+        "https://fonts.googleapis.com/**",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "text/css",
+                body: "",
+            });
+        }
+    );
+
+    // Тестовый пользователь без задолженности.
+    await page.route(
+        "**/api/orders/me/status",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    debt: 0,
+                },
+            });
+        }
+    );
+
     page.on("pageerror", (error) => {
         console.log("[PAGE ERROR]", error.message);
     });
@@ -200,23 +244,91 @@ async function setupChatMocks(page, options = {}) {
         });
     });
 
-    await page.route("**/api/messages/regular/101", async (route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify(messages),
-        });
-    });
+    /*
+ * Новая синхронизация чата.
+ *
+ * Сервер возвращает сообщения,
+ * которые появились после afterId.
+ */
+    await page.route(
+        "**/api/messages/sync/*/101**",
+        async (route) => {
+            const url = new URL(route.request().url());
 
-    await page.route("**/api/messages/express/101", async (route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify(messages),
-        });
-    });
+            const afterId = Number(
+                url.searchParams.get("afterId") || 0
+            );
 
-    await page.route("**/api/disputes/order/101", async (route) => {
+            const batch = messages.filter(
+                (message) => Number(message.id) > afterId
+            );
+
+            const nextCursor = batch.length
+                ? Number(batch[batch.length - 1].id)
+                : afterId;
+
+            await route.fulfill({
+                status: 200,
+                json: {
+                    messages: batch,
+                    nextCursor,
+                    hasMore: false,
+                },
+            });
+        }
+    );
+
+    /*
+     * Проверка прочтения исходящих сообщений.
+     */
+    await page.route(
+        "**/api/messages/read-state/*/101",
+        async (route) => {
+            const url = new URL(route.request().url());
+
+            const orderType =
+                url.pathname.split("/")[4];
+
+            await route.fulfill({
+                status: 200,
+                json: {
+                    orderId: 101,
+                    orderType,
+                    readerId: customerUser.id,
+                    lastReadMessageId: 0,
+                    readAt: null,
+                },
+            });
+        }
+    );
+
+    /*
+     * Подтверждение прочтения входящих сообщений.
+     */
+    await page.route(
+        "**/api/messages/read/*/101",
+        async (route) => {
+            const url = new URL(route.request().url());
+
+            const orderType =
+                url.pathname.split("/")[4];
+
+            const body = route.request().postDataJSON();
+
+            await route.fulfill({
+                status: 200,
+                json: {
+                    orderId: 101,
+                    orderType,
+                    readerId: testUser.id,
+                    lastReadMessageId: body.throughId,
+                    readAt: "2026-07-01T10:20:00.000Z",
+                },
+            });
+        }
+    );
+
+    await page.route("**/api/disputes/order/*/101", async (route) => {
         await route.fulfill({
             status: 200,
             contentType: "application/json",
@@ -391,95 +503,79 @@ test.describe("ChatPage", () => {
     });
 
     test("отправляет сообщение кнопкой", async ({ page }) => {
-        let messageRequestBody = null;
-
-        await page.route("**/api/messages", async (route) => {
-            messageRequestBody = route.request().postDataJSON();
-
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    id: 999,
-                    content: messageRequestBody.content,
-                    senderId: testUser.id,
-                    receiverId: customerUser.id,
-                    orderId: 101,
-                    orderType: "regular",
-                    createdAt: "2026-07-01T10:10:00.000Z",
-                }),
-            });
-        });
+        const requests = await mockSuccessfulChatSend(page, 999);
 
         const input = page.locator(".chat-input");
-        const sendButton = page.locator(".chat-send-button");
 
-        await input.fill("Тестовое сообщение");
+        const sendButton = page.getByRole("button", {
+            name: "Отправить сообщение",
+        });
+
+        await input.fill("  Тестовое сообщение  ");
 
         await expect(sendButton).toBeEnabled();
 
-        await clickSendMessage(page);
+        await sendButton.click();
 
-        await expect
-            .poll(() => messageRequestBody, {
-                timeout: 5000,
-            })
-            .toEqual({
-                content: "Тестовое сообщение",
-                receiverId: customerUser.id,
-                orderId: "101",
-                orderType: "regular",
-            });
+        // Убеждаемся, что POST действительно отправился.
+        await expect.poll(() => requests.length).toBe(1);
 
-        await expect(page.locator(".chat-message-sent").last()).toContainText(
-            "Тестовое сообщение"
+        // Проверяем содержимое запроса.
+        expect(requests[0]).toMatchObject({
+            content: "Тестовое сообщение",
+            receiverId: customerUser.id,
+            orderId: "101",
+            orderType: "regular",
+            replyToMessageId: null,
+        });
+
+        // Каждая отправка должна иметь UUID версии 4.
+        expect(requests[0].clientMessageId).toMatch(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
         );
 
-        await expect(page.locator(".chat-input")).toHaveValue("");
+        // Сообщение должно появиться на экране один раз.
+        await expect(
+            page.locator(".chat-message-sent").filter({
+                hasText: "Тестовое сообщение",
+            })
+        ).toHaveCount(1);
+
+        // После подтверждения поле очищается.
+        await expect(input).toHaveValue("");
     });
 
     test("отправляет сообщение по Enter", async ({ page }) => {
-        let messageRequestBody = null;
+        const requests = await mockSuccessfulChatSend(page, 1000);
 
-        await page.route("**/api/messages", async (route) => {
-            messageRequestBody = route.request().postDataJSON();
+        const input = page.locator(".chat-input");
 
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    id: 1000,
-                    content: messageRequestBody.content,
-                    senderId: testUser.id,
-                    receiverId: customerUser.id,
-                    orderId: 101,
-                    orderType: "regular",
-                    createdAt: "2026-07-01T10:11:00.000Z",
-                }),
-            });
+        await input.fill("Сообщение через Enter");
+
+        await input.press("Enter");
+
+        // Должен произойти ровно один POST.
+        await expect.poll(() => requests.length).toBe(1);
+
+        expect(requests[0]).toMatchObject({
+            content: "Сообщение через Enter",
+            receiverId: customerUser.id,
+            orderId: "101",
+            orderType: "regular",
+            replyToMessageId: null,
         });
 
-        await page.locator(".chat-input").fill("Сообщение через Enter");
-        await page.locator(".chat-input").press("Enter");
-
-        await expect
-            .poll(() => messageRequestBody, {
-                timeout: 5000,
-            })
-            .toEqual({
-                content: "Сообщение через Enter",
-                receiverId: customerUser.id,
-                orderId: "101",
-                orderType: "regular",
-            });
+        expect(requests[0].clientMessageId).toMatch(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        );
 
         await expect(
-            page.locator(".chat-message-sent").last()
-        ).toContainText("Сообщение через Enter");
+            page.locator(".chat-message-sent").filter({
+                hasText: "Сообщение через Enter",
+            })
+        ).toHaveCount(1);
 
-        await expect(page.locator(".chat-message-sent").last()).toContainText(
-            "Сообщение через Enter"
-        );
+        await expect(input).toHaveValue("");
     });
 
     test("Shift+Enter не отправляет сообщение", async ({ page }) => {
