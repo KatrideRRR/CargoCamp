@@ -5,6 +5,7 @@ const {
 
 const {
     mockSuccessfulChatSend,
+    mockChatSendAfterFailure,
 } = require("./utils/mockChatSend");
 
 const FRONT_URL = "http://localhost:3000";
@@ -579,50 +580,153 @@ test.describe("ChatPage", () => {
     });
 
     test("Shift+Enter не отправляет сообщение", async ({ page }) => {
-        let wasMessageSent = false;
+        const requests = await mockSuccessfulChatSend(page, 1001);
 
-        await page.route("**/api/messages", async (route) => {
-            wasMessageSent = true;
+        const input = page.locator(".chat-input");
 
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    id: 1001,
-                    content: "Не должно отправиться",
-                    senderId: testUser.id,
-                    receiverId: customerUser.id,
-                    orderId: 101,
-                    orderType: "regular",
-                    createdAt: "2026-07-01T10:12:00.000Z",
-                }),
-            });
+        const sendButton = page.getByRole("button", {
+            name: "Отправить сообщение",
         });
 
-        await page.locator(".chat-input").fill("Первая строка");
-        await page.locator(".chat-input").press("Shift+Enter");
+        await input.fill("Первая строка");
 
-        await page.waitForTimeout(300);
+        await input.press("Shift+Enter");
 
-        expect(wasMessageSent).toBe(false);
+        // Shift+Enter должен добавить перенос строки.
+        await expect(input).toHaveValue("Первая строка\n");
+
+        // Даём браузеру обработать возможный запрос.
+        await page.waitForTimeout(250);
+
+        // Ни один POST отправляться не должен.
+        expect(requests).toHaveLength(0);
+
+        // Текст остаётся доступным для отправки.
+        await expect(sendButton).toBeEnabled();
     });
 
-    test("показывает ошибку, если отправка сообщения не удалась", async ({ page }) => {
-        await page.route("**/api/messages", async (route) => {
-            await route.fulfill({
-                status: 500,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    message: "Server error",
-                }),
-            });
+    test("после ошибки 500 повторяет сообщение с тем же UUID", async ({ page }) => {
+        const requests = await mockChatSendAfterFailure(page, {
+            firstStatus: 500,
+            firstMessage: "Внутренняя ошибка сервера",
+            messageId: 1002,
         });
 
-        await page.locator(".chat-input").fill("Сообщение с ошибкой");
+        const input = page.locator(".chat-input");
 
-        await clickSendMessage(page);
+        const sendButton = page.getByRole("button", {
+            name: "Отправить сообщение",
+        });
 
-        await expect(page.getByText("Ошибка: Не удалось отправить сообщение.")).toBeVisible();
+        const message = "Сообщение после ошибки сервера";
+
+        await input.fill(message);
+
+        // Первая попытка: сервер отвечает 500.
+        await sendButton.click();
+
+        await expect.poll(() => requests.length).toBe(1);
+
+        await expect(
+            page.locator(".chat-send-status--error")
+        ).toContainText("Нет подтверждения отправки");
+
+        // Текст после ошибки не должен исчезнуть.
+        await expect(input).toHaveValue(message);
+
+        const originalId = requests[0].clientMessageId;
+
+        expect(originalId).toMatch(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        );
+
+        // Вторая попытка: сервер отвечает успешно.
+        await expect(sendButton).toBeEnabled();
+
+        await sendButton.click();
+
+        await expect.poll(() => requests.length).toBe(2);
+
+        // Проверяем, что новый UUID НЕ создавался.
+        expect(requests[1].clientMessageId).toBe(originalId);
+
+        expect(requests[1]).toMatchObject({
+            content: message,
+            receiverId: customerUser.id,
+            orderId: "101",
+            orderType: "regular",
+            replyToMessageId: null,
+        });
+
+        // На экране должно быть одно сообщение.
+        await expect(
+            page.locator(".chat-message-sent").filter({
+                hasText: message,
+            })
+        ).toHaveCount(1);
+
+        // Поле очищается только после подтверждения.
+        await expect(input).toHaveValue("");
+
+        await expect(
+            page.locator(".chat-send-status--error")
+        ).not.toBeVisible();
+    });
+
+    test("после ошибки 400 исправленное сообщение получает новый UUID", async ({ page }) => {
+        const requests = await mockChatSendAfterFailure(page, {
+            firstStatus: 400,
+            firstMessage: "Тестовая ошибка валидации",
+            messageId: 1003,
+        });
+
+        const input = page.locator(".chat-input");
+
+        const sendButton = page.getByRole("button", {
+            name: "Отправить сообщение",
+        });
+
+        // Первая попытка отклоняется сервером.
+        await input.fill("Первоначальный текст");
+
+        await sendButton.click();
+
+        await expect.poll(() => requests.length).toBe(1);
+
+        await expect(
+            page.locator(".chat-send-status--error")
+        ).toContainText("Тестовая ошибка валидации");
+
+        const rejectedId = requests[0].clientMessageId;
+
+        // Пользователь исправляет сообщение.
+        await input.fill("Исправленный текст");
+
+        await expect(sendButton).toBeEnabled();
+
+        await sendButton.click();
+
+        await expect.poll(() => requests.length).toBe(2);
+
+        // После окончательного отклонения
+        // создаётся новое логическое сообщение.
+        expect(requests[1].clientMessageId).not.toBe(rejectedId);
+
+        expect(requests[1]).toMatchObject({
+            content: "Исправленный текст",
+            receiverId: customerUser.id,
+            orderId: "101",
+            orderType: "regular",
+            replyToMessageId: null,
+        });
+
+        await expect(
+            page.locator(".chat-message-sent").filter({
+                hasText: "Исправленный текст",
+            })
+        ).toHaveCount(1);
+
+        await expect(input).toHaveValue("");
     });
 
     test("кнопка Позвонить содержит корректную tel-ссылку", async ({ page }) => {
