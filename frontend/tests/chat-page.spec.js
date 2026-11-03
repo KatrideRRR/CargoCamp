@@ -942,6 +942,205 @@ test.describe("ChatPage", () => {
         expect(requests).toHaveLength(1);
     });
 
+    test("выбирает сообщение для ответа и отменяет цитату", async ({ page }) => {
+        const originalMessage = initialMessages[0];
+
+        const replyButton = page.locator(
+            `.chat-message-row[data-message-id="${originalMessage.id}"] .chat-reply-action`
+        );
+
+        // Выбираем входящее сообщение для ответа.
+        await replyButton.click();
+
+        const composerQuote = page.locator(".chat-compose-reply");
+
+        await expect(composerQuote).toBeVisible();
+
+        // Проверяем автора и текст цитаты.
+        await expect(
+            composerQuote.locator(".chat-reply-quote-author")
+        ).toHaveText(customerUser.username);
+
+        await expect(
+            composerQuote.locator(".chat-reply-quote-text")
+        ).toHaveText(originalMessage.content);
+
+        // Убеждаемся, что цитата сохранена локально.
+        const savedReply = await page.evaluate(() => {
+            const key = Object.keys(localStorage).find(
+                (item) =>
+                    item.startsWith("cc:chat:reply:v1:") &&
+                    item.endsWith(":1:regular:101")
+            );
+
+            return key
+                ? JSON.parse(localStorage.getItem(key))
+                : null;
+        });
+
+        expect(savedReply).toMatchObject({
+            id: originalMessage.id,
+            senderId: originalMessage.senderId,
+            content: originalMessage.content,
+        });
+
+        // Пользователь отменяет ответ.
+        await page.getByRole("button", {
+            name: "Отменить ответ",
+        }).click();
+
+        await expect(composerQuote).not.toBeVisible();
+
+        // Цитата должна удалиться и из localStorage.
+        const hasSavedReply = await page.evaluate(() =>
+            Object.keys(localStorage).some(
+                (key) =>
+                    key.startsWith("cc:chat:reply:v1:") &&
+                    key.endsWith(":1:regular:101")
+            )
+        );
+
+        expect(hasSavedReply).toBe(false);
+    });
+
+    test("отправляет ответ с правильным replyToMessageId", async ({ page }) => {
+        const originalMessage = initialMessages[0];
+
+        const requests = await mockSuccessfulChatSend(
+            page,
+            1006,
+            {
+                replyTo: originalMessage,
+            }
+        );
+
+        // Выбираем сообщение заказчика.
+        await page.locator(
+            `.chat-message-row[data-message-id="${originalMessage.id}"] .chat-reply-action`
+        ).click();
+
+        const composerQuote = page.locator(".chat-compose-reply");
+
+        await expect(composerQuote).toBeVisible();
+
+        const input = page.locator(".chat-input");
+
+        const replyText = "Да, заказ актуален, приступаю к работе";
+
+        await input.fill(replyText);
+
+// Сначала подписываемся на ответ тестового API.
+        const responsePromise = page.waitForResponse(
+            (response) =>
+                new URL(response.url()).pathname === "/api/messages" &&
+                response.request().method() === "POST"
+        );
+
+        await page.getByRole("button", {
+            name: "Отправить сообщение",
+        }).click();
+
+// Проверяем, что вымышленный сервер вернул
+// полноценное сообщение вместе с цитатой.
+        const response = await responsePromise;
+        const savedMessage = await response.json();
+
+        expect(response.status()).toBe(201);
+
+        expect(savedMessage).toMatchObject({
+            id: 1006,
+            replyToMessageId: originalMessage.id,
+
+            replyTo: {
+                id: originalMessage.id,
+                senderId: originalMessage.senderId,
+                content: originalMessage.content,
+            },
+        });
+
+        // Проверяем единственный HTTP-запрос.
+        await expect.poll(() => requests.length).toBe(1);
+
+        expect(requests[0]).toMatchObject({
+            content: replyText,
+            receiverId: customerUser.id,
+            orderId: "101",
+            orderType: "regular",
+            replyToMessageId: originalMessage.id,
+        });
+
+        // Сообщение имеет уникальный UUID.
+        expect(requests[0].clientMessageId).toMatch(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        );
+
+        // Отправленное сообщение появилось на экране.
+        const sentMessage = page.locator(
+            '.chat-message-row[data-message-id="1006"]'
+        );
+
+        await expect(sentMessage).toContainText(replyText);
+
+        // У отправленного сообщения должна остаться цитата.
+        await expect(
+            sentMessage.locator(".chat-reply-quote")
+        ).toContainText(originalMessage.content);
+
+        // После подтверждения выбранная цитата исчезает
+        // из поля создания следующего сообщения.
+        await expect(composerQuote).not.toBeVisible();
+
+        await expect(input).toHaveValue("");
+
+        // Проверяем отсутствие дублирования.
+        await expect(
+            page.locator(".chat-message-sent").filter({
+                hasText: replyText,
+            })
+        ).toHaveCount(1);
+    });
+
+    test("сохраняет выбранную цитату после перезагрузки страницы", async ({ page }) => {
+        const originalMessage = initialMessages[0];
+
+        // Выбираем сообщение для ответа.
+        await page.locator(
+            `.chat-message-row[data-message-id="${originalMessage.id}"] .chat-reply-action`
+        ).click();
+
+        const composerQuote = page.locator(".chat-compose-reply");
+
+        await expect(composerQuote).toBeVisible();
+
+        await expect(
+            composerQuote.locator(".chat-reply-quote-text")
+        ).toHaveText(originalMessage.content);
+
+        // Перезагружаем приложение.
+        await page.reload({
+            waitUntil: "domcontentloaded",
+        });
+
+        // Цитата должна восстановиться автоматически.
+        await expect(composerQuote).toBeVisible();
+
+        await expect(
+            composerQuote.locator(".chat-reply-quote-author")
+        ).toHaveText(customerUser.username);
+
+        await expect(
+            composerQuote.locator(".chat-reply-quote-text")
+        ).toHaveText(originalMessage.content);
+
+        // Проверяем, что можно отменить
+        // восстановленную цитату.
+        await page.getByRole("button", {
+            name: "Отменить ответ",
+        }).click();
+
+        await expect(composerQuote).not.toBeVisible();
+    });
+
     test("кнопка Позвонить содержит корректную tel-ссылку", async ({ page }) => {
         const callLink = page.getByRole("link", {
             name: /Позвонить/i,

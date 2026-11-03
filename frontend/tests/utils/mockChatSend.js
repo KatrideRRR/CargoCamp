@@ -1,4 +1,8 @@
-async function mockSuccessfulChatSend(page, messageId) {
+async function mockSuccessfulChatSend(
+    page,
+    messageId,
+    { replyTo = null } = {}
+) {
     const requests = [];
 
     await page.route("**/api/messages", async (route) => {
@@ -18,21 +22,47 @@ async function mockSuccessfulChatSend(page, messageId) {
 
         requests.push(body);
 
-        // Имитируем успешное сохранение сообщения.
+        const replyToMessageId =
+            body.replyToMessageId == null
+                ? null
+                : Number(body.replyToMessageId);
+
+        const replyToMessage =
+            replyToMessageId &&
+            Number(replyTo?.id) === replyToMessageId
+                ? {
+                    id: Number(replyTo.id),
+                    senderId: replyTo.senderId,
+                    content: replyTo.content,
+                    createdAt: replyTo.createdAt,
+                }
+                : null;
+
+        const savedMessage = {
+            id: messageId,
+            content: body.content,
+
+            senderId: 1,
+            receiverId: Number(body.receiverId),
+
+            orderId: Number(body.orderId),
+            orderType: body.orderType,
+
+            clientMessageId: body.clientMessageId,
+
+            // Связь с исходным сообщением
+            replyToMessageId,
+
+            // Содержимое цитируемого сообщения
+            replyTo: replyToMessage,
+
+            createdAt: "2026-07-01T10:10:00.000Z",
+            readAt: null,
+        };
+
         await route.fulfill({
             status: 201,
-            json: {
-                id: messageId,
-                content: body.content,
-                senderId: 1,
-                receiverId: Number(body.receiverId),
-                orderId: Number(body.orderId),
-                orderType: body.orderType,
-                clientMessageId: body.clientMessageId,
-                replyToMessageId: body.replyToMessageId,
-                createdAt: "2026-07-01T10:10:00.000Z",
-                readAt: null,
-            },
+            json: savedMessage,
         });
     });
 
