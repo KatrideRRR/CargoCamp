@@ -73,6 +73,7 @@ async function mockChatSendAfterFailure(page, {
     firstStatus = 500,
     firstMessage = "Тестовая ошибка сервера",
     messageId = 1002,
+    replyTo = null,
 } = {}) {
     const requests = [];
 
@@ -116,6 +117,18 @@ async function mockChatSendAfterFailure(page, {
                 orderType: body.orderType,
                 clientMessageId: body.clientMessageId,
                 replyToMessageId: body.replyToMessageId,
+
+                replyTo:
+                    body.replyToMessageId != null &&
+                    Number(body.replyToMessageId) === Number(replyTo?.id)
+                        ? {
+                            id: Number(replyTo.id),
+                            senderId: replyTo.senderId,
+                            content: replyTo.content,
+                            createdAt: replyTo.createdAt,
+                        }
+                        : null,
+
                 createdAt: "2026-07-01T10:15:00.000Z",
                 readAt: null,
             },

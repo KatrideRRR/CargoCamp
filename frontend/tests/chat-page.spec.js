@@ -1141,6 +1141,184 @@ test.describe("ChatPage", () => {
         await expect(composerQuote).not.toBeVisible();
     });
 
+    test("после ошибки 500 сохраняет цитату и UUID ответа", async ({ page }) => {
+        const originalMessage = initialMessages[0];
+
+        const requests = await mockChatSendAfterFailure(page, {
+            firstStatus: 500,
+            firstMessage: "Временная ошибка сервера",
+            messageId: 1007,
+            replyTo: originalMessage,
+        });
+
+        const originalRow = page.locator(
+            `.chat-message-row[data-message-id="${originalMessage.id}"]`
+        );
+
+        await originalRow.locator(".chat-reply-action").click();
+
+        const composerQuote = page.locator(".chat-compose-reply");
+
+        await expect(composerQuote).toContainText(
+            originalMessage.content
+        );
+
+        const input = page.locator(".chat-input");
+
+        const sendButton = page.getByRole("button", {
+            name: "Отправить сообщение",
+        });
+
+        const message = "Ответ после временной ошибки";
+
+        await input.fill(message);
+
+        // Первая отправка завершается ошибкой 500.
+        await sendButton.click();
+
+        await expect.poll(() => requests.length).toBe(1);
+
+        await expect(
+            page.locator(".chat-send-status--error")
+        ).toContainText("Нет подтверждения отправки");
+
+        // Цитата и текст не должны исчезнуть.
+        await expect(composerQuote).toBeVisible();
+        await expect(input).toHaveValue(message);
+
+        const originalUUID = requests[0].clientMessageId;
+
+        expect(requests[0].replyToMessageId).toBe(
+            originalMessage.id
+        );
+
+        // Проверяем сохранённую неподтверждённую отправку.
+        const pending = await page.evaluate(() => {
+            const key = Object.keys(localStorage).find(
+                (item) =>
+                    item.startsWith("cc:chat:pending:v1:") &&
+                    item.endsWith(":1:regular:101")
+            );
+
+            return key
+                ? JSON.parse(localStorage.getItem(key))
+                : null;
+        });
+
+        expect(pending).toMatchObject({
+            content: message,
+            clientMessageId: originalUUID,
+            replyToMessageId: originalMessage.id,
+        });
+
+        // Вторая попытка успешно подтверждается.
+        await expect(sendButton).toBeEnabled();
+        await sendButton.click();
+
+        await expect.poll(() => requests.length).toBe(2);
+
+        // UUID и связь с исходным сообщением сохраняются.
+        expect(requests[1].clientMessageId).toBe(originalUUID);
+
+        expect(requests[1]).toMatchObject({
+            content: message,
+            receiverId: customerUser.id,
+            orderId: "101",
+            orderType: "regular",
+            replyToMessageId: originalMessage.id,
+        });
+
+        // Отправленный ответ содержит исходную цитату.
+        const sentMessage = page.locator(
+            '.chat-message-row[data-message-id="1007"]'
+        );
+
+        await expect(sentMessage).toContainText(message);
+
+        await expect(
+            sentMessage.locator(".chat-reply-quote-text")
+        ).toHaveText(originalMessage.content);
+
+        // Повтор не создаёт вторую копию сообщения.
+        await expect(
+            page.locator(".chat-message-sent").filter({
+                hasText: message,
+            })
+        ).toHaveCount(1);
+
+        // После подтверждения очищаются поле и выбранная цитата.
+        await expect(input).toHaveValue("");
+        await expect(composerQuote).not.toBeVisible();
+
+        // Неподтверждённая отправка удаляется из хранилища.
+        await expect.poll(() =>
+            page.evaluate(() =>
+                Object.keys(localStorage).some(
+                    (key) =>
+                        key.startsWith("cc:chat:pending:v1:") &&
+                        key.endsWith(":1:regular:101")
+                )
+            )
+        ).toBe(false);
+    });
+
+    test("по нажатию на цитату выделяет исходное сообщение", async ({ page }) => {
+        const originalMessage = initialMessages[0];
+
+        const requests = await mockSuccessfulChatSend(
+            page,
+            1008,
+            {
+                replyTo: originalMessage,
+            }
+        );
+
+        // Отвечаем на первое сообщение.
+        const originalRow = page.locator(
+            `.chat-message-row[data-message-id="${originalMessage.id}"]`
+        );
+
+        await originalRow.locator(".chat-reply-action").click();
+
+        const replyText = "Проверяем переход к исходному сообщению";
+
+        await page.locator(".chat-input").fill(replyText);
+
+        await page.getByRole("button", {
+            name: "Отправить сообщение",
+        }).click();
+
+        await expect.poll(() => requests.length).toBe(1);
+
+        // Убеждаемся, что ответ отобразился.
+        const sentMessage = page.locator(
+            '.chat-message-row[data-message-id="1008"]'
+        );
+
+        await expect(sentMessage).toContainText(replyText);
+
+        const quote = sentMessage.locator(".chat-reply-quote");
+
+        await expect(quote).toContainText(
+            originalMessage.content
+        );
+
+        // Нажимаем цитату внутри отправленного сообщения.
+        await quote.click();
+
+        // Исходное сообщение должно получить
+        // временное визуальное выделение.
+        await expect(originalRow).toHaveClass(
+            /chat-message-highlight/,
+            {
+                timeout: 1000,
+            }
+        );
+
+        // При переходе не должны создаваться новые сообщения.
+        expect(requests).toHaveLength(1);
+    });
+
     test("кнопка Позвонить содержит корректную tel-ссылку", async ({ page }) => {
         const callLink = page.getByRole("link", {
             name: /Позвонить/i,
