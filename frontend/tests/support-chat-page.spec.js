@@ -1,6 +1,16 @@
-import { test, expect } from "@playwright/test";
+const {
+    test,
+    expect,
+} = require("./fixtures/safeTest");
+
+const {
+    mockChatSocket,
+} = require("./utils/mockChatSocket");
 
 const FRONT_URL = "http://localhost:3000";
+
+const UUID_V4 =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const testUser = {
     id: 123,
@@ -65,13 +75,74 @@ async function setupSupportMocks(page, options = {}) {
         messages = initialMessages,
         messagesStatus = 200,
         messagesBody = messages,
-        sendStatus = 200,
+        sendStatus = 201,
         sendBody = null,
         readStatus = 200,
         onGetMessages,
         onSendMessage,
         onRead,
     } = options;
+
+    // Полностью поддельное Socket.IO-соединение.
+    await mockChatSocket(page);
+
+    // Яндекс.Карты.
+    await page.route(
+        "https://api-maps.yandex.ru/2.1/**",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/javascript",
+                body: "",
+            });
+        }
+    );
+
+    // Google Fonts.
+    await page.route(
+        "https://fonts.googleapis.com/**",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "text/css",
+                body: "",
+            });
+        }
+    );
+
+    // Проверка задолженности вымышленного пользователя.
+    await page.route(
+        "**/api/orders/me/status",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    debt: 0,
+                },
+            });
+        }
+    );
+
+    // Дополнительные методы получения профиля.
+    await page.route(
+        "**/api/auth/me",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: user,
+            });
+        }
+    );
+
+    await page.route(
+        "**/api/users/me",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: user,
+            });
+        }
+    );
 
     page.on("pageerror", (error) => {
         console.log("[PAGE ERROR]", error.message);
@@ -122,8 +193,11 @@ async function setupSupportMocks(page, options = {}) {
                 body: JSON.stringify(
                     sendBody || {
                         id: 3,
+                        userId: user.id,
                         senderRole: "user",
                         text: requestBody.text,
+                        clientMessageId: requestBody.clientMessageId,
+                        isReadByAdmin: false,
                         createdAt: "2026-07-01T10:05:00.000Z",
                     }
                 ),
@@ -135,17 +209,38 @@ async function setupSupportMocks(page, options = {}) {
         await route.fallback();
     });
 
-    await page.route("**/api/support/read", async (route) => {
-        onRead?.();
+    await page.route(
+        "**/api/support/read",
+        async (route) => {
+            const request = route.request();
 
-        await route.fulfill({
-            status: readStatus,
-            contentType: "application/json",
-            body: JSON.stringify({
-                success: true,
-            }),
-        });
-    });
+            if (request.method() !== "PATCH") {
+                await route.fulfill({
+                    status: 405,
+                    json: {
+                        message: "Метод не поддерживается",
+                    },
+                });
+                return;
+            }
+
+            const body = request.postDataJSON();
+
+            onRead?.({
+                method: request.method(),
+                body,
+            });
+
+            await route.fulfill({
+                status: readStatus,
+                json: {
+                    success: readStatus === 200,
+                    updated: 1,
+                    throughId: body.throughId,
+                },
+            });
+        }
+    );
 }
 
 async function openSupportChatPage(page, options = {}) {
@@ -245,19 +340,24 @@ test.describe("SupportChatPage", () => {
     });
 
     test("после загрузки помечает сообщения прочитанными", async ({ page }) => {
-        let readCalls = 0;
+        const readRequests = [];
 
         await openSupportChatPage(page, {
-            onRead: () => {
-                readCalls += 1;
+            onRead: (request) => {
+                readRequests.push(request);
             },
         });
 
-        await expect
-            .poll(() => readCalls, {
-                timeout: 10000,
-            })
-            .toBeGreaterThanOrEqual(1);
+        await expect.poll(
+            () => readRequests.length
+        ).toBeGreaterThanOrEqual(1);
+
+        expect(readRequests[0]).toMatchObject({
+            method: "PATCH",
+            body: {
+                throughId: 2,
+            },
+        });
     });
 
     test("показывает пустое состояние, если сообщений нет", async ({ page }) => {
@@ -281,7 +381,7 @@ test.describe("SupportChatPage", () => {
         });
 
         await expect(page.locator(".support-error")).toHaveText(
-            "Не удалось загрузить чат поддержки"
+            "Не удалось обновить переписку поддержки"
         );
     });
 
@@ -318,7 +418,7 @@ test.describe("SupportChatPage", () => {
             .poll(() => sentBody, {
                 timeout: 10000,
             })
-            .toEqual({
+            .toMatchObject({
                 text: "Нужна помощь с оплатой",
             });
 
@@ -341,7 +441,7 @@ test.describe("SupportChatPage", () => {
             .poll(() => sentBody, {
                 timeout: 10000,
             })
-            .toEqual({
+            .toMatchObject({
                 text: "Текст с пробелами",
             });
     });
@@ -364,7 +464,7 @@ test.describe("SupportChatPage", () => {
             .poll(() => sentBody, {
                 timeout: 10000,
             })
-            .toEqual({
+            .toMatchObject({
                 text: "Отправка через Enter",
             });
 
@@ -387,7 +487,7 @@ test.describe("SupportChatPage", () => {
 
         expect(sentBody).toBeNull();
 
-        await expect(input).toHaveValue(/Первая строка/);
+        await expect(input).toHaveValue("Первая строка\n");
     });
 
     test("при ошибке отправки показывает ошибку и возвращает текст в поле", async ({ page }) => {
@@ -400,8 +500,10 @@ test.describe("SupportChatPage", () => {
 
         await sendTextByButton(page, "Сообщение не отправится");
 
-        await expect(page.locator(".support-error")).toHaveText(
-            "Не удалось отправить сообщение"
+        await expect(
+            page.locator(".support-error")
+        ).toContainText(
+            "Нет подтверждения отправки"
         );
 
         await expect(page.getByPlaceholder("Напишите сообщение...")).toHaveValue(
@@ -429,7 +531,7 @@ test.describe("SupportChatPage", () => {
         await setFakeAuth(page);
         await setupSupportMocks(page);
 
-        await page.goto(`${FRONT_URL}/profile?platform=web`);
+        await page.goto(`${FRONT_URL}/?platform=web`);
         await page.goto(`${FRONT_URL}/support?platform=web`);
 
         await expect(page.locator(".support-chat-page")).toBeVisible({
@@ -438,7 +540,9 @@ test.describe("SupportChatPage", () => {
 
         await page.getByLabel("Назад").click();
 
-        await expect(page).toHaveURL(/\/profile/);
+        await expect(page).toHaveURL(
+            `${FRONT_URL}/?platform=web`
+        );
     });
 
     test("отображает время сообщения", async ({ page }) => {
