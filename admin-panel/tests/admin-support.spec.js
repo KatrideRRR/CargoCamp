@@ -1,4 +1,14 @@
-import { test, expect } from "@playwright/test";
+const {
+    test,
+    expect,
+} = require("./fixtures/safeTest");
+
+const {
+    mockAdminSocket,
+} = require("./utils/mockAdminSocket");
+
+const UUID_V4 =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const FRONT_URL = "http://localhost:3001";
 
@@ -65,28 +75,60 @@ const messagesByUser = {
 };
 
 async function setAdminAuth(page) {
-    await page.addInitScript(() => {
-        const adminUser = {
-            id: 1,
-            username: "admin",
-            name: "admin",
+    const adminUser = {
+        id: 1,
+        username: "test-admin",
+        name: "Тестовый администратор",
+        role: "admin",
+        isAdmin: true,
+    };
+
+    const encode = (value) =>
+        Buffer.from(JSON.stringify(value))
+            .toString("base64url");
+
+    const token = [
+        encode({
+            alg: "none",
+            typ: "JWT",
+        }),
+        encode({
+            id: adminUser.id,
             role: "admin",
-            isAdmin: true,
-        };
+            exp:
+                Math.floor(Date.now() / 1000) +
+                24 * 60 * 60,
+        }),
+        "",
+    ].join(".");
 
-        const token = "admin-test-token";
+    await page.addInitScript(
+        ({ token, adminUser }) => {
+            localStorage.setItem("authToken", token);
+            localStorage.setItem("adminToken", token);
+            localStorage.setItem("token", token);
+            localStorage.setItem("userRole", "admin");
 
-        localStorage.setItem("authToken", token);
-        localStorage.setItem("adminToken", token);
-        localStorage.setItem("token", token);
+            localStorage.setItem(
+                "user",
+                JSON.stringify(adminUser)
+            );
 
-        // ВАЖНО: это проверяет PrivateRoute в admin-panel
-        localStorage.setItem("userRole", "admin");
+            localStorage.setItem(
+                "adminUser",
+                JSON.stringify(adminUser)
+            );
 
-        localStorage.setItem("user", JSON.stringify(adminUser));
-        localStorage.setItem("adminUser", JSON.stringify(adminUser));
-        localStorage.setItem("currentUser", JSON.stringify(adminUser));
-    });
+            localStorage.setItem(
+                "currentUser",
+                JSON.stringify(adminUser)
+            );
+        },
+        {
+            token,
+            adminUser,
+        }
+    );
 }
 
 async function setupMocks(page, options = {}) {
@@ -95,12 +137,15 @@ async function setupMocks(page, options = {}) {
         chatsBody = chats,
         messagesStatus = 200,
         messagesMap = messagesByUser,
-        sendStatus = 200,
+        sendStatus = 201,
         sendBody = {
             id: 99,
             text: "Ответ администратора",
             senderRole: "admin",
             createdAt: "2026-07-01T10:25:00.000Z",
+            userId: 101,
+            senderId: 1,
+            isReadByUser: false,
             sender: {
                 username: "Администратор",
             },
@@ -110,6 +155,32 @@ async function setupMocks(page, options = {}) {
         onFetchChats,
         onFetchMessages,
     } = options;
+
+    const socketConnections = await mockAdminSocket(page);
+
+    options.onSocketConnections?.(socketConnections);
+
+    await page.route(
+        "https://fonts.googleapis.com/**",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "text/css",
+                body: "",
+            });
+        }
+    );
+
+    await page.route(
+        "https://api-maps.yandex.ru/2.1/**",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/javascript",
+                body: "",
+            });
+        }
+    );
 
     page.on("pageerror", (error) => {
         console.log("[PAGE ERROR]", error.message);
@@ -179,21 +250,45 @@ async function setupMocks(page, options = {}) {
         await route.fallback();
     });
 
-    await page.route("**/api/admin/support/chats/*/read", async (route) => {
-        const url = route.request().url();
-        const match = url.match(/\/admin\/support\/chats\/(\d+)\/read/);
-        const userId = match?.[1];
+    await page.route(
+        "**/api/admin/support/chats/*/read",
+        async (route) => {
+            const request = route.request();
 
-        onRead?.(Number(userId));
+            const match = request.url().match(
+                /\/admin\/support\/chats\/(\d+)\/read/
+            );
 
-        await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify({
-                success: true,
-            }),
-        });
-    });
+            const userId = Number(match?.[1]);
+
+            if (request.method() !== "PATCH") {
+                await route.fulfill({
+                    status: 405,
+                    json: {
+                        message: "Метод не поддерживается",
+                    },
+                });
+                return;
+            }
+
+            const body = request.postDataJSON();
+
+            onRead?.({
+                userId,
+                method: "PATCH",
+                body,
+            });
+
+            await route.fulfill({
+                status: 200,
+                json: {
+                    success: true,
+                    updated: 1,
+                    throughId: body.throughId,
+                },
+            });
+        }
+    );
 }
 
 async function openSupportPage(page, options = {}) {
@@ -286,16 +381,18 @@ test.describe("AdminSupportPage", () => {
         const readCalls = [];
 
         await openSupportPage(page, {
-            onRead: (userId) => {
-                readCalls.push(userId);
+            onRead: (request) => {
+                readCalls.push(request);
             },
         });
 
-        await expect
-            .poll(() => readCalls, {
-                timeout: 10000,
-            })
-            .toContain(101);
+        await expect.poll(() =>
+            readCalls.some((request) =>
+                request.userId === 101 &&
+                request.method === "PATCH" &&
+                request.body.throughId === 1
+            )
+        ).toBe(true);
 
         await expect(
             page.locator(".admin-support-chat-item").first().locator(".admin-support-unread")
@@ -341,12 +438,15 @@ test.describe("AdminSupportPage", () => {
             .poll(() => sentPayload, {
                 timeout: 10000,
             })
-            .toEqual({
+            .toMatchObject({
                 userId: 101,
                 body: {
                     text: "Ответ администратора",
                 },
             });
+        expect(
+            sentPayload.body.clientMessageId
+        ).toMatch(UUID_V4);
 
         await expect(textarea).toHaveValue("");
         await expect(page.locator(".admin-support-message-row.mine").last()).toContainText(
@@ -381,12 +481,15 @@ test.describe("AdminSupportPage", () => {
             .poll(() => sentPayload, {
                 timeout: 10000,
             })
-            .toEqual({
+            .toMatchObject({
                 userId: 101,
                 body: {
                     text: "Ответ через Enter",
                 },
             });
+        expect(
+            sentPayload.body.clientMessageId
+        ).toMatch(UUID_V4);
 
         await expect(page.locator(".admin-support-message-row.mine").last()).toContainText(
             "Ответ через Enter"
@@ -451,7 +554,7 @@ test.describe("AdminSupportPage", () => {
         }).click();
 
         await expect(page.locator(".admin-support-error")).toHaveText(
-            "Не удалось отправить ответ"
+            "Нет подтверждения отправки. Повторите отправку того же текста."
         );
 
         await expect(textarea).toHaveValue("Не отправилось");
@@ -526,7 +629,7 @@ test.describe("AdminSupportPage", () => {
         });
 
         await expect(page.locator(".admin-support-error")).toHaveText(
-            "Не удалось загрузить сообщения"
+            "Не удалось обновить переписку"
         );
     });
 
