@@ -1,0 +1,30 @@
+services:
+  mysql:
+    image: mysql:8.4
+
+    hostname: cc-chat-mysql-test
+
+    environment:
+      MYSQL_ROOT_PASSWORD: cc_test_root_local_only
+      MYSQL_DATABASE: cc_chat_test_only
+      MYSQL_USER: cc_chat_test
+      MYSQL_PASSWORD: cc_chat_test_local_only
+
+    ports:
+      - "127.0.0.1:13316:3306"
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          mysql --protocol=tcp
+          -h 127.0.0.1
+          -u cc_chat_test
+          -pcc_chat_test_local_only
+          cc_chat_test_only
+          -e 'SELECT 1'
+          >/dev/null 2>&1
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
