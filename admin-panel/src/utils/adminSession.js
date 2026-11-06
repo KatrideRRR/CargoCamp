@@ -104,12 +104,17 @@ export async function refreshAdminSession() {
     return refreshPromise;
 }
 
-export function redirectToAdminLogin() {
+export function redirectToAdminLogin(reason = "expired") {
+    const loginReason =
+        reason === "access_revoked"
+            ? "access_revoked"
+            : "expired";
+
     clearAdminSession();
 
     if (window.location.pathname !== "/login") {
         window.location.replace(
-            "/login?reason=expired"
+            `/login?reason=${loginReason}`
         );
     }
 }
