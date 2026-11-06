@@ -156,7 +156,7 @@ function pepCell(page) {
         .locator(".users-table tbody tr")
         .first()
         .locator("td")
-        .nth(6);
+        .nth(5);
 }
 
 function revokeButton(page) {

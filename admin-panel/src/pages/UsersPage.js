@@ -875,34 +875,6 @@ function UsersPage() {
                                             : "—"}
                                     </td>
 
-                                    <td>
-                                        <button
-                                            className={`verify-button ${
-                                                user.userStatus ===
-                                                "verified"
-                                                    ? "verified"
-                                                    : user.userStatus ===
-                                                    "pensioner"
-                                                        ? "pensioner"
-                                                        : "unverified"
-                                            }`}
-                                            onClick={() =>
-                                                toggleVerification(
-                                                    user.id,
-                                                    user.userStatus
-                                                )
-                                            }
-                                        >
-                                            {user.userStatus ===
-                                            "verified"
-                                                ? "Верифицирован"
-                                                : user.userStatus ===
-                                                "pensioner"
-                                                    ? "Пенсионер"
-                                                    : "Не верифицирован"}
-                                        </button>
-                                    </td>
-
 
                                     <td>
                                         {(() => {

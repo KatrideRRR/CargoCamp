@@ -275,6 +275,48 @@ test.describe("UsersPage", () => {
         await expect(page.locator(".users-table")).toBeVisible();
     });
 
+    test("заголовки таблицы соответствуют данным пользователей", async ({ page }) => {
+        await openUsersPage(page);
+
+        const headers = page.locator(
+            ".users-table thead th"
+        );
+
+        const firstRow = rows(page).first();
+
+        await expect(headers).toHaveText([
+            "ID",
+            "Имя",
+            "Телефон",
+            "Дата регистрации",
+            "Рейтинг",
+            "ПЭП",
+            "Роль",
+            "Премиум",
+            "Автомобиль",
+            "Действия",
+        ]);
+
+        await expect(
+            firstRow.locator("td")
+        ).toHaveCount(10);
+
+        // Шестая колонка — ПЭП.
+        await expect(
+            firstRow.locator("td").nth(5)
+        ).toContainText("Не подключена");
+
+        // Седьмая колонка — роль пользователя.
+        await expect(
+            firstRow.locator("td").nth(6)
+        ).toContainText("Пользователь");
+
+        // Старого управления статусами больше нет.
+        await expect(
+            page.locator(".verify-button")
+        ).toHaveCount(0);
+    });
+
     test("запрашивает пользователей с authToken", async ({ page }) => {
         let usersRequest = null;
 
@@ -307,18 +349,15 @@ test.describe("UsersPage", () => {
         await expect(rows(page).nth(0)).toContainText("Аким");
         await expect(rows(page).nth(0)).toContainText("+79781114567");
         await expect(rows(page).nth(0)).toContainText("4.8");
-        await expect(rows(page).nth(0)).toContainText("Не верифицирован");
 
         await expect(rows(page).nth(1)).toContainText("2");
         await expect(rows(page).nth(1)).toContainText("Иван");
         await expect(rows(page).nth(1)).toContainText("+79990001122");
         await expect(rows(page).nth(1)).toContainText("5.0");
-        await expect(rows(page).nth(1)).toContainText("Пенсионер");
 
         await expect(rows(page).nth(2)).toContainText("3");
         await expect(rows(page).nth(2)).toContainText("Бан Пользователь");
         await expect(rows(page).nth(2)).toContainText("—");
-        await expect(rows(page).nth(2)).toContainText("Верифицирован");
     });
 
     test("загружает счётчики документов жалоб и заказов", async ({ page }) => {
@@ -499,102 +538,6 @@ test.describe("UsersPage", () => {
         await expect(rows(page).nth(2).getByRole("button", {
             name: "Блок",
         })).toBeVisible();
-    });
-
-    test("переключает верификацию unverified -> pensioner", async ({ page }) => {
-        let verifyRequest = null;
-
-        await openUsersPage(page, {
-            onVerify: (data) => {
-                verifyRequest = data;
-            },
-        });
-
-        await rows(page).nth(0).getByRole("button", {
-            name: "Не верифицирован",
-        }).click();
-
-        await expect
-            .poll(() => verifyRequest, {
-                timeout: 10000,
-            })
-            .toEqual(
-                expect.objectContaining({
-                    id: 1,
-                    body: {
-                        userStatus: "pensioner",
-                    },
-                    headers: expect.objectContaining({
-                        authorization: `Bearer ${ADMIN_TEST_TOKEN}`,
-                    }),
-                })
-            );
-
-        await expect(rows(page).nth(0).getByRole("button", {
-            name: "Пенсионер",
-        })).toHaveClass(/pensioner/);
-    });
-
-    test("переключает верификацию pensioner -> verified", async ({ page }) => {
-        let verifyRequest = null;
-
-        await openUsersPage(page, {
-            onVerify: (data) => {
-                verifyRequest = data;
-            },
-        });
-
-        await rows(page).nth(1).getByRole("button", {
-            name: "Пенсионер",
-        }).click();
-
-        await expect
-            .poll(() => verifyRequest, {
-                timeout: 10000,
-            })
-            .toEqual(
-                expect.objectContaining({
-                    id: 2,
-                    body: {
-                        userStatus: "verified",
-                    },
-                })
-            );
-
-        await expect(rows(page).nth(1).getByRole("button", {
-            name: "Верифицирован",
-        })).toHaveClass(/verified/);
-    });
-
-    test("переключает верификацию verified -> unverified", async ({ page }) => {
-        let verifyRequest = null;
-
-        await openUsersPage(page, {
-            onVerify: (data) => {
-                verifyRequest = data;
-            },
-        });
-
-        await rows(page).nth(2).getByRole("button", {
-            name: "Верифицирован",
-        }).click();
-
-        await expect
-            .poll(() => verifyRequest, {
-                timeout: 10000,
-            })
-            .toEqual(
-                expect.objectContaining({
-                    id: 3,
-                    body: {
-                        userStatus: "unverified",
-                    },
-                })
-            );
-
-        await expect(rows(page).nth(2).getByRole("button", {
-            name: "Не верифицирован",
-        })).toHaveClass(/unverified/);
     });
 
     test("если users API вернул ошибку, таблица остаётся пустой", async ({ page }) => {
