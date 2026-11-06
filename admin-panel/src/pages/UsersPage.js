@@ -939,12 +939,24 @@ function UsersPage() {
                                                                 "Причина повторной проверки ПЭП:"
                                                             );
 
-                                                            if (!reason) return;
+                                                            if (reason === null) return;
+
+                                                            const cleanReason = reason.trim();
+
+                                                            if (
+                                                                cleanReason.length < 10 ||
+                                                                cleanReason.length > 255
+                                                            ) {
+                                                                window.alert(
+                                                                    "Причина отзыва ПЭП должна содержать от 10 до 255 символов"
+                                                                );
+                                                                return;
+                                                            }
 
                                                             try {
                                                                 await axios.post(
                                                                     `${apiUrl}/api/admin/pep/${user.id}/revoke`,
-                                                                    { reason },
+                                                                    { reason: cleanReason },
                                                                     {
                                                                         headers: {
                                                                             Authorization: `Bearer ${token}`,
