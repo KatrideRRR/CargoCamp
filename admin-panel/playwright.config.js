@@ -32,6 +32,8 @@ module.exports = defineConfig({
             BROWSER: "none",
             REACT_APP_API_URL: FAKE_API_URL,
             REACT_APP_SOCKET_URL: FAKE_API_URL,
+            REACT_APP_YANDEX_API_KEY: "playwright-test-only-key",
+
         },
     },
 
