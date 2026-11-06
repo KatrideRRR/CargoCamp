@@ -9,6 +9,9 @@ const bcrypt = require("bcrypt");
 const {calculateRecommendedPrice,} = require("../services/recommendedPriceService");
 const {createAuthSession, refreshAuthSession, revokeAuthSession,} = require("../services/authSessionService");
 const {validateAdminSessionOrigin, getAdminRefreshToken, setAdminRefreshCookie, clearAdminRefreshCookie,} = require("../utils/adminSessionCookie");
+const {
+    getAdminSelfActionError,
+} = require("../utils/adminRoleSafety");
 
 const geocoder = NodeGeocoder({provider: "openstreetmap",});
 
@@ -1262,6 +1265,18 @@ router.put('/users/:id/block', authMiddleware, adminMiddleware, async (req, res)
         const user = await User.findByPk(req.params.id);
         if (!user) return res.status(404).json({ message: 'Пользователь не найден' });
 
+        const safetyError = getAdminSelfActionError({
+            actorId: req.user.id,
+            targetUser: user,
+            nextRole: "banned",
+        });
+
+        if (safetyError) {
+            return res.status(403).json({
+                message: safetyError,
+            });
+        }
+
         user.role = 'banned';
         await user.save();
 
@@ -1308,6 +1323,18 @@ router.put("/users/:id/role", authMiddleware, adminMiddleware, async (req, res) 
                 return res.status(400).json({
                     message:
                         "Сначала разблокируйте пользователя",
+                });
+            }
+
+            const safetyError = getAdminSelfActionError({
+                actorId: req.user.id,
+                targetUser: user,
+                nextRole: role,
+            });
+
+            if (safetyError) {
+                return res.status(403).json({
+                    message: safetyError,
                 });
             }
 
