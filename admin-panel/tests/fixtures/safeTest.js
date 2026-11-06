@@ -35,6 +35,36 @@ const test = base.extend({
                 await route.abort("blockedbyclient");
             });
 
+            await context.routeWebSocket(
+                "**/*",
+                (webSocket) => {
+                    const url = new URL(webSocket.url());
+
+                    // Разрешаем только служебный WebSocket
+                    // локального React Dev Server.
+                    if (
+                        url.protocol === "ws:" &&
+                        url.hostname === "localhost" &&
+                        url.port === "3001" &&
+                        url.pathname === "/ws"
+                    ) {
+                        webSocket.connectToServer();
+                        return;
+                    }
+
+                    // Любые остальные WebSocket-соединения
+                    // должны быть явно замоканы в тестах.
+                    unexpectedRequests.push(
+                        `WEBSOCKET ${webSocket.url()}`
+                    );
+
+                    webSocket.close({
+                        code: 1008,
+                        reason: "Blocked by isolated Playwright test",
+                    });
+                }
+            );
+
             await use();
 
             expect(

@@ -1,13 +1,15 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/safeTest";
+import { makeAdminToken } from "./utils/adminTestAuth";
 
 const FRONT_URL = "http://localhost:3001";
-const LOGIN_PATH = "/";
+const LOGIN_PATH = "/login";
+const TEST_ADMIN_TOKEN = makeAdminToken();
 
 async function setupMocks(page, options = {}) {
     const {
         status = 200,
         body = {
-            token: "admin-real-token",
+            token: TEST_ADMIN_TOKEN,
             user: {
                 id: 1,
                 username: "admin",
@@ -189,7 +191,7 @@ test.describe("LoginPage", () => {
             .poll(async () => {
                 return await page.evaluate(() => localStorage.getItem("authToken"));
             })
-            .toBe("admin-real-token");
+            .toBe(TEST_ADMIN_TOKEN);
 
         await expect
             .poll(async () => {
@@ -216,7 +218,7 @@ test.describe("LoginPage", () => {
 
         await expect(page.locator(".error-message")).toHaveText("Доступ запрещён");
 
-        await expect(page).toHaveURL(`${FRONT_URL}/`);
+        await expect(page).toHaveURL(`${FRONT_URL}/login`);
     });
 
     test("если API вернул ошибку без message, показывает fallback", async ({ page }) => {

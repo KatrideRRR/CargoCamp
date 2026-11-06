@@ -1,4 +1,5 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/safeTest";
+import { setAdminAuth, ADMIN_TEST_TOKEN } from "./utils/adminTestAuth";
 
 const FRONT_URL = "http://localhost:3001";
 const USERS_PATH = "/users";
@@ -51,28 +52,6 @@ const userExtra = {
     },
 };
 
-async function setAdminAuth(page) {
-    await page.addInitScript(() => {
-        const adminUser = {
-            id: 1,
-            username: "admin",
-            name: "admin",
-            role: "admin",
-            isAdmin: true,
-        };
-
-        const token = "admin-test-token";
-
-        localStorage.setItem("authToken", token);
-        localStorage.setItem("adminToken", token);
-        localStorage.setItem("token", token);
-        localStorage.setItem("userRole", "admin");
-
-        localStorage.setItem("user", JSON.stringify(adminUser));
-        localStorage.setItem("adminUser", JSON.stringify(adminUser));
-        localStorage.setItem("currentUser", JSON.stringify(adminUser));
-    });
-}
 
 async function setupMocks(page, options = {}) {
     const {
@@ -106,6 +85,23 @@ async function setupMocks(page, options = {}) {
             console.log(`[BROWSER ${msg.type()}]`, text);
         }
     });
+
+    await page.route(
+        "**/api/admin/pep/enrollments",
+        async (route) => {
+            if (route.request().method() !== "GET") {
+                await route.fallback();
+                return;
+            }
+
+            await route.fulfill({
+                status: 200,
+                json: {
+                    enrollments: [],
+                },
+            });
+        }
+    );
 
     await page.route("**/api/admin/users", async (route) => {
         if (route.request().method() !== "GET") {
@@ -270,7 +266,7 @@ test.describe("UsersPage", () => {
             name: "Пользователи",
         })).toBeVisible();
 
-        await expect(page.getByPlaceholder("Поиск по ID или номеру телефона")).toBeVisible();
+        await expect(page.getByPlaceholder("Поиск по ID, имени или телефону")).toBeVisible();
 
         await expect(page.getByRole("button", {
             name: "Создать пользователя",
@@ -296,7 +292,7 @@ test.describe("UsersPage", () => {
                 expect.objectContaining({
                     url: expect.stringContaining("/api/admin/users"),
                     headers: expect.objectContaining({
-                        authorization: "Bearer admin-test-token",
+                        authorization: `Bearer ${ADMIN_TEST_TOKEN}`,
                     }),
                 })
             );
@@ -364,7 +360,7 @@ test.describe("UsersPage", () => {
     test("ищет пользователя по ID", async ({ page }) => {
         await openUsersPage(page);
 
-        await page.getByPlaceholder("Поиск по ID или номеру телефона").fill("2");
+        await page.getByPlaceholder("Поиск по ID, имени или телефону").fill("2");
 
         await expect(rows(page)).toHaveCount(1);
         await expect(rows(page).first()).toContainText("Иван");
@@ -373,7 +369,7 @@ test.describe("UsersPage", () => {
     test("ищет пользователя по телефону", async ({ page }) => {
         await openUsersPage(page);
 
-        await page.getByPlaceholder("Поиск по ID или номеру телефона").fill("978111");
+        await page.getByPlaceholder("Поиск по ID, имени или телефону").fill("978111");
 
         await expect(rows(page)).toHaveCount(1);
         await expect(rows(page).first()).toContainText("Аким");
@@ -382,7 +378,7 @@ test.describe("UsersPage", () => {
     test("сбрасывает поиск при очистке поля", async ({ page }) => {
         await openUsersPage(page);
 
-        const search = page.getByPlaceholder("Поиск по ID или номеру телефона");
+        const search = page.getByPlaceholder("Поиск по ID, имени или телефону");
 
         await search.fill("2");
         await expect(rows(page)).toHaveCount(1);
@@ -464,7 +460,7 @@ test.describe("UsersPage", () => {
                 expect.objectContaining({
                     id: 1,
                     headers: expect.objectContaining({
-                        authorization: "Bearer admin-test-token",
+                        authorization: `Bearer ${ADMIN_TEST_TOKEN}`,
                     }),
                 })
             );
@@ -495,7 +491,7 @@ test.describe("UsersPage", () => {
                 expect.objectContaining({
                     id: 3,
                     headers: expect.objectContaining({
-                        authorization: "Bearer admin-test-token",
+                        authorization: `Bearer ${ADMIN_TEST_TOKEN}`,
                     }),
                 })
             );
@@ -529,7 +525,7 @@ test.describe("UsersPage", () => {
                         userStatus: "pensioner",
                     },
                     headers: expect.objectContaining({
-                        authorization: "Bearer admin-test-token",
+                        authorization: `Bearer ${ADMIN_TEST_TOKEN}`,
                     }),
                 })
             );

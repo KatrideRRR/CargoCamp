@@ -1,34 +1,11 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/safeTest";
+import { setAdminAuth, ADMIN_TEST_TOKEN } from "./utils/adminTestAuth";
 
 const FRONT_URL = "http://localhost:3001";
 
 // Если route в App.js другой — поменяй только это:
 const CREATE_USER_PATH = "/create-user";
 
-async function setAdminAuth(page) {
-    await page.addInitScript(() => {
-        const adminUser = {
-            id: 1,
-            username: "admin",
-            name: "admin",
-            role: "admin",
-            isAdmin: true,
-        };
-
-        const token = "admin-test-token";
-
-        localStorage.setItem("authToken", token);
-        localStorage.setItem("adminToken", token);
-        localStorage.setItem("token", token);
-
-        // Это проверяет PrivateRoute в admin-panel
-        localStorage.setItem("userRole", "admin");
-
-        localStorage.setItem("user", JSON.stringify(adminUser));
-        localStorage.setItem("adminUser", JSON.stringify(adminUser));
-        localStorage.setItem("currentUser", JSON.stringify(adminUser));
-    });
-}
 
 async function setupMocks(page, options = {}) {
     const {
@@ -54,6 +31,38 @@ async function setupMocks(page, options = {}) {
             console.log(`[BROWSER ${msg.type()}]`, text);
         }
     });
+
+    await page.route(
+        "**/api/admin/users",
+        async (route) => {
+            if (route.request().method() !== "GET") {
+                await route.fallback();
+                return;
+            }
+
+            await route.fulfill({
+                status: 200,
+                json: [],
+            });
+        }
+    );
+
+    await page.route(
+        "**/api/admin/pep/enrollments",
+        async (route) => {
+            if (route.request().method() !== "GET") {
+                await route.fallback();
+                return;
+            }
+
+            await route.fulfill({
+                status: 200,
+                json: {
+                    enrollments: [],
+                },
+            });
+        }
+    );
 
     await page.route("**/api/admin/create-user", async (route) => {
         onCreate?.({
@@ -210,7 +219,7 @@ test.describe("CreateUserPage", () => {
                         password: "qwerty123",
                     },
                     headers: expect.objectContaining({
-                        authorization: "Bearer admin-test-token",
+                        authorization: `Bearer ${ADMIN_TEST_TOKEN}`,
                     }),
                 })
             );

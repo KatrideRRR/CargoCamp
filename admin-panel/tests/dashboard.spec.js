@@ -1,34 +1,11 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/safeTest";
+import { setAdminAuth } from "./utils/adminTestAuth";
 
 const FRONT_URL = "http://localhost:3001";
 
 // Если Dashboard route другой — поменяй только это:
 const DASHBOARD_PATH = "/dashboard";
 
-async function setAdminAuth(page) {
-    await page.addInitScript(() => {
-        const adminUser = {
-            id: 1,
-            username: "admin",
-            name: "admin",
-            role: "admin",
-            isAdmin: true,
-        };
-
-        const token = "admin-test-token";
-
-        localStorage.setItem("authToken", token);
-        localStorage.setItem("adminToken", token);
-        localStorage.setItem("token", token);
-
-        // Это проверяет PrivateRoute в admin-panel
-        localStorage.setItem("userRole", "admin");
-
-        localStorage.setItem("user", JSON.stringify(adminUser));
-        localStorage.setItem("adminUser", JSON.stringify(adminUser));
-        localStorage.setItem("currentUser", JSON.stringify(adminUser));
-    });
-}
 
 async function openDashboard(page) {
     await setAdminAuth(page);
@@ -73,6 +50,31 @@ test.describe("Dashboard", () => {
 
         await expect(page.locator(".dashboard-title")).toHaveText(
             "Панель администратора"
+        );
+    });
+
+    test("показывает новые административные разделы", async ({ page }) => {
+        await openDashboard(page);
+
+        const identityLink = page.getByRole("link", {
+            name: "Проверка личности",
+        });
+
+        const benefitsLink = page.getByRole("link", {
+            name: "Проверка льгот",
+        });
+
+        await expect(identityLink).toBeVisible();
+        await expect(benefitsLink).toBeVisible();
+
+        await expect(identityLink).toHaveAttribute(
+            "href",
+            "/identity"
+        );
+
+        await expect(benefitsLink).toHaveAttribute(
+            "href",
+            "/benefits"
         );
     });
 

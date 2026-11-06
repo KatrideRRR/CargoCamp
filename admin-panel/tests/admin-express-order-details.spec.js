@@ -1,4 +1,5 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/safeTest";
+import { setAdminAuth } from "./utils/adminTestAuth";
 
 const FRONT_URL = "http://localhost:3001";
 
@@ -68,30 +69,6 @@ const logsRows = [
     },
 ];
 
-async function setAdminAuth(page) {
-    await page.addInitScript(() => {
-        const adminUser = {
-            id: 1,
-            username: "admin",
-            name: "admin",
-            role: "admin",
-            isAdmin: true,
-        };
-
-        const token = "admin-test-token";
-
-        localStorage.setItem("authToken", token);
-        localStorage.setItem("adminToken", token);
-        localStorage.setItem("token", token);
-
-        // ВАЖНО: именно это проверяет PrivateRoute в admin-panel
-        localStorage.setItem("userRole", "admin");
-
-        localStorage.setItem("user", JSON.stringify(adminUser));
-        localStorage.setItem("adminUser", JSON.stringify(adminUser));
-        localStorage.setItem("currentUser", JSON.stringify(adminUser));
-    });
-}
 
 async function setupMocks(page, options = {}) {
     const {
@@ -118,6 +95,23 @@ async function setupMocks(page, options = {}) {
             console.log(`[BROWSER ${msg.type()}]`, text);
         }
     });
+
+    await page.route(
+        "**/api/admin/disputes**",
+        async (route) => {
+            if (route.request().method() !== "GET") {
+                await route.fallback();
+                return;
+            }
+
+            await route.fulfill({
+                status: 200,
+                json: {
+                    disputes: [],
+                },
+            });
+        }
+    );
 
     await page.route("**/api/admin/express-orders/201", async (route) => {
         await route.fulfill({
@@ -388,25 +382,37 @@ test.describe("AdminExpressOrderDetailsPage", () => {
         await expect(page.locator(".page-message.error")).toHaveText("Логи недоступны");
     });
 
-    test("если нет токена, показывает ошибку авторизации", async ({ page }) => {
+    test("без токена перенаправляет на вход", async ({ page }) => {
         await page.addInitScript(() => {
             localStorage.clear();
         });
 
         await setupMocks(page);
 
-        await page.goto(`${FRONT_URL}${DETAILS_PATH}`);
-        await page.waitForLoadState("domcontentloaded");
-
-        // Если route защищён PrivateRoute, он может редиректить на главную.
-        // Тогда этот тест можно удалить.
-        if (page.url() === `${FRONT_URL}/` || page.url().endsWith("/login")) {
-            test.skip(true, "PrivateRoute не пускает без токена, внутренняя ошибка компонента недостижима");
-        }
-
-        await expect(page.locator(".page-message.error")).toHaveText(
-            "Нет токена авторизации"
+        // Настоящий backend не используется.
+        await page.route(
+            "**/api/admin/session/refresh",
+            async (route) => {
+                await route.fulfill({
+                    status: 401,
+                    json: {
+                        message: "Сессия отсутствует",
+                    },
+                });
+            }
         );
+
+        await page.goto(`${FRONT_URL}${DETAILS_PATH}`);
+
+        await expect(page).toHaveURL(
+            /\/login\?reason=expired/
+        );
+
+        await expect(
+            page.getByRole("heading", {
+                name: "Вход для администратора",
+            })
+        ).toBeVisible();
     });
 
     test("кнопка Назад ведёт к /orders", async ({ page }) => {
@@ -419,20 +425,70 @@ test.describe("AdminExpressOrderDetailsPage", () => {
         await expect(page).toHaveURL(/\/orders/);
     });
 
-    test("кнопка Удалить показывает alert", async ({ page }) => {
-        await openDetailsPage(page);
+    test("скрывает экспресс-заказ без исполнителя", async ({ page }) => {
+        let deleteCalled = false;
 
-        const dialogPromise = page.waitForEvent("dialog").then(async (dialog) => {
-            expect(dialog.message()).toBe("Удаление express-заказа пока не подключено");
+        const hiddenOrder = {
+            ...expressOrder,
+            status: "created",
+            executorId: null,
+            adminDeleted: true,
+        };
+
+        await openDetailsPage(page, {
+            orderBody: {
+                ...expressOrder,
+                status: "created",
+                executorId: null,
+            },
+        });
+
+        // Настраиваем ответ только для DELETE.
+        await page.route(
+            "**/api/admin/express-orders/201",
+            async (route) => {
+                if (route.request().method() !== "DELETE") {
+                    await route.fallback();
+                    return;
+                }
+
+                deleteCalled = true;
+
+                await route.fulfill({
+                    status: 200,
+                    json: {
+                        order: hiddenOrder,
+                    },
+                });
+            }
+        );
+
+        const dialogMessages = [];
+
+        page.on("dialog", async (dialog) => {
+            dialogMessages.push(dialog.message());
             await dialog.accept();
         });
 
         await page.getByRole("button", {
-            name: "Удалить",
-        }).click({
-            noWaitAfter: true,
-        });
+            name: "Скрыть заказ",
+        }).click();
 
-        await dialogPromise;
+        await expect.poll(
+            () => deleteCalled
+        ).toBe(true);
+
+        await expect.poll(
+            () => dialogMessages
+        ).toEqual([
+            "Скрыть экспресс-заказ?",
+            "Экспресс-заказ скрыт",
+        ]);
+
+        await expect(
+            page.getByRole("button", {
+                name: "Восстановить",
+            })
+        ).toBeVisible();
     });
 });

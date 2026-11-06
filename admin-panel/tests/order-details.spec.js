@@ -1,4 +1,5 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/safeTest";
+import { setAdminAuth, ADMIN_TEST_TOKEN } from "./utils/adminTestAuth";
 
 const FRONT_URL = "http://localhost:3001";
 
@@ -103,28 +104,6 @@ const logsRows = [
     },
 ];
 
-async function setAdminAuth(page) {
-    await page.addInitScript(() => {
-        const adminUser = {
-            id: 1,
-            username: "admin",
-            name: "admin",
-            role: "admin",
-            isAdmin: true,
-        };
-
-        const token = "admin-test-token";
-
-        localStorage.setItem("authToken", token);
-        localStorage.setItem("adminToken", token);
-        localStorage.setItem("token", token);
-        localStorage.setItem("userRole", "admin");
-
-        localStorage.setItem("user", JSON.stringify(adminUser));
-        localStorage.setItem("adminUser", JSON.stringify(adminUser));
-        localStorage.setItem("currentUser", JSON.stringify(adminUser));
-    });
-}
 
 async function setupMocks(page, options = {}) {
     const {
@@ -378,7 +357,7 @@ test.describe("OrderDetailsPage", () => {
                 expect.objectContaining({
                     url: expect.stringContaining("/api/admin/orders/777"),
                     headers: expect.objectContaining({
-                        authorization: "Bearer admin-test-token",
+                        authorization: `Bearer ${ADMIN_TEST_TOKEN}`,
                     }),
                 })
             );
@@ -389,7 +368,7 @@ test.describe("OrderDetailsPage", () => {
                 expect.objectContaining({
                     url: expect.stringContaining("/api/admin/orders/777/logs"),
                     headers: expect.objectContaining({
-                        authorization: "Bearer admin-test-token",
+                        authorization: `Bearer ${ADMIN_TEST_TOKEN}`,
                     }),
                 })
             );
@@ -444,6 +423,11 @@ test.describe("OrderDetailsPage", () => {
         const dialogMessages = [];
 
         await openOrderDetailsPage(page, {
+            orderBody: {
+                ...baseOrder,
+                status: "pending",
+                executorId: null,
+            },
             onDelete: () => {
                 deleteCalled = true;
             },
@@ -454,7 +438,9 @@ test.describe("OrderDetailsPage", () => {
             await dialog.accept();
         });
 
-        await page.getByRole("button", { name: "Удалить" }).click({
+        await page.getByRole("button", {
+            name: "Скрыть заказ",
+        }).click({
             noWaitAfter: true,
         });
 
@@ -476,6 +462,11 @@ test.describe("OrderDetailsPage", () => {
         let deleteCalled = false;
 
         await openOrderDetailsPage(page, {
+            orderBody: {
+                ...baseOrder,
+                status: "pending",
+                executorId: null,
+            },
             onDelete: () => {
                 deleteCalled = true;
             },
@@ -486,7 +477,11 @@ test.describe("OrderDetailsPage", () => {
             await dialog.dismiss();
         });
 
-        await page.getByRole("button", { name: "Удалить" }).click({ noWaitAfter: true });
+        await page.getByRole("button", {
+            name: "Скрыть заказ",
+        }).click({
+            noWaitAfter: true,
+        });
 
         await dialogPromise;
 
@@ -590,7 +585,7 @@ test.describe("OrderDetailsPage", () => {
                 expect.objectContaining({
                     body: { status: "in_review" },
                     headers: expect.objectContaining({
-                        authorization: "Bearer admin-test-token",
+                        authorization: `Bearer ${ADMIN_TEST_TOKEN}`,
                     }),
                 })
             );
@@ -647,7 +642,7 @@ test.describe("OrderDetailsPage", () => {
                         resolution: "Вернуть заказчику часть суммы",
                     },
                     headers: expect.objectContaining({
-                        authorization: "Bearer admin-test-token",
+                        authorization: `Bearer ${ADMIN_TEST_TOKEN}`,
                     }),
                 })
             );

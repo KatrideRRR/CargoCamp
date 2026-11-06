@@ -1,4 +1,5 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/safeTest";
+import { setAdminAuth } from "./utils/adminTestAuth";
 
 const FRONT_URL = "http://localhost:3001";
 
@@ -72,30 +73,6 @@ function createFakeJwt(payload) {
     return `${base64url(header)}.${base64url(payload)}.`;
 }
 
-async function setAdminAuth(page) {
-    await page.addInitScript(() => {
-        const adminUser = {
-            id: 1,
-            username: "admin",
-            name: "admin",
-            role: "admin",
-            isAdmin: true,
-        };
-
-        const token = "admin-test-token";
-
-        localStorage.setItem("authToken", token);
-        localStorage.setItem("adminToken", token);
-        localStorage.setItem("token", token);
-
-        // ВАЖНО: именно это проверяет PrivateRoute
-        localStorage.setItem("userRole", "admin");
-
-        localStorage.setItem("user", JSON.stringify(adminUser));
-        localStorage.setItem("adminUser", JSON.stringify(adminUser));
-        localStorage.setItem("currentUser", JSON.stringify(adminUser));
-    });
-}
 
 async function setupMocks(page, options = {}) {
     const {
@@ -121,6 +98,62 @@ async function setupMocks(page, options = {}) {
         ) {
             console.log(`[BROWSER ${msg.type()}]`, text);
         }
+    });
+
+    await page.route("**/api/category/search**", async (route) => {
+        const query = new URL(
+            route.request().url()
+        ).searchParams.get("q") || "";
+
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+                query,
+                results: [
+                    {
+                        type: "subcategory",
+                        categoryId: 1,
+                        categoryName: "Грузоперевозки",
+                        subcategoryId: 10,
+                        subcategoryName: "Перевозка мебели",
+                        label: "Перевозка мебели",
+                        formConfig: null,
+                        pricingConfig: null,
+                    },
+                    {
+                        type: "subcategory",
+                        categoryId: 1,
+                        categoryName: "Грузоперевозки",
+                        subcategoryId: 11,
+                        subcategoryName: "Вывоз мусора",
+                        label: "Вывоз мусора",
+                    },
+                    {
+                        type: "subcategory",
+                        categoryId: 2,
+                        categoryName: "Ремонт",
+                        subcategoryId: 20,
+                        subcategoryName: "Ремонт сантехники",
+                        label: "Ремонт сантехники",
+                    },
+                    {
+                        type: "category",
+                        categoryId: 3,
+                        categoryName: "Такси",
+                        subcategoryId: null,
+                        label: "Такси",
+                    },
+                    {
+                        type: "category",
+                        categoryId: 4,
+                        categoryName: "Курьер",
+                        subcategoryId: null,
+                        label: "Курьер",
+                    },
+                ],
+            }),
+        });
     });
 
     await page.route("**/api/category", async (route) => {
@@ -221,6 +254,30 @@ async function setupMocks(page, options = {}) {
             body: JSON.stringify(expressBody),
         });
     });
+
+    // Список обычных заказов после перехода на /orders
+    await page.route(
+        "**/api/admin/orders",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify([]),
+            });
+        }
+    );
+
+// Список экспресс-заказов после перехода на /orders
+    await page.route(
+        "**/api/admin/express-orders",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify([]),
+            });
+        }
+    );
 }
 
 async function openAdminCreateOrderPage(page, options = {}) {
@@ -265,18 +322,34 @@ async function waitAndPickFirstSuggestion(page) {
     await page.locator(".admin-suggestions li").first().click();
 }
 
+async function selectRegularService(page) {
+    const serviceInput = page.getByPlaceholder(
+        "Например: перевезти диван, починить кран"
+    );
+
+    await serviceInput.fill("перевезти диван");
+
+    const suggestion = page
+        .locator(".admin-service-result")
+        .filter({
+            hasText: "Перевозка мебели",
+        });
+
+    await expect(suggestion).toBeVisible();
+
+    await suggestion.click();
+
+    await expect(
+        page.locator(".admin-selected-service-name")
+    ).toHaveText("Перевозка мебели");
+}
+
 async function fillRegularOrder(page) {
     await page.getByPlaceholder("Введите адрес").fill("Пушкина 1");
 
     await waitAndPickFirstSuggestion(page);
 
-    await page.locator("select").first().selectOption("1");
-
-    await expect(page.locator("select").nth(1)).toBeVisible({
-        timeout: 10000,
-    });
-
-    await page.locator("select").nth(1).selectOption("10");
+    await selectRegularService(page);
 
     await page.getByPlaceholder("Что нужно сделать?").fill("Перевезти диван");
     await page.getByPlaceholder("Например 1500").fill("2500");
@@ -324,7 +397,17 @@ test.describe("AdminCreateOrderPage", () => {
         await expect(page.locator(".admin-mode-btn.active")).toHaveText("Обычный");
 
         await expect(page.locator(".admin-section-title", { hasText: "Время и адрес" })).toBeVisible();
-        await expect(page.locator(".admin-section-title", { hasText: "Категория" })).toBeVisible();
+        await expect(
+            page.locator(".admin-section-title", {
+                hasText: "Что нужно сделать?",
+            })
+        ).toBeVisible();
+
+        await expect(
+            page.getByPlaceholder(
+                "Например: перевезти диван, починить кран"
+            )
+        ).toBeVisible();
         await expect(page.locator(".admin-section-title", { hasText: "Описание" })).toBeVisible();
 
         await expect(page.getByPlaceholder("Введите адрес")).toBeVisible();
@@ -346,31 +429,47 @@ test.describe("AdminCreateOrderPage", () => {
         await expect(page.getByPlaceholder("Комментарий к экспресс-заказу")).toBeVisible();
     });
 
-    test("загружает категории и скрывает Такси/Курьер из обычного заказа", async ({ page }) => {
+    test("поиск показывает услуги и скрывает Такси/Курьер", async ({ page }) => {
         await openAdminCreateOrderPage(page);
 
-        const categorySelect = page.locator("select").first();
+        await page.getByPlaceholder(
+            "Например: перевезти диван, починить кран"
+        ).fill("перевезти диван");
 
-        await expect(categorySelect).toContainText("Грузоперевозки");
-        await expect(categorySelect).toContainText("Ремонт");
+        const results = page.locator(
+            ".admin-service-result-list"
+        );
 
-        await expect(categorySelect).not.toContainText("Такси");
-        await expect(categorySelect).not.toContainText("Курьер");
+        await expect(results).toBeVisible();
+
+        await expect(results).toContainText(
+            "Перевозка мебели"
+        );
+
+        await expect(results).toContainText(
+            "Вывоз мусора"
+        );
+
+        await expect(results).not.toContainText("Такси");
+        await expect(results).not.toContainText("Курьер");
     });
 
-    test("после выбора категории загружает подкатегории", async ({ page }) => {
+    test("выбор услуги сохраняет категорию и подкатегорию", async ({ page }) => {
         await openAdminCreateOrderPage(page);
 
-        await page.locator("select").first().selectOption("1");
+        await selectRegularService(page);
 
-        const subcategorySelect = page.locator("select").nth(1);
+        await expect(
+            page.locator(".admin-selected-service-category")
+        ).toContainText(
+            "Категория: Грузоперевозки"
+        );
 
-        await expect(subcategorySelect).toBeVisible({
-            timeout: 10000,
-        });
-
-        await expect(subcategorySelect).toContainText("Перевозка мебели");
-        await expect(subcategorySelect).toContainText("Вывоз мусора");
+        await expect(
+            page.getByRole("button", {
+                name: "Изменить",
+            })
+        ).toBeVisible();
     });
 
     test("показывает подсказки адреса для обычного заказа и выбирает адрес", async ({ page }) => {
@@ -409,7 +508,10 @@ test.describe("AdminCreateOrderPage", () => {
         }).click();
 
         await expect(page.locator(".admin-alert-danger")).toBeVisible();
-        await expect(page.locator(".admin-alert-text")).toHaveText("Выберите категорию");
+        await expect(page.locator(".admin-alert-text"))
+            .toHaveText(
+                "Выберите подходящую услугу из подсказки"
+            );
     });
 
     test("создаёт обычный заказ", async ({ page }) => {
@@ -441,10 +543,10 @@ test.describe("AdminCreateOrderPage", () => {
             })
             .toEqual(
                 expect.objectContaining({
-                    userId: "123",
+                    userId: 123,
                     description: "Перевезти диван",
                     address: "Россия, Республика Крым, Симферополь, улица Пушкина, 1",
-                    proposedSum: "2500",
+                    proposedSum: 2500,
                     paymentType: "cash",
                     categoryId: 1,
                     subcategoryId: 10,

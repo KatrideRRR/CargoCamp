@@ -1,4 +1,5 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/safeTest";
+import { setAdminAuth, ADMIN_TEST_TOKEN } from "./utils/adminTestAuth";
 
 const FRONT_URL = "http://localhost:3001";
 
@@ -36,28 +37,6 @@ const orders = [
     },
 ];
 
-async function setAdminAuth(page) {
-    await page.addInitScript(() => {
-        const adminUser = {
-            id: 1,
-            username: "admin",
-            name: "admin",
-            role: "admin",
-            isAdmin: true,
-        };
-
-        const token = "admin-test-token";
-
-        localStorage.setItem("authToken", token);
-        localStorage.setItem("adminToken", token);
-        localStorage.setItem("token", token);
-        localStorage.setItem("userRole", "admin");
-
-        localStorage.setItem("user", JSON.stringify(adminUser));
-        localStorage.setItem("adminUser", JSON.stringify(adminUser));
-        localStorage.setItem("currentUser", JSON.stringify(adminUser));
-    });
-}
 
 async function setupMocks(page, options = {}) {
     const {
@@ -165,7 +144,7 @@ test.describe("UserOrdersPage", () => {
                 expect.objectContaining({
                     url: expect.stringContaining("/api/admin/users/123/orders"),
                     headers: expect.objectContaining({
-                        authorization: "Bearer admin-test-token",
+                        authorization: `Bearer ${ADMIN_TEST_TOKEN}`,
                     }),
                 })
             );

@@ -31,6 +31,7 @@ module.exports = defineConfig({
             PORT: "3001",
             BROWSER: "none",
             REACT_APP_API_URL: FAKE_API_URL,
+            REACT_APP_SOCKET_URL: FAKE_API_URL,
         },
     },
 
