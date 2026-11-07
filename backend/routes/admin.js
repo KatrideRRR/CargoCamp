@@ -1490,7 +1490,6 @@ router.delete("/users/:id/premium", authMiddleware, adminMiddleware, async (req,
 
         return res.status(500).json({
             message: "Ошибка снятия премиума",
-            error: error.message,
         });
     }
 });
