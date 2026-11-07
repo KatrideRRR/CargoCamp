@@ -78,24 +78,27 @@ async function requestTBank(method, payload = {}) {
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
-        console.error("❌ TBank HTTP error:", {
+        console.error("TBank HTTP error:", {
             method,
-            requestBody: body,
-            response: data,
-        });
-
-        throw new Error(`TBank HTTP error ${response.status}: ${JSON.stringify(data)}`);
-    }
-
-    if (!data?.Success) {
-        console.error("❌ TBank API error:", {
-            method,
-            requestBody: body,
-            response: data,
+            httpStatus: response.status,
+            errorCode: data?.ErrorCode || null,
+            message: data?.Message || null,
         });
 
         throw new Error(
-            `${data?.Message || "TBank request failed"}${data?.Details ? `: ${data.Details}` : ""}`
+            `TBank HTTP error ${response.status}`
+        );
+    }
+
+    if (!data?.Success) {
+        console.error("TBank API error:", {
+            method,
+            errorCode: data?.ErrorCode || null,
+            message: data?.Message || null,
+        });
+
+        throw new Error(
+            data?.Message || "TBank request failed"
         );
     }
 
@@ -109,15 +112,9 @@ function verifyNotificationToken(body = {}) {
     const receivedToken = body.Token;
 
     if (expectedToken !== receivedToken) {
-        console.warn("⚠️ TBank token mismatch:", {
-            expectedToken,
-            receivedToken,
-            fields: Object.keys(body)
-                .filter((key) => {
-                    const value = body[key];
-                    return key !== "Token" && !(value && typeof value === "object");
-                })
-                .sort(),
+        console.warn("TBank webhook token mismatch", {
+            paymentId: body.PaymentId || null,
+            status: body.Status || null,
         });
     }
 

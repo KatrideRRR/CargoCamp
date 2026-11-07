@@ -13,6 +13,10 @@ const {
 const { sendOrderPush } = require("../utils/orderPushService");
 const {sendAdminNotification, adminUsersUrl, adminOrderUrl} = require("../services/adminNotificationService");
 const {sendBusinessCashPayment, sendBusinessCashRefund,} = require("../services/businessCashService");
+const {
+    verifyTBankPromotion,
+    applyVerifiedPromotion,
+} = require("../services/promotionPaymentService");
 
 function notifyPaymentProblem({provider, type, title, message, userId = null, orderId = null,}) {
     const buttonUrl =
@@ -698,17 +702,6 @@ router.post("/webhook", async (req, res) => {
                 "debt";
         }
 
-        if (
-            type === "promo" ||
-            type ===
-            "order_promotion" ||
-            type ===
-            "promotion"
-        ) {
-            businessCashKind =
-                "promotion";
-        }
-
         if (businessCashKind) {
             void sendBusinessCashPayment({
                 provider:
@@ -830,91 +823,109 @@ router.post("/webhook", async (req, res) => {
         }
 
         // ====== 3) Promotion ======
-        if (type === "promo" || type === "order_promotion" || type === "promotion") {
-            if (!orderId) {
-                console.warn("⚠️ TBank promo webhook: не хватает orderId", {
-                    body,
-                    orderId,
-                });
-
-                return res.status(200).send("OK");
+        if (
+            type === "promo" ||
+            type === "order_promotion" ||
+            type === "promotion"
+        ) {
+            if (
+                !Number.isSafeInteger(orderId) ||
+                orderId <= 0 ||
+                !paymentId
+            ) {
+                throw new Error(
+                    "Некорректный платёж продвижения Т-Банка"
+                );
             }
 
             const order = await Order.findByPk(orderId);
-            if (!order) return res.status(200).send("OK");
 
-            // ✅ Уже обработали этот платёж
-            if (String(order.promotionPaymentId || "") === String(paymentId) && order.promotionPaidAt) {
-                return res.status(200).send("OK");
+            if (!order) {
+                throw new Error(
+                    "Заказ оплаченного продвижения не найден"
+                );
             }
 
-            // ✅ Уже есть другой paymentId
-            if (
-                order.promotionPaymentId &&
-                String(order.promotionPaymentId) !== String(paymentId)
-            ) {
-                return res.status(200).send("OK");
-            }
-
-            let pr = order.promotionRequested || {};
-
-            if (typeof pr === "string") {
-                try {
-                    pr = JSON.parse(pr);
-                } catch {
-                    pr = {};
+            const verified = await requestTBank(
+                "GetState",
+                {
+                    PaymentId: paymentId,
                 }
-            }
+            );
 
-            const shouldSendPush = !!pr.push && !order.promotionPaidAt;
+            verifyTBankPromotion(
+                verified,
+                order,
+                paymentId,
+                body.OrderId
+            );
 
-            await order.update({
-                status: "pending",
-                is_highlighted: !!pr.highlight,
-                is_recommended: !!pr.recommended,
-                is_push_notified: !!pr.push,
-                promotionPaidAt: order.promotionPaidAt || new Date(),
-                promotionPaymentId: paymentId,
-                promotionPaymentProvider: "tbank",
+            const result = await applyVerifiedPromotion({
+                provider: "tbank",
+                paymentId,
+                orderId,
+                amountKopecks: Number(verified.Amount),
             });
+
+            if (result.duplicate) {
+                return res.status(200).send("OK");
+            }
 
             io?.emit("orderUpdated");
 
-            if (shouldSendPush) {
-                try {
-                    const logAction =
-                        req.logAction ||
-                        req.app?.locals?.logAction ||
-                        null;
+            void sendBusinessCashPayment({
+                provider: "tbank",
+                paymentId,
+                kind: "promotion",
+                amountKopecks: Number(verified.Amount),
+                userId: order.creatorId,
+                orderId,
+                occurredAt: new Date().toISOString(),
+            });
 
+            if (result.sendPush) {
+                try {
                     await sendOrderPush({
                         db,
                         io,
-                        orderId: order.id,
+                        orderId,
                         radiusKm: 50,
                         limit: 10,
-                        logAction,
+                        logAction:
+                            req.logAction ||
+                            req.app?.locals?.logAction ||
+                            null,
                     });
-                } catch (e) {
-                    console.error("sendOrderPush error:", e);
+                } catch (error) {
+                    console.error(
+                        "TBank promotion push error:",
+                        error
+                    );
                 }
             }
 
-            await req.logAction?.({
-                req,
-                actorUserId: order.creatorId,
-                actorRole: "webhook",
-                actionType: "promotion_paid",
-                entityType: "order",
-                paymentId,
-                orderId: order.id,
-                severity: "info",
-                meta: {
-                    provider: "tbank",
-                    amount: kopecksToRubString(amountKopecks),
-                    promotionRequested: pr,
-                },
-            });
+            try {
+                await req.logAction?.({
+                    req,
+                    actorUserId: order.creatorId,
+                    actorRole: "webhook",
+                    actionType: "promotion_paid",
+                    entityType: "order",
+                    paymentId,
+                    orderId,
+                    severity: "info",
+                    meta: {
+                        provider: "tbank",
+                        amountKopecks:
+                            Number(verified.Amount),
+                    },
+                });
+            } catch (error) {
+                console.error(
+                    "Promotion audit error:",
+                    error
+                );
+            }
 
             return res.status(200).send("OK");
         }
@@ -950,8 +961,8 @@ router.post("/webhook", async (req, res) => {
         ).type;
 
         if (
-            paymentType === "premium" ||
-            paymentType === "debt"
+            ["premium", "debt", "promo", "promotion", "order_promotion"]
+                .includes(paymentType)
         ) {
             return res.status(500).send("ERROR");
         }

@@ -16,6 +16,10 @@ const {getGuaranteeEligibility,} = require("../services/guaranteeEligibilityServ
 const {OrderSafeDeal,} = require("../models");
 const {getDeal, getPayment,} = require("../services/yooSafeDealClient");
 const {verifySafeDealFunding,} = require("../services/safeDealFundingVerifier");
+const {
+    verifyYooPromotion,
+    applyVerifiedPromotion,
+} = require("../services/promotionPaymentService");
 
 function notifyPaymentProblem({provider, type, title, message, userId = null, orderId = null,}) {
     const buttonUrl =
@@ -746,36 +750,58 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
              * не дожидаясь вебхука. Вебхук потом придёт повторно, но ничего страшного.
              */
             if (payment.status === "succeeded") {
-                await order.update({
-                    status:
-                        order.paymentType === "guarantee"
-                            ? order.status
-                            : "pending",
-                    is_highlighted: !!pr.highlight,
-                    is_recommended: !!pr.recommended,
-                    is_push_notified: !!pr.push,
-                    promotionPaidAt: new Date(),
+                const verified = await yooKassa.getPayment(
+                    payment.id
+                );
+
+                verifyYooPromotion(verified, order);
+
+                const result = await applyVerifiedPromotion({
+                    provider: "yookassa",
+                    paymentId: payment.id,
+                    orderId: order.id,
+                    amountKopecks: Math.round(
+                        Number(verified.amount.value) * 100
+                    ),
                 });
 
-                req.app.locals.io?.emit("orderUpdated");
+                if (!result.duplicate) {
+                    req.app.locals.io?.emit("orderUpdated");
 
-                if (pr.push) {
-                    try {
-                        const logAction =
-                            req.logAction ||
-                            req.app?.locals?.logAction ||
-                            null;
+                    void sendBusinessCashPayment({
+                        provider: "yookassa",
+                        paymentId: payment.id,
+                        kind: "promotion",
+                        amountKopecks: Math.round(
+                            Number(verified.amount.value) * 100
+                        ),
+                        userId,
+                        orderId: order.id,
+                        occurredAt:
+                            verified.captured_at ||
+                            verified.created_at ||
+                            new Date().toISOString(),
+                    });
 
-                        await sendOrderPush({
-                            db,
-                            io: req.app.locals.io,
-                            orderId: order.id,
-                            radiusKm: 50,
-                            limit: 10,
-                            logAction,
-                        });
-                    } catch (e) {
-                        console.error("sendOrderPush error:", e);
+                    if (result.sendPush) {
+                        try {
+                            await sendOrderPush({
+                                db,
+                                io: req.app.locals.io,
+                                orderId: order.id,
+                                radiusKm: 50,
+                                limit: 10,
+                                logAction:
+                                    req.logAction ||
+                                    req.app?.locals?.logAction ||
+                                    null,
+                            });
+                        } catch (error) {
+                            console.error(
+                                "Promotion push error:",
+                                error
+                            );
+                        }
                     }
                 }
             }
@@ -1330,14 +1356,6 @@ router.post("/yookassa/webhook", async (req, res) => {
                     "debt";
             }
 
-            if (
-                meta.type ===
-                "order_promotion"
-            ) {
-                businessCashKind =
-                    "promotion";
-            }
-
             if (businessCashKind) {
                 const amountKopecks =
                     Math.round(
@@ -1608,68 +1626,85 @@ router.post("/yookassa/webhook", async (req, res) => {
 
             const orderId = Number(meta.orderId);
 
-            const order = await Order.findByPk(orderId);
-            if (!order) {
-                return res.sendStatus(200);
-            }
-
-            // ✅ Уже обработали именно этот платёж — ничего не делаем
-            if (order.promotionPaymentId === payment.id && order.promotionPaidAt) {
-                return res.sendStatus(200);
-            }
-
-            // ✅ Если у заказа уже есть другой paymentId — не трогаем
             if (
-                order.promotionPaymentId &&
-                order.promotionPaymentId !== payment.id
+                !Number.isSafeInteger(orderId) ||
+                orderId <= 0 ||
+                !payment?.id
             ) {
+                throw new Error(
+                    "Некорректный платёж продвижения ЮKassa"
+                );
+            }
+
+            const order = await Order.findByPk(orderId);
+
+            if (!order) {
+                throw new Error(
+                    "Заказ оплаченного продвижения не найден"
+                );
+            }
+
+            // Подтверждаем платёж непосредственно через ЮKassa.
+            const verified = await yooKassa.getPayment(
+                payment.id
+            );
+
+            verifyYooPromotion(verified, order);
+
+            if (String(verified.id) !== String(payment.id)) {
+                throw new Error(
+                    "PaymentId ЮKassa не совпадает"
+                );
+            }
+
+            const amountKopecks = Math.round(
+                Number(verified.amount.value) * 100
+            );
+
+            const result = await applyVerifiedPromotion({
+                provider: "yookassa",
+                paymentId: verified.id,
+                orderId,
+                amountKopecks,
+            });
+
+            if (result.duplicate) {
                 return res.sendStatus(200);
             }
-
-            let pr = order.promotionRequested || {};
-
-            if (typeof pr === "string") {
-                try {
-                    pr = JSON.parse(pr);
-                } catch {
-                    pr = {};
-                }
-            }
-
-            const shouldSendPush = !!pr.push && !order.promotionPaidAt;
-
-            await order.update({
-                status:
-                    order.paymentType === "guarantee"
-                        ? order.status
-                        : "pending",
-                is_highlighted: !!pr.highlight,
-                is_recommended: !!pr.recommended,
-                is_push_notified: !!pr.push,
-                promotionPaidAt: order.promotionPaidAt || new Date(),
-                promotionPaymentId: payment.id,
-                promotionPaymentProvider: "yookassa",
-            });
 
             io?.emit("orderUpdated");
 
-            if (shouldSendPush) {
-                try {
-                    const logAction =
-                        req.logAction ||
-                        req.app?.locals?.logAction ||
-                        null;
+            void sendBusinessCashPayment({
+                provider: "yookassa",
+                paymentId: verified.id,
+                kind: "promotion",
+                amountKopecks,
+                userId: order.creatorId,
+                orderId,
+                occurredAt:
+                    verified.captured_at ||
+                    verified.created_at ||
+                    new Date().toISOString(),
+            });
 
+            if (result.sendPush) {
+                try {
                     await sendOrderPush({
                         db,
                         io,
-                        orderId: order.id,
+                        orderId,
                         radiusKm: 50,
                         limit: 10,
-                        logAction,
+                        logAction:
+                            req.logAction ||
+                            req.app?.locals?.logAction ||
+                            null,
                     });
-                } catch (e) {
-                    console.error("sendOrderPush error:", e);
+                } catch (error) {
+                    console.error(
+                        "Promotion push error:",
+                        error
+                    );
                 }
             }
 
@@ -1759,7 +1794,10 @@ router.post("/yookassa/webhook", async (req, res) => {
         const paymentType =
             req.body?.object?.metadata?.type;
 
-        if (["premium", "debt"].includes(paymentType)) {
+        if (
+            ["premium", "debt", "order_promotion"]
+                .includes(paymentType)
+        ) {
             return res.sendStatus(500);
         }
 
