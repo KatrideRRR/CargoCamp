@@ -17,6 +17,11 @@ const {
     verifyTBankPromotion,
     applyVerifiedPromotion,
 } = require("../services/promotionPaymentService");
+const {
+    claimPromotionPaymentIntent,
+    recordPromotionPaymentIntent,
+    existingPromotionPaymentResponse,
+} = require("../services/promotionPaymentIntentService");
 
 function notifyPaymentProblem({provider, type, title, message, userId = null, orderId = null,}) {
     const buttonUrl =
@@ -356,37 +361,24 @@ router.post("/order/promotion/create", authenticateToken, async (req, res) => {
             });
         }
 
-        const PROMOTION_PRICES = {
-            highlight: 50,
-            recommended: 100,
-            push: 150,
-        };
+        const intent = await claimPromotionPaymentIntent({
+            orderId: order.id,
+            userId,
+            provider: "tbank",
+            mode: "redirect",
+        });
 
-        let pr = order.promotionRequested || {};
+        if (!intent.created) {
+            const previous =
+                existingPromotionPaymentResponse(intent);
 
-        if (typeof pr === "string") {
-            try {
-                pr = JSON.parse(pr);
-            } catch {
-                pr = {};
-            }
+            return res.status(previous.httpStatus)
+                .json(previous.body);
         }
 
-        const totalRub = Object.entries(pr).reduce((sum, [key, value]) => {
-            return value && PROMOTION_PRICES[key]
-                ? sum + PROMOTION_PRICES[key]
-                : sum;
-        }, 0);
+        const amountKopecks = intent.amountKopecks;
 
-        if (totalRub <= 0) {
-            return res.status(400).json({
-                success: false,
-                error: "Продвижение не выбрано",
-            });
-        }
-
-        const amountKopecks = rubToKopecks(totalRub);
-        const tbankOrderId = buildTBankOrderId("promo", orderId);
+        const tbankOrderId = intent.bankOrderId;
         const description = `Продвижение заказа #${orderId}`;
 
         const payment = await requestTBank("Init", {
@@ -408,9 +400,12 @@ router.post("/order/promotion/create", authenticateToken, async (req, res) => {
             }),
         });
 
-        await order.update({
-            promotionPaymentId: String(payment.PaymentId),
-            promotionPaymentProvider: "tbank",
+        await recordPromotionPaymentIntent({
+            orderId: order.id,
+            provider: "tbank",
+            paymentId: String(payment.PaymentId || ""),
+            confirmationUrl: payment.PaymentURL || null,
+            paymentStatus: payment.Status,
         });
 
         await req.logAction?.({
@@ -480,7 +475,13 @@ router.post("/webhook", async (req, res) => {
         const isValid = verifyNotificationToken(body);
 
         if (!isValid) {
-            console.warn("⚠️ Invalid TBank webhook token", body);
+            console.warn(
+                "Invalid TBank webhook token",
+                {
+                    paymentId: body?.PaymentId || null,
+                    orderId: body?.OrderId || null,
+                }
+            );
 
             void sendAdminNotification({
                 topic: "system",

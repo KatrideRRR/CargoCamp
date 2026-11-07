@@ -21,6 +21,12 @@ const {
     applyVerifiedPromotion,
 } = require("../services/promotionPaymentService");
 
+const {
+    claimPromotionPaymentIntent,
+    recordPromotionPaymentIntent,
+    existingPromotionPaymentResponse,
+} = require("../services/promotionPaymentIntentService");
+
 function notifyPaymentProblem({provider, type, title, message, userId = null, orderId = null,}) {
     const buttonUrl =
         orderId
@@ -619,37 +625,28 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
             });
         }
 
-        const PROMOTION_PRICES = {
-            highlight: 50,
-            recommended: 100,
-            push: 150,
-        };
+        const intent = await claimPromotionPaymentIntent({
+            orderId: order.id,
+            userId,
+            provider: "yookassa",
 
-        let pr = order.promotionRequested || {};
+            mode: user.yookassa_payment_method_id
+                ? "saved"
+                : "redirect",
+        });
 
-        if (typeof pr === "string") {
-            try {
-                pr = JSON.parse(pr);
-            } catch {
-                pr = {};
-            }
+        if (!intent.created) {
+            const previous =
+                existingPromotionPaymentResponse(intent);
+
+            return res.status(previous.httpStatus)
+                .json(previous.body);
         }
 
-        const total = Object.entries(pr).reduce((sum, [key, enabled]) => {
-            return enabled && PROMOTION_PRICES[key]
-                ? sum + PROMOTION_PRICES[key]
-                : sum;
-        }, 0);
+        const amountValue =
+            (intent.amountKopecks / 100).toFixed(2);
 
-        if (total <= 0) {
-            return res.status(400).json({
-                success: false,
-                error: 'Продвижение не выбрано',
-            });
-        }
-
-        const amountValue = total.toFixed(2);
-        const idempotenceKey = uuidv4();
+        const idempotenceKey = intent.idempotencyKey;
 
         const basePayload = {
             amount: {
@@ -696,9 +693,13 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
                 idempotenceKey
             );
 
-            await order.update({
-                promotionPaymentId: payment.id,
-                promotionPaymentProvider: "yookassa",
+            await recordPromotionPaymentIntent({
+                orderId: order.id,
+                provider: "yookassa",
+                paymentId: payment.id,
+                confirmationUrl:
+                    payment.confirmation?.confirmation_url || null,
+                paymentStatus: payment.status,
             });
 
             await req.logAction?.({
@@ -1870,86 +1871,164 @@ router.get("/card/bind/status", authenticateToken, async (req, res) => {
     }
 });
 
-router.get('/promotion/status', authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const { orderId } = req.query;
-        if (!orderId) return res.status(400).json({ success: false, error: 'orderId required' });
+router.get(
+    "/promotion/status",
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const userId = Number(req.user.id);
+            const orderId = Number(req.query.orderId);
 
-        const order = await Order.findByPk(orderId);
-        if (!order) return res.status(404).json({ success: false, error: 'order not found' });
-        if (order.creatorId !== userId) return res.status(403).json({ success: false, error: 'no access' });
-
-        if (!order.promotionPaymentId) {
-            return res.json({ success: true, status: 'no_payment_id' });
-        }
-
-        const payment = await yooKassa.getPayment(order.promotionPaymentId);
-
-        if (payment.status === 'succeeded' && order.status === 'pending_payment') {
-            let pr = order.promotionRequested || {};
-
-            if (typeof pr === "string") {
-                try {
-                    pr = JSON.parse(pr);
-                } catch {
-                    pr = {};
-                }
+            if (
+                !Number.isSafeInteger(orderId) ||
+                orderId <= 0
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Некорректный номер заказа",
+                });
             }
 
-            await order.update({
-                status: 'pending',
-                is_highlighted: !!pr.highlight,
-                is_recommended: !!pr.recommended,
-                is_push_notified: !!pr.push,
-                promotionPaidAt: new Date(),
-            });
+            const order = await Order.findByPk(orderId);
 
-            io?.emit("orderUpdated");
+            if (!order) {
+                return res.status(404).json({
+                    success: false,
+                    error: "Заказ не найден",
+                });
+            }
 
-            if (pr.push) {
-                try {
-                    const logAction =
-                        req.logAction ||
-                        req.app?.locals?.logAction ||
-                        null;
+            if (Number(order.creatorId) !== userId) {
+                return res.status(403).json({
+                    success: false,
+                    error: "Нет доступа",
+                });
+            }
 
-                    await sendOrderPush({
-                        db,
-                        io,
-                        orderId: order.id,
-                        radiusKm: 50,
-                        limit: 10,
-                        logAction,
+            if (!order.promotionPaymentId) {
+                return res.json({
+                    success: true,
+                    status: "no_payment_id",
+                });
+            }
+
+            const provider =
+                order.promotionPaymentProvider ||
+                "yookassa";
+
+            /*
+             * Т-Банк подтверждается собственным webhook,
+             * где выполняется GetState и проверка суммы.
+             *
+             * Не отправляем его PaymentId в ЮKassa.
+             */
+            if (provider === "tbank") {
+                return res.json({
+                    success: true,
+                    provider,
+                    status: order.promotionPaidAt
+                        ? "succeeded"
+                        : "pending",
+                });
+            }
+
+            if (provider !== "yookassa") {
+                return res.status(409).json({
+                    success: false,
+                    error: "Неизвестный провайдер оплаты",
+                });
+            }
+
+            const payment = await yooKassa.getPayment(
+                order.promotionPaymentId
+            );
+
+            if (
+                payment.status === "succeeded" &&
+                !order.promotionPaidAt
+            ) {
+                verifyYooPromotion(payment, order);
+
+                const amountKopecks = Math.round(
+                    Number(payment.amount.value) * 100
+                );
+
+                const result = await applyVerifiedPromotion({
+                    provider: "yookassa",
+                    paymentId: payment.id,
+                    orderId,
+                    amountKopecks,
+                });
+
+                if (!result.duplicate) {
+                    const io = req.app.locals.io;
+
+                    try {
+                        io?.emit("orderUpdated");
+                    } catch (error) {
+                        console.error(
+                            "Promotion socket error:",
+                            error
+                        );
+                    }
+
+                    void sendBusinessCashPayment({
+                        provider: "yookassa",
+                        paymentId: payment.id,
+                        kind: "promotion",
+                        amountKopecks,
+                        userId,
+                        orderId,
+                        occurredAt:
+                            payment.captured_at ||
+                            payment.created_at ||
+                            new Date().toISOString(),
                     });
-                } catch (e) {
-                    console.error("sendOrderPush from promotion/status error:", e);
+
+                    if (result.sendPush) {
+                        try {
+                            await sendOrderPush({
+                                db,
+                                io,
+                                orderId,
+                                radiusKm: 50,
+                                limit: 10,
+                                logAction:
+                                    req.logAction ||
+                                    req.app?.locals?.logAction ||
+                                    null,
+                            });
+                        } catch (error) {
+                            console.error(
+                                "Promotion push error:",
+                                error
+                            );
+                        }
+                    }
                 }
             }
+
+            return res.json({
+                success: true,
+                provider,
+                status: payment.status,
+            });
+        } catch (error) {
+            console.error(
+                "Promotion status error:",
+                error
+            );
+
+            return res.status(
+                error.httpStatus || 502
+            ).json({
+                success: false,
+                error:
+                    "Не удалось подтвердить состояние оплаты. " +
+                    "Повторное списание не выполнялось.",
+            });
         }
-
-        return res.json({ success: true, status: payment.status });
-    } catch (e) {
-        console.error('promotion/status error:', e);
-
-        notifyPaymentProblem({
-
-            provider: "YooKassa",
-
-            type: "premium",
-
-            title: "🚨 Ошибка оплаты",
-
-            userId: req.user?.id,
-
-            message:
-
-                `Ошибка: ${e?.message || "Unknown error"}`,
-
-        });
-
-        return res.status(500).json({ success: false, error: e?.message || 'Internal error' });
     }
-});
+);
 
 module.exports = router;
