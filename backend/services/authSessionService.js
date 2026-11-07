@@ -114,12 +114,22 @@ async function refreshAuthSession(refreshToken, scope) {
             throw createSessionError("Сессия не найдена");
         }
 
-        const now = new Date();
+        const now = Date.now();
+
+        const expiresAtMs = new Date(
+            session.expiresAt
+        ).getTime();
+
+        const absoluteExpiresAtMs = new Date(
+            session.absoluteExpiresAt
+        ).getTime();
 
         if (
             session.revokedAt ||
-            session.expiresAt <= now ||
-            session.absoluteExpiresAt <= now
+            !Number.isFinite(expiresAtMs) ||
+            !Number.isFinite(absoluteExpiresAtMs) ||
+            expiresAtMs <= now ||
+            absoluteExpiresAtMs <= now
         ) {
             throw createSessionError(
                 "Срок действия сессии закончился"
@@ -149,7 +159,7 @@ async function refreshAuthSession(refreshToken, scope) {
         const nextExpiry = new Date(
             Math.min(
                 Date.now() + settings.idleDays * DAY,
-                session.absoluteExpiresAt.getTime()
+                absoluteExpiresAtMs
             )
         );
 
@@ -157,7 +167,7 @@ async function refreshAuthSession(refreshToken, scope) {
             {
                 tokenHash: hashToken(nextRefreshToken),
                 expiresAt: nextExpiry,
-                lastUsedAt: now,
+                lastUsedAt: new Date(now),
             },
             { transaction }
         );
