@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "../styles/CreateUserPage.css";
@@ -10,6 +10,8 @@ function CreateUserPage() {
     const [phone, setPhone] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+    const submittingRef = useRef(false);
 
     const navigate = useNavigate();
     const token = localStorage.getItem("authToken");
@@ -17,10 +19,18 @@ function CreateUserPage() {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
+        if (submittingRef.current) {
+            return;
+        }
+
         if (!username || !phone || !password) {
             setError("Пожалуйста, заполните все поля.");
             return;
         }
+
+        submittingRef.current = true;
+        setSubmitting(true);
+        setError("");
 
         try {
             const response = await axios.post(
@@ -36,8 +46,18 @@ function CreateUserPage() {
             alert(response.data.message);
             navigate("/users");
         } catch (err) {
-            console.error("Ошибка при создании пользователя:", err);
-            setError(err.response?.data?.message || "Ошибка при создании пользователя");
+            console.error(
+                "Ошибка при создании пользователя:",
+                err
+            );
+
+            setError(
+                err.response?.data?.message ||
+                "Ошибка при создании пользователя"
+            );
+        } finally {
+            submittingRef.current = false;
+            setSubmitting(false);
         }
     };
 
@@ -85,8 +105,14 @@ function CreateUserPage() {
                         />
                     </div>
 
-                    <button type="submit" className="submit-button">
-                        Создать пользователя
+                    <button
+                        type="submit"
+                        className="submit-button"
+                        disabled={submitting}
+                    >
+                        {submitting
+                            ? "Создаём..."
+                            : "Создать пользователя"}
                     </button>
                 </form>
             </div>

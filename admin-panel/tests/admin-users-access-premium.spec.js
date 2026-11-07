@@ -501,6 +501,47 @@ test.describe("UsersPage — роли и Premium", () => {
         ).toBeVisible();
     });
 
+    test("ошибка снятия Premium сохраняет подписку", async ({ page }) => {
+        const state = await openUsers(page, {
+            user: premiumUser(),
+            removePremiumStatus: 500,
+        });
+
+        const alerts = [];
+
+        page.on("dialog", async (dialog) => {
+            if (dialog.type() === "alert") {
+                alerts.push(dialog.message());
+            }
+
+            await dialog.accept();
+        });
+
+        await userRow(page).getByRole("button", {
+            name: "Снять",
+        }).click();
+
+        await expect.poll(
+            () => alerts.length
+        ).toBe(1);
+
+        expect(alerts[0]).toBe(
+            "Не удалось снять премиум"
+        );
+
+        expect(state.removals).toHaveLength(1);
+
+        await expect(
+            userRow(page)
+        ).toContainText("PREMIUM");
+
+        await expect(
+            userRow(page).getByRole("button", {
+                name: "Снять",
+            })
+        ).toBeVisible();
+    });
+
     test("отправляет запрос на продление Premium", async ({ page }) => {
         const state = await openUsers(page, {
             user: premiumUser(),

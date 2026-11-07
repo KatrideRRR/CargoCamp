@@ -48,6 +48,7 @@ const PNG = Buffer.from(
 async function setupMocks(page, options = {}) {
     const {
         order = ORDER,
+        evidenceStatus = 200,
         hideStatus = 200,
         restoreStatus = 200,
         disputes = [],
@@ -191,11 +192,20 @@ async function setupMocks(page, options = {}) {
                         .authorization,
                 });
 
-                await route.fulfill({
-                    status: 200,
-                    contentType: "image/png",
-                    body: PNG,
-                });
+                await route.fulfill(
+                    evidenceStatus === 200
+                        ? {
+                            status: 200,
+                            contentType: "image/png",
+                            body: PNG,
+                        }
+                        : {
+                            status: evidenceStatus,
+                            json: {
+                                message: "Фотография недоступна",
+                            },
+                        }
+                );
             }
         );
     }
@@ -276,6 +286,91 @@ test.describe("Экспресс-заказы — действия и споры"
             page.getByRole("button", {
                 name: "Скрыть заказ",
             })
+        ).toHaveCount(0);
+    });
+
+    test("ошибка фотографии не оставляет бесконечную загрузку", async ({ page }) => {
+        await openPage(page, {
+            disputes: [
+                {
+                    ...DISPUTE,
+                    evidencePhotos: [
+                        {
+                            id: 77,
+                            uploadedById: 20,
+                        },
+                    ],
+                },
+            ],
+            evidence: true,
+            evidenceStatus: 500,
+        });
+
+        await expect(
+            page.getByRole("alert", {
+                name: "",
+            }).filter({
+                hasText: "Не удалось загрузить фотографию",
+            })
+        ).toBeVisible();
+
+        await expect(
+            page.getByRole("button", {
+                name: "Повторить",
+            })
+        ).toBeVisible();
+    });
+
+    test("повторная загрузка фотографии работает после ошибки", async ({ page }) => {
+        await openPage(page, {
+            disputes: [
+                {
+                    ...DISPUTE,
+                    evidencePhotos: [
+                        {
+                            id: 77,
+                            uploadedById: 20,
+                        },
+                    ],
+                },
+            ],
+            evidence: true,
+            evidenceStatus: 500,
+        });
+
+        await expect(
+            page.getByText(
+                "Не удалось загрузить фотографию"
+            )
+        ).toBeVisible();
+
+        // Последний зарегистрированный обработчик маршрута
+        // имеет приоритет над предыдущим.
+        await page.route(
+            "**/api/disputes/evidence/501/77",
+            async (route) => {
+                await route.fulfill({
+                    status: 200,
+                    contentType: "image/png",
+                    body: PNG,
+                });
+            }
+        );
+
+        await page.getByRole("button", {
+            name: "Повторить",
+        }).click();
+
+        await expect(
+            page.getByRole("img", {
+                name: "Доказательство 1",
+            })
+        ).toHaveAttribute("src", /^blob:/);
+
+        await expect(
+            page.getByText(
+                "Не удалось загрузить фотографию"
+            )
         ).toHaveCount(0);
     });
 

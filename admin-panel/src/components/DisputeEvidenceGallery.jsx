@@ -15,11 +15,15 @@ export default function DisputeEvidenceGallery({
         : EMPTY_PHOTOS;
     const [imageUrls, setImageUrls] = useState({});
 
+    const [retryVersion, setRetryVersion] = useState(0);
+
     useEffect(() => {
         if (!dispute?.id || !token || !photos.length) {
             setImageUrls({});
             return;
         }
+
+        setImageUrls({});
 
         let cancelled = false;
         const objectUrls = [];
@@ -39,6 +43,12 @@ export default function DisputeEvidenceGallery({
                         );
 
                         const url = URL.createObjectURL(response.data);
+
+                        if (cancelled) {
+                            URL.revokeObjectURL(url);
+                            return [photo.id, null];
+                        }
+
                         objectUrls.push(url);
 
                         return [photo.id, url];
@@ -63,7 +73,7 @@ export default function DisputeEvidenceGallery({
             cancelled = true;
             objectUrls.forEach((url) => URL.revokeObjectURL(url));
         };
-    }, [dispute?.id, photos, token]);
+    }, [dispute?.id, photos, token, retryVersion]);
 
     if (!photos.length) return null;
 
@@ -97,13 +107,44 @@ export default function DisputeEvidenceGallery({
                                     }}
                                 />
                             </a>
+                        ) : Object.prototype.hasOwnProperty.call(
+                            imageUrls,
+                            photo.id
+                        ) ? (
+                            <div
+                                role="alert"
+                                style={{
+                                    padding: 8,
+                                    fontSize: 12,
+                                    background: "#fee2e2",
+                                    borderRadius: 8,
+                                }}
+                            >
+                                <div>
+                                    Не удалось загрузить фотографию
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setRetryVersion(
+                                            (value) => value + 1
+                                        )
+                                    }
+                                    style={{ marginTop: 8 }}
+                                >
+                                    Повторить
+                                </button>
+                            </div>
                         ) : (
-                            <div style={{
-                                padding: 12,
-                                fontSize: 12,
-                                background: "#e2e8f0",
-                                borderRadius: 8,
-                            }}>
+                            <div
+                                style={{
+                                    padding: 12,
+                                    fontSize: 12,
+                                    background: "#e2e8f0",
+                                    borderRadius: 8,
+                                }}
+                            >
                                 Загрузка фото…
                             </div>
                         )}

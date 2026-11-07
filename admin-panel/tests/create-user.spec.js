@@ -179,6 +179,82 @@ test.describe("CreateUserPage", () => {
         await expect(page.getByLabel("Имя")).toBeFocused();
     });
 
+    test("повторная отправка во время создания не создаёт второй запрос", async ({ page }) => {
+        await openCreateUserPage(page);
+
+        let requestCount = 0;
+        let releaseRequest;
+
+        const pendingRequest = new Promise((resolve) => {
+            releaseRequest = resolve;
+        });
+
+        await page.route(
+            "**/api/admin/create-user",
+            async (route) => {
+                requestCount++;
+
+                await pendingRequest;
+
+                await route.fulfill({
+                    status: 500,
+                    json: {
+                        message: "Тестовая ошибка",
+                    },
+                });
+            }
+        );
+
+        await fillCreateUserForm(page);
+
+        const button = page.getByRole("button", {
+            name: "Создать пользователя",
+        });
+
+        try {
+            await button.click();
+
+            await expect.poll(
+                () => requestCount
+            ).toBe(1);
+
+            await expect(
+                page.getByRole("button", {
+                    name: "Создаём...",
+                })
+            ).toBeDisabled();
+
+            // Искусственно вызываем ещё одно событие submit.
+            // Это проверяет не только disabled, но и защиту в обработчике.
+            await page.locator(
+                ".create-user-form"
+            ).evaluate((form) => {
+                form.dispatchEvent(
+                    new Event("submit", {
+                        bubbles: true,
+                        cancelable: true,
+                    })
+                );
+            });
+
+            expect(requestCount).toBe(1);
+        } finally {
+            releaseRequest();
+        }
+
+        await expect(
+            page.locator(".error-message")
+        ).toHaveText("Тестовая ошибка");
+
+        await expect(
+            page.getByRole("button", {
+                name: "Создать пользователя",
+            })
+        ).toBeEnabled();
+
+        expect(requestCount).toBe(1);
+    });
+
     test("создаёт пользователя и отправляет правильный payload", async ({ page }) => {
         let createRequest = null;
 
