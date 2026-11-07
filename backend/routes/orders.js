@@ -59,6 +59,9 @@ const {
 const {
     getCompletionPhase,
 } = require("../services/orderCompletionWorkflowService");
+const {
+    getVerifiedWorkStartBlockReason,
+} = require("../services/verifiedWorkStartGuard");
 const {uploadsRoot, ordersRoot, tempRoot, contractsRoot, ensureDirectory,} = require("../config/storagePaths");
 const uploadDocumentRoot = path.resolve(__dirname, "..", "upload-document");
 ensureDirectory(uploadDocumentRoot);
@@ -3498,21 +3501,78 @@ module.exports = (io) => {
                     });
                 }
 
-                order.workStartedAt =
-                    new Date();
+                // Проверяем наличие подтверждённого договора.
+                const verifiedAssignment = await db.Contract.findOne({
+                    where: {
+                        orderId: order.id,
+                        type: "verified_assignment",
+                    },
+                    order: [
+                        ["version", "DESC"],
+                        ["id", "DESC"],
+                    ],
+                });
 
-                order.workStartedBy =
-                    userId;
+                const blockReason =
+                    getVerifiedWorkStartBlockReason(
+                        verifiedAssignment
+                    );
+
+                if (blockReason) {
+                    return res.status(409).json({
+                        success: false,
+                        code: "VERIFIED_ASSIGNMENT_NOT_SIGNED",
+                        message: blockReason,
+                        contractId:
+                            verifiedAssignment
+                                ? String(verifiedAssignment.id)
+                                : null,
+                    });
+                }
 
                 /*
-                 * На случай повторного запуска
-                 * старые данные окончания очищаем.
-                 * Обычно их здесь быть не должно.
+                 * Атомарный запуск.
+                 *
+                 * Два одновременных запроса не должны
+                 * перезаписывать время начала работы.
                  */
-                order.workEndedAt = null;
-                order.workEndedBy = null;
+                const startedAt = new Date();
 
-                await order.save();
+                const [updatedCount] = await Order.update(
+                    {
+                        workStartedAt: startedAt,
+                        workStartedBy: userId,
+                        workEndedAt: null,
+                        workEndedBy: null,
+                    },
+                    {
+                        where: {
+                            id: order.id,
+                            status: "active",
+                            workStartedAt: null,
+                        },
+                    }
+                );
+
+                await order.reload();
+
+                if (updatedCount === 0) {
+                    if (order.workStartedAt) {
+                        return res.json({
+                            success: true,
+                            alreadyStarted: true,
+                            order,
+                            workStartedAt: order.workStartedAt,
+                            workStartedBy: order.workStartedBy,
+                        });
+                    }
+
+                    return res.status(409).json({
+                        success: false,
+                        message:
+                            "Состояние заказа изменилось. Обновите страницу.",
+                    });
+                }
 
                 const beforePhotos =
                     Array.isArray(

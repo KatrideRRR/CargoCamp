@@ -21,6 +21,10 @@ const {
 } = require("./verifiedPdfIntegrity");
 
 const {
+    verifyDocumentChain,
+} = require("./verifiedDocumentChainService");
+
+const {
     verifySignatureEvidence,
 } = require("./contractSignatureEvidence");
 
@@ -356,6 +360,119 @@ async function buildContractEvidence(contractId) {
 
     const warnings = [];
 
+    /*
+ * Проверка цепочки документов.
+ *
+ * Используем идентификаторы, сохранённые
+ * в момент формирования PDF.
+ *
+ * Не пытаемся восстановить историю по
+ * текущей стоимости заказа.
+ */
+    const lineageSnapshot =
+        contract.metadata?.snapshot || {};
+
+    const linkedIds = [
+        contract.parentContractId,
+
+        lineageSnapshot.assignmentId,
+
+        ...(Array.isArray(lineageSnapshot.addenda)
+            ? lineageSnapshot.addenda
+                .slice(0, 100)
+                .map((item) => item?.contractId)
+            : []),
+    ]
+        .filter((id) =>
+            /^[1-9]\d*$/.test(String(id ?? ""))
+        )
+        .map(String);
+
+    const uniqueLinkedIds = [
+        ...new Set(linkedIds),
+    ];
+
+    const linkedContracts =
+        uniqueLinkedIds.length
+            ? await Contract.findAll({
+                where: {
+                    id: {
+                        [Op.in]: uniqueLinkedIds,
+                    },
+                },
+            })
+            : [];
+
+    const linkedMap = new Map(
+        linkedContracts.map((item) => [
+            String(item.id),
+            item,
+        ])
+    );
+
+    const assignmentId =
+        contract.type === "verified_addendum"
+            ? contract.parentContractId
+            : lineageSnapshot.assignmentId;
+
+    const linkedAssignment =
+        linkedMap.get(String(assignmentId || "")) ||
+        null;
+
+    const previousAct =
+        contract.type === "verified_completion_act" &&
+        Number(contract.version) === 2
+            ? linkedMap.get(
+            String(contract.parentContractId || "")
+        ) || null
+            : null;
+
+    const linkedAddenda =
+        linkedContracts.filter(
+            (item) => item.type === "verified_addendum"
+        );
+
+    warnings.push(
+        ...verifyDocumentChain({
+            contract,
+            assignment: linkedAssignment,
+            previousAct,
+            addenda: linkedAddenda,
+        })
+    );
+
+    /*
+     * Проверяем, что связанные PDF физически
+     * существуют и совпадают со своими SHA-256.
+     */
+    const linkedDocumentIntegrity = [];
+
+    for (const item of linkedContracts) {
+        let valid = false;
+        let actualSha256 = null;
+
+        try {
+            actualSha256 =
+                await assertVerifiedPdfIntegrity(item);
+
+            valid = true;
+        } catch (error) {
+            warnings.push(
+                `Связанный документ №${item.id}: ` +
+                "не прошёл проверку целостности PDF."
+            );
+        }
+
+        linkedDocumentIntegrity.push({
+            contractId: String(item.id),
+            type: item.type,
+            version: item.version,
+            expectedSha256: item.documentHash,
+            actualSha256,
+            valid,
+        });
+    }
+
     if (
         contract.type === "verified_completion_act" &&
         signatures.length > 0
@@ -536,6 +653,21 @@ async function buildContractEvidence(contractId) {
 
             sha256:
             contract.documentHash,
+        },
+
+        documentChain: {
+            linkedDocuments:
+            linkedDocumentIntegrity,
+
+            valid:
+                !warnings.some((warning) =>
+                    warning.includes("договор") ||
+                    warning.includes("Акт v") ||
+                    warning.includes("соглашен") ||
+                    warning.includes("стоимост") ||
+                    warning.includes("PDF") ||
+                    warning.includes("история")
+                ),
         },
 
         integrity: {
