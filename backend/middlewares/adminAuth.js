@@ -1,48 +1,103 @@
-const jwt = require('jsonwebtoken');
-const {User, AuthSession,} = require("../models");
+const jwt = require("jsonwebtoken");
+
+const {
+    User,
+    AuthSession,
+} = require("../models");
 
 const authMiddleware = async (req, res, next) => {
     try {
-        const token = req.header('Authorization')?.split(' ')[1]; // Получаем токен из заголовка
-        if (!token) return res.status(401).json({ message: 'Нет доступа' });
+        const authorization = req.header("Authorization");
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET); // Декодируем токен
-        const user = await User.findByPk(decoded.id); // Ищем пользователя в БД
+        const token =
+            typeof authorization === "string" &&
+            authorization.startsWith("Bearer ")
+                ? authorization.slice(7).trim()
+                : null;
 
-        if (!user) return res.status(401).json({ message: 'Пользователь не найден' });
-
-        if (decoded.scope === "admin" && decoded.sid) {
-            const session = await AuthSession.findByPk(
-                decoded.sid
-            );
-
-            if (
-                !session ||
-                session.scope !== "admin" ||
-                Number(session.userId) !== Number(user.id) ||
-                session.revokedAt ||
-                new Date(session.expiresAt) <= new Date() ||
-                new Date(session.absoluteExpiresAt) <= new Date()
-            ) {
-                return res.status(401).json({
-                    message: "Административная сессия завершена",
-                });
-            }
+        if (!token) {
+            return res.status(401).json({
+                message: "Нет доступа",
+            });
         }
 
-        req.user = user; // Передаём пользователя в req
-        next();
+        const decoded = jwt.verify(
+            token,
+            process.env.JWT_SECRET
+        );
+
+        // Административные маршруты принимают
+        // только JWT, привязанные к admin-сессии.
+        if (
+            decoded.scope !== "admin" ||
+            !decoded.sid
+        ) {
+            return res.status(401).json({
+                message:
+                    "Недействительная административная сессия",
+            });
+        }
+
+        const user = await User.findByPk(decoded.id);
+
+        if (!user) {
+            return res.status(401).json({
+                message: "Пользователь не найден",
+            });
+        }
+
+        const session = await AuthSession.findByPk(
+            decoded.sid
+        );
+
+        const now = Date.now();
+
+        const expiresAt = new Date(
+            session?.expiresAt
+        ).getTime();
+
+        const absoluteExpiresAt = new Date(
+            session?.absoluteExpiresAt
+        ).getTime();
+
+        if (
+            !session ||
+            session.scope !== "admin" ||
+            Number(session.userId) !== Number(user.id) ||
+            session.revokedAt ||
+            !Number.isFinite(expiresAt) ||
+            !Number.isFinite(absoluteExpiresAt) ||
+            expiresAt <= now ||
+            absoluteExpiresAt <= now
+        ) {
+            return res.status(401).json({
+                message:
+                    "Административная сессия завершена",
+            });
+        }
+
+        req.user = user;
+        req.adminSession = session;
+
+        return next();
     } catch (error) {
-        res.status(401).json({ message: 'Ошибка авторизации' });
+        return res.status(401).json({
+            message: "Ошибка авторизации",
+        });
     }
 };
 
-// Middleware для проверки роли admin
 const adminMiddleware = (req, res, next) => {
-    if (req.user.role !== 'admin') {
-        return res.status(403).json({ message: 'Доступ запрещен' });
+    if (req.user?.role !== "admin") {
+        return res.status(403).json({
+            message: "Доступ запрещен",
+        });
     }
-    next();
+
+    return next();
 };
 
-module.exports = { authMiddleware, adminMiddleware };
+module.exports = {
+    authMiddleware,
+    adminMiddleware,
+};
