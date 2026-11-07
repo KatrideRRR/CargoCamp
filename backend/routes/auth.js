@@ -22,6 +22,9 @@ const {
 const crypto = require("crypto");
 const {uploadsRoot: publicUploadsRoot,} = require("../config/storagePaths");
 const avatarsDir = path.join(__dirname, "..", "uploads", "avatars");
+const {
+    resetPasswordAndRevokeSessions,
+} = require("../services/passwordResetService");
 
 function ensureDir(dirPath) {
     if (!fs.existsSync(dirPath)) {
@@ -381,15 +384,38 @@ router.post("/password-reset/confirm", async (req, res) => {
         });
     }
 
-    const user = await User.findOne({where: {phone: phoneKey}});
-    if (!user) return res.status(404).json({message: "Пользователь не найден"});
-
-    const hashed = await bcrypt.hash(String(newPassword), 10);
-    await user.update({password: hashed});
-
+// Удаляем код до первой асинхронной операции.
+//
+// Это не позволит двум одновременным запросам
+// использовать один код в рамках одного
+// процесса Node.js.
     smsCodes.delete(phoneKey);
 
-    return res.json({message: "Пароль успешно изменён"});
+    try {
+        await resetPasswordAndRevokeSessions({
+            phone: phoneKey,
+            newPassword: String(newPassword),
+        });
+
+        return res.json({
+            message: "Пароль успешно изменён",
+        });
+    } catch (error) {
+        if (error.status === 404) {
+            return res.status(404).json({
+                message: "Пользователь не найден",
+            });
+        }
+
+        console.error(
+            "Password reset error:",
+            error
+        );
+
+        return res.status(500).json({
+            message: "Не удалось изменить пароль",
+        });
+    }
 });
 
 router.post("/upload-documents", authenticateToken, (req, res) => {

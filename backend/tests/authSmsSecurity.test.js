@@ -43,6 +43,7 @@ async function createHarness() {
 
     const smsRequests = [];
     const sessionRequests = [];
+    const passwordResets = [];
 
     let captchaRequests = 0;
     let nextUserId = 2;
@@ -200,6 +201,34 @@ async function createHarness() {
                 revokeAuthSession: async () => {},
             },
 
+            "../services/passwordResetService": {
+                async resetPasswordAndRevokeSessions({
+                                                         phone,
+                                                         newPassword,
+                                                     }) {
+                    const user = users.get(phone);
+
+                    if (!user) {
+                        const error = new Error(
+                            "Пользователь не найден"
+                        );
+
+                        error.status = 404;
+
+                        throw error;
+                    }
+
+                    passwordResets.push({
+                        phone,
+                        newPassword,
+                    });
+
+                    await user.update({
+                        password: `hashed:${newPassword}`,
+                    });
+                },
+            },
+
             "../utils/userSessionTransport": {
                 getSessionClient,
                 getUserRefreshToken,
@@ -275,6 +304,7 @@ async function createHarness() {
         users,
         smsRequests,
         sessionRequests,
+        passwordResets,
 
         get captchaRequests() {
             return captchaRequests;
@@ -592,3 +622,54 @@ test("Старое восстановление пароля отключено"
         assert.equal(api.smsRequests.length, 0);
     });
 });
+
+test(
+    "SMS: два одновременных сброса не используют один код",
+    async () => {
+        await withHarness(async (api) => {
+            const sent = await api.sendSms(
+                "password_reset"
+            );
+
+            assert.equal(sent.status, 200);
+
+            const code = api.lastCode();
+
+            const requests = await Promise.all([
+                api.request(
+                    "/api/auth/password-reset/confirm",
+                    {
+                        phone: PHONE,
+                        smsCode: code,
+                        newPassword: "password-first",
+                    }
+                ),
+
+                api.request(
+                    "/api/auth/password-reset/confirm",
+                    {
+                        phone: PHONE,
+                        smsCode: code,
+                        newPassword: "password-second",
+                    }
+                ),
+            ]);
+
+            const statuses = requests
+                .map((result) => result.status)
+                .sort((a, b) => a - b);
+
+            assert.deepEqual(
+                statuses,
+                [200, 400]
+            );
+
+            // Сервис смены пароля должен
+            // вызваться только один раз.
+            assert.equal(
+                api.passwordResets.length,
+                1
+            );
+        });
+    }
+);
