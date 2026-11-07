@@ -45,6 +45,124 @@ async function createHarness() {
     const sessionRequests = [];
     const passwordResets = [];
 
+    const smsStates = new Map();
+
+    const fakeSmsCodeStore = {
+        async reserveSmsCode({ phone, purpose }) {
+            const now = Date.now();
+            const previous = smsStates.get(phone);
+
+            if (
+                previous?.lastSentAt &&
+                now - previous.lastSentAt < 60_000
+            ) {
+                const error = new Error(
+                    "Повторная отправка пока запрещена"
+                );
+
+                error.status = 429;
+                error.waitSec = 60;
+
+                throw error;
+            }
+
+            const code = crypto
+                .randomInt(100000, 1000000)
+                .toString();
+
+            const reservationId = crypto.randomUUID();
+
+            smsStates.set(phone, {
+                code,
+                purpose,
+                reservationId,
+                status: "pending",
+                attempts: 0,
+                expiresAt: now + 300_000,
+                lastSentAt: now,
+            });
+
+            return {
+                code,
+                reservationId,
+                cooldownSec: 60,
+                expiresInSec: 300,
+            };
+        },
+
+        async completeSmsSend({
+                                  phone,
+                                  reservationId,
+                                  success,
+                              }) {
+            const state = smsStates.get(phone);
+
+            if (
+                !state ||
+                state.status !== "pending" ||
+                state.reservationId !== reservationId
+            ) {
+                return false;
+            }
+
+            state.status = success ? "active" : "idle";
+
+            return true;
+        },
+
+        async consumeSmsCode({
+                                 phone,
+                                 purpose,
+                                 code,
+                             }) {
+            const state = smsStates.get(phone);
+
+            if (
+                !state ||
+                state.status !== "active" ||
+                state.purpose !== purpose
+            ) {
+                return {
+                    ok: false,
+                    reason: "not_found",
+                };
+            }
+
+            if (Date.now() >= state.expiresAt) {
+                state.status = "idle";
+
+                return {
+                    ok: false,
+                    reason: "expired",
+                };
+            }
+
+            if (state.code !== String(code)) {
+                state.attempts++;
+
+                if (state.attempts >= 5) {
+                    state.status = "idle";
+
+                    return {
+                        ok: false,
+                        reason: "too_many_attempts",
+                    };
+                }
+
+                return {
+                    ok: false,
+                    reason: "incorrect",
+                };
+            }
+
+            state.status = "idle";
+
+            return {
+                ok: true,
+            };
+        },
+    };
+
     let captchaRequests = 0;
     let nextUserId = 2;
 
@@ -163,6 +281,8 @@ async function createHarness() {
                     );
                 },
             },
+
+            "../services/smsCodeStore": fakeSmsCodeStore,
 
             "../services/notificationService": {
                 notifyUser: async () => {},
@@ -668,6 +788,77 @@ test(
             // вызваться только один раз.
             assert.equal(
                 api.passwordResets.length,
+                1
+            );
+        });
+    }
+);
+
+test(
+    "SMS: два одновременных входа не используют один код",
+    async () => {
+        await withHarness(async (api) => {
+            const sent = await api.sendSms("login");
+
+            assert.equal(sent.status, 200);
+
+            const code = api.lastCode();
+
+            const results = await Promise.all([
+                api.request("/api/auth/login-sms", {
+                    phone: PHONE,
+                    smsCode: code,
+                }),
+
+                api.request("/api/auth/login-sms", {
+                    phone: PHONE,
+                    smsCode: code,
+                }),
+            ]);
+
+            const statuses = results
+                .map((result) => result.status)
+                .sort((a, b) => a - b);
+
+            assert.deepEqual(statuses, [
+                200,
+                401,
+            ]);
+
+            assert.equal(
+                api.sessionRequests.length,
+                0
+            );
+        });
+    }
+);
+
+test(
+    "SMS: использование кода не сбрасывает cooldown",
+    async () => {
+        await withHarness(async (api) => {
+            const sent = await api.sendSms("login");
+
+            assert.equal(sent.status, 200);
+
+            const login = await api.request(
+                "/api/auth/login-sms",
+                {
+                    phone: PHONE,
+                    smsCode: api.lastCode(),
+                }
+            );
+
+            assert.equal(login.status, 200);
+
+            const repeated = await api.sendSms(
+                "login"
+            );
+
+            assert.equal(repeated.status, 429);
+
+            assert.equal(
+                api.smsRequests.length,
                 1
             );
         });

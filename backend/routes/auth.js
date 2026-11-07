@@ -25,6 +25,11 @@ const avatarsDir = path.join(__dirname, "..", "uploads", "avatars");
 const {
     resetPasswordAndRevokeSessions,
 } = require("../services/passwordResetService");
+const {
+    reserveSmsCode,
+    completeSmsSend,
+    consumeSmsCode,
+} = require("../services/smsCodeStore");
 
 function ensureDir(dirPath) {
     if (!fs.existsSync(dirPath)) {
@@ -167,16 +172,6 @@ const uploadAvatar = multer({
 
 });
 
-const generateCode = () =>
-    crypto.randomInt(100000, 1000000).toString();
-
-const smsCodes = new Map();
-
-const CODE_TTL_MS = 5 * 60 * 1000; // код живёт 5 минут
-const SMS_RESEND_COOLDOWN_MS = 60 * 1000; // повторная отправка не чаще 60 сек
-const SMS_MAX_SENDS = 5; // максимум 5 SMS
-const SMS_WINDOW_MS = 15 * 60 * 1000; // за 15 минут
-
 function normalizePhone(raw) {
     const digits = String(raw || "").replace(/\D/g, "");
     if (!digits) return "";
@@ -184,6 +179,25 @@ function normalizePhone(raw) {
     if (digits.length === 11 && digits.startsWith("7")) return digits;
     if (digits.length === 10) return "7" + digits;
     return digits;
+}
+
+function smsCodeFailureMessage(reason) {
+    switch (reason) {
+        case "incorrect":
+            return "Неверный код";
+
+        case "expired":
+            return "Код истёк. Запросите новый.";
+
+        case "too_many_attempts":
+            return (
+                "Слишком много неверных попыток. " +
+                "Запросите новый код."
+            );
+
+        default:
+            return "Код не найден. Запросите новый.";
+    }
 }
 
 router.post("/upload-avatar", authenticateToken, uploadAvatar.single("avatar"), async (req, res) => {
@@ -214,16 +228,24 @@ router.post("/upload-avatar", authenticateToken, uploadAvatar.single("avatar"), 
 });
 
 router.post("/send-sms", async (req, res) => {
-    const {phone, captchaToken, purpose = "register"} = req.body;
+    const {
+        phone,
+        captchaToken,
+        purpose = "register",
+    } = req.body || {};
 
     if (!phone) {
-        return res.status(400).json({message: "Введите номер телефона"});
+        return res.status(400).json({
+            message: "Введите номер телефона",
+        });
     }
 
     const phoneKey = normalizePhone(phone);
 
-    if (!phoneKey || phoneKey.length !== 11 || !phoneKey.startsWith("7")) {
-        return res.status(400).json({message: "Некорректный номер телефона"});
+    if (!/^7\d{10}$/.test(phoneKey)) {
+        return res.status(400).json({
+            message: "Некорректный номер телефона",
+        });
     }
 
     if (!["register", "login", "password_reset"].includes(purpose)) {
@@ -232,110 +254,148 @@ router.post("/send-sms", async (req, res) => {
         });
     }
 
-    const existingUser = await User.findOne({where: {phone: phoneKey}});
+    try {
+        const existingUser = await User.findOne({
+            where: { phone: phoneKey },
+        });
 
-    if (purpose === "register" && existingUser) {
-        return res.status(400).json({message: "Телефон уже используется"});
-    }
-
-    if ((purpose === "login" || purpose === "password_reset") && !existingUser) {
-        return res.status(404).json({message: "Пользователь не найден"});
-    }
-
-    if (purpose === "register") {
-        if (!captchaToken) {
-            return res.status(400).json({message: "Капча не пройдена"});
+        if (purpose === "register" && existingUser) {
+            return res.status(400).json({
+                message: "Телефон уже используется",
+            });
         }
 
+        if (
+            purpose !== "register" &&
+            !existingUser
+        ) {
+            return res.status(404).json({
+                message: "Пользователь не найден",
+            });
+        }
+
+        if (purpose === "register") {
+            if (!captchaToken) {
+                return res.status(400).json({
+                    message: "Капча не пройдена",
+                });
+            }
+
+            let captchaResponse;
+
+            try {
+                captchaResponse = await axios.post(
+                    "https://www.google.com/recaptcha/api/siteverify",
+                    null,
+                    {
+                        params: {
+                            secret: SECRET_KEY,
+                            response: captchaToken,
+                        },
+                        timeout: 10000,
+                    }
+                );
+            } catch (error) {
+                return res.status(500).json({
+                    message: "Ошибка проверки капчи",
+                });
+            }
+
+            if (!captchaResponse.data?.success) {
+                return res.status(400).json({
+                    message: "Ошибка капчи",
+                });
+            }
+        }
+
+        const apiId = process.env.SMS_RU_API_ID;
+
+        if (!apiId) {
+            return res.status(500).json({
+                message: "Сервис SMS не настроен",
+            });
+        }
+
+        // Резервируем отправку в MySQL.
+        // Лимиты проверяются под блокировкой записи.
+        const reservation = await reserveSmsCode({
+            phone: phoneKey,
+            purpose,
+        });
+
+        let accepted = false;
+
         try {
-            const captchaResponse = await axios.post(
-                "https://www.google.com/recaptcha/api/siteverify",
-                null,
+            const response = await axios.get(
+                "https://sms.ru/sms/send",
                 {
                     params: {
-                        secret: SECRET_KEY,
-                        response: captchaToken,
+                        api_id: apiId,
+                        to: phoneKey,
+                        msg:
+                            `Ваш код подтверждения: ${reservation.code}`,
+                        json: 1,
                     },
-                    timeout: 10000,
+                    timeout: 15000,
                 }
             );
 
-            if (!captchaResponse.data?.success) {
-                return res.status(400).json({message: "Ошибка капчи"});
-            }
+            const recipient =
+                response.data?.sms?.[phoneKey];
+
+            accepted =
+                response.data?.status === "OK" &&
+                (
+                    !recipient ||
+                    (
+                        recipient.status === "OK" &&
+                        Number(recipient.status_code) === 100
+                    )
+                );
         } catch (error) {
-            console.error("Ошибка проверки reCAPTCHA при отправке SMS:", error?.message);
-            return res.status(500).json({message: "Ошибка проверки капчи"});
+            // Не выводим axios.config:
+            // там могут находиться API-ключ и SMS-код.
+            console.error(
+                "Auth SMS transport error:",
+                error.code || "PROVIDER_UNAVAILABLE"
+            );
         }
-    }
 
-    const now = Date.now();
-    const existing = smsCodes.get(phoneKey);
-
-    if (existing?.lastSentAt && now - existing.lastSentAt < SMS_RESEND_COOLDOWN_MS) {
-        const waitSec = Math.ceil((SMS_RESEND_COOLDOWN_MS - (now - existing.lastSentAt)) / 1000);
-
-        return res.status(429).json({
-            message: `Отправить код повторно можно через ${waitSec} сек.`,
-            waitSec,
-        });
-    }
-
-    let sendHistory = Array.isArray(existing?.sendHistory) ? existing.sendHistory : [];
-
-    sendHistory = sendHistory.filter((time) => now - time < SMS_WINDOW_MS);
-
-    if (sendHistory.length >= SMS_MAX_SENDS) {
-        return res.status(429).json({
-            message: "Слишком много попыток отправки SMS. Попробуйте позже.",
-        });
-    }
-
-    const apiId = process.env.SMS_RU_API_ID;
-
-    if (!apiId) {
-        return res.status(500).json({message: "SMS_RU_API_ID не задан"});
-    }
-
-    const code = generateCode();
-
-    try {
-        const response = await axios.get("https://sms.ru/sms/send", {
-            params: {
-                api_id: apiId,
-                to: phoneKey,
-                msg: `Ваш код подтверждения: ${code}`,
-                json: 1,
-            },
-            timeout: 15000,
+        // Завершаем резервацию.
+        // Даже при неудаче лимиты сохраняются.
+        const finalized = await completeSmsSend({
+            phone: phoneKey,
+            reservationId: reservation.reservationId,
+            success: accepted,
         });
 
-        if (response.data?.status === "OK") {
-            smsCodes.set(phoneKey, {
-                code,
-                purpose,
-                expiresAt: now + CODE_TTL_MS,
-                lastSentAt: now,
-                sendHistory: [...sendHistory, now],
-                attempts: 0,
-            });
-
-            return res.json({
-                message: "Код отправлен",
-                cooldownSec: Math.ceil(SMS_RESEND_COOLDOWN_MS / 1000),
-                expiresInSec: Math.ceil(CODE_TTL_MS / 1000),
+        if (!accepted || !finalized) {
+            return res.status(502).json({
+                message:
+                    "Не удалось подтвердить отправку SMS. " +
+                    "Попробуйте позже.",
             });
         }
 
-        console.error("[SEND SMS] sms.ru отказал:", response.data);
-
-        return res.status(500).json({
-            message: "Не удалось отправить SMS. Попробуйте позже.",
+        return res.json({
+            message: "Код отправлен",
+            cooldownSec: reservation.cooldownSec,
+            expiresInSec: reservation.expiresInSec,
         });
     } catch (error) {
-        console.error("[SEND SMS] axios error message:", error?.message);
-        console.error("[SEND SMS] status:", error?.response?.status);
-        console.error("[SEND SMS] data:", error?.response?.data);
+        if (error.status) {
+            return res.status(error.status).json({
+                message: error.message,
+                ...(error.waitSec
+                    ? { waitSec: error.waitSec }
+                    : {}),
+            });
+        }
+
+        console.error(
+            "Auth SMS error:",
+            error.code || error.name
+        );
 
         return res.status(500).json({
             message: "Ошибка отправки SMS",
@@ -353,43 +413,32 @@ router.post("/password-reset/confirm", async (req, res) => {
         return res.status(400).json({message: "Пароль должен быть минимум 6 символов"});
     }
 
-    const entry = smsCodes.get(phoneKey);
-    if (!entry || entry.purpose !== "password_reset") {
-        return res.status(400).json({
-            message: "Код не найден. Запросите новый.",
+    let verification;
+
+    try {
+        verification = await consumeSmsCode({
+            phone: phoneKey,
+            purpose: "password_reset",
+            code: codeFromUser,
+        });
+    } catch (error) {
+        console.error(
+            "Password reset SMS verification error:",
+            error.code || error.name
+        );
+
+        return res.status(500).json({
+            message: "Ошибка проверки SMS-кода",
         });
     }
 
-    if (Date.now() > entry.expiresAt) {
-        smsCodes.delete(phoneKey);
-        return res.status(400).json({message: "Код истёк. Запросите новый."});
-    }
-
-    if (String(entry.code).trim() !== codeFromUser) {
-        entry.attempts = Number(entry.attempts || 0) + 1;
-
-        if (entry.attempts >= 5) {
-            smsCodes.delete(phoneKey);
-
-            return res.status(400).json({
-                message:
-                    "Слишком много неверных попыток. Запросите новый код.",
-            });
-        }
-
-        smsCodes.set(phoneKey, entry);
-
+    if (!verification.ok) {
         return res.status(400).json({
-            message: "Неверный код",
+            message: smsCodeFailureMessage(
+                verification.reason
+            ),
         });
     }
-
-// Удаляем код до первой асинхронной операции.
-//
-// Это не позволит двум одновременным запросам
-// использовать один код в рамках одного
-// процесса Node.js.
-    smsCodes.delete(phoneKey);
 
     try {
         await resetPasswordAndRevokeSessions({
@@ -437,41 +486,28 @@ router.post('/register', async (req, res) => {
     const phoneKey = normalizePhone(phone);
     const codeFromUser = String(smsCode || "").trim();
 
-    const entry = smsCodes.get(phoneKey); // {code, expiresAt} | undefined
-    const codeSaved = String(entry?.code || "").trim();
-
-    if (!entry || entry.purpose !== "register") {
-        return res.status(400).json({
-            message: "Неверный код",
-        });
-    }
-
-    if (Date.now() > entry.expiresAt) {
-        smsCodes.delete(phoneKey);
-        return res.status(400).json({message: "Код истёк. Запросите новый."});
-    }
-
-    if (codeSaved !== codeFromUser) {
-        entry.attempts = Number(entry.attempts || 0) + 1;
-
-        if (entry.attempts >= 5) {
-            smsCodes.delete(phoneKey);
-            return res.status(400).json({
-                message: "Слишком много неверных попыток. Запросите новый код.",
-            });
-        }
-
-        smsCodes.set(phoneKey, entry);
-
-        return res.status(400).json({message: "Неверный код"});
-    }
-
     try {
         // Проверка на существующего пользователя
         const userExists = await User.findOne({where: {phone: phoneKey}});
 
         if (userExists) {
             return res.status(400).json({message: "Телефон уже используется"});
+        }
+        // Проверяем тип клиента до использования SMS-кода.
+        const client = getSessionClient(req);
+
+        const verification = await consumeSmsCode({
+            phone: phoneKey,
+            purpose: "register",
+            code: codeFromUser,
+        });
+
+        if (!verification.ok) {
+            return res.status(400).json({
+                message: smsCodeFailureMessage(
+                    verification.reason
+                ),
+            });
         }
 
         // Хеширование пароля
@@ -486,11 +522,6 @@ router.post('/register', async (req, res) => {
             subscription_type: "premium",
             subscription_expires_at: expiresAt,
         });
-
-        smsCodes.delete(phoneKey);
-
-        // Генерация токена
-        const client = getSessionClient(req);
 
         let authResponse;
 
@@ -713,47 +744,39 @@ router.post("/login-sms", async (req, res) => {
         const phoneKey = normalizePhone(phone);
         const codeFromUser = String(smsCode || "").trim();
 
-        const entry = smsCodes.get(phoneKey);
-        if (!entry || entry.purpose !== "login") {
-            return res.status(401).json({
-                message: "Код не найден. Запросите новый.",
+        const user = await User.findOne({
+            where: { phone: phoneKey },
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: "Пользователь не найден",
             });
         }
-
-        if (Date.now() > entry.expiresAt) {
-            smsCodes.delete(phoneKey);
-            return res.status(401).json({message: "Код истёк. Запросите новый."});
-        }
-
-        if (String(entry.code).trim() !== codeFromUser) {
-            entry.attempts = Number(entry.attempts || 0) + 1;
-
-            if (entry.attempts >= 5) {
-                smsCodes.delete(phoneKey);
-
-                return res.status(401).json({
-                    message:
-                        "Слишком много неверных попыток. Запросите новый код.",
-                });
-            }
-
-            smsCodes.set(phoneKey, entry);
-
-            return res.status(401).json({
-                message: "Неверный код",
-            });
-        }
-
-        smsCodes.delete(phoneKey);
-
-        const user = await User.findOne({where: {phone: phoneKey}});
-        if (!user) return res.status(404).json({message: "User not found"});
 
         if (user.role === "banned") {
-            return res.status(403).json({message: "Ваш аккаунт заблокирован"});
+            return res.status(403).json({
+                message: "Ваш аккаунт заблокирован",
+            });
         }
 
+// Сначала проверяем Origin/тип клиента,
+// затем используем одноразовый код.
         const client = getSessionClient(req);
+
+        const verification = await consumeSmsCode({
+            phone: phoneKey,
+            purpose: "login",
+            code: codeFromUser,
+        });
+
+        if (!verification.ok) {
+            return res.status(401).json({
+                message: smsCodeFailureMessage(
+                    verification.reason
+                ),
+            });
+        }
 
         let authResponse;
 

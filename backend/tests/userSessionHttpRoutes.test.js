@@ -234,6 +234,16 @@ async function createTestServer() {
                 adminUsersUrl: () => "",
             },
 
+            "../services/passwordResetService": {
+                async resetPasswordAndRevokeSessions() {
+                    throw new Error(
+                        "Password reset is not used in session tests"
+                    );
+                },
+            },
+
+            "../services/smsCodeStore": {},
+
             "../services/authSessionService": {
                 createAuthSession,
                 refreshAuthSession,
