@@ -178,7 +178,8 @@ async function assignCashRegularOrder({
 
         if (
             !Number.isFinite(price) ||
-            price <= 0
+            price < 1 ||
+            price > 300000
         ) {
             throw fail(
                 409,

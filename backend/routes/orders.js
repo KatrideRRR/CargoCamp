@@ -45,6 +45,9 @@ const {
 const {
     startCommissionAutoCharge,
 } = require("../services/commissionAutoChargeService");
+const {
+    createRegularOrderRequest,
+} = require("../services/regularOrderRequestService");
 const uploadExecutorBefore = buildOrderPhotoUploader("executor_before");
 const uploadExecutorAfter = buildOrderPhotoUploader("executor_after");
 const uploadCustomerBefore = buildOrderPhotoUploader("customer_before");
@@ -184,35 +187,81 @@ async function hasBusyExpressOrder(ExpressOrder, executorId) {
     return Boolean(busyOrder);
 }
 
-async function removeExecutorFromOtherPendingOrders(Order, executorId, approvedOrderId) {
-    const orders = await Order.findAll({
+async function removeExecutorFromOtherPendingOrders(
+    Order,
+    executorId,
+    approvedOrderId
+) {
+    const candidates = await Order.findAll({
         where: {
             id: { [Op.ne]: approvedOrderId },
             status: "pending",
         },
+        attributes: ["id"],
     });
 
     const updatedOrderIds = [];
 
-    for (const order of orders) {
-        let requestedExecutors = safeJsonArray(order.requestedExecutors);
-        let requests = safeJsonArray(order.requests);
+    for (const candidate of candidates) {
+        const changed = await db.sequelize.transaction(
+            async (transaction) => {
+                const order = await Order.findByPk(
+                    candidate.id,
+                    {
+                        transaction,
+                        lock: transaction.LOCK.UPDATE,
+                    }
+                );
 
-        const beforeRequestedLen = requestedExecutors.length;
-        const beforeRequestsLen = requests.length;
+                if (
+                    !order ||
+                    order.status !== "pending"
+                ) {
+                    return false;
+                }
 
-        requestedExecutors = requestedExecutors.filter(id => Number(id) !== Number(executorId));
-        requests = requests.filter(r => Number(r.executorId) !== Number(executorId));
+                const requestedExecutors =
+                    safeJsonArray(order.requestedExecutors);
 
-        const changed =
-            requestedExecutors.length !== beforeRequestedLen ||
-            requests.length !== beforeRequestsLen;
+                const requests =
+                    safeJsonArray(order.requests);
+
+                const remainingExecutors =
+                    requestedExecutors.filter(
+                        (id) =>
+                            Number(id) !== Number(executorId)
+                    );
+
+                const remainingRequests =
+                    requests.filter(
+                        (item) =>
+                            Number(item.executorId) !==
+                            Number(executorId)
+                    );
+
+                if (
+                    remainingExecutors.length ===
+                    requestedExecutors.length &&
+                    remainingRequests.length ===
+                    requests.length
+                ) {
+                    return false;
+                }
+
+                order.requestedExecutors =
+                    JSON.stringify(remainingExecutors);
+
+                order.requests =
+                    JSON.stringify(remainingRequests);
+
+                await order.save({ transaction });
+
+                return true;
+            }
+        );
 
         if (changed) {
-            order.requestedExecutors = JSON.stringify(requestedExecutors);
-            order.requests = JSON.stringify(requests);
-            await order.save();
-            updatedOrderIds.push(order.id);
+            updatedOrderIds.push(candidate.id);
         }
     }
 
@@ -2051,162 +2100,22 @@ module.exports = (io) => {
     });
 
     router.post("/:id/request", authenticateToken, async (req, res) => {
-        const { id } = req.params;
-        const { proposedSum, comment, availableAt } = req.body;
-        const executorId = req.user.id;
-
         try {
-            const executor = await User.findByPk(executorId, {
-                attributes: ["id", "debt", "subscription_type", "subscription_expires_at"],
-            });
+            const executorId = Number(req.user.id);
 
-            if (!executor) {
-                return res.status(404).json({ message: "Пользователь не найден" });
-            }
-
-            const hasActivePremium =
-                executor.subscription_type === "premium" &&
-                executor.subscription_expires_at &&
-                new Date(executor.subscription_expires_at) > new Date();
-
-            if (!hasActivePremium && Number(executor.debt || 0) > 0) {
-                return res.status(400).json({
-                    message: "У вас есть задолженность по комиссии. Погасите её, чтобы брать новые заказы.",
-                });
-            }
-
-            const activeRegular = await Order.findOne({
-                where: {
-                    executorId,
-                    status: "active",
-                },
-            });
-
-            const activeExpress = await hasBusyExpressOrder(
-                ExpressOrder,
-                executorId
-            );
-
-            if (activeExpress) {
-                return res.status(409).json({
-                    message:
-                        "Пока выполняется экспресс-заказ, откликнуться на обычный заказ нельзя.",
-                });
-            }
-
-            const rawAvailableAt =
-                typeof availableAt === "string"
-                    ? availableAt.trim()
-                    : "";
-
-            const parsedAvailableAt = rawAvailableAt
-                ? new Date(rawAvailableAt)
-                : null;
-
-            if (
-                parsedAvailableAt &&
-                (
-                    !Number.isFinite(parsedAvailableAt.getTime()) ||
-                    parsedAvailableAt.getTime() <= Date.now() ||
-                    parsedAvailableAt.getTime() >
-                    Date.now() + 7 * 24 * 60 * 60 * 1000
-                )
-            ) {
-                return res.status(400).json({
-                    message:
-                        "Укажите корректное время начала в пределах следующих 7 дней.",
-                });
-            }
-
-            if (activeRegular && !parsedAvailableAt) {
-                return res.status(400).json({
-                    message:
-                        "Вы уже выполняете заказ. Укажите, когда сможете приступить к следующему.",
-                });
-            }
-
-            const order = await Order.findByPk(id);
-            if (!order) {
-                return res.status(404).json({ message: "Заказ не найден" });
-            }
-
-            if (order.status !== "pending") {
-                return res.status(400).json({ message: "Заказ недоступен" });
-            }
-
-            if (Number(order.creatorId) === Number(executorId)) {
-                return res.status(400).json({ message: "Нельзя откликнуться на свой заказ" });
-            }
-
-            const normalizedProposedSum = Number(
-                String(proposedSum ?? "")
-                    .replace(",", ".")
-                    .trim()
-            );
-
-            if (!Number.isFinite(normalizedProposedSum) || normalizedProposedSum <= 0) {
-                return res.status(400).json({
-                    message: "Введите корректную сумму больше 0",
-                });
-            }
-
-            const safeProposedSum = Math.round(normalizedProposedSum);
-            const safeComment = comment ? String(comment).trim().slice(0, 1000) : "";
-
-            let requests = [];
-            try {
-                requests = Array.isArray(order.requests)
-                    ? order.requests
-                    : JSON.parse(order.requests || "[]");
-
-                if (!Array.isArray(requests)) {
-                    requests = [];
-                }
-            } catch (e) {
-                console.error("Ошибка парсинга requests:", e);
-                requests = [];
-            }
-
-            if (requests.some((reqItem) => Number(reqItem.executorId) === Number(executorId))) {
-                return res.status(400).json({ message: "Вы уже отправили запрос на этот заказ" });
-            }
-
-            requests.push({
+            const result = await createRegularOrderRequest({
+                orderId: req.params.id,
                 executorId,
-                proposedSum: safeProposedSum,
-                comment: safeComment,
-                availableAt: parsedAvailableAt
-                    ? parsedAvailableAt.toISOString()
-                    : null,
-                sourceOrderId: activeRegular?.id || null,
-                createdAt: new Date().toISOString(),
+
+                proposedSum: req.body?.proposedSum,
+                comment: req.body?.comment,
+                availableAt: req.body?.availableAt,
             });
 
-            order.requests = JSON.stringify(requests);
+            const order = result.order;
 
-            let requestedExecutors = [];
             try {
-                requestedExecutors = Array.isArray(order.requestedExecutors)
-                    ? order.requestedExecutors
-                    : JSON.parse(order.requestedExecutors || "[]");
-
-                if (!Array.isArray(requestedExecutors)) {
-                    requestedExecutors = [];
-                }
-            } catch (e) {
-                requestedExecutors = [];
-            }
-
-            if (!requestedExecutors.map(Number).includes(Number(executorId))) {
-                requestedExecutors.push(executorId);
-            }
-
-            order.requestedExecutors = JSON.stringify(requestedExecutors);
-
-            await order.save();
-
-            if (req.logAction) {
-                await req.logAction({
+                await req.logAction?.({
                     req,
                     actorUserId: executorId,
                     actorRole: "user",
@@ -2214,46 +2123,87 @@ module.exports = (io) => {
                     entityType: "order",
                     entityId: order.id,
                     orderId: order.id,
+
                     meta: {
-                        proposedSum: safeProposedSum,
-                        comment: safeComment || null,
+                        proposedSum: result.proposedSum,
+                        comment: result.comment || null,
+                        sourceOrderId: result.sourceOrderId,
                     },
                 });
+            } catch (error) {
+                console.error(
+                    "Не удалось записать отклик в ActionLog:",
+                    error
+                );
             }
 
-            await notifyUser({
-                userId: order.creatorId || order.userId,
-                type: "order_request",
-                title: "Новый отклик на заказ",
-                body: `Исполнитель хочет выполнить заказ №${order.id}`,
-                orderId: order.id,
-                orderType: "regular",
-                data: {
-                    creatorId: order.creatorId || order.userId,
-                    executorId,
-                    requesterId: executorId,
-                    proposedSum: safeProposedSum,
-                },
-                socketEvent: `orderRequest:${String(order.creatorId || order.userId)}`,
-                socketPayload: {
+            try {
+                await notifyUser({
+                    userId: order.creatorId || order.userId,
+
+                    type: "order_request",
+                    title: "Новый отклик на заказ",
+
+                    body:
+                        `Исполнитель хочет выполнить заказ №${order.id}`,
+
                     orderId: order.id,
                     orderType: "regular",
 
-                    creatorId: order.creatorId || order.userId,
-                    executorId,
-                    requesterId: executorId,
+                    data: {
+                        creatorId:
+                            order.creatorId || order.userId,
 
-                    proposedSum: safeProposedSum,
-                },
-            });
+                        executorId,
+                        requesterId: executorId,
+
+                        proposedSum: result.proposedSum,
+                    },
+
+                    socketEvent:
+                        `orderRequest:${String(
+                            order.creatorId || order.userId
+                        )}`,
+
+                    socketPayload: {
+                        orderId: order.id,
+                        orderType: "regular",
+
+                        creatorId:
+                            order.creatorId || order.userId,
+
+                        executorId,
+                        requesterId: executorId,
+
+                        proposedSum: result.proposedSum,
+                    },
+                });
+            } catch (error) {
+                console.error(
+                    "Отклик сохранён, но уведомление не отправлено:",
+                    error
+                );
+            }
 
             return res.json({
-                message: "Запрос на выполнение отправлен заказчику",
+                message:
+                    "Запрос на выполнение отправлен заказчику",
+
                 order,
             });
         } catch (error) {
-            console.error("Ошибка при запросе заказа:", error);
-            return res.status(500).json({ message: "Ошибка сервера" });
+            console.error(
+                "Ошибка создания отклика:",
+                error
+            );
+
+            return res.status(
+                error.httpStatus || 500
+            ).json({
+                message: error.httpStatus
+                    ? error.message
+                    : "Ошибка сервера",
+            });
         }
     });
 
@@ -2455,7 +2405,7 @@ module.exports = (io) => {
                 }
             } else {
                 if (
-                    !["pending", "pending_payment"].includes(order.status) ||
+                    order.status !== "pending" ||
                     order.executorId
                 ) {
                     return res.status(409).json({
@@ -2516,7 +2466,11 @@ module.exports = (io) => {
                     .trim()
             );
 
-            if (!Number.isFinite(approvedSum) || approvedSum <= 0) {
+            if (
+                !Number.isFinite(approvedSum) ||
+                approvedSum < 1 ||
+                approvedSum > 300000
+            ) {
                 return res.status(400).json({
                     message: "У выбранного исполнителя некорректная сумма. Попросите отправить запрос заново.",
                 });
@@ -2637,12 +2591,7 @@ module.exports = (io) => {
                     {
                         where: {
                             id: order.id,
-                            status: {
-                                [Op.in]: [
-                                    "pending",
-                                    "pending_payment",
-                                ],
-                            },
+                            status: "pending",
                             executorId: null,
                         },
                     }
