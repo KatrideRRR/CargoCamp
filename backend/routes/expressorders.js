@@ -9,6 +9,14 @@ const {
 const { sequelize, ExpressOrder, ExpressSavedAddress, User, Order } = require("../models");
 const { notifyUser, notifyMany } = require("../services/notificationService");
 const { notifyNearbyExpressExecutors } = require("../services/expressPushService");
+const {
+    advanceExpressOrder,
+    cancelExpressOrder,
+} = require("../services/expressOrderLifecycleService");
+
+const {
+    calculateExpressCommission,
+} = require("../utils/expressCommissionPolicy");
 
 /* ================= helpers ================= */
 
@@ -740,6 +748,18 @@ router.post("/express-orders", authenticateToken, async (req, res) => {
             return res.status(400).json({ success: false, message: "paymentType должен быть cash|guarantee" });
         }
 
+        if (paymentType === "guarantee") {
+            await t.rollback();
+
+            return res.status(503).json({
+                success: false,
+                code: "EXPRESS_GUARANTEE_UNAVAILABLE",
+                message:
+                    "Гарантийная оплата экспресс-заказов " +
+                    "пока недоступна. Выберите оплату наличными.",
+            });
+        }
+
         const fLat = toNum(fromLat);
         const fLng = toNum(fromLng);
         const tLat = toNum(toLat);
@@ -975,6 +995,25 @@ router.post("/express-orders", authenticateToken, async (req, res) => {
 
         await t.commit();
 
+        try {
+            const io = req.app.locals.io;
+
+            if (io) {
+                io.emit(
+                    "expressOrdersUpdated",
+                    buildExpressPayload(order, {
+                        message:
+                            "Создан новый экспресс-заказ",
+                    })
+                );
+            }
+        } catch (error) {
+            console.error(
+                "Не удалось отправить событие создания заказа:",
+                error
+            );
+        }
+
         await notifyAdminsAboutNewExpressOrder({
             order,
             creatorId,
@@ -1032,7 +1071,9 @@ router.post("/express-orders", authenticateToken, async (req, res) => {
             order,
         });
     } catch (e) {
-        await t.rollback();
+        if (!t.finished) {
+            await t.rollback();
+        }
         console.error("express-orders POST error:", e);
         res.status(500).json({ success: false, message: "Ошибка сервера" });
     }
@@ -1517,22 +1558,12 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
 router.post("/express-orders/:id/on-the-way", authenticateToken, async (req, res) => {
     try {
         const executorId = req.user.id;
-        const id = Number(req.params.id);
-
-        const order = await ExpressOrder.findByPk(id);
-        if (!order) return res.status(404).json({ success: false, message: "Заказ не найден" });
-
-        if (order.executorId !== executorId) {
-            return res.status(403).json({ success: false, message: "Только исполнитель" });
-        }
-
-        if (order.status !== "accepted") {
-            return res.status(409).json({ success: false, message: `Нельзя из статуса ${order.status}` });
-        }
-
-        const from = order.status;
-        order.status = "on_the_way_to_A";
-        await order.save();
+        const { order, from } = await advanceExpressOrder({
+            orderId: req.params.id,
+            executorId,
+            fromStatuses: ["accepted"],
+            targetStatus: "on_the_way_to_A",
+        });
 
         const vehicleName = [
             order.executorVehicleColor,
@@ -1550,6 +1581,8 @@ router.post("/express-orders/:id/on-the-way", authenticateToken, async (req, res
                         : ""
                 }.`
                 : `Курьер выехал к точке A по заказу №${order.id}.`;
+        try {
+
 
         const io = req.app.locals.io;
 
@@ -1608,37 +1641,40 @@ router.post("/express-orders/:id/on-the-way", authenticateToken, async (req, res
             expressOrderId: order.id,
             meta: { from, to: order.status },
         });
-
+        } catch (sideEffectError) {
+            console.error(
+                "Express post-transition action failed:",
+                sideEffectError
+            );
+        }
         res.json({ success: true, order });
     } catch (e) {
         console.error("express-orders on-the-way error:", e);
-        res.status(500).json({ success: false, message: "Ошибка сервера" });
-    }
+        return res.status(
+            e.httpStatus || 500
+        ).json({
+            success: false,
+            message: e.httpStatus
+                ? e.message
+                : "Ошибка сервера",
+        });    }
 });
 
 router.post("/express-orders/:id/arrived", authenticateToken, async (req, res) => {
     try {
         const executorId = req.user.id;
-        const id = Number(req.params.id);
+        const { order, from } = await advanceExpressOrder({
+            orderId: req.params.id,
+            executorId,
+            fromStatuses: [
+                "accepted",
+                "on_the_way_to_A",
+            ],
+            targetStatus: "arrived_at_A",
+            timestampField: "arrivedAt",
+        });
 
-        const order = await ExpressOrder.findByPk(id);
-        if (!order) return res.status(404).json({ success: false, message: "Заказ не найден" });
-
-        if (order.executorId !== executorId) {
-            return res.status(403).json({ success: false, message: "Только исполнитель" });
-        }
-
-        if (!["accepted", "on_the_way_to_A"].includes(order.status)) {
-            return res.status(409).json({
-                success: false,
-                message: `Нельзя подтвердить прибытие из статуса ${order.status}`,
-            });
-        }
-
-        const from = order.status;
-        order.status = "arrived_at_A";
-        order.arrivedAt = new Date();
-        await order.save();
+        try{
 
         const io = req.app.locals.io;
 
@@ -1725,41 +1761,38 @@ router.post("/express-orders/:id/arrived", authenticateToken, async (req, res) =
                 order.executorVehiclePlate,
             },
         });
-
+        } catch (sideEffectError) {
+            console.error(
+                "Express post-transition action failed:",
+                sideEffectError
+            );
+        }
         res.json({ success: true, order });
     } catch (e) {
         console.error("express-orders arrived error:", e);
-        res.status(500).json({ success: false, message: "Ошибка сервера" });
-    }
+        return res.status(
+            e.httpStatus || 500
+        ).json({
+            success: false,
+            message: e.httpStatus
+                ? e.message
+                : "Ошибка сервера",
+        });    }
 });
 
 router.post("/express-orders/:id/start-waiting", authenticateToken, async (req, res) => {
     try {
         const executorId = req.user.id;
-        const id = Number(req.params.id);
+        const { order, from } = await advanceExpressOrder({
+            orderId: req.params.id,
+            executorId,
+            expressType: "taxi",
+            fromStatuses: ["arrived_at_A"],
+            targetStatus: "waiting_at_A",
+            timestampField: "waitingStartedAt",
+        });
 
-        const order = await ExpressOrder.findByPk(id);
-        if (!order) {
-            return res.status(404).json({ success: false, message: "Заказ не найден" });
-        }
-
-        if (Number(order.executorId) !== Number(executorId)) {
-            return res.status(403).json({ success: false, message: "Только исполнитель" });
-        }
-
-        if (order.type !== "taxi") {
-            return res.status(409).json({ success: false, message: "Ожидание доступно только для такси" });
-        }
-
-        if (order.status !== "arrived_at_A") {
-            return res.status(409).json({ success: false, message: "Сначала подтвердите прибытие" });
-        }
-
-        const from = order.status;
-        order.status = "waiting_at_A";
-        order.waitingStartedAt = new Date();
-        await order.save();
-
+        try{
         const io = req.app.locals.io;
 
         emitExpressStatusToParticipants(io, order, {
@@ -1794,41 +1827,37 @@ router.post("/express-orders/:id/start-waiting", authenticateToken, async (req, 
                 waitingStartedAt: order.waitingStartedAt,
             },
         });
-
+        } catch (sideEffectError) {
+            console.error(
+                "Express post-transition action failed:",
+                sideEffectError
+            );
+        }
         return res.json({ success: true, order });
     } catch (e) {
         console.error("express-orders start-waiting error:", e);
-        return res.status(500).json({ success: false, message: "Ошибка сервера" });
-    }
+        return res.status(
+            e.httpStatus || 500
+        ).json({
+            success: false,
+            message: e.httpStatus
+                ? e.message
+                : "Ошибка сервера",
+        });    }
 });
 
 router.post("/express-orders/:id/pick-up", authenticateToken, async (req, res) => {
     try {
         const executorId = req.user.id;
-        const id = Number(req.params.id);
-
-        const order = await ExpressOrder.findByPk(id);
-        if (!order) {
-            return res.status(404).json({ success: false, message: "Заказ не найден" });
-        }
-
-        if (Number(order.executorId) !== Number(executorId)) {
-            return res.status(403).json({ success: false, message: "Только исполнитель" });
-        }
-
-        if (order.type !== "courier") {
-            return res.status(409).json({ success: false, message: "Этот шаг доступен только для курьера" });
-        }
-
-        if (order.status !== "arrived_at_A") {
-            return res.status(409).json({ success: false, message: "Сначала подтвердите прибытие" });
-        }
-
-        const from = order.status;
-        order.status = "picked_up";
-        order.pickedUpAt = new Date();
-        await order.save();
-
+        const { order, from } = await advanceExpressOrder({
+            orderId: req.params.id,
+            executorId,
+            expressType: "courier",
+            fromStatuses: ["arrived_at_A"],
+            targetStatus: "picked_up",
+            timestampField: "pickedUpAt",
+        });
+try{
         const io = req.app.locals.io;
 
         emitExpressStatusToParticipants(io, order, {
@@ -1863,43 +1892,41 @@ router.post("/express-orders/:id/pick-up", authenticateToken, async (req, res) =
                 pickedUpAt: order.pickedUpAt,
             },
         });
-
+} catch (sideEffectError) {
+    console.error(
+        "Express post-transition action failed:",
+        sideEffectError
+    );
+}
         return res.json({ success: true, order });
     } catch (e) {
         console.error("express-orders pick-up error:", e);
-        return res.status(500).json({ success: false, message: "Ошибка сервера" });
-    }
+        return res.status(
+            e.httpStatus || 500
+        ).json({
+            success: false,
+            message: e.httpStatus
+                ? e.message
+                : "Ошибка сервера",
+        });    }
 });
 
 router.post("/express-orders/:id/start", authenticateToken, async (req, res) => {
     try {
         const executorId = req.user.id;
-        const id = Number(req.params.id);
+        const { order, from } = await advanceExpressOrder({
+            orderId: req.params.id,
+            executorId,
 
-        const order = await ExpressOrder.findByPk(id);
-        if (!order) return res.status(404).json({ success: false, message: "Заказ не найден" });
+            allowedStatusesByType: {
+                taxi: ["waiting_at_A"],
+                courier: ["picked_up"],
+            },
 
-        if (Number(order.executorId) !== Number(executorId)) {
-            return res.status(403).json({ success: false, message: "Только исполнитель" });
-        }
-
-        const allowedStatuses =
-            order.type === "taxi"
-                ? ["waiting_at_A"]
-                : ["picked_up"];
-
-        if (!allowedStatuses.includes(order.status)) {
-            return res.status(409).json({
-                success: false,
-                message: "Нельзя начать выполнение из текущего статуса",
-            });
-        }
-
-        const from = order.status;
-        order.status = "in_progress";
-        order.startedAt = new Date();
-        await order.save();
-
+            targetStatus: "in_progress",
+            timestampField: "startedAt",
+        });
+try{
         const io = req.app.locals.io;
 
         emitExpressStatusToParticipants(io, order, {
@@ -1939,11 +1966,23 @@ router.post("/express-orders/:id/start", authenticateToken, async (req, res) => 
             expressOrderId: order.id,
             meta: { from, to: order.status },
         });
-
+} catch (sideEffectError) {
+    console.error(
+        "Express post-transition action failed:",
+        sideEffectError
+    );
+}
         return res.json({ success: true, order });
     } catch (e) {
         console.error("express-orders start error:", e);
-        return res.status(500).json({ success: false, message: "Ошибка сервера" });
+        return res.status(
+            e.httpStatus || 500
+        ).json({
+            success: false,
+            message: e.httpStatus
+                ? e.message
+                : "Ошибка сервера",
+        });
     }
 });
 
@@ -2059,57 +2098,36 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
             const now =
                 new Date();
 
-            const premiumActive =
-                executor
-                    .subscription_type ===
-                "premium" &&
-                (
-                    !executor
-                        .subscription_expires_at ||
-                    new Date(
-                        executor
-                            .subscription_expires_at
-                    ) > now
-                );
+            const totalRubles = Number(order.totalPrice);
 
-            /*
-             * totalPrice хранится в рублях.
-             * Всегда переводим рубли
-             * в копейки одинаково.
-             */
-            const totalRubles =
-                Number(
-                    order.totalPrice
-                );
+            let commission;
 
-            if (
-                !Number.isFinite(
-                    totalRubles
-                ) ||
-                totalRubles <= 0
-            ) {
+            try {
+                commission = calculateExpressCommission({
+                    totalPriceRub: totalRubles,
+
+                    subscriptionType:
+                    executor.subscription_type,
+
+                    subscriptionExpiresAt:
+                    executor.subscription_expires_at,
+
+                    now,
+                });
+            } catch (error) {
                 await t.rollback();
 
                 return res.status(409).json({
                     success: false,
-                    message:
-                        "У заказа указана некорректная стоимость",
+                    message: error.message,
                 });
             }
 
-            const totalKopecks =
-                Math.round(
-                    totalRubles *
-                    100
-                );
-
-            const feeKopecks =
-                premiumActive
-                    ? 0
-                    : Math.round(
-                        totalKopecks *
-                        0.10
-                    );
+            const {
+                premiumActive,
+                totalKopecks,
+                feeKopecks,
+            } = commission;
 
             let paidBySavedCard = false;
             let debtAdded = false;
@@ -2122,9 +2140,24 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
             if (feeKopecks > 0) {
                 // Сначала начисляем задолженность.
                 // Здесь НЕТ обращения к платёжному провайдеру.
-                executor.debt =
+                const newDebt =
                     Number(executor.debt || 0) +
                     feeKopecks;
+
+                if (
+                    !Number.isSafeInteger(newDebt) ||
+                    newDebt < 0
+                ) {
+                    await t.rollback();
+
+                    return res.status(409).json({
+                        success: false,
+                        message:
+                            "Некорректная итоговая задолженность исполнителя",
+                    });
+                }
+
+                executor.debt = newDebt;
 
                 await executor.save({
                     transaction: t,
@@ -2166,7 +2199,7 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
             await order.save({
                 transaction: t,
             });
-
+try{
             await req.logAction({
                 req,
 
@@ -2209,7 +2242,12 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
                     debtAdded,
                 },
             });
-
+} catch (error) {
+    console.error(
+        "Express cancellation audit failed:",
+        error
+    );
+}
             await t.commit();
 
             // Обращаемся к банку только ПОСЛЕ COMMIT.
@@ -2252,7 +2290,7 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
                         "Экспресс-заказ завершён",
                 }
             );
-
+try{
             await notifyUser({
                 userId:
                 order.creatorId,
@@ -2312,68 +2350,80 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
                     order.type,
                 },
             });
+} catch (error) {
+    console.error(
+        "Express cancellation audit failed:",
+        error
+    );
+}
 
-            await notifyUser({
-                userId:
-                order.executorId,
+try {
+    await notifyUser({
+        userId:
+        order.executorId,
 
-                type:
-                    "express_completed",
+        type:
+            "express_completed",
 
-                title:
-                    "Экспресс-заказ завершён",
+        title:
+            "Экспресс-заказ завершён",
 
-                body:
-                    `Заказ №${order.id} успешно завершён`,
+        body:
+            `Заказ №${order.id} успешно завершён`,
 
-                orderId:
-                order.id,
+        orderId:
+        order.id,
 
-                orderType:
-                    "express",
+        orderType:
+            "express",
 
-                data: {
-                    creatorId:
-                    order.creatorId,
+        data: {
+            creatorId:
+            order.creatorId,
 
-                    executorId:
-                    order.executorId,
+            executorId:
+            order.executorId,
 
-                    expressType:
-                    order.type,
+            expressType:
+            order.type,
 
-                    status:
-                    order.status,
+            status:
+            order.status,
 
-                    completedAt:
-                    order.completedAt,
+            completedAt:
+            order.completedAt,
 
-                    commissionKopecks:
-                    feeKopecks,
+            commissionKopecks:
+            feeKopecks,
 
-                    commissionStatus,
-                },
+            commissionStatus,
+        },
 
-                socketEvent:
-                    "expressOrderCompletedForExecutor",
+        socketEvent:
+            "expressOrderCompletedForExecutor",
 
-                socketPayload: {
-                    orderId:
-                    order.id,
+        socketPayload: {
+            orderId:
+            order.id,
 
-                    orderType:
-                        "express",
+            orderType:
+                "express",
 
-                    message:
-                        "Экспресс-заказ завершён",
+            message:
+                "Экспресс-заказ завершён",
 
-                    commissionKopecks:
-                    feeKopecks,
+            commissionKopecks:
+            feeKopecks,
 
-                    commissionStatus,
-                },
-            });
-
+            commissionStatus,
+        },
+    });
+} catch (error) {
+    console.error(
+        "Express cancellation audit failed:",
+        error
+    );
+}
             return res.json({
                 success: true,
 
@@ -2436,62 +2486,20 @@ router.post("/express-orders/:id/cancel", authenticateToken, async (req, res) =>
             });
         }
 
-        const order = await ExpressOrder.findByPk(id);
-        if (!order) {
-            return res.status(404).json({
-                success: false,
-                message: "Заказ не найден",
-            });
-        }
+        const {
+            order,
+            from,
+            cancelledAt,
+            cancelledByRole,
+        } = await cancelExpressOrder({
+            orderId: id,
+            userId,
+        });
 
-        if (!isParticipant(order, userId)) {
-            return res.status(403).json({
-                success: false,
-                message: "Нет доступа",
-            });
-        }
-
-        if (["completed", "cancelled"].includes(order.status)) {
-            return res.status(409).json({
-                success: false,
-                message: `Заказ уже ${order.status === "completed" ? "завершён" : "отменён"}`,
-            });
-        }
-
-        const byCreator = Number(order.creatorId) === Number(userId);
-        const byExecutor = Number(order.executorId) === Number(userId);
-
-        const creatorAllowed = [
-            "created",
-            "accepted",
-            "on_the_way_to_A",
-            "arrived_at_A",
-            "waiting_at_A",
-        ].includes(order.status);
-
-        const execAllowed = [
-            "accepted",
-            "on_the_way_to_A",
-            "arrived_at_A",
-            "waiting_at_A",
-        ].includes(order.status);
-
-        if ((byCreator && !creatorAllowed) || (byExecutor && !execAllowed)) {
-            return res.status(409).json({
-                success: false,
-                message: `Нельзя отменить из статуса ${order.status}`,
-            });
-        }
-
-        const from = order.status;
-
-        order.status = "cancelled";
-        order.dealStatus = "cancelled";
-        order.cancelledAt = new Date();
-
-        await order.save();
-
-        const cancelledByRole = byCreator ? "creator" : "executor";
+// Временная метка для ответа и уведомлений.
+// Долговременная история отмены хранится
+// в ActionLog.
+        order.cancelledAt = cancelledAt;
 
         const cancelledByText =
             cancelledByRole === "creator"
@@ -2509,6 +2517,7 @@ router.post("/express-orders/:id/cancel", authenticateToken, async (req, res) =>
             message: body,
         });
 
+        try{
         await req.logAction({
             req,
             actorUserId: userId,
@@ -2525,7 +2534,12 @@ router.post("/express-orders/:id/cancel", authenticateToken, async (req, res) =>
                 cancelledByRole,
             },
         });
-
+    } catch (error) {
+        console.error(
+            "Express cancellation audit failed:",
+            error
+        );
+    }
         const io = req.app.locals.io;
 
         const participantIds = [
@@ -2547,6 +2561,7 @@ router.post("/express-orders/:id/cancel", authenticateToken, async (req, res) =>
         );
 
         if (notifyTo.length > 0) {
+            try{
             await notifyMany(notifyTo, {
                 type: "express_cancelled",
                 title,
@@ -2565,6 +2580,12 @@ router.post("/express-orders/:id/cancel", authenticateToken, async (req, res) =>
                     cancelledAt: order.cancelledAt,
                 },
             });
+            } catch (error) {
+                console.error(
+                    "Express cancellation audit failed:",
+                    error
+                );
+            }
         }
 
         return res.json({
@@ -2575,10 +2596,18 @@ router.post("/express-orders/:id/cancel", authenticateToken, async (req, res) =>
             message: body,
         });
     } catch (e) {
-        console.error("express-orders cancel error:", e);
-        return res.status(500).json({
+        console.error(
+            "express-orders cancel error:",
+            e
+        );
+
+        return res.status(
+            e.httpStatus || 500
+        ).json({
             success: false,
-            message: "Ошибка сервера",
+            message: e.httpStatus
+                ? e.message
+                : "Ошибка сервера",
         });
     }
 });
