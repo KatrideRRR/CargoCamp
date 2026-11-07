@@ -164,6 +164,7 @@ async function createHarness() {
     };
 
     let captchaRequests = 0;
+    let smsRecipientAccepted = true;
     let nextUserId = 2;
 
     const User = {
@@ -227,6 +228,17 @@ async function createHarness() {
             return {
                 data: {
                     status: "OK",
+                    sms: {
+                        [options.params.to]: {
+                            status: smsRecipientAccepted
+                                ? "OK"
+                                : "ERROR",
+
+                            status_code: smsRecipientAccepted
+                                ? 100
+                                : 201,
+                        },
+                    },
                 },
             };
         },
@@ -425,6 +437,9 @@ async function createHarness() {
         smsRequests,
         sessionRequests,
         passwordResets,
+        setSmsRecipientAccepted(value) {
+            smsRecipientAccepted = Boolean(value);
+        },
 
         get captchaRequests() {
             return captchaRequests;
@@ -448,6 +463,7 @@ async function createHarness() {
             }
         },
     };
+
 }
 
 async function withHarness(callback) {
@@ -861,6 +877,29 @@ test(
                 api.smsRequests.length,
                 1
             );
+        });
+    }
+);
+
+test(
+    "SMS: отказ конкретному получателю не активирует код",
+    async () => {
+        await withHarness(async (api) => {
+            api.setSmsRecipientAccepted(false);
+
+            const response = await api.sendSms("login");
+
+            assert.equal(response.status, 502);
+
+            const login = await api.request(
+                "/api/auth/login-sms",
+                {
+                    phone: PHONE,
+                    smsCode: api.lastCode(),
+                }
+            );
+
+            assert.equal(login.status, 401);
         });
     }
 );

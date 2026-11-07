@@ -345,13 +345,9 @@ router.post("/send-sms", async (req, res) => {
 
             accepted =
                 response.data?.status === "OK" &&
-                (
-                    !recipient ||
-                    (
-                        recipient.status === "OK" &&
-                        Number(recipient.status_code) === 100
-                    )
-                );
+                recipient?.status === "OK" &&
+                Number(recipient?.status_code) === 100;
+
         } catch (error) {
             // Не выводим axios.config:
             // там могут находиться API-ключ и SMS-код.
