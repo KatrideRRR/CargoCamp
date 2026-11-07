@@ -185,51 +185,78 @@ async function createHarness() {
     };
 
     const fakeAxios = {
-        async post(url) {
+        async post(url, body, options = {}) {
+            // Искусственная проверка reCAPTCHA.
             if (
-                url !==
+                url ===
                 "https://www.google.com/recaptcha/api/siteverify"
             ) {
-                throw new Error(
-                    "Незапланированный внешний запрос"
-                );
+                captchaRequests++;
+
+                return {
+                    data: {
+                        success: true,
+                    },
+                };
             }
 
-            captchaRequests++;
-
-            return {
-                data: {
-                    success: true,
-                },
-            };
-        },
-
-        async get(url, options) {
-            if (url !== "https://sms.ru/sms/send") {
-                throw new Error(
-                    "Незапланированный внешний запрос"
-                );
-            }
-
-            const message = String(
-                options?.params?.msg || ""
+            // Любые другие внешние запросы запрещены.
+            assert.equal(
+                url,
+                "https://sms.ru/sms/send"
             );
 
-            const code = message.match(/\b\d{6}\b/)?.[0];
+            // Проверяем безопасный способ передачи данных.
+            assert.equal(
+                typeof body,
+                "string"
+            );
 
-            assert.ok(code, "SMS должна содержать код");
+            assert.equal(
+                options.headers?.["Content-Type"],
+                "application/x-www-form-urlencoded"
+            );
+
+            assert.equal(options.timeout, 15000);
+            assert.equal(options.maxRedirects, 0);
+
+            // SMS нельзя отправлять параметрами URL.
+            assert.equal(options.params, undefined);
+
+            const params = new URLSearchParams(body);
+
+            assert.equal(
+                params.get("api_id"),
+                "CARGOCAMP_TEST_ONLY"
+            );
+
+            assert.equal(
+                params.get("json"),
+                "1"
+            );
+
+            const phone = params.get("to");
+            const message = params.get("msg") || "";
+
+            const code =
+                message.match(/\b\d{6}\b/)?.[0];
+
+            assert.ok(
+                code,
+                "SMS должна содержать шестизначный код"
+            );
 
             smsRequests.push({
-                phone: options.params.to,
+                phone,
                 code,
+                method: "POST",
             });
 
-            // Искусственный ответ SMS.ru.
             return {
                 data: {
                     status: "OK",
                     sms: {
-                        [options.params.to]: {
+                        [phone]: {
                             status: smsRecipientAccepted
                                 ? "OK"
                                 : "ERROR",
@@ -241,6 +268,12 @@ async function createHarness() {
                     },
                 },
             };
+        },
+
+        async get() {
+            throw new Error(
+                "Отправка SMS через GET запрещена"
+            );
         },
     };
 
@@ -900,6 +933,33 @@ test(
             );
 
             assert.equal(login.status, 401);
+        });
+    }
+);
+
+test(
+    "SMS: код отправляется через POST без параметров URL",
+    async () => {
+        await withHarness(async (api) => {
+            const response =
+                await api.sendSms("login");
+
+            assert.equal(response.status, 200);
+
+            assert.equal(
+                api.smsRequests.length,
+                1
+            );
+
+            assert.equal(
+                api.smsRequests[0].method,
+                "POST"
+            );
+
+            assert.match(
+                api.smsRequests[0].code,
+                /^\d{6}$/
+            );
         });
     }
 );

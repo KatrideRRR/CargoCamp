@@ -326,17 +326,26 @@ router.post("/send-sms", async (req, res) => {
         let accepted = false;
 
         try {
-            const response = await axios.get(
+            const form = new URLSearchParams({
+                api_id: apiId,
+                to: phoneKey,
+                msg:
+                    `CargoCamp: ваш код подтверждения: ` +
+                    `${reservation.code}. ` +
+                    `Никому не сообщайте код.`,
+                json: "1",
+            });
+
+            const response = await axios.post(
                 "https://sms.ru/sms/send",
+                form.toString(),
                 {
-                    params: {
-                        api_id: apiId,
-                        to: phoneKey,
-                        msg:
-                            `Ваш код подтверждения: ${reservation.code}`,
-                        json: 1,
+                    headers: {
+                        "Content-Type":
+                            "application/x-www-form-urlencoded",
                     },
                     timeout: 15000,
+                    maxRedirects: 0,
                 }
             );
 
