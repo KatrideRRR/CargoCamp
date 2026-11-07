@@ -191,3 +191,55 @@ test("Неизвестный способ подписи запрещён", () =
 
     assert.notEqual(check(data).length, 0);
 });
+
+test("Нулевой ID сессии не принимается", () => {
+    const data = fixtures();
+
+    data.signature.evidence.sessionId = "0";
+
+    assert.notDeepEqual(check(data), []);
+});
+
+test("Чужая первичная SMS-подпись запрещена", () => {
+    const data = fixtures();
+
+    data.bootstrapSignature.userId = 999;
+
+    assert.notDeepEqual(check(data), []);
+});
+
+test("Подмена времени активации обнаруживается", () => {
+    const data = fixtures();
+
+    data.signature.evidence
+        .pepEnrollmentSnapshot.activatedAt =
+        "2026-11-01T10:01:00.000Z";
+
+    assert.notDeepEqual(check(data), []);
+});
+
+test("Согласие после создания SMS-запроса недопустимо", () => {
+    const data = fixtures();
+
+    data.agreement.acceptedAt =
+        "2026-11-01T09:59:30.000Z";
+
+    assert.notDeepEqual(check(data), []);
+});
+
+test("Изменение пользователя SMS-запроса обнаруживается", () => {
+    const data = fixtures();
+
+    data.bootstrapChallenge.userId = 999;
+
+    assert.notDeepEqual(check(data), []);
+});
+
+test("Изменение документа первичной SMS обнаруживается", () => {
+    const data = fixtures();
+
+    data.bootstrapChallenge.documentHash =
+        "f".repeat(64);
+
+    assert.notDeepEqual(check(data), []);
+});

@@ -1,5 +1,12 @@
+function validId(value) {
+    return /^[1-9]\d{0,19}$/.test(
+        String(value ?? "")
+    );
+}
+
 function sameId(a, b) {
-    return /^[1-9]\d{0,19}$/.test(String(a ?? "")) &&
+    return validId(a) &&
+        validId(b) &&
         String(a) === String(b);
 }
 
@@ -68,6 +75,13 @@ function verifySignatureEvidence({
     const warnings = [];
     const evidence = signature.evidence || {};
 
+    const firstSmsRequestAt =
+        signature.method === "otp_sms"
+            ? time(challenge?.createdAt)
+            : signature.method === "authenticated_click"
+                ? time(bootstrapChallenge?.createdAt)
+                : NaN;
+
     if (
         !agreement ||
         !archiveValid ||
@@ -80,7 +94,11 @@ function verifySignatureEvidence({
         agreement.policyCode !== signature.signaturePolicyCode ||
         agreement.policyVersion !== signature.signaturePolicyVersion ||
         !Number.isFinite(time(agreement.acceptedAt)) ||
-        time(agreement.acceptedAt) > time(signature.signedAt)
+        time(agreement.acceptedAt) > time(signature.signedAt) ||
+        (
+            Number.isFinite(firstSmsRequestAt) &&
+            time(agreement.acceptedAt) > firstSmsRequestAt
+        )
     ) {
         warnings.push(
             "Не подтверждено принятие архивной редакции правил ПЭП."
@@ -112,7 +130,7 @@ function verifySignatureEvidence({
                 evidence.method === "authenticated_click" &&
                 evidence.intentConfirmed === true &&
 
-                sameId(evidence.sessionId, evidence.sessionId) &&
+                validId(evidence.sessionId) &&
 
                 sameHash(
                     evidence.documentHash,
@@ -201,7 +219,7 @@ function verifySignatureEvidence({
                 [signed, activated, expires, bootstrapSigned]
                     .every(Number.isFinite) &&
 
-                bootstrapSigned <= activated &&
+                bootstrapSigned === activated &&
                 activated <= signed &&
                 signed < expires;
 
