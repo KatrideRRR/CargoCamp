@@ -164,11 +164,8 @@ const uploadAvatar = multer({
 
 });
 
-const generateTemporaryPassword = () => {
-    return Math.random().toString(36).slice(-8);
-};
-
-const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString();
+const generateCode = () =>
+    crypto.randomInt(100000, 1000000).toString();
 
 const smsCodes = new Map();
 
@@ -224,6 +221,12 @@ router.post("/send-sms", async (req, res) => {
 
     if (!phoneKey || phoneKey.length !== 11 || !phoneKey.startsWith("7")) {
         return res.status(400).json({message: "Некорректный номер телефона"});
+    }
+
+    if (!["register", "login", "password_reset"].includes(purpose)) {
+        return res.status(400).json({
+            message: "Недопустимое назначение SMS-кода",
+        });
     }
 
     const existingUser = await User.findOne({where: {phone: phoneKey}});
@@ -307,6 +310,7 @@ router.post("/send-sms", async (req, res) => {
         if (response.data?.status === "OK") {
             smsCodes.set(phoneKey, {
                 code,
+                purpose,
                 expiresAt: now + CODE_TTL_MS,
                 lastSentAt: now,
                 sendHistory: [...sendHistory, now],
@@ -347,7 +351,11 @@ router.post("/password-reset/confirm", async (req, res) => {
     }
 
     const entry = smsCodes.get(phoneKey);
-    if (!entry) return res.status(400).json({message: "Код не найден. Запросите новый."});
+    if (!entry || entry.purpose !== "password_reset") {
+        return res.status(400).json({
+            message: "Код не найден. Запросите новый.",
+        });
+    }
 
     if (Date.now() > entry.expiresAt) {
         smsCodes.delete(phoneKey);
@@ -355,7 +363,22 @@ router.post("/password-reset/confirm", async (req, res) => {
     }
 
     if (String(entry.code).trim() !== codeFromUser) {
-        return res.status(400).json({message: "Неверный код"});
+        entry.attempts = Number(entry.attempts || 0) + 1;
+
+        if (entry.attempts >= 5) {
+            smsCodes.delete(phoneKey);
+
+            return res.status(400).json({
+                message:
+                    "Слишком много неверных попыток. Запросите новый код.",
+            });
+        }
+
+        smsCodes.set(phoneKey, entry);
+
+        return res.status(400).json({
+            message: "Неверный код",
+        });
     }
 
     const user = await User.findOne({where: {phone: phoneKey}});
@@ -391,7 +414,11 @@ router.post('/register', async (req, res) => {
     const entry = smsCodes.get(phoneKey); // {code, expiresAt} | undefined
     const codeSaved = String(entry?.code || "").trim();
 
-    if (!entry) return res.status(400).json({message: "Неверный код"});
+    if (!entry || entry.purpose !== "register") {
+        return res.status(400).json({
+            message: "Неверный код",
+        });
+    }
 
     if (Date.now() > entry.expiresAt) {
         smsCodes.delete(phoneKey);
@@ -661,7 +688,11 @@ router.post("/login-sms", async (req, res) => {
         const codeFromUser = String(smsCode || "").trim();
 
         const entry = smsCodes.get(phoneKey);
-        if (!entry) return res.status(401).json({message: "Код не найден. Запросите новый."});
+        if (!entry || entry.purpose !== "login") {
+            return res.status(401).json({
+                message: "Код не найден. Запросите новый.",
+            });
+        }
 
         if (Date.now() > entry.expiresAt) {
             smsCodes.delete(phoneKey);
@@ -669,7 +700,22 @@ router.post("/login-sms", async (req, res) => {
         }
 
         if (String(entry.code).trim() !== codeFromUser) {
-            return res.status(401).json({message: "Неверный код"});
+            entry.attempts = Number(entry.attempts || 0) + 1;
+
+            if (entry.attempts >= 5) {
+                smsCodes.delete(phoneKey);
+
+                return res.status(401).json({
+                    message:
+                        "Слишком много неверных попыток. Запросите новый код.",
+                });
+            }
+
+            smsCodes.set(phoneKey, entry);
+
+            return res.status(401).json({
+                message: "Неверный код",
+            });
         }
 
         smsCodes.delete(phoneKey);
@@ -938,46 +984,12 @@ router.get('/user/:id', async (req, res) => {
     }
 });
 
-router.post("/recover-password", async (req, res) => {
-    const {phone} = req.body;
-
-    if (!phone) {
-        return res.status(400).json({message: "Введите номер телефона"});
-    }
-
-    try {
-        const phoneKey = normalizePhone(phone);
-        const user = await User.findOne({where: {phone: phoneKey}});
-        if (!user) {
-            return res.status(404).json({message: "Пользователь не найден"});
-        }
-
-        // Генерируем временный пароль
-        const tempPassword = generateTemporaryPassword();
-        const hashedPassword = await bcrypt.hash(tempPassword, 10);
-
-        // Обновляем пароль в базе данных
-        await user.update({password: hashedPassword});
-
-        // Отправляем новый пароль через SMS
-        const response = await axios.get("https://sms.ru/sms/send", {
-            params: {
-                api_id: "706A8778-9606-1CA6-F061-72BA6F3A60E3",
-                to: phone,
-                msg: `Ваш новый пароль: ${tempPassword}`, // Отправляем временный пароль
-                json: 1,
-            },
-        });
-
-        if (response.data.status === "OK") {
-            return res.json({message: "Новый пароль отправлен на ваш номер"});
-        } else {
-            return res.status(500).json({message: "Ошибка отправки SMS"});
-        }
-    } catch (error) {
-        console.error("Ошибка восстановления пароля:", error);
-        return res.status(500).json({message: "Ошибка сервера"});
-    }
+router.post("/recover-password", (req, res) => {
+    return res.status(410).json({
+        message:
+            "Старый способ восстановления пароля отключён. " +
+            "Используйте подтверждение по SMS.",
+    });
 });
 
 router.get("/reviews/user/:userId", async (req, res) => {
@@ -1597,8 +1609,7 @@ router.post("/vehicle/me", authenticateToken, async (req, res) => {
     }
 });
 
-router.post("/vehicle/photo", authenticateToken, (req, res, next) => {
-    vehiclePhotoUpload(req, res, (error) => {
+router.post("/vehicle/photo", authenticateToken, (req, res, next) => {vehiclePhotoUpload(req, res, (error) => {
         if (!error) {
             return next();
         }
@@ -1619,10 +1630,7 @@ router.post("/vehicle/photo", authenticateToken, (req, res, next) => {
             message:
                 "Не удалось загрузить фотографию автомобиля",
         });
-    });
-}, async (req, res) => {
-    let newFilePath = null;
-    try {
+    });}, async (req, res) => {let newFilePath = null;try {
         const userId = Number(req.user.id);
 
         if (!req.file) {
@@ -1690,8 +1698,7 @@ router.post("/vehicle/photo", authenticateToken, (req, res, next) => {
             user.vehicleVerificationStatus,
         });
 
-    } catch (error) {
-        if (newFilePath) {
+    } catch (error) {if (newFilePath) {
             try {
                 await fs.promises.rm(
                     newFilePath,
@@ -1703,19 +1710,10 @@ router.post("/vehicle/photo", authenticateToken, (req, res, next) => {
                     cleanupError
                 );
             }
-        }
-
-        console.error(
-            "Ошибка загрузки фото автомобиля:",
-            error
-        );
-
-        return res.status(500).json({
+        }console.error("Ошибка загрузки фото автомобиля:", error);return res.status(500).json({
             success: false,
             message:
                 "Не удалось сохранить фотографию автомобиля",
-        });
-    }
-});
+        });}});
 
 module.exports = router;
