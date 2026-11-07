@@ -244,6 +244,15 @@ async function createTestServer() {
 
             "../services/smsCodeStore": {},
 
+            "../services/publicUserBadgesService": {
+                async getPublicUserBadges() {
+                    return {
+                        identityVerified: false,
+                        isPensioner: false,
+                    };
+                },
+            },
+
             "../services/authSessionService": {
                 createAuthSession,
                 refreshAuthSession,

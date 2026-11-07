@@ -50,22 +50,14 @@ const formatOrderDate = (value) => {
 };
 
 const normalizeUserStatus = (user) => {
-    const status = String(
-        user?.userStatus ??
-        user?.user_status ??
-        ""
-    )
-        .trim()
-        .toLowerCase();
-
-    if (status === "verified") {
+    if (user?.identityVerified === true) {
         return {
             status: "verified",
             label: "Верифицирован",
         };
     }
 
-    if (status === "pensioner") {
+    if (user?.isPensioner === true) {
         return {
             status: "pensioner",
             label: "Пенсионер",

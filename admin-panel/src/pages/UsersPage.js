@@ -660,51 +660,6 @@ function UsersPage() {
         );
     };
 
-    const toggleVerification = async (
-        id,
-        currentStatus
-    ) => {
-        const statusOptions = [
-            "unverified",
-            "pensioner",
-            "verified",
-        ];
-
-        const currentIndex =
-            statusOptions.indexOf(
-                currentStatus
-            );
-
-        const nextStatus =
-            statusOptions[
-            (currentIndex + 1) %
-            statusOptions.length
-                ];
-
-        try {
-            await axios.put(
-                `${apiUrl}/api/admin/users/${id}/verify`,
-                {
-                    userStatus: nextStatus,
-                },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
-
-            updateUserLocally(id, {
-                userStatus: nextStatus,
-            });
-        } catch (error) {
-            console.error(
-                "Ошибка обновления верификации",
-                error
-            );
-        }
-    };
-
     const isPremiumActive = (user) => {
         if (
             user.subscription_type !==

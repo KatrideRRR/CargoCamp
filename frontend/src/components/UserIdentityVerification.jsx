@@ -133,7 +133,6 @@ function validateFiles(files) {
 
 export default function UserIdentityVerification({
                                                      userId,
-                                                     legacyUserStatus,
                                                  }) {
     const inputId = useId();
     const submittingRef = useRef(false);
@@ -464,18 +463,6 @@ export default function UserIdentityVerification({
                                 )}
                         </div>
                     )}
-
-                    {legacyUserStatus === "verified" &&
-                        status !== "verified" && (
-                            <div className="cc-identity-legacy">
-                                В профиле ранее был назначен
-                                статус проверки личности.
-                                Новая система учитывает
-                                отдельные заявки, поэтому
-                                старый статус пока не
-                                переносится автоматически.
-                            </div>
-                        )}
 
                     {canApply && (
                         <div className="cc-identity-form">

@@ -133,7 +133,6 @@ function validateFile(file) {
 
 function UserBenefitsSection({
                                  userId,
-                                 legacyUserStatus,
                                  embedded = false,
                              }) {
     const [benefits, setBenefits] = useState([]);
@@ -396,20 +395,6 @@ function UserBenefitsSection({
                         не обязательна для выполнения
                         обычных заказов.
                     </p>
-
-                    {legacyUserStatus === "pensioner" &&
-                        benefitsByCode.pension_recipient
-                            ?.status !== "verified" && (
-                            <div className="cc-benefits-legacy">
-                                Ранее вам был назначен
-                                пенсионный статус.
-                                Перенос старых статусов
-                                в новую систему ещё не
-                                завершён. Действующие
-                                правила комиссии пока
-                                не меняются.
-                            </div>
-                        )}
 
                     {error && (
                         <div

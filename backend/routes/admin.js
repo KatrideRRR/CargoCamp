@@ -107,38 +107,6 @@ function normalizeOptionalMoney(value) {
 
 const router = express.Router();
 
-router.put('/users/:id/verify',authMiddleware, adminMiddleware, async (req, res) => {
-    const { id } = req.params; // Получаем id пользователя из параметров URL
-    const { userStatus } = req.body; // Получаем новый статус верификации
-
-    try {
-        // Проверка на валидность статуса
-        const validStatuses = ["unverified", "pensioner", "verified"];
-        if (!validStatuses.includes(userStatus)) {
-            return res.status(400).json({ message: 'Неверный статус верификации' });
-        }
-
-        // Ищем пользователя по ID
-        const user = await User.findByPk(id);
-
-        if (!user) {
-            return res.status(404).json({ message: 'Пользователь не найден' });
-        }
-
-        // Обновляем поле userStatus
-        user.userStatus = userStatus;
-
-        // Сохраняем изменения в базе
-        await user.save();
-
-        // Отправляем успешный ответ
-        res.status(200).json({ message: `Статус верификации пользователя ${id} обновлен`, user });
-    } catch (error) {
-        console.error('Ошибка при обновлении верификации', error);
-        res.status(500).json({ message: 'Ошибка на сервере' });
-    }
-});
-
 router.get("/user-documents/:userId", authMiddleware, adminMiddleware, (req, res) => {
         return res.status(410).json({
             success: false,
@@ -2108,7 +2076,6 @@ router.get("/users/:userId/orders", authMiddleware, adminMiddleware, async (req,
                             "username",
                             "phone",
                             "role",
-                            "userStatus",
                         ],
                     }
                 );

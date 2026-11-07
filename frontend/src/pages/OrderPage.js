@@ -23,11 +23,7 @@ import RegularAdvanceTimeField from "../components/RegularAdvanceTimeField";
 const apiUrl = process.env.REACT_APP_API_URL;
 
 function isPensionerUser(user) {
-    return (
-        String(user?.userStatus || "")
-            .trim()
-            .toLowerCase() === "pensioner"
-    );
+    return user?.isPensioner === true;
 }
 
 function normalizeBoolean(value) {

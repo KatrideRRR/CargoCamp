@@ -22,6 +22,16 @@ const {
     ExpressOrder,
     Service,
 } = require("../models");
+const {
+    hasVerifiedBenefit,
+} = require("../services/benefitService");
+
+const {
+    calculateRegularCommissionKopecks,
+} = require("../utils/regularCommissionPolicy");
+const {
+    getPublicUserBadges,
+} = require("../services/publicUserBadgesService");
 const generateContractPDF = require('../utils/generateContractPDF');
 const {createVerifiedAssignmentIfEligible,} = require("../services/verifiedContractService");
 const {createVerifiedCompletionActIfEligible,} = require("../services/verifiedCompletionActService");
@@ -2278,12 +2288,17 @@ module.exports = (io) => {
                     "username",
                     "rating",
                     "ratingCount",
-                    "userStatus",
                 ],
             });
 
+            const badges = await Promise.all(
+                executors.map((executor) =>
+                    getPublicUserBadges(executor.id)
+                )
+            );
+
             return res.json(
-                executors.map((executor) => {
+                executors.map((executor, index) => {
                     const request = requests.find(
                         (item) =>
                             Number(item.executorId) ===
@@ -2292,6 +2307,7 @@ module.exports = (io) => {
 
                     return {
                         ...executor.toJSON(),
+                        ...badges[index],
                         proposedSum: request?.proposedSum ?? null,
                         comment: request?.comment || "",
                         availableAt: request?.availableAt || null,
@@ -2683,10 +2699,7 @@ module.exports = (io) => {
 // Загружаем заказчика, потому что скидка на комиссию
 // зависит от статуса создателя заказа.
             const creator = await User.findByPk(order.creatorId, {
-                attributes: [
-                    "id",
-                    "userStatus",
-                ],
+                attributes: ["id"],
             });
 
             if (!creator) {
@@ -2708,15 +2721,12 @@ module.exports = (io) => {
             const isCash = order.paymentType === "cash";
             const isRecommended = Boolean(order.is_recommended);
 
-            const creatorStatus = String(
-                creator.userStatus || ""
-            )
-                .trim()
-                .toLowerCase();
-
             const isPensionerCreator = cashAssignment
                 ? cashAssignment.isPensionerCreator
-                : creatorStatus === "pensioner";
+                : await hasVerifiedBenefit({
+                    userId: creator.id,
+                    benefitCode: "pension_recipient",
+                });
 
 // Базовая комиссия:
 // обычный заказ — 200 ₽
@@ -2725,19 +2735,14 @@ module.exports = (io) => {
 
 // Если заказчик — пенсионер,
 // комиссия исполнителя уменьшается в два раза.
-            const feeRub = isPensionerCreator
-                ? baseFeeRub / 2
-                : baseFeeRub;
-
-// Premium или безналичная сделка через гарантию —
-// комиссию в задолженность не начисляем.
             const commissionKopecks = cashAssignment
                 ? cashAssignment.commissionKopecks
-                : (
-                    !isPremium && isCash
-                        ? Math.round(feeRub * 100)
-                        : 0
-                );
+                : calculateRegularCommissionKopecks({
+                    isCash,
+                    isPremium,
+                    isRecommended,
+                    isPensioner: isPensionerCreator,
+                });
 
             let finalDebtKopecks = Number(executor.debt || 0);
 
@@ -2806,7 +2811,9 @@ module.exports = (io) => {
                     status: order.status,
                     dealStatus: order.dealStatus,
 
-                    creatorUserStatus: creatorStatus,
+                    creatorBenefitCode: isPensionerCreator
+                        ? "pension_recipient"
+                        : null,
                     isPensionerCreator,
 
                     baseCommissionKopecks: baseFeeRub * 100,

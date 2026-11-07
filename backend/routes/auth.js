@@ -19,6 +19,9 @@ const {
     buildUserSessionResponse,
     clearUserRefreshCookie,
 } = require("../utils/userSessionTransport");
+const {
+    getPublicUserBadges,
+} = require("../services/publicUserBadgesService");
 const crypto = require("crypto");
 const {uploadsRoot: publicUploadsRoot,} = require("../config/storagePaths");
 const avatarsDir = path.join(__dirname, "..", "uploads", "avatars");
@@ -882,7 +885,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
             createdAt: user.createdAt,
             complaints: user.complaints,
             complaintsCount: user.complaintsCount,
-            userStatus: user.userStatus,
+            ...await getPublicUserBadges(user.id),
 
             avatar: user.avatar,
             debt: user.debt,
@@ -995,7 +998,6 @@ router.get("/:id", async (req, res) => {
                 "rating",
                 "ratingCount",
                 "avatar",
-                "userStatus",
                 "createdAt",
             ],
         });
@@ -1006,7 +1008,10 @@ router.get("/:id", async (req, res) => {
             });
         }
 
-        return res.json(user);
+        return res.json({
+            ...user.toJSON(),
+            ...await getPublicUserBadges(user.id),
+        });
 
     } catch (error) {
         console.error(
@@ -1025,13 +1030,17 @@ router.get('/user/:id', async (req, res) => {
         const userId = Number(req.params.id);
 
         const user = await User.findByPk(userId, {
-            attributes: ['id', 'username', 'phone', 'rating', 'ratingCount', 'role', 'userStatus'],
+            attributes: ['id', 'username', 'phone', 'rating', 'ratingCount', 'role'],
         });
         if (!user) return res.status(404).json({message: 'Пользователь не найден'});
 
         const reviewsCount = await OrderReview.count({where: {toUserId: userId}});
 
-        return res.json({...user.toJSON(), reviewsCount});
+        return res.json({
+            ...user.toJSON(),
+            ...await getPublicUserBadges(user.id),
+            reviewsCount,
+        });
     } catch (err) {
         console.error('GET /auth/user/:id error:', err);
         return res.status(500).json({message: 'Ошибка сервера'});

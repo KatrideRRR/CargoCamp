@@ -31,11 +31,7 @@ const RADIUS_KM = 50;
 const HIDE_FROM_DRAWER = new Set(["Такси", "Курьер"]);
 
 function isPensionerUser(user) {
-    return (
-        String(user?.userStatus || "")
-            .trim()
-            .toLowerCase() === "pensioner"
-    );
+    return user?.isPensioner === true;
 }
 
 function normalizeBoolean(value) {

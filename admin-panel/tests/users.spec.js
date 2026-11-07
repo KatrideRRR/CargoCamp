@@ -275,6 +275,68 @@ test.describe("UsersPage", () => {
         await expect(page.locator(".users-table")).toBeVisible();
     });
 
+    test("ошибка блокировки не изменяет роль пользователя", async ({ page }) => {
+        await openUsersPage(page, {
+            blockStatus: 500,
+        });
+
+        const alerts = [];
+
+        page.on("dialog", async (dialog) => {
+            alerts.push(dialog.message());
+            await dialog.accept();
+        });
+
+        await rows(page).nth(0).getByRole("button", {
+            name: "Блок",
+        }).click();
+
+        await expect.poll(
+            () => alerts.length
+        ).toBe(1);
+
+        expect(alerts[0]).toBe(
+            "Не удалось заблокировать пользователя"
+        );
+
+        await expect(
+            rows(page).nth(0).getByRole("button", {
+                name: "Блок",
+            })
+        ).toBeVisible();
+    });
+
+    test("ошибка разблокировки сохраняет блокировку", async ({ page }) => {
+        await openUsersPage(page, {
+            unblockStatus: 500,
+        });
+
+        const alerts = [];
+
+        page.on("dialog", async (dialog) => {
+            alerts.push(dialog.message());
+            await dialog.accept();
+        });
+
+        await rows(page).nth(2).getByRole("button", {
+            name: "Разблок.",
+        }).click();
+
+        await expect.poll(
+            () => alerts.length
+        ).toBe(1);
+
+        expect(alerts[0]).toBe(
+            "Не удалось разблокировать пользователя"
+        );
+
+        await expect(
+            rows(page).nth(2).getByRole("button", {
+                name: "Разблок.",
+            })
+        ).toBeVisible();
+    });
+
     test("заголовки таблицы соответствуют данным пользователей", async ({ page }) => {
         await openUsersPage(page);
 

@@ -42,6 +42,7 @@ async function hasVerifiedBenefit({
                                       userId,
                                       benefitCode,
                                       countryCode = "RU",
+                                      transaction = null,
                                   }) {
     const id = Number(userId);
 
@@ -88,6 +89,7 @@ async function hasVerifiedBenefit({
                 ["verifiedAt", "DESC"],
                 ["id", "DESC"],
             ],
+            transaction,
         });
 
     return Boolean(verification);

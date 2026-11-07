@@ -366,6 +366,15 @@ async function createHarness() {
                 revokeAuthSession: async () => {},
             },
 
+            "../services/publicUserBadgesService": {
+                async getPublicUserBadges() {
+                    return {
+                        identityVerified: false,
+                        isPensioner: false,
+                    };
+                },
+            },
+
             "../services/passwordResetService": {
                 async resetPasswordAndRevokeSessions({
                                                          phone,

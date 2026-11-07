@@ -2265,9 +2265,7 @@ const ProfilePage = () => {
 
                         <UserIdentityVerification
                             userId={profile?.id}
-                            legacyUserStatus={profile?.userStatus}
                         />
-
                         {/* =========================
             АВТОМОБИЛЬ
         ========================= */}
@@ -2609,7 +2607,6 @@ const ProfilePage = () => {
                         {/* Социальные льготы */}
                         <UserBenefitsSection
                             userId={profile?.id}
-                            legacyUserStatus={profile?.userStatus}
                             embedded
                         />
 

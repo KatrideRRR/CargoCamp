@@ -11,6 +11,14 @@ const {
     accrueOrderCommissionOnce,
 } = require("./orderCommissionService");
 
+const {
+    hasVerifiedBenefit,
+} = require("./benefitService");
+
+const {
+    calculateRegularCommissionKopecks,
+} = require("../utils/regularCommissionPolicy");
+
 function fail(status, message) {
     const error = new Error(message);
     error.httpStatus = status;
@@ -313,10 +321,7 @@ async function assignCashRegularOrder({
         const creator = await User.findByPk(
             order.creatorId,
             {
-                attributes: [
-                    "id",
-                    "userStatus",
-                ],
+                attributes: ["id"],
                 transaction,
             }
         );
@@ -325,26 +330,20 @@ async function assignCashRegularOrder({
             throw fail(404, "Заказчик не найден");
         }
 
-        const creatorStatus = String(
-            creator.userStatus || ""
-        ).trim().toLowerCase();
-
         const isPensionerCreator =
-            creatorStatus === "pensioner";
-
-        const baseCommissionKopecks =
-            order.is_recommended
-                ? 10000
-                : 20000;
+            await hasVerifiedBenefit({
+                userId: creator.id,
+                benefitCode: "pension_recipient",
+                transaction,
+            });
 
         const commissionKopecks =
-            isPremium
-                ? 0
-                : isPensionerCreator
-                    ? Math.round(
-                        baseCommissionKopecks / 2
-                    )
-                    : baseCommissionKopecks;
+            calculateRegularCommissionKopecks({
+                isCash: true,
+                isPremium: Boolean(isPremium),
+                isRecommended: Boolean(order.is_recommended),
+                isPensioner: isPensionerCreator,
+            });
 
         // Назначение исполнителя.
         order.executorId = workerId;
@@ -384,7 +383,6 @@ async function assignCashRegularOrder({
             approvedSum: price,
             isPremium: Boolean(isPremium),
             isPensionerCreator,
-            creatorStatus,
             commissionKopecks,
             commissionAccrual,
         };
