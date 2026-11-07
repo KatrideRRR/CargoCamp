@@ -2728,7 +2728,10 @@ router.put("/users/:id/vehicle-verification", authMiddleware, adminMiddleware, a
                         String(value || "").trim().length > 0
                 );
 
-            if (!hasAllRequiredVehicleData) {
+            if (
+                status === "verified" &&
+                !hasAllRequiredVehicleData
+            ) {
                 return res.status(400).json({
                     success: false,
                     message:
