@@ -20,9 +20,14 @@ const {
     assertVerifiedPdfIntegrity,
 } = require("./verifiedPdfIntegrity");
 
+const {
+    verifySignatureEvidence,
+} = require("./contractSignatureEvidence");
+
 const ALLOWED_TYPES = [
     "verified_assignment",
     "verified_completion_act",
+    "verified_addendum",
 ];
 
 function fail(status, message) {
@@ -207,26 +212,79 @@ async function buildContractEvidence(contractId) {
         );
     }
 
-    const agreementIds = [
+    const uniqueIds = (values) => [
         ...new Set(
-            [
-                ...challenges.map(
-                    (challenge) =>
-                        String(challenge.agreementId)
-                ),
-
-                ...signatures.map(
-                    (signature) =>
-                        String(
-                            signature.evidence
-                                ?.agreementId || ""
-                        )
-                ),
-            ].filter((id) =>
-                /^[1-9]\d*$/.test(id)
-            )
+            values
+                .map((value) => String(value ?? ""))
+                .filter((value) =>
+                    /^[1-9]\d{0,19}$/.test(value)
+                )
         ),
     ];
+
+    const bootstrapIds = uniqueIds(
+        signatures
+            .filter((signature) =>
+                signature.method === "authenticated_click"
+            )
+            .map((signature) =>
+                signature.evidence?.bootstrapSignatureId
+            )
+    );
+
+    const bootstrapSignatures = bootstrapIds.length
+        ? await ContractSignature.findAll({
+            where: {
+                id: { [Op.in]: bootstrapIds },
+            },
+        })
+        : [];
+
+    const bootstrapSignatureMap = new Map(
+        bootstrapSignatures.map((signature) => [
+            String(signature.id),
+            signature,
+        ])
+    );
+
+    const bootstrapChallengeIds = uniqueIds(
+        bootstrapSignatures.map(
+            (signature) => signature.evidence?.challengeId
+        )
+    );
+
+    const bootstrapChallenges = bootstrapChallengeIds.length
+        ? await SignatureChallenge.findAll({
+            where: {
+                id: { [Op.in]: bootstrapChallengeIds },
+            },
+        })
+        : [];
+
+    const bootstrapChallengeMap = new Map(
+        bootstrapChallenges.map((challenge) => [
+            String(challenge.id),
+            challenge,
+        ])
+    );
+
+    const agreementIds = uniqueIds([
+        ...challenges.map(
+            (challenge) => challenge.agreementId
+        ),
+
+        ...signatures.map(
+            (signature) => signature.evidence?.agreementId
+        ),
+
+        ...bootstrapSignatures.map(
+            (signature) => signature.evidence?.agreementId
+        ),
+
+        ...bootstrapChallenges.map(
+            (challenge) => challenge.agreementId
+        ),
+    ]);
 
     const agreements = agreementIds.length
         ? await ElectronicSignatureAgreement.findAll({
@@ -354,67 +412,53 @@ async function buildContractEvidence(contractId) {
                 signature.documentHash,
                 contract.documentHash
             )
-
-
         ) {
             warnings.push(
                 `Контрольная сумма подписи №${signature.id} не совпадает с документом.`
             );
         }
 
+        const agreementId = String(
+            signature.evidence?.agreementId || ""
+        );
 
-        const challengeId =
-            signature.evidence?.challengeId;
+        const agreement = agreementMap.get(agreementId);
+
+        const archiveValid = Boolean(
+            archivedAgreementMap.get(agreementId)?.valid
+        );
 
         const challenge = challenges.find(
             (item) =>
                 String(item.id) ===
-                String(challengeId || "")
+                String(signature.evidence?.challengeId || "")
         );
 
-        if (
-            !challenge ||
-            challenge.status !== "consumed" ||
-            !challenge.consumedAt ||
-            !challenge.verifiedAt ||
-            Number(challenge.userId) !==
-            Number(signature.userId) ||
-            challenge.partyRole !==
-            signature.partyRole ||
-            !sameHash(
-                challenge.documentHash,
-                contract.documentHash
-            )
-        ) {
-            warnings.push(
-                `Подпись №${signature.id}: не подтверждена согласованная запись успешного SMS-вызова.`
-            );
-        }
-
-        const agreementId =
-            signature.evidence?.agreementId;
-
-        const agreement =
-            agreementMap.get(
-                String(agreementId || "")
+        const bootstrapSignature =
+            bootstrapSignatureMap.get(
+                String(
+                    signature.evidence?.bootstrapSignatureId || ""
+                )
             );
 
-        if (
-            !agreement ||
-            Number(agreement.userId) !==
-            Number(signature.userId) ||
-            !sameHash(
-                agreement.policySha256,
-                signature.evidence?.policySha256
-            ) ||
-            String(agreement.policyVersion) !==
-            String(signature.signaturePolicyVersion)
-        ) {
-            warnings.push(
-                `Подпись №${signature.id}: отсутствует согласованная запись принятия правил ПЭП.`
+        const bootstrapChallenge =
+            bootstrapChallengeMap.get(
+                String(
+                    bootstrapSignature?.evidence?.challengeId || ""
+                )
             );
-        }
 
+        const signatureWarnings =
+            verifySignatureEvidence({
+                signature,
+                agreement,
+                archiveValid,
+                challenge,
+                bootstrapSignature,
+                bootstrapChallenge,
+            });
+
+        warnings.push(...signatureWarnings);
     }
 
     const snapshot =
@@ -566,12 +610,60 @@ async function buildContractEvidence(contractId) {
                     signature.evidence
                         ?.agreementId || null,
 
+                bootstrapSignatureId:
+                    signature.evidence
+                        ?.bootstrapSignatureId || null,
+
+                pepEnrollmentSnapshot:
+                    signature.evidence
+                        ?.pepEnrollmentSnapshot || null,
+
+                sessionId:
+                    signature.evidence
+                        ?.sessionId || null,
+
                 ipAddress:
                 signature.ipAddress,
 
                 userAgent:
                 signature.userAgent,
             })
+        ),
+
+        pepBootstrapProofs: bootstrapSignatures.map(
+            (signature) => {
+                const challenge = bootstrapChallengeMap.get(
+                    String(signature.evidence?.challengeId || "")
+                );
+
+                return {
+                    signatureId: String(signature.id),
+                    contractId: String(signature.contractId),
+                    userId: signature.userId,
+                    method: signature.method,
+                    signedAt: signature.signedAt,
+
+                    documentHash:
+                    signature.documentHash,
+
+                    agreementId:
+                        signature.evidence?.agreementId || null,
+
+                    policySha256:
+                        signature.evidence?.policySha256 || null,
+
+                    challenge: challenge
+                        ? {
+                            id: String(challenge.id),
+                            contractId: String(challenge.contractId),
+                            status: challenge.status,
+                            verifiedAt: challenge.verifiedAt,
+                            consumedAt: challenge.consumedAt,
+                            documentHash: challenge.documentHash,
+                        }
+                        : null,
+                };
+            }
         ),
 
 
