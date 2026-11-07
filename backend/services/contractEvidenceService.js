@@ -209,13 +209,22 @@ async function buildContractEvidence(contractId) {
 
     const agreementIds = [
         ...new Set(
-            challenges
-                .map((challenge) =>
-                    String(challenge.agreementId)
-                )
-                .filter((id) =>
-                    /^[1-9]\d*$/.test(id)
-                )
+            [
+                ...challenges.map(
+                    (challenge) =>
+                        String(challenge.agreementId)
+                ),
+
+                ...signatures.map(
+                    (signature) =>
+                        String(
+                            signature.evidence
+                                ?.agreementId || ""
+                        )
+                ),
+            ].filter((id) =>
+                /^[1-9]\d*$/.test(id)
+            )
         ),
     ];
 

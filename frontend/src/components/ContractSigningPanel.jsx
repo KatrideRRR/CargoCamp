@@ -182,9 +182,9 @@ export default function ContractSigningPanel({
             >
                 <span>
 <strong>
-    ✍️ : isAct
-    ? "Подписать акт"
-    : "Подписать договор"
+    {isAct
+        ? "✍️ Подписать акт"
+        : "✍️ Подписать договор"}
 </strong>
                     <small>
     {state?.signingMethod === "click"
@@ -333,7 +333,9 @@ export default function ContractSigningPanel({
                                             >
                                                 {busy
                                                     ? "Проверяем..."
-                                                    : "Подписать договор"}
+                                                    : isAct
+                                                        ? "Подписать акт"
+                                                        : "Подписать договор"}
                                             </button>
                                         </>
                                     )}

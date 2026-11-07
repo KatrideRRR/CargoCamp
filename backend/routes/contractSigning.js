@@ -547,6 +547,7 @@ async function getActivePepEnrollment({
                                           phone,
                                           verification,
                                           transaction = null,
+                                          lock = false,
                                       }) {
     if (
         !policy.enabled ||
@@ -561,6 +562,9 @@ async function getActivePepEnrollment({
     const enrollment = await PepEnrollment.findOne({
         where: { userId },
         transaction,
+        ...(lock && transaction
+            ? { lock: transaction.LOCK.UPDATE }
+            : {}),
     });
 
     if (
@@ -1770,6 +1774,7 @@ router.post("/:contractId/click-sign", async (req, res) => {
                         phone: user?.phone,
                         verification: prereq.identity,
                         transaction,
+                        lock: true,
                     });
 
                 if (!enrollment) {
@@ -1812,6 +1817,33 @@ router.post("/:contractId/click-sign", async (req, res) => {
                             policySha256: prereq.policy.sha256,
                             documentHash: ctx.contract.documentHash,
                             intentConfirmed: true,
+                        },
+                        pepEnrollmentSnapshot: {
+                            id: String(enrollment.id),
+
+                            agreementId:
+                                String(enrollment.agreementId),
+
+                            verificationId:
+                                String(enrollment.verificationId),
+
+                            bootstrapSignatureId:
+                                String(enrollment.bootstrapSignatureId),
+
+                            bootstrapChallengeId:
+                                String(enrollment.bootstrapChallengeId),
+
+                            policySha256:
+                            enrollment.policySha256,
+
+                            activatedAt:
+                            enrollment.activatedAt,
+
+                            expiresAt:
+                            enrollment.expiresAt,
+
+                            revokedAt:
+                            enrollment.revokedAt,
                         },
                     },
                     { transaction }
