@@ -204,6 +204,36 @@ async function assignCashRegularOrder({
         // Бронь обязана относиться к тому заказу,
         // который исполнитель выполнял ранее.
         if (activation) {
+
+            const approvedAt = new Date(
+                order.reservationApprovedAt
+            ).getTime();
+
+            const availableAt = new Date(
+                order.reservationAvailableAt
+            ).getTime();
+
+            const requestedAvailableAt = new Date(
+                matchedRequest.availableAt
+            ).getTime();
+
+            if (
+                !order.reservationApprovedAt ||
+                !order.reservationAvailableAt ||
+                !matchedRequest.availableAt ||
+                !Number.isFinite(approvedAt) ||
+                !Number.isFinite(availableAt) ||
+                !Number.isFinite(requestedAvailableAt) ||
+                Math.abs(
+                    availableAt - requestedAvailableAt
+                ) >= 1000
+            ) {
+                throw fail(
+                    409,
+                    "Данные бронирования изменились. Отмените бронь и согласуйте её заново."
+                );
+            }
+
             const sourceId = Number(
                 order.reservationSourceOrderId
             );

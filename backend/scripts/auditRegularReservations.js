@@ -126,15 +126,6 @@ async function audit() {
             );
         }
 
-        if (
-            reserved.length > 0 &&
-            activeRegular.length === 0
-        ) {
-            warnings.push(
-                `Исполнитель ${executorId}: ` +
-                "есть бронь, но нет активного обычного заказа"
-            );
-        }
     }
 
     for (const order of orders) {
@@ -184,7 +175,13 @@ async function audit() {
                 information.push(
                     `Бронь #${order.id}: ` +
                     "предыдущий заказ завершён, " +
-                    "можно проверить возможность активации"
+                    "ожидается активация исполнителем"
+                );
+            } else if (source.status !== "active") {
+                warnings.push(
+                    `Бронь #${order.id}: ` +
+                    `предыдущий заказ имеет статус ${source.status}. ` +
+                    "Проверьте возможность продолжения бронирования."
                 );
             }
 

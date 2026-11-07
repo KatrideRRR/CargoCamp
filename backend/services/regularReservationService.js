@@ -14,18 +14,29 @@ function reservationError(status, message) {
 }
 
 function asArray(value) {
-    if (Array.isArray(value)) return value;
-
-    if (typeof value === "string") {
-        try {
-            const parsed = JSON.parse(value);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch {
-            return [];
-        }
+    if (Array.isArray(value)) {
+        return value;
     }
 
-    return [];
+    if (value == null || value === "") {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(value);
+
+        if (Array.isArray(parsed)) {
+            return parsed;
+        }
+    } catch {
+        // Повреждённые данные нельзя
+        // молча заменять пустым массивом.
+    }
+
+    throw reservationError(
+        409,
+        "История откликов повреждена. Обратитесь в поддержку."
+    );
 }
 
 async function reserveRegularOrder({
@@ -33,13 +44,30 @@ async function reserveRegularOrder({
                                        creatorId,
                                        executorId,
                                    }) {
+    const ids = [
+        Number(orderId),
+        Number(creatorId),
+        Number(executorId),
+    ];
+
     if (
-        !Number.isSafeInteger(Number(orderId)) ||
-        !Number.isSafeInteger(Number(executorId)) ||
-        Number(orderId) <= 0 ||
-        Number(executorId) <= 0
+        ids.some(
+            (id) =>
+                !Number.isSafeInteger(id) ||
+                id <= 0
+        )
     ) {
-        throw reservationError(400, "Некорректные данные заказа");
+        throw reservationError(
+            400,
+            "Некорректные данные бронирования"
+        );
+    }
+
+    if (Number(creatorId) === Number(executorId)) {
+        throw reservationError(
+            403,
+            "Нельзя бронировать собственный заказ"
+        );
     }
 
     return sequelize.transaction(async (transaction) => {
@@ -197,18 +225,38 @@ async function reserveRegularOrder({
             );
         }
 
-        const price = Number(request.proposedSum);
+        const price = Number(
+            String(request.proposedSum ?? "")
+                .replace(",", ".")
+                .trim()
+        );
 
-        if (!Number.isFinite(price) || price <= 0) {
+        if (
+            !Number.isSafeInteger(price) ||
+            price < 1 ||
+            price > 300000
+        ) {
             throw reservationError(
-                400,
-                "Некорректная цена предложения"
+                409,
+                "Стоимость предложения недействительна. Запросите новый отклик."
+            );
+        }
+
+        const priceKopecks = price * 100;
+
+        if (
+            !Number.isSafeInteger(priceKopecks) ||
+            priceKopecks > 2147483647
+        ) {
+            throw reservationError(
+                409,
+                "Стоимость бронирования выходит за допустимые пределы"
             );
         }
 
         order.executorId = Number(executorId);
         order.status = "reserved";
-        order.finalPriceKopecks = Math.round(price * 100);
+        order.finalPriceKopecks = priceKopecks;
 
         order.reservationSourceOrderId = activeOrder.id;
         order.reservationAvailableAt = availableAt;
@@ -234,6 +282,19 @@ async function cancelRegularReservation({
                                             orderId,
                                             userId,
                                         }) {
+
+    if (
+        !Number.isSafeInteger(Number(orderId)) ||
+        Number(orderId) <= 0 ||
+        !Number.isSafeInteger(Number(userId)) ||
+        Number(userId) <= 0
+    ) {
+        throw reservationError(
+            400,
+            "Некорректные данные отмены бронирования"
+        );
+    }
+
     return sequelize.transaction(async (transaction) => {
         const snapshot = await Order.findByPk(orderId, {
             transaction,
@@ -250,10 +311,20 @@ async function cancelRegularReservation({
             );
         }
 
-        await User.findByPk(snapshot.executorId, {
-            transaction,
-            lock: transaction.LOCK.UPDATE,
-        });
+        const executor = await User.findByPk(
+            snapshot.executorId,
+            {
+                transaction,
+                lock: transaction.LOCK.UPDATE,
+            }
+        );
+
+        if (!executor) {
+            throw reservationError(
+                409,
+                "Исполнитель бронирования больше не найден"
+            );
+        }
 
         const order = await Order.findByPk(orderId, {
             transaction,
@@ -267,6 +338,16 @@ async function cancelRegularReservation({
             throw reservationError(
                 409,
                 "Этот заказ уже не забронирован"
+            );
+        }
+
+        if (
+            Number(order.executorId) !==
+            Number(snapshot.executorId)
+        ) {
+            throw reservationError(
+                409,
+                "Исполнитель бронирования изменился. Обновите страницу."
             );
         }
 
