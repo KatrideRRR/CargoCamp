@@ -602,7 +602,10 @@ async function getActivePepEnrollment({
     return enrollment;
 }
 
-async function hasRecentSigningSession(req) {
+async function hasRecentSigningSession(
+    req,
+    transaction = null
+) {
     if (
         req.user?.scope !== "user" ||
         !req.user?.sid
@@ -611,7 +614,15 @@ async function hasRecentSigningSession(req) {
     }
 
     const session = await AuthSession.findByPk(
-        req.user.sid
+        req.user.sid,
+        {
+            ...(transaction
+                ? {
+                    transaction,
+                    lock: transaction.LOCK.UPDATE,
+                }
+                : {}),
+        }
     );
 
     if (
@@ -625,8 +636,6 @@ async function hasRecentSigningSession(req) {
         return false;
     }
 
-    // Для подписания без SMS требуется
-    // вход в аккаунт не старше семи дней.
     const sessionAge =
         Date.now() - new Date(session.createdAt).getTime();
 
@@ -1763,6 +1772,13 @@ router.post("/:contractId/click-sign", async (req, res) => {
                     transaction
                 );
 
+                if (!(await hasRecentSigningSession(req, transaction))) {
+                    throw fail(
+                        403,
+                        "Сессия больше не подходит для подписания. Войдите повторно."
+                    );
+                }
+
                 const user = await User.findByPk(userId, {
                     transaction,
                 });
@@ -1809,41 +1825,63 @@ router.post("/:contractId/click-sign", async (req, res) => {
 
                         evidence: {
                             method: "authenticated_click",
-                            sessionId: String(req.user.sid),
-                            pepEnrollmentId: String(enrollment.id),
+
+                            sessionId:
+                                String(req.user.sid),
+
+                            pepEnrollmentId:
+                                String(enrollment.id),
+
                             bootstrapSignatureId:
                                 String(enrollment.bootstrapSignatureId),
-                            agreementId: String(prereq.agreement.id),
-                            policySha256: prereq.policy.sha256,
-                            documentHash: ctx.contract.documentHash,
-                            intentConfirmed: true,
-                        },
-                        pepEnrollmentSnapshot: {
-                            id: String(enrollment.id),
 
                             agreementId:
-                                String(enrollment.agreementId),
-
-                            verificationId:
-                                String(enrollment.verificationId),
-
-                            bootstrapSignatureId:
-                                String(enrollment.bootstrapSignatureId),
-
-                            bootstrapChallengeId:
-                                String(enrollment.bootstrapChallengeId),
+                                String(prereq.agreement.id),
 
                             policySha256:
-                            enrollment.policySha256,
+                            prereq.policy.sha256,
 
-                            activatedAt:
-                            enrollment.activatedAt,
+                            documentHash:
+                            ctx.contract.documentHash,
 
-                            expiresAt:
-                            enrollment.expiresAt,
+                            intentConfirmed: true,
 
-                            revokedAt:
-                            enrollment.revokedAt,
+                            pepEnrollmentSnapshot: {
+                                id: String(enrollment.id),
+
+                                agreementId:
+                                    String(enrollment.agreementId),
+
+                                verificationId:
+                                    String(enrollment.verificationId),
+
+                                bootstrapSignatureId:
+                                    String(enrollment.bootstrapSignatureId),
+
+                                bootstrapChallengeId:
+                                    String(enrollment.bootstrapChallengeId),
+
+                                policyCode:
+                                enrollment.policyCode,
+
+                                policyVersion:
+                                enrollment.policyVersion,
+
+                                policySha256:
+                                enrollment.policySha256,
+
+                                phoneFingerprint:
+                                enrollment.phoneFingerprint,
+
+                                activatedAt:
+                                enrollment.activatedAt,
+
+                                expiresAt:
+                                enrollment.expiresAt,
+
+                                revokedAt:
+                                enrollment.revokedAt,
+                            },
                         },
                     },
                     { transaction }
