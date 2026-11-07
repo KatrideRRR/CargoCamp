@@ -1,6 +1,9 @@
 import { test, expect } from "./fixtures/safeTest";
 import { setAdminAuth, ADMIN_TEST_TOKEN } from "./utils/adminTestAuth";
-
+import {
+    mockOrderDetailsNavigation,
+    mockExpressOrderDetailsNavigation,
+} from "./utils/mockAdminNavigation";
 const FRONT_URL = "http://localhost:3001";
 const ORDERS_PATH = "/orders";
 
@@ -280,11 +283,19 @@ test.describe("OrdersPage", () => {
     test("переходит в детали обычного заказа", async ({ page }) => {
         await openOrdersPage(page);
 
+        await mockOrderDetailsNavigation(page, 101);
+
         await regularRows(page).first().getByRole("button", {
             name: "Подробнее",
         }).click();
 
         await expect(page).toHaveURL(/\/orders\/101/);
+
+        await expect(
+            page.getByRole("heading", {
+                name: "Детали заказа #101",
+            })
+        ).toBeVisible();
     });
 
     test("переключается на express-заказы", async ({ page }) => {
@@ -346,6 +357,8 @@ test.describe("OrdersPage", () => {
     test("переходит в детали express-заказа", async ({ page }) => {
         await openOrdersPage(page);
 
+        await mockExpressOrderDetailsNavigation(page, 901);
+
         await page.getByRole("button", {
             name: "Экспресс",
         }).click();
@@ -354,7 +367,15 @@ test.describe("OrdersPage", () => {
             name: "Подробнее",
         }).click();
 
-        await expect(page).toHaveURL(/\/express-orders\/901/);
+        await expect(page).toHaveURL(
+            /\/express-orders\/901/
+        );
+
+        await expect(
+            page.getByRole("heading", {
+                name: "Детали экспресс-заказа #901",
+            })
+        ).toBeVisible();
     });
 
     test("показывает empty state, если обычных заказов нет", async ({ page }) => {

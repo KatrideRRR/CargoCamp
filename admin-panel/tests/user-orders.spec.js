@@ -1,6 +1,9 @@
 import { test, expect } from "./fixtures/safeTest";
 import { setAdminAuth, ADMIN_TEST_TOKEN } from "./utils/adminTestAuth";
-
+import {
+    mockOrderDetailsNavigation,
+    mockCreateOrderNavigation,
+} from "./utils/mockAdminNavigation";
 const FRONT_URL = "http://localhost:3001";
 
 // Если route в App.js другой — поменяй только это:
@@ -243,21 +246,39 @@ test.describe("UserOrdersPage", () => {
     test("кнопка Создать заказ ведёт на create-order пользователя", async ({ page }) => {
         await openUserOrdersPage(page);
 
+        await mockCreateOrderNavigation(page);
+
         await page.getByRole("button", {
             name: "Создать заказ",
         }).click();
 
-        await expect(page).toHaveURL(/\/create-order\/123/);
+        await expect(page).toHaveURL(
+            /\/create-order\/123/
+        );
+
+        await expect(
+            page.locator(".admin-create-page")
+        ).toBeVisible();
     });
 
     test("кнопка Подробнее ведёт в детали заказа", async ({ page }) => {
         await openUserOrdersPage(page);
 
+        await mockOrderDetailsNavigation(page, 202);
+
         await rows(page).nth(1).getByRole("button", {
             name: "Подробнее",
         }).click();
 
-        await expect(page).toHaveURL(/\/orders\/202/);
+        await expect(page).toHaveURL(
+            /\/orders\/202/
+        );
+
+        await expect(
+            page.getByRole("heading", {
+                name: "Детали заказа #202",
+            })
+        ).toBeVisible();
     });
 
     test("если заказов нет, показывает empty state", async ({ page }) => {

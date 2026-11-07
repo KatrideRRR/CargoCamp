@@ -1,6 +1,8 @@
 import { test, expect } from "./fixtures/safeTest";
 import { setAdminAuth, ADMIN_TEST_TOKEN } from "./utils/adminTestAuth";
-
+import {
+    mockMessagesNavigation,
+} from "./utils/mockAdminNavigation";
 const FRONT_URL = "http://localhost:3001";
 
 // Если route в App.js другой — поменяй только это:
@@ -108,6 +110,8 @@ const logsRows = [
 async function setupMocks(page, options = {}) {
     const {
         orderStatus = 200,
+        disputeStatusHttpStatus = 200,
+        disputeResolveHttpStatus = 200,
         orderBody = baseOrder,
         logsStatus = 200,
         logsBody = { rows: logsRows },
@@ -237,7 +241,7 @@ async function setupMocks(page, options = {}) {
         });
 
         await route.fulfill({
-            status: 200,
+            status: disputeStatusHttpStatus,
             contentType: "application/json",
             body: JSON.stringify(disputeStatusBody),
         });
@@ -250,7 +254,7 @@ async function setupMocks(page, options = {}) {
         });
 
         await route.fulfill({
-            status: 200,
+            status: disputeResolveHttpStatus,
             contentType: "application/json",
             body: JSON.stringify(disputeResolveBody),
         });
@@ -374,14 +378,202 @@ test.describe("OrderDetailsPage", () => {
             );
     });
 
+    test("ошибка восстановления сохраняет заказ скрытым", async ({ page }) => {
+        await openOrderDetailsPage(page, {
+            orderBody: {
+                ...baseOrder,
+                adminDeleted: true,
+            },
+            restoreStatus: 500,
+            restoreBody: {
+                message: "Не удалось восстановить заказ",
+            },
+        });
+
+        const alerts = [];
+
+        page.on("dialog", async (dialog) => {
+            if (dialog.type() === "alert") {
+                alerts.push(dialog.message());
+            }
+
+            await dialog.accept();
+        });
+
+        await page.getByRole("button", {
+            name: "Восстановить",
+        }).click();
+
+        await expect.poll(
+            () => alerts.length
+        ).toBe(1);
+
+        expect(alerts[0]).toBe(
+            "Не удалось восстановить заказ"
+        );
+
+        await expect(
+            page.locator(".visibility-badge")
+        ).toContainText("Удалён админом");
+
+        await expect(
+            page.getByRole("button", {
+                name: "Восстановить",
+            })
+        ).toBeVisible();
+    });
+
+    test("ошибка удаления не скрывает обычный заказ", async ({ page }) => {
+        await openOrderDetailsPage(page, {
+            orderBody: {
+                ...baseOrder,
+                status: "pending",
+                executorId: null,
+                adminDeleted: false,
+            },
+            deleteStatus: 500,
+            deleteBody: {
+                message: "Ошибка скрытия заказа",
+            },
+        });
+
+        const alerts = [];
+
+        page.on("dialog", async (dialog) => {
+            if (dialog.type() === "alert") {
+                alerts.push(dialog.message());
+            }
+
+            await dialog.accept();
+        });
+
+        await page.getByRole("button", {
+            name: "Скрыть заказ",
+        }).click();
+
+        await expect.poll(
+            () => alerts.length
+        ).toBe(1);
+
+        expect(alerts[0]).toBe(
+            "Ошибка скрытия заказа"
+        );
+
+        await expect(
+            page.locator(".visibility-badge")
+        ).toContainText("Видимый");
+
+        await expect(
+            page.getByRole("button", {
+                name: "Скрыть заказ",
+            })
+        ).toBeVisible();
+    });
+
+    test("ошибка API не переводит спор в работу", async ({ page }) => {
+        await openOrderDetailsPage(page, {
+            disputeStatusHttpStatus: 500,
+            disputeStatusBody: {
+                message: "Ошибка изменения статуса спора",
+            },
+        });
+
+        const alerts = [];
+
+        page.on("dialog", async (dialog) => {
+            alerts.push(dialog.message());
+            await dialog.accept();
+        });
+
+        const dispute = page.locator(
+            ".dispute-card"
+        ).first();
+
+        await dispute.getByRole("button", {
+            name: "Взять в работу",
+        }).click();
+
+        await expect.poll(
+            () => alerts.length
+        ).toBe(1);
+
+        expect(alerts[0]).toBe(
+            "Ошибка изменения статуса спора"
+        );
+
+        await expect(
+            dispute.locator(".dispute-admin-badge")
+        ).toHaveText("Открыт");
+
+        await expect(
+            dispute.getByRole("button", {
+                name: "Взять в работу",
+            })
+        ).toBeVisible();
+    });
+
+    test("ошибка сохранения решения оставляет спор открытым", async ({ page }) => {
+        await openOrderDetailsPage(page, {
+            disputeResolveHttpStatus: 500,
+            disputeResolveBody: {
+                message: "Ошибка сохранения решения",
+            },
+        });
+
+        const alerts = [];
+
+        page.on("dialog", async (dialog) => {
+            alerts.push(dialog.message());
+            await dialog.accept();
+        });
+
+        const dispute = page.locator(
+            ".dispute-card"
+        ).nth(1);
+
+        await dispute.locator(
+            ".dispute-resolution-textarea"
+        ).fill(
+            "Тестовое решение администратора"
+        );
+
+        await dispute.getByRole("button", {
+            name: "Решить спор",
+        }).click();
+
+        await expect.poll(
+            () => alerts.length
+        ).toBe(1);
+
+        expect(alerts[0]).toBe(
+            "Ошибка сохранения решения"
+        );
+
+        await expect(
+            dispute.locator(".dispute-admin-badge")
+        ).toHaveText("На рассмотрении");
+
+        await expect(
+            dispute.getByRole("button", {
+                name: "Решить спор",
+            })
+        ).toBeVisible();
+    });
+
     test("кнопка Открыть чат ведёт в сообщения заказа", async ({ page }) => {
         await openOrderDetailsPage(page);
+
+        await mockMessagesNavigation(page, 777);
 
         await page.getByRole("button", {
             name: "Открыть чат",
         }).click();
 
         await expect(page).toHaveURL(/\/777\/messages/);
+
+        await expect(
+            page.locator(".messages-page")
+        ).toBeVisible();
     });
 
     test("показывает статус adminDeleted и кнопку восстановления", async ({ page }) => {

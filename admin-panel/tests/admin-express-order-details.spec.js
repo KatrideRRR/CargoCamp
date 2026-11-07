@@ -1,6 +1,8 @@
 import { test, expect } from "./fixtures/safeTest";
 import { setAdminAuth } from "./utils/adminTestAuth";
-
+import {
+    mockOrdersNavigation,
+} from "./utils/mockAdminNavigation";
 const FRONT_URL = "http://localhost:3001";
 
 // Если route в App.js другой — поменяй только это:
@@ -418,11 +420,16 @@ test.describe("AdminExpressOrderDetailsPage", () => {
     test("кнопка Назад ведёт к /orders", async ({ page }) => {
         await openDetailsPage(page);
 
+        await mockOrdersNavigation(page);
+
         await page.getByRole("button", {
             name: "Назад",
         }).click();
 
         await expect(page).toHaveURL(/\/orders/);
+        await expect(
+            page.locator(".orders-container")
+        ).toBeVisible();
     });
 
     test("скрывает экспресс-заказ без исполнителя", async ({ page }) => {

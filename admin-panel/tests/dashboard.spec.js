@@ -1,6 +1,12 @@
 import { test, expect } from "./fixtures/safeTest";
 import { setAdminAuth } from "./utils/adminTestAuth";
 
+import {
+    mockUsersNavigation,
+    mockOrdersNavigation,
+    mockSupportNavigation,
+} from "./utils/mockAdminNavigation";
+
 const FRONT_URL = "http://localhost:3001";
 
 // Если Dashboard route другой — поменяй только это:
@@ -115,25 +121,37 @@ test.describe("Dashboard", () => {
     test("переходит на страницу пользователей", async ({ page }) => {
         await openDashboard(page);
 
+        await mockUsersNavigation(page);
+
         await page.getByRole("link", {
             name: "Пользователи",
         }).click();
 
         await expect(page).toHaveURL(/\/users/);
+        await expect(
+            page.locator(".users-container")
+        ).toBeVisible();
     });
 
     test("переходит на страницу заказов", async ({ page }) => {
         await openDashboard(page);
+
+        await mockOrdersNavigation(page);
 
         await page.getByRole("link", {
             name: "Заказы",
         }).click();
 
         await expect(page).toHaveURL(/\/orders/);
+        await expect(
+            page.locator(".orders-container")
+        ).toBeVisible();
     });
 
     test("переходит на страницу поддержки", async ({ page }) => {
         await openDashboard(page);
+
+        await mockSupportNavigation(page);
 
         await page.getByRole("link", {
             name: "Поддержка",
