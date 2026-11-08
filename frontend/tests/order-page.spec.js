@@ -198,7 +198,7 @@ async function setupOrderMocks(page, options = {}) {
     // На случай, если ExpressRouteButtons внутри делает служебные запросы.
     await page.route("**/api/express/express-orders/201/**", async (route) => {
         if (route.request().url().includes("/accept")) {
-            await route.continue();
+            await route.fallback();
             return;
         }
 

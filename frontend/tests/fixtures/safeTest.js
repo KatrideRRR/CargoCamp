@@ -64,6 +64,51 @@ const test = base.extend({
                         return;
                     }
 
+                    /*
+ * Стандартный тестовый Socket.IO.
+ *
+ * Разрешаем исключительно фиктивный адрес,
+ * заданный в playwright.config.js.
+ *
+ * Реальный backend никогда не вызывается.
+ */
+                    const isFakeBackendSocket =
+                        url.protocol === "ws:" &&
+                        url.hostname === "127.0.0.1" &&
+                        url.port === "59999" &&
+                        url.pathname === "/socket.io/";
+
+                    if (isFakeBackendSocket) {
+                        webSocket.onMessage((message) => {
+                            const raw = String(message);
+
+                            // Socket.IO namespace handshake.
+                            if (raw.startsWith("40")) {
+                                webSocket.send(
+                                    '40{"sid":"isolated-default-socket"}'
+                                );
+
+                                return;
+                            }
+
+                            // Engine.IO heartbeat.
+                            if (raw === "2") {
+                                webSocket.send("3");
+                            }
+                        });
+
+                        // Поддельное Engine.IO-соединение.
+                        webSocket.send(
+                            '0{"sid":"isolated-engine",' +
+                            '"upgrades":[],' +
+                            '"pingInterval":25000,' +
+                            '"pingTimeout":20000,' +
+                            '"maxPayload":1000000}'
+                        );
+
+                        return;
+                    }
+
                     unexpectedRequests.push(
                         `WEBSOCKET ${webSocket.url()}`
                     );
