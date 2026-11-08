@@ -81,6 +81,8 @@ async function createSocketHarness() {
         ["s-505", makeSession(505, "user")],
     ]);
 
+    const orderLookupHooks = new Map();
+
     const regularOrders = {
         11: {
             id: 11,
@@ -119,6 +121,14 @@ async function createSocketHarness() {
 
         Order: {
             async findByPk(id) {
+                const hook = orderLookupHooks.get(
+                    Number(id)
+                );
+
+                if (hook) {
+                    await hook();
+                }
+
                 return regularOrders[id] || null;
             },
         },
@@ -343,6 +353,7 @@ async function createSocketHarness() {
         joinChat,
         waitUntil,
         close,
+        orderLookupHooks,
     };
 }
 
@@ -788,6 +799,11 @@ test("Socket.IO: markAsRead не изменяет чужие уведомлен�
             "regular"
         );
 
+        assert.equal(
+            h.notificationUpdates[0].where.type,
+            "new_message"
+        );
+
         // Чужой заказ.
         user.emit("markAsRead", {
             orderId: 22,
@@ -848,3 +864,182 @@ test("Socket.IO: повторная проверка обнаруживает о
         );
     });
 });
+
+test(
+    "Socket.IO: запоздавшая подписка не возвращает старый чат",
+    async () => {
+        await withHarness(async (h) => {
+            const user = await h.connect(
+                h.token(101, "s-101", "user")
+            );
+
+            let releaseLookup;
+            let lookupStarted;
+
+            const started = new Promise((resolve) => {
+                lookupStarted = resolve;
+            });
+
+            const hold = new Promise((resolve) => {
+                releaseLookup = resolve;
+            });
+
+            h.orderLookupHooks.set(
+                11,
+                async () => {
+                    lookupStarted();
+                    await hold;
+                }
+            );
+
+            /*
+             * Открываем обычный чат.
+             * Проверка доступа пока не завершена.
+             */
+            const oldJoin = h.joinChat(user, {
+                orderId: 11,
+                orderType: "regular",
+            });
+
+            await started;
+
+            /*
+             * Пользователь переключился
+             * на экспресс-чат.
+             */
+            const currentJoin = await h.joinChat(
+                user,
+                {
+                    orderId: 11,
+                    orderType: "express",
+                }
+            );
+
+            assert.equal(currentJoin.ok, true);
+
+            // Теперь MySQL завершила старую проверку.
+            releaseLookup();
+
+            const staleResult = await oldJoin;
+
+            assert.equal(staleResult.ok, false);
+
+            assert.equal(
+                h.inRoom(user, "chat_express_11"),
+                true
+            );
+
+            assert.equal(
+                h.inRoom(user, "chat_regular_11"),
+                false
+            );
+        });
+    }
+);
+
+test(
+    "Socket.IO: закрытый чат не открывается запоздавшим запросом",
+    async () => {
+        await withHarness(async (h) => {
+            const user = await h.connect(
+                h.token(101, "s-101", "user")
+            );
+
+            const initial = await h.joinChat(
+                user,
+                {
+                    orderId: 11,
+                    orderType: "express",
+                }
+            );
+
+            assert.equal(initial.ok, true);
+
+            let releaseLookup;
+            let lookupStarted;
+
+            const started = new Promise((resolve) => {
+                lookupStarted = resolve;
+            });
+
+            const hold = new Promise((resolve) => {
+                releaseLookup = resolve;
+            });
+
+            h.orderLookupHooks.set(
+                11,
+                async () => {
+                    lookupStarted();
+                    await hold;
+                }
+            );
+
+            const pendingJoin = h.joinChat(
+                user,
+                {
+                    orderId: 11,
+                    orderType: "regular",
+                }
+            );
+
+            await started;
+
+            user.emit("leaveChat");
+
+            await h.waitUntil(
+                () =>
+                    h.serverSocket(user)
+                        ?.data.activeChatRoom === null
+            );
+
+            releaseLookup();
+
+            const result = await pendingJoin;
+
+            assert.equal(result.ok, false);
+
+            assert.equal(
+                h.inRoom(user, "chat_regular_11"),
+                false
+            );
+
+            assert.equal(
+                h.inRoom(user, "chat_express_11"),
+                false
+            );
+        });
+    }
+);
+
+test(
+    "Socket.IO: при подписке отправляет снимок непрочитанных",
+    async () => {
+        await withHarness(async (h) => {
+            const user = await h.connect(
+                h.token(101, "s-101", "user")
+            );
+
+            const received = [];
+
+            user.on(
+                "new_notification",
+                (payload) => {
+                    received.push(payload);
+                }
+            );
+
+            user.emit(
+                "subscribeToNotifications"
+            );
+
+            await h.waitUntil(
+                () => received.length > 0
+            );
+
+            assert.equal(
+                Array.isArray(received[0]),
+                true
+            );
+        });
+    }
+);

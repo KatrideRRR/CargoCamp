@@ -278,6 +278,24 @@ async function createTestServer() {
             "../services/supportMessageIdempotency": {
                 createSupportMessage,
             },
+
+            "../services/notificationService": {
+                async notifyUser(payload) {
+                    notifications.push({
+                        ...payload,
+                        messageId: payload.messageId ?? null,
+                    });
+
+                    events.push({
+                        room: `user_${payload.userId}`,
+                        event: "new_notification",
+                        payload: {
+                            id: notifications.length,
+                            type: payload.type,
+                        },
+                    });
+                },
+            },
         })
     );
 
@@ -461,6 +479,37 @@ test("HTTP API поддержки: безопасность и повторы", 
             assert.equal(sent.status, 201);
             assert.equal(sent.body.senderRole, "admin");
             assert.equal(sent.body.senderId, 1);
+
+            const supportNotification =
+                api.notifications.find(
+                    (notification) =>
+                        notification.type === "support_reply"
+                );
+
+            assert.ok(supportNotification);
+
+            assert.equal(
+                supportNotification.messageId,
+                null
+            );
+
+            assert.equal(
+                supportNotification.data.supportMessageId,
+                sent.body.id
+            );
+
+            const replyEvents =
+                api.events.filter(
+                    (event) =>
+                        event.event === "support:reply"
+                );
+
+            assert.equal(replyEvents.length, 1);
+
+            assert.equal(
+                replyEvents[0].room,
+                "user_101"
+            );
 
             const notificationsBefore =
                 api.notifications.length;

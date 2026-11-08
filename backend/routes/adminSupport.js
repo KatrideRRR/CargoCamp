@@ -5,6 +5,9 @@ const { authMiddleware, adminMiddleware } = require("../middlewares/adminAuth");
 const {
     createSupportMessage,
 } = require("../services/supportMessageIdempotency");
+const {
+    notifyUser,
+} = require("../services/notificationService");
 
 const {
     sequelize,
@@ -130,20 +133,38 @@ router.post("/chats/:userId/messages", authMiddleware, adminMiddleware, async (r
             return res.status(200).json(fullMessage);
         }
 
-        await Notification.create({
-            userId,
-            type: "support_reply",
-            title: "Ответ поддержки",
-            body: text.trim().slice(0, 200),
-            isRead: false,
-            messageId: message.id,
-            data: {
-                support: true,
-                url: "/support",
-            },
-        }).catch((e) => {
-            console.warn("Не удалось создать Notification support_reply:", e.message);
-        });
+        try {
+            await notifyUser({
+                userId: Number(userId),
+
+                type: "support_reply",
+
+                title: "Ответ поддержки",
+
+                body: text.trim().slice(0, 200),
+
+                /*
+                 * SupportMessage и Message —
+                 * разные таблицы.
+                 *
+                 * Не записываем ID SupportMessage
+                 * в поле messageId, предназначенное
+                 * для обычных сообщений.
+                 */
+                messageId: null,
+
+                data: {
+                    support: true,
+                    supportMessageId: message.id,
+                    url: "/support",
+                },
+            });
+        } catch (error) {
+            console.error(
+                "Не удалось отправить уведомление поддержки:",
+                error
+            );
+        }
 
         await ActionLog.create({
             actorUserId: adminId,
@@ -162,25 +183,31 @@ router.post("/chats/:userId/messages", authMiddleware, adminMiddleware, async (r
         });
 
         if (io) {
-            io.to(`user_${userId}`).emit("support:reply", {
-                userId,
-                message: fullMessage,
-            });
+            /*
+             * Все пользовательские подключения
+             * автоматически входят в user_{id}.
+             *
+             * Одно сообщение — одна отправка.
+             */
+            io.to(`user_${userId}`).emit(
+                "support:reply",
+                {
+                    userId,
+                    message: fullMessage,
+                }
+            );
 
-            io.to(`support_user_${userId}`).emit("support:reply", {
-                userId,
-                message: fullMessage,
-            });
-
-            io.to(`notifications_${userId}`).emit("new_notification", {
-                type: "support_reply",
-                support: true,
-            });
-
-            io.to("admins").emit("support:admin_reply", {
-                userId,
-                message: fullMessage,
-            });
+            /*
+             * Административные подключения
+             * уведомляем отдельно.
+             */
+            io.to("admins").emit(
+                "support:admin_reply",
+                {
+                    userId,
+                    message: fullMessage,
+                }
+            );
         }
 
         res.status(201).json(fullMessage);

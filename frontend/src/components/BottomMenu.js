@@ -1,4 +1,10 @@
-import React, { useContext, useEffect, useMemo, useState } from "react";
+import React, {
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import "../styles/BottomMenu.css";
 import { AuthContext } from "../utils/authContext";
 import { ListTodo, Home, ClipboardList, PackagePlus, UserRound } from "lucide-react";
@@ -14,6 +20,13 @@ const BottomMenu = () => {
 
     const [requestCount, setRequestCount] = useState(0);
     const [messageCount, setMessageCount] = useState(0);
+
+    /*
+ * Храним ID непрочитанных сообщений.
+ * Это защищает счётчик от повторной
+ * доставки одного уведомления.
+ */
+    const unreadMessageIdsRef = useRef(new Set());
 
     const platform = useMemo(() => {
         const params = new URLSearchParams(window.location.search);
@@ -37,6 +50,9 @@ const BottomMenu = () => {
 
     useEffect(() => {
         if (!user?.id || shouldHide) return;
+
+        unreadMessageIdsRef.current = new Set();
+        setMessageCount(0);
 
         const fetchDebt = async () => {
             try {
@@ -70,14 +86,57 @@ const BottomMenu = () => {
         socket.on("connect", subscribe);
         socket.on("reconnect", subscribe);
 
-        const handleNewNotification = (notifications) => {
-            if (!Array.isArray(notifications)) return;
+        const handleNewNotification = (payload) => {
+            if (Array.isArray(payload)) {
+                /*
+                 * Полный снимок непрочитанных
+                 * уведомлений с сервера.
+                 */
+                const unreadIds = new Set();
 
-            const unreadMessageNotifications = notifications.filter(
-                (item) => item?.type === "new_message"
+                for (const item of payload) {
+                    if (
+                        item?.type !== "new_message" ||
+                        item?.isRead === true
+                    ) {
+                        continue;
+                    }
+
+                    const id =
+                        item.id ??
+                        item.notificationId ??
+                        item.data?.notificationId;
+
+                    if (id != null) {
+                        unreadIds.add(String(id));
+                    }
+                }
+
+                unreadMessageIdsRef.current = unreadIds;
+            } else if (
+                payload?.type === "new_message" &&
+                payload?.isRead !== true
+            ) {
+                /*
+                 * Новое одиночное уведомление.
+                 * Один и тот же ID не увеличивает
+                 * счётчик повторно.
+                 */
+                const id =
+                    payload.id ??
+                    payload.notificationId ??
+                    payload.data?.notificationId;
+
+                if (id != null) {
+                    unreadMessageIdsRef.current.add(
+                        String(id)
+                    );
+                }
+            }
+
+            setMessageCount(
+                unreadMessageIdsRef.current.size
             );
-
-            setMessageCount(unreadMessageNotifications.length);
         };
 
         const orderRequestEvent = `orderRequest:${user.id}`;
@@ -108,8 +167,9 @@ const BottomMenu = () => {
     };
 
     const handleOpenActive = () => {
+        if (!user?.id) return;
+
         navigate("/active-orders");
-        setMessageCount(0);
     };
 
     const formatCount = (count) => {

@@ -112,6 +112,12 @@ function initializeSocket(server) {
         const userId = socket.data.userId;
         const scope = socket.data.scope;
 
+        /*
+ * Каждая новая попытка подключения к чату
+ * отменяет результаты предыдущих проверок.
+ */
+        socket.data.chatJoinGeneration = 0;
+
         const stopTyping =
             registerChatTypingEvents({
                 socket,
@@ -187,11 +193,21 @@ function initializeSocket(server) {
         socket.on(
             "subscribeToNotifications",
             () => {
-                if (scope !== "user") return;
+                if (scope !== "user") {
+                    return;
+                }
 
                 socket.join(
                     `notifications_${userId}`
                 );
+
+                /*
+                 * При открытии приложения
+                 * или восстановлении соединения
+                 * отправляем актуальные непрочитанные
+                 * уведомления из MySQL.
+                 */
+                void sendNotifications(userId);
             }
         );
 
@@ -265,6 +281,9 @@ function initializeSocket(server) {
                     return;
                 }
 
+                const joinGeneration =
+                    ++socket.data.chatJoinGeneration;
+
                 try {
                     const {
                         orderId,
@@ -277,6 +296,26 @@ function initializeSocket(server) {
                             orderType,
                             userId,
                         });
+
+                    /*
+ * Пока MySQL проверяла доступ,
+ * пользователь мог открыть другой чат
+ * или выйти из текущего.
+ *
+ * Запоздавший результат использовать нельзя.
+ */
+                    if (
+                        !socket.connected ||
+                        joinGeneration !==
+                        socket.data.chatJoinGeneration
+                    ) {
+                        reply({
+                            ok: false,
+                            message: "Запрос подписки устарел",
+                        });
+
+                        return;
+                    }
 
                     const nextRoom =
                         `chat_${access.orderType}_${access.orderId}`;
@@ -318,6 +357,8 @@ function initializeSocket(server) {
          * Выход из комнаты открытого чата.
          */
         socket.on("leaveChat", () => {
+
+            socket.data.chatJoinGeneration += 1;
 
             stopTyping();
 
@@ -366,6 +407,11 @@ function initializeSocket(server) {
                                 userId: access.userId,
                                 orderId: access.orderId,
                                 orderType: access.orderType,
+
+                                // Отмечаем прочитанными
+                                // только уведомления о сообщениях.
+                                type: "new_message",
+
                                 isRead: false,
                             },
                         }
@@ -386,7 +432,10 @@ function initializeSocket(server) {
         );
 
         socket.on("disconnect", () => {
+            socket.data.chatJoinGeneration += 1;
+
             stopTyping();
+
             clearInterval(sessionTimer);
         });
     });
