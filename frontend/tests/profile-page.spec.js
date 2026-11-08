@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/safeTest";
 
 const FRONT_URL = "http://localhost:3000";
 

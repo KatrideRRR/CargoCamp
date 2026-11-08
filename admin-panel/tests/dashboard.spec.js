@@ -148,6 +148,92 @@ test.describe("Dashboard", () => {
         ).toBeVisible();
     });
 
+    test(
+        "переходит из Dashboard в проверку личности",
+        async ({ page }) => {
+            await openDashboard(page);
+
+            await page.route(
+                "**/api/admin/identity/pending",
+                async (route) => {
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                            applications: [],
+                        },
+                    });
+                }
+            );
+
+            await page.route(
+                "**/api/admin/identity/verified**",
+                async (route) => {
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                            users: [],
+                            total: 0,
+                        },
+                    });
+                }
+            );
+
+            await page.getByRole("link", {
+                name: "Проверка личности",
+            }).click();
+
+            await expect(page).toHaveURL(
+                /\/identity$/
+            );
+
+            await expect(
+                page.locator(".admin-identity-page")
+            ).toBeVisible();
+
+            await expect(
+                page.locator(".admin-identity-container")
+            ).toBeVisible();
+        }
+    );
+
+    test(
+        "переходит из Dashboard в проверку льгот",
+        async ({ page }) => {
+            await openDashboard(page);
+
+            await page.route(
+                "**/api/admin/benefits/pending",
+                async (route) => {
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                            applications: [],
+                        },
+                    });
+                }
+            );
+
+            await page.getByRole("link", {
+                name: "Проверка льгот",
+            }).click();
+
+            await expect(page).toHaveURL(
+                /\/benefits$/
+            );
+
+            await expect(
+                page.locator(".admin-benefits-page")
+            ).toBeVisible();
+
+            await expect(
+                page.locator(".admin-benefits-container")
+            ).toBeVisible();
+        }
+    );
+
     test("переходит на страницу поддержки", async ({ page }) => {
         await openDashboard(page);
 
