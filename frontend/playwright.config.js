@@ -47,6 +47,8 @@ module.exports = defineConfig({
             REACT_APP_API_URL: FAKE_API_URL,
 
             REACT_APP_SOCKET_URL: FAKE_API_URL,
+
+            REACT_APP_E2E_TEST: "1",
         },
     },
 

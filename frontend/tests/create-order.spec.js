@@ -90,6 +90,185 @@ async function setupCreateOrderMocks(page, options = {}) {
         },
     } = options;
 
+    // Список обычных заказов.
+    await page.route(
+        "**/api/orders/all",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: [],
+            });
+        }
+    );
+
+// Доступные экспресс-заказы.
+    await page.route(
+        "**/api/express/express-orders/available",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    orders: [],
+                },
+            });
+        }
+    );
+
+// Активные обычные заказы.
+    await page.route(
+        "**/api/orders/active-orders",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    orders: [],
+                },
+            });
+        }
+    );
+
+// Активные экспресс-заказы.
+    await page.route(
+        "**/api/express/express-orders/me?mode=active",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    orders: [],
+                },
+            });
+        }
+    );
+
+    // Яндекс.Карты: внешний JavaScript не загружаем.
+    await page.route(
+        "https://api-maps.yandex.ru/2.1/**",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/javascript",
+                body: "",
+            });
+        }
+    );
+
+// Google Fonts: исключаем внешний запрос.
+    await page.route(
+        "https://fonts.googleapis.com/**",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "text/css",
+                body: "",
+            });
+        }
+    );
+
+// Профиль вымышленного пользователя.
+    await page.route(
+        "**/api/auth/profile",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    ...testUser,
+                    ...profileLocation,
+                    debt: 0,
+                },
+            });
+        }
+    );
+
+// Задолженности нет.
+    await page.route(
+        "**/api/orders/me/status",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    debt: 0,
+                },
+            });
+        }
+    );
+
+// Гарантийная оплата пока недоступна.
+    await page.route(
+        "**/api/payments/guarantee/capabilities",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    verified: true,
+                    available: false,
+                    operational: false,
+                },
+            });
+        }
+    );
+
+    // Актуальный поиск услуг CargoCamp.
+    await page.route(
+        "**/api/category/search**",
+        async (route) => {
+            const results = [
+                {
+                    type: "subcategory",
+                    categoryId: 1,
+                    categoryName: "Грузоперевозки",
+                    subcategoryId: 10,
+                    subcategoryName: "Перевозка мебели",
+                    label: "Перевозка мебели",
+                    formConfig: null,
+                    pricingConfig: null,
+                },
+                {
+                    type: "subcategory",
+                    categoryId: 1,
+                    categoryName: "Грузоперевозки",
+                    subcategoryId: 11,
+                    subcategoryName: "Вывоз мусора",
+                    label: "Вывоз мусора",
+                    formConfig: null,
+                    pricingConfig: null,
+                },
+                {
+                    type: "subcategory",
+                    categoryId: 2,
+                    categoryName: "Ремонт",
+                    subcategoryId: 20,
+                    subcategoryName: "Электрика",
+                    label: "Электрика",
+                    formConfig: null,
+                    pricingConfig: null,
+                },
+
+                // Намеренно возвращаем экспресс-категории.
+                // Фронтенд обязан самостоятельно их скрыть.
+                {
+                    type: "category",
+                    categoryId: 3,
+                    categoryName: "Такси",
+                    label: "Такси",
+                },
+                {
+                    type: "category",
+                    categoryId: 4,
+                    categoryName: "Курьер",
+                    label: "Курьер",
+                },
+            ];
+
+            await route.fulfill({
+                status: 200,
+                json: {
+                    success: true,
+                    results,
+                },
+            });
+        }
+    );
+
     page.on("pageerror", (error) => {
         console.log("[PAGE ERROR]", error.message);
     });
@@ -278,17 +457,43 @@ async function clickAsapToggle(page) {
     await button.click();
 }
 
-async function fillRequiredOrderFields(page) {
-    await page.locator("textarea.textarea").fill("Нужно перевезти мебель аккуратно");
-    await page.locator('input[type="number"]').fill("1500");
+async function selectTestService(
+    page,
+    serviceName = "Перевозка мебели"
+) {
+    const search = page.getByRole("textbox", {
+        name: "Поиск услуги",
+    });
 
-    await page.locator("select.control").first().selectOption("1");
+    await search.fill("мебель");
 
-    await expect(page.locator("select.control").nth(1)).toBeVisible({
+    const suggestion = page
+        .locator(".serviceSuggestionItem")
+        .filter({
+            hasText: serviceName,
+        });
+
+    await expect(suggestion).toBeVisible({
         timeout: 10000,
     });
 
-    await page.locator("select.control").nth(1).selectOption("10");
+    await suggestion.click();
+
+    await expect(
+        page.locator(".selectedServiceCard")
+    ).toContainText(serviceName);
+}
+
+async function fillRequiredOrderFields(page) {
+    await selectTestService(page);
+
+    await page
+        .locator("textarea.textarea")
+        .fill("Нужно перевезти мебель аккуратно");
+
+    await page
+        .locator('input[type="number"]')
+        .fill("1500");
 }
 
 test.describe("CreateOrderPage", () => {
@@ -304,7 +509,11 @@ test.describe("CreateOrderPage", () => {
 
         await expect(page.getByText("Адрес и время подставятся автоматически")).toBeVisible();
 
-        await expect(page.locator(".section-title", { hasText: "Категория" })).toBeVisible();
+        await expect(
+            page.locator(".section-title", {
+                hasText: "Что нужно сделать?",
+            })
+        ).toBeVisible();
         await expect(page.locator(".section-title", { hasText: "Описание" })).toBeVisible();
         await expect(page.locator(".section-title", { hasText: "Оплата и продвижение" })).toBeVisible();
 
@@ -376,28 +585,64 @@ test.describe("CreateOrderPage", () => {
         await expect(page.getByPlaceholder("Выберите дату и время")).not.toBeVisible();
     });
 
-    test("загружает категории и фильтрует Такси/Курьер", async ({ page }) => {
-        const categorySelect = page.locator("select.control").first();
+    test(
+        "поиск услуг скрывает Такси и Курьер",
+        async ({ page }) => {
+            const search = page.getByRole("textbox", {
+                name: "Поиск услуги",
+            });
 
-        await expect(categorySelect).toContainText("Грузоперевозки");
-        await expect(categorySelect).toContainText("Ремонт");
+            await search.fill("мебель");
 
-        await expect(categorySelect).not.toContainText("Такси");
-        await expect(categorySelect).not.toContainText("Курьер");
-    });
+            const suggestions = page.locator(
+                ".serviceSuggestionList"
+            );
 
-    test("после выбора категории показывает подкатегории", async ({ page }) => {
-        await page.locator("select.control").first().selectOption("1");
+            await expect(suggestions).toBeVisible();
 
-        const subcategorySelect = page.locator("select.control").nth(1);
+            await expect(suggestions).toContainText(
+                "Перевозка мебели"
+            );
 
-        await expect(subcategorySelect).toBeVisible({
-            timeout: 10000,
-        });
+            await expect(suggestions).toContainText(
+                "Вывоз мусора"
+            );
 
-        await expect(subcategorySelect).toContainText("Перевозка мебели");
-        await expect(subcategorySelect).toContainText("Вывоз мусора");
-    });
+            await expect(suggestions).not.toContainText(
+                "Такси"
+            );
+
+            await expect(suggestions).not.toContainText(
+                "Курьер"
+            );
+        }
+    );
+
+    test(
+        "выбирает услугу и сохраняет категорию",
+        async ({ page }) => {
+            await selectTestService(
+                page,
+                "Перевозка мебели"
+            );
+
+            const selected = page.locator(
+                ".selectedServiceCard"
+            );
+
+            await expect(selected).toContainText(
+                "Перевозка мебели"
+            );
+
+            await expect(selected).toContainText(
+                "Категория: Грузоперевозки"
+            );
+
+            await expect(
+                page.locator(".serviceSuggestionPanel")
+            ).not.toBeVisible();
+        }
+    );
 
     test("ограничивает сумму максимумом 300000", async ({ page }) => {
         const amountInput = page.locator('input[type="number"]');
@@ -422,7 +667,9 @@ test.describe("CreateOrderPage", () => {
 
         await clickCreateOrderButton(page);
 
-        await expect(page.getByText("Адрес обязателен")).toBeVisible();
+        await expect(
+            page.locator(".alert-text")
+        ).toContainText("Адрес обязателен");
     });
 
     test("показывает ошибку, если адрес является координатами", async ({ page }) => {
@@ -433,25 +680,41 @@ test.describe("CreateOrderPage", () => {
         await clickCreateOrderButton(page);
 
         await expect(
-            page.getByText("Нужно указать адрес текстом")
-        ).toBeVisible();
+            page.locator(".alert-text")
+        ).toContainText("Нужно указать адрес текстом");
     });
 
-    test("показывает ошибку, если категория не выбрана", async ({ page }) => {
-        await page.locator('input[type="number"]').fill("1500");
+    test(
+        "не создаёт заказ без выбранной услуги",
+        async ({ page }) => {
+            await page
+                .locator('input[type="number"]')
+                .fill("1500");
 
-        await clickCreateOrderButton(page);
+            await clickCreateOrderButton(page);
 
-        await expect(page.locator(".alert-text")).toHaveText("Выберите категорию");
-    });
+            await expect(
+                page.locator(".alert-text")
+            ).toContainText(
+                "Выберите подходящую услугу из подсказки"
+            );
+        }
+    );
 
-    test("показывает ошибку, если сумма некорректная", async ({ page }) => {
-        await page.locator("select.control").first().selectOption("1");
+    test(
+        "не создаёт заказ с некорректной суммой",
+        async ({ page }) => {
+            await selectTestService(page);
 
-        await clickCreateOrderButton(page);
+            await clickCreateOrderButton(page);
 
-        await expect(page.getByText("Укажите корректную сумму за работу")).toBeVisible();
-    });
+            await expect(
+                page.locator(".alert-text")
+            ).toContainText(
+                "Укажите корректную сумму за работу"
+            );
+        }
+    );
 
     test("успешно создаёт заказ без продвижения", async ({ page }) => {
         let createOrderRequest = null;
@@ -520,36 +783,59 @@ test.describe("CreateOrderPage", () => {
 
         await clickCreateOrderButton(page);
 
-        await expect(page.getByText("Ошибка сервера при создании заказа")).toBeVisible({
-            timeout: 10000,
-        });
+        await expect(
+            page.locator(".alert-text")
+        ).toContainText(
+            "Ошибка сервера при создании заказа"
+        );
     });
 
-    test("при выбранном продвижении показывает сумму к оплате", async ({ page }) => {
-        const promoLabels = page.locator(".promoBox label");
+    test(
+        "при выбранном продвижении показывает сумму к оплате",
+        async ({ page }) => {
+            const highlight = page
+                .locator(".promoBox .promoOption")
+                .filter({
+                    hasText: "Выделить цветом",
+                });
 
-        const count = await promoLabels.count();
+            await expect(highlight).toBeVisible();
 
-        if (count === 0) {
-            test.skip(true, "PromotionOptions не содержит label-элементов в текущей верстке");
+            await expect(
+                page.locator(".totalAmount")
+            ).toHaveText("0 ₽");
+
+            await highlight.click();
+
+            await expect(
+                highlight.locator('input[type="checkbox"]')
+            ).toBeChecked();
+
+            await expect(
+                page.locator(".totalAmount")
+            ).toHaveText("50 ₽");
+
+            // Повторное нажатие отключает продвижение.
+            await highlight.click();
+
+            await expect(
+                highlight.locator('input[type="checkbox"]')
+            ).not.toBeChecked();
+
+            await expect(
+                page.locator(".totalAmount")
+            ).toHaveText("0 ₽");
         }
-
-        await promoLabels.first().click();
-
-        await expect(page.locator(".totalAmount")).not.toHaveText("0 ₽");
-    });
+    );
 
     test("создаёт заказ с продвижением и открывает ссылку оплаты", async ({ page }) => {
-        const promoLabels = page.locator(".promoBox label");
+        const highlight = page
+            .locator(".promoBox .promoOption")
+            .filter({
+                hasText: "Выделить цветом",
+            });
 
-        const count = await promoLabels.count();
-
-        if (count === 0) {
-            test.skip(
-                true,
-                "PromotionOptions не содержит label-элементов в текущей верстке"
-            );
-        }
+        await expect(highlight).toBeVisible();
 
         let promotionPaymentRequest = null;
 
@@ -572,7 +858,15 @@ test.describe("CreateOrderPage", () => {
             }
         );
 
-        await promoLabels.first().click();
+        await highlight.click();
+
+        await expect(
+            highlight.locator('input[type="checkbox"]')
+        ).toBeChecked();
+
+        await expect(
+            page.locator(".totalAmount")
+        ).toHaveText("50 ₽");
 
         await fillRequiredOrderFields(page);
 

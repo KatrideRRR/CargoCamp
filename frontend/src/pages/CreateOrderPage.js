@@ -788,7 +788,12 @@ function CreateOrderPage() {
                 const compressedFile = await imageCompression(file, {
                     maxSizeMB: 0.5,
                     maxWidthOrHeight: 1024,
-                    useWebWorker: true,
+
+                    // В Playwright сжимаем без внешнего
+                    // Web Worker и запросов к CDN.
+                    // Для обычного приложения сохраняем Worker.
+                    useWebWorker:
+                        process.env.REACT_APP_E2E_TEST !== "1",
                 });
                 compressed.push(compressedFile);
             } catch (e) {
@@ -1838,6 +1843,37 @@ function CreateOrderPage() {
 
                     {/* Description */}
                     <div className="glass section-card">
+
+                        <div className="section-head">
+                            <div>
+                                <div className="section-title">
+                                    Описание
+                                </div>
+
+                                <div className="section-sub">
+                                    Расскажите исполнителю подробнее
+                                    о необходимой работе
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="glass field">
+                            <label
+                                className="label"
+                                htmlFor="order-description"
+                            >
+                                Описание задачи
+                            </label>
+
+                            <textarea
+                                id="order-description"
+                                className="control textarea"
+                                rows={3}
+                                placeholder="Опишите, что необходимо сделать"
+                                value={formData.description}
+                                onChange={handleDescriptionChange}
+                            />
+                        </div>
 
 
                         <div className="glass field">
