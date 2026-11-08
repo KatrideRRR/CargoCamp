@@ -20,7 +20,9 @@ const {
     verifyYooPromotion,
     applyVerifiedPromotion,
 } = require("../services/promotionPaymentService");
-
+const {
+    reconcilePromotionPayment,
+} = require("../services/promotionPaymentReconciliationService");
 const {
     claimPromotionPaymentIntent,
     recordPromotionPaymentIntent,
@@ -835,9 +837,15 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
             idempotenceKey
         );
 
-        await order.update({
-            promotionPaymentId: payment.id,
-            promotionPaymentProvider: "yookassa",
+        await recordPromotionPaymentIntent({
+            orderId: order.id,
+            provider: "yookassa",
+            paymentId: payment.id,
+
+            confirmationUrl:
+                payment.confirmation?.confirmation_url || null,
+
+            paymentStatus: payment.status,
         });
 
         await req.logAction?.({
@@ -1219,75 +1227,88 @@ router.post("/yookassa/webhook", async (req, res) => {
             return res.sendStatus(200);
         }
 
-        if (
-            event.event ===
-            "refund.succeeded"
-        ) {
-            const refund =
-                event.object || {};
+        if (event.event === "refund.succeeded") {
+            const incoming = event.object || {};
 
-            const refundId =
-                String(
-                    refund.id || ""
+            const refundId = String(
+                incoming.id || ""
+            );
+
+            const paymentId = String(
+                incoming.payment_id || ""
+            );
+
+            if (!refundId || !paymentId) {
+                throw new Error(
+                    "Некорректное уведомление о возврате ЮKassa"
                 );
-
-            const paymentId =
-                String(
-                    refund.payment_id || ""
-                );
-
-            const amountKopecks =
-                Math.round(
-                    Number(
-                        refund
-                            ?.amount
-                            ?.value ||
-                        0
-                    ) * 100
-                );
-
-            if (
-                refundId &&
-                paymentId &&
-                amountKopecks > 0
-            ) {
-                void sendBusinessCashRefund({
-                    provider:
-                        "yookassa",
-
-                    paymentId,
-
-                    refundId,
-
-                    amountKopecks,
-
-                    fullRefund:
-                        false,
-
-                    occurredAt:
-                        refund.created_at ||
-                        new Date()
-                            .toISOString(),
-                });
             }
 
-            await req.logAction?.({
-                req,
-                actorUserId: null,
-                actorRole:
-                    "webhook",
-                actionType:
-                    "yookassa_refund_succeeded",
-                entityType:
-                    "payment",
+            /*
+             * Подтверждаем возврат непосредственно
+             * через API ЮKassa.
+             */
+            const verified = await yooKassa.getRefund(
+                refundId
+            );
+
+            const amountKopecks = Math.round(
+                Number(verified?.amount?.value) * 100
+            );
+
+            if (
+                String(verified?.id) !== refundId ||
+                String(verified?.payment_id) !== paymentId ||
+                verified?.status !== "succeeded" ||
+                verified?.amount?.currency !== "RUB" ||
+                !Number.isSafeInteger(amountKopecks) ||
+                amountKopecks <= 0
+            ) {
+                throw new Error(
+                    "ЮKassa не подтвердила возврат"
+                );
+            }
+
+            const result = await sendBusinessCashRefund({
+                provider: "yookassa",
                 paymentId,
-                severity:
-                    "info",
-                meta: {
-                    refundId,
-                    amountKopecks,
-                },
+                refundId,
+                amountKopecks,
+                fullRefund: false,
+
+                occurredAt:
+                    verified.created_at ||
+                    new Date().toISOString(),
             });
+
+            if (!result?.ok) {
+                throw new Error(
+                    "Не удалось передать возврат в BusinessCash"
+                );
+            }
+
+            try {
+                await req.logAction?.({
+                    req,
+                    actorUserId: null,
+                    actorRole: "webhook",
+                    actionType: "yookassa_refund_succeeded",
+                    entityType: "payment",
+                    paymentId,
+
+                    severity: "info",
+
+                    meta: {
+                        refundId,
+                        amountKopecks,
+                    },
+                });
+            } catch (error) {
+                console.error(
+                    "Refund audit log error:",
+                    error
+                );
+            }
 
             return res.sendStatus(200);
         }
@@ -1796,8 +1817,12 @@ router.post("/yookassa/webhook", async (req, res) => {
             req.body?.object?.metadata?.type;
 
         if (
-            ["premium", "debt", "order_promotion"]
-                .includes(paymentType)
+            req.body?.event === "refund.succeeded" ||
+            [
+                "premium",
+                "debt",
+                "order_promotion",
+            ].includes(paymentType)
         ) {
             return res.sendStatus(500);
         }
@@ -1905,117 +1930,77 @@ router.get(
                 });
             }
 
-            if (!order.promotionPaymentId) {
-                return res.json({
-                    success: true,
-                    status: "no_payment_id",
-                });
-            }
-
-            const provider =
-                order.promotionPaymentProvider ||
-                "yookassa";
-
-            /*
-             * Т-Банк подтверждается собственным webhook,
-             * где выполняется GetState и проверка суммы.
-             *
-             * Не отправляем его PaymentId в ЮKassa.
-             */
-            if (provider === "tbank") {
-                return res.json({
-                    success: true,
-                    provider,
-                    status: order.promotionPaidAt
-                        ? "succeeded"
-                        : "pending",
-                });
-            }
-
-            if (provider !== "yookassa") {
-                return res.status(409).json({
-                    success: false,
-                    error: "Неизвестный провайдер оплаты",
-                });
-            }
-
-            const payment = await yooKassa.getPayment(
-                order.promotionPaymentId
-            );
-
-            if (
-                payment.status === "succeeded" &&
-                !order.promotionPaidAt
-            ) {
-                verifyYooPromotion(payment, order);
-
-                const amountKopecks = Math.round(
-                    Number(payment.amount.value) * 100
-                );
-
-                const result = await applyVerifiedPromotion({
-                    provider: "yookassa",
-                    paymentId: payment.id,
+            const result =
+                await reconcilePromotionPayment({
                     orderId,
-                    amountKopecks,
                 });
 
-                if (!result.duplicate) {
-                    const io = req.app.locals.io;
+            if (result.newlyApplied) {
+                const io = req.app.locals.io;
 
+                try {
+                    io?.emit("orderUpdated");
+                } catch (error) {
+                    console.error(
+                        "Promotion socket error:",
+                        error
+                    );
+                }
+
+                void sendBusinessCashPayment({
+                    provider: result.provider,
+                    paymentId: result.paymentId,
+                    kind: "promotion",
+                    amountKopecks:
+                    result.amountKopecks,
+
+                    userId:
+                    result.userId,
+
+                    orderId,
+                    occurredAt:
+                        result.occurredAt ||
+                        new Date().toISOString(),
+                }).catch((error) => {
+                    console.error(
+                        "BusinessCash promotion sync error:",
+                        error
+                    );
+                });
+
+                if (result.sendPush) {
                     try {
-                        io?.emit("orderUpdated");
+                        await sendOrderPush({
+                            db,
+                            io,
+                            orderId,
+                            radiusKm: 50,
+                            limit: 10,
+
+                            logAction:
+                                req.logAction ||
+                                req.app?.locals?.logAction ||
+                                null,
+                        });
                     } catch (error) {
                         console.error(
-                            "Promotion socket error:",
+                            "Promotion push error:",
                             error
                         );
-                    }
-
-                    void sendBusinessCashPayment({
-                        provider: "yookassa",
-                        paymentId: payment.id,
-                        kind: "promotion",
-                        amountKopecks,
-                        userId,
-                        orderId,
-                        occurredAt:
-                            payment.captured_at ||
-                            payment.created_at ||
-                            new Date().toISOString(),
-                    });
-
-                    if (result.sendPush) {
-                        try {
-                            await sendOrderPush({
-                                db,
-                                io,
-                                orderId,
-                                radiusKm: 50,
-                                limit: 10,
-                                logAction:
-                                    req.logAction ||
-                                    req.app?.locals?.logAction ||
-                                    null,
-                            });
-                        } catch (error) {
-                            console.error(
-                                "Promotion push error:",
-                                error
-                            );
-                        }
                     }
                 }
             }
 
             return res.json({
                 success: true,
-                provider,
-                status: payment.status,
+                provider: result.provider,
+                status: result.status,
+                needsReview:
+                    result.needsReview === true,
             });
         } catch (error) {
             console.error(
-                "Promotion status error:",
+                "Promotion reconciliation error:",
                 error
             );
 
@@ -2024,8 +2009,8 @@ router.get(
             ).json({
                 success: false,
                 error:
-                    "Не удалось подтвердить состояние оплаты. " +
-                    "Повторное списание не выполнялось.",
+                    "Не удалось подтвердить оплату. " +
+                    "Новая операция списания не создавалась.",
             });
         }
     }
