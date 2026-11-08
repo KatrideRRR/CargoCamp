@@ -123,6 +123,14 @@ async function setupChatMocks(page, options = {}) {
         dispute = null,
     } = options;
 
+    /*
+ * Каждый тест ChatPage использует
+ * полностью изолированный Socket.IO.
+ *
+ * Никаких соединений с реальным сервером.
+ */
+    const socketConnections = await mockChatSocket(page);
+
     // Яндекс.Карты не загружаем из интернета.
     await page.route(
         "https://api-maps.yandex.ru/2.1/**",
@@ -342,6 +350,8 @@ async function setupChatMocks(page, options = {}) {
             }),
         });
     });
+
+    return socketConnections;
 }
 
 async function openChatPage(page, options = {}) {
@@ -447,7 +457,7 @@ async function openFreshChat(page, {
 } = {}) {
     await setFakeAuth(page);
 
-    await setupChatMocks(page, {
+    const connections = await setupChatMocks(page, {
         messages,
     });
 
@@ -467,16 +477,12 @@ async function openFreshChat(page, {
     ).toBeVisible({
         timeout: 15000,
     });
+
+    return connections;
 }
 
 async function openSocketChat(page) {
-    let connections = [];
-
-    await openFreshChat(page, {
-        onSetup: async () => {
-            connections = await mockChatSocket(page);
-        },
-    });
+    const connections = await openFreshChat(page);
 
     // Ждём, когда приложение подключится
     // к нашему поддельному Socket.IO.
