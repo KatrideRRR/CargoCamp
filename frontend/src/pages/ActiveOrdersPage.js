@@ -1999,7 +1999,7 @@ const ActiveOrdersPage = () => {
 
                                                                 {dispute && (
                                                                     <div className={`dispute-status-badge dispute-status-${dispute.status}`}>
-                                                                        Спор: {orderDisputes[order.id].status}
+                                                                        Спор: {dispute.status}
                                                                     </div>
                                                                 )}
                                                             </div>
