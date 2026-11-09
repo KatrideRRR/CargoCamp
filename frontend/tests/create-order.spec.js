@@ -909,3 +909,678 @@ test.describe("CreateOrderPage", () => {
         });
     });
 });
+
+// ============================================================
+// CARGOCAMP: DYNAMIC ORDER FORM E2E
+// Полностью изолированные сценарии.
+// ============================================================
+
+const DYNAMIC_TEST_SERVICE = {
+    type: "subcategory",
+
+    categoryId: 2,
+    categoryName: "Ремонт",
+
+    subcategoryId: 20,
+    subcategoryName: "Ремонт сантехники",
+
+    label: "Ремонт сантехники",
+
+    formConfig: {
+        fields: [
+            {
+                key: "workType",
+                label: "Тип работы",
+                type: "select",
+                required: true,
+
+                options: [
+                    {
+                        value: "faucet",
+                        label: "Замена смесителя",
+                    },
+                    {
+                        value: "pipes",
+                        label: "Ремонт труб",
+                    },
+                ],
+            },
+
+            {
+                key: "tasksCount",
+                label: "Количество точек",
+                type: "number",
+                required: true,
+                min: 1,
+                max: 5,
+            },
+
+            {
+                key: "needAssistant",
+                label: "Нужен помощник",
+                type: "boolean",
+            },
+
+            {
+                key: "assistantNote",
+                label: "Комментарий помощнику",
+                type: "textarea",
+                required: true,
+
+                showWhen: {
+                    field: "needAssistant",
+                    equals: true,
+                },
+            },
+        ],
+    },
+
+    pricingConfig: {
+        enabled: true,
+        calculator: "fixed_service",
+
+        visitPrice: 500,
+
+        workTypePrices: {
+            faucet: 700,
+            pipes: 1000,
+        },
+
+        quantityField: "tasksCount",
+        quantityLabel: "Количество точек",
+        pricePerUnit: 100,
+
+        minimumPrice: 0,
+        maximumPrice: 300000,
+        rangePercent: 10,
+    },
+};
+
+/**
+ * Подменяет поиск услуг.
+ *
+ * Все результаты вымышленные.
+ * Реальный API не вызывается.
+ */
+async function selectDynamicTestService(page) {
+    await page.route(
+        "**/api/category/search**",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+
+                json: {
+                    success: true,
+                    results: [
+                        DYNAMIC_TEST_SERVICE,
+                    ],
+                },
+            });
+        }
+    );
+
+    const search = page.getByRole(
+        "textbox",
+        {
+            name: "Поиск услуги",
+        }
+    );
+
+    await search.fill("смеситель");
+
+    const suggestion = page
+        .locator(".serviceSuggestionItem")
+        .filter({
+            hasText: "Ремонт сантехники",
+        });
+
+    await expect(suggestion).toBeVisible({
+        timeout: 10000,
+    });
+
+    await suggestion.click();
+
+    await expect(
+        page.locator(".selectedServiceCard")
+    ).toContainText(
+        "Ремонт сантехники"
+    );
+
+    await expect(
+        page.locator(".dynamicServiceFields")
+    ).toBeVisible();
+}
+
+/**
+ * Заполняет стоимость и параметры услуги.
+ */
+async function fillDynamicTestFields(
+    page,
+    {
+        count = 2,
+        amount = "1500",
+    } = {}
+) {
+    const fields = page.locator(
+        ".dynamicServiceFields"
+    );
+
+    await fields
+        .locator(".field")
+        .filter({
+            hasText: "Тип работы",
+        })
+        .locator("select")
+        .selectOption("faucet");
+
+    if (count !== null) {
+        await fields
+            .locator(".field")
+            .filter({
+                hasText: "Количество точек",
+            })
+            .locator('input[type="number"]')
+            .fill(String(count));
+    }
+
+    await page
+        .getByPlaceholder("Например 1500")
+        .fill(amount);
+}
+
+/**
+ * Извлекает JSON из FormData-запроса.
+ *
+ * Используется для проверки serviceDetails,
+ * которые реально передаются фронтендом.
+ */
+function readMultipartJson(request, fieldName) {
+    const body = request.postData() || "";
+
+    const match = body.match(
+        new RegExp(
+            `name="${fieldName}"\\r?\\n\\r?\\n([^\\r\\n]+)`
+        )
+    );
+
+    if (!match) {
+        throw new Error(
+            `Поле ${fieldName} отсутствует в FormData`
+        );
+    }
+
+    return JSON.parse(match[1]);
+}
+
+test.describe(
+    "CreateOrderPage — динамические поля и оплата",
+    () => {
+        test.beforeEach(async ({ page }) => {
+            await openCreateOrderPage(page);
+        });
+
+        // ------------------------------------------------
+        // 1. ОБЯЗАТЕЛЬНЫЕ ПОЛЯ
+        // ------------------------------------------------
+
+        test(
+            "не создаёт заказ без обязательного динамического поля",
+            async ({ page }) => {
+                await selectDynamicTestService(page);
+
+                await fillDynamicTestFields(page, {
+                    count: null,
+                });
+
+                let createRequests = 0;
+
+                await page.route(
+                    "**/api/orders/",
+                    async (route) => {
+                        createRequests++;
+
+                        await route.fulfill({
+                            status: 200,
+                            json: {
+                                success: true,
+                                id: 777,
+                            },
+                        });
+                    }
+                );
+
+                await clickCreateOrderButton(page);
+
+                await expect(
+                    page.locator(".alert-text")
+                ).toContainText(
+                    "Заполните поле «Количество точек»"
+                );
+
+                expect(createRequests).toBe(0);
+            }
+        );
+
+        // ------------------------------------------------
+        // 2. ОГРАНИЧЕНИЯ ЧИСЛОВОГО ПОЛЯ
+        // ------------------------------------------------
+
+        test(
+            "не принимает число больше максимума",
+            async ({ page }) => {
+                await selectDynamicTestService(page);
+
+                await fillDynamicTestFields(page, {
+                    count: 7,
+                });
+
+                await clickCreateOrderButton(page);
+
+                await expect(
+                    page.locator(".alert-text")
+                ).toContainText(
+                    "Максимальное значение поля «Количество точек» — 5"
+                );
+            }
+        );
+
+        // ------------------------------------------------
+        // 3. УСЛОВНО ОБЯЗАТЕЛЬНОЕ ПОЛЕ
+        // ------------------------------------------------
+
+        test(
+            "требует комментарий только при выборе помощника",
+            async ({ page }) => {
+                await selectDynamicTestService(page);
+
+                await fillDynamicTestFields(page);
+
+                const assistant = page
+                    .locator(".dynamicBooleanField")
+                    .filter({
+                        hasText: "Нужен помощник",
+                    })
+                    .locator('input[type="checkbox"]');
+
+                await expect(assistant).not.toBeChecked();
+
+                await assistant.check();
+
+                const note = page
+                    .locator(".dynamicServiceFields .field")
+                    .filter({
+                        hasText: "Комментарий помощнику",
+                    });
+
+                await expect(note).toBeVisible();
+
+                await clickCreateOrderButton(page);
+
+                await expect(
+                    page.locator(".alert-text")
+                ).toContainText(
+                    "Заполните поле «Комментарий помощнику»"
+                );
+            }
+        );
+
+        // ------------------------------------------------
+        // 4. ОЧИСТКА СКРЫТЫХ ПОЛЕЙ
+        // ------------------------------------------------
+
+        test(
+            "удаляет скрытое поле из отправляемого заказа",
+            async ({ page }) => {
+                await selectDynamicTestService(page);
+
+                await fillDynamicTestFields(page);
+
+                const assistant = page
+                    .locator(".dynamicBooleanField")
+                    .filter({
+                        hasText: "Нужен помощник",
+                    })
+                    .locator('input[type="checkbox"]');
+
+                await assistant.check();
+
+                const note = page
+                    .locator(".dynamicServiceFields .field")
+                    .filter({
+                        hasText: "Комментарий помощнику",
+                    })
+                    .locator("textarea");
+
+                await note.fill(
+                    "Помощнику потребуется инструмент"
+                );
+
+                await assistant.uncheck();
+
+                await expect(
+                    page.locator(".dynamicServiceFields .field")
+                        .filter({
+                            hasText: "Комментарий помощнику",
+                        })
+                ).toHaveCount(0);
+
+                let createRequest = null;
+
+                await page.route(
+                    "**/api/orders/",
+                    async (route) => {
+                        createRequest = route.request();
+
+                        await route.fulfill({
+                            status: 200,
+                            json: {
+                                success: true,
+                                id: 777,
+                            },
+                        });
+                    }
+                );
+
+                page.once(
+                    "dialog",
+                    async (dialog) => {
+                        await dialog.accept();
+                    }
+                );
+
+                await clickCreateOrderButton(page);
+
+                await expect.poll(
+                    () => createRequest
+                ).not.toBeNull();
+
+                const details = readMultipartJson(
+                    createRequest,
+                    "serviceDetails"
+                );
+
+                expect(details).toMatchObject({
+                    workType: "faucet",
+                    tasksCount: 2,
+                    needAssistant: false,
+                });
+
+                expect(details).not.toHaveProperty(
+                    "assistantNote"
+                );
+            }
+        );
+
+        // ------------------------------------------------
+        // 5. РЕКОМЕНДУЕМАЯ ЦЕНА
+        // ------------------------------------------------
+
+        test(
+            "рассчитывает стоимость и подставляет сумму",
+            async ({ page }) => {
+                await selectDynamicTestService(page);
+
+                await fillDynamicTestFields(page);
+
+                /*
+                 * Тестовая формула:
+                 *
+                 * Выезд: 500 ₽
+                 * Замена смесителя: 700 ₽
+                 * 2 точки × 100 ₽: 200 ₽
+                 *
+                 * Итого: 1400 ₽
+                 */
+                await expect(
+                    page.locator(".recommendedPriceCard")
+                ).toBeVisible();
+
+                await expect(
+                    page.locator(".recommendedPriceRange")
+                ).toContainText(
+                    /1[\s\u00a0]?300/
+                );
+
+                await expect(
+                    page.locator(".recommendedPriceRange")
+                ).toContainText(
+                    /1[\s\u00a0]?500/
+                );
+
+                await page.getByRole(
+                    "button",
+                    {
+                        name: "Указать эту сумму",
+                    }
+                ).click();
+
+                await expect(
+                    page.getByPlaceholder(
+                        "Например 1500"
+                    )
+                ).toHaveValue("1400");
+            }
+        );
+
+        // ------------------------------------------------
+        // 6. ВЫБОР Т-БАНКА
+        // ------------------------------------------------
+
+        test(
+            "выбирает Т-Банк и создаёт платёж через его API",
+            async ({ page }) => {
+                const highlight = page
+                    .locator(".promoBox .promoOption")
+                    .filter({
+                        hasText: "Выделить цветом",
+                    });
+
+                await highlight.click();
+
+                await expect(
+                    page.locator(".totalAmount")
+                ).toHaveText("50 ₽");
+
+                const tbankButton = page.getByRole(
+                    "button",
+                    {
+                        name: /Т-Банк/,
+                    }
+                );
+
+                await tbankButton.click();
+
+                await expect(
+                    tbankButton
+                ).toHaveAttribute(
+                    "aria-pressed",
+                    "true"
+                );
+
+                const paymentNavigation =
+                    await mockPaymentNavigation(page);
+
+                let tbankRequest = null;
+                let yooRequests = 0;
+
+                await page.route(
+                    "**/api/tbank-payments/order/promotion/create",
+                    async (route) => {
+                        tbankRequest = route.request();
+
+                        await route.fulfill({
+                            status: 200,
+                            json: {
+                                success: true,
+                                confirmationUrl:
+                                    "https://payment.example.test/confirm",
+                            },
+                        });
+                    }
+                );
+
+                await page.route(
+                    "**/api/payments/order/promotion/create",
+                    async (route) => {
+                        yooRequests++;
+
+                        await route.fulfill({
+                            status: 500,
+                            json: {
+                                success: false,
+                            },
+                        });
+                    }
+                );
+
+                await fillRequiredOrderFields(page);
+
+                await clickCreateOrderButton(page);
+
+                await expect.poll(
+                    () => tbankRequest
+                ).not.toBeNull();
+
+                expect(
+                    tbankRequest.method()
+                ).toBe("POST");
+
+                expect(
+                    tbankRequest.postDataJSON()
+                ).toEqual({
+                    orderId: 777,
+                });
+
+                expect(yooRequests).toBe(0);
+
+                await expect
+                    .poll(
+                        () => paymentNavigation.getOpenedUrl()
+                    )
+                    .toBe(
+                        "https://payment.example.test/confirm"
+                    );
+
+                await expect(page).toHaveURL(
+                    "https://payment.example.test/confirm"
+                );
+            }
+        );
+
+        // ------------------------------------------------
+        // 7. СОХРАНЁННАЯ КАРТА
+        // ------------------------------------------------
+
+        test(
+            "после успешной оплаты сохранённой картой открывает заказы",
+            async ({ page }) => {
+                let paymentRequests = 0;
+
+                await page.route(
+                    "**/api/payments/order/promotion/create",
+                    async (route) => {
+                        paymentRequests++;
+
+                        await route.fulfill({
+                            status: 200,
+                            json: {
+                                success: true,
+                                paidBySavedCard: true,
+                                paid: true,
+                            },
+                        });
+                    }
+                );
+
+                const messages = [];
+
+                page.on(
+                    "dialog",
+                    async (dialog) => {
+                        messages.push(
+                            dialog.message()
+                        );
+
+                        await dialog.accept();
+                    }
+                );
+
+                await page
+                    .locator(".promoBox .promoOption")
+                    .filter({
+                        hasText: "Выделить цветом",
+                    })
+                    .click();
+
+                await fillRequiredOrderFields(page);
+
+                await clickCreateOrderButton(page);
+
+                await expect.poll(
+                    () =>
+                        messages.some((message) =>
+                            message.includes(
+                                "продвижение оплачено"
+                            )
+                        )
+                ).toBe(true);
+
+                await expect(page).toHaveURL(
+                    /\/orders(?:\?|$)/
+                );
+
+                expect(paymentRequests).toBe(1);
+            }
+        );
+
+        // ------------------------------------------------
+        // 8. ОШИБКА ПЛАТЁЖНОГО ПРОВАЙДЕРА
+        // ------------------------------------------------
+
+        test(
+            "показывает ошибку банка без перехода на оплату",
+            async ({ page }) => {
+                await page.route(
+                    "**/api/payments/order/promotion/create",
+                    async (route) => {
+                        await route.fulfill({
+                            status: 200,
+                            json: {
+                                success: false,
+                                error:
+                                    "Тестовый платёж отклонён",
+                            },
+                        });
+                    }
+                );
+
+                await page
+                    .locator(".promoBox .promoOption")
+                    .filter({
+                        hasText: "Выделить цветом",
+                    })
+                    .click();
+
+                await fillRequiredOrderFields(page);
+
+                await clickCreateOrderButton(page);
+
+                await expect(
+                    page.locator(".alert-text")
+                ).toContainText(
+                    "Тестовый платёж отклонён"
+                );
+
+                await expect(page).toHaveURL(
+                    /\/create-order(?:\?|$)/
+                );
+
+                await expect(
+                    page.getByRole("button", {
+                        name: "Создать заказ",
+                    })
+                ).toBeEnabled();
+            }
+        );
+    }
+);
