@@ -934,37 +934,168 @@ test.describe("ActiveOrdersPage", () => {
         await dialog.accept();
     });
 
-    test("загружает фото ДО от исполнителя", async ({ page }) => {
-        await page.route("**/api/orders/101/executor-before-photos", async (route) => {
-            expect(route.request().method()).toBe("POST");
+    test(
+        "исполнитель видит фото до работы без возможности повторной загрузки",
+        async ({ page }) => {
+            const card = page.locator(
+                ".order-card"
+            ).first();
 
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    success: true,
-                }),
+            const photoSection = card.locator(
+                ".work-photo-section"
+            );
+
+            await expect(photoSection).toBeVisible();
+
+            const beforeCard = photoSection
+                .locator(".work-photo-card")
+                .filter({
+                    has: page.getByRole("heading", {
+                        name: "До работы",
+                    }),
+                });
+
+            await expect(beforeCard).toBeVisible();
+
+            await expect(beforeCard).toContainText(
+                "Заказчик прикрепил фотографии"
+            );
+
+            await expect(beforeCard).toContainText(
+                "2 шт."
+            );
+
+            await expect(
+                beforeCard.locator('input[type="file"]')
+            ).toHaveCount(0);
+
+            // Исходные фотографии остались в карточке.
+            await expect(
+                card.locator(".image-stack img")
+            ).toHaveCount(2);
+
+            // Загрузка разрешена только после работы.
+            await expect(
+                photoSection.locator('input[type="file"]')
+            ).toHaveCount(1);
+        }
+    );
+
+    test(
+        "исполнитель загружает фото после работы",
+        async ({ page }) => {
+            let uploadRequest = null;
+            const alerts = [];
+
+            await page.route(
+                "**/api/orders/101/executor-after-photos",
+                async (route) => {
+                    uploadRequest = route.request();
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                            executorAfterPhotos: [
+                                "/uploads/orders/order_101/executor_after_1.jpg",
+                            ],
+                        },
+                    });
+                }
+            );
+
+            page.on("dialog", async (dialog) => {
+                if (dialog.type() === "alert") {
+                    alerts.push(dialog.message());
+                }
+
+                await dialog.accept();
             });
-        });
 
-        page.on("dialog", async (dialog) => {
-            await dialog.accept();
-        });
+            const input = page.locator(
+                '.work-photo-section input[type="file"]'
+            );
 
-        const fileInput = page.locator('input[type="file"]').first();
+            await expect(input).toHaveCount(1);
 
-        await fileInput.setInputFiles({
-            name: "photo.jpg",
-            mimeType: "image/jpeg",
-            buffer: Buffer.from("fake-image"),
-        });
+            await input.setInputFiles({
+                name: "after.jpg",
+                mimeType: "image/jpeg",
+                buffer: Buffer.from("fake-after-image"),
+            });
 
-        await expect(
-            page.getByText("Заказ №101", {
-                exact: true,
-            })
-        ).toBeVisible();
-    });
+            await expect
+                .poll(() => uploadRequest)
+                .not.toBeNull();
+
+            expect(uploadRequest.method()).toBe("POST");
+
+            expect(
+                uploadRequest.headers()["content-type"]
+            ).toContain("multipart/form-data");
+
+            expect(
+                uploadRequest.postData()
+            ).toContain('filename="after.jpg"');
+
+            await expect
+                .poll(() =>
+                    alerts.some((message) =>
+                        message.includes(
+                            "Фотография успешно загружена"
+                        )
+                    )
+                )
+                .toBe(true);
+        }
+    );
+
+    test(
+        "заказчик видит исходные фото без кнопки загрузки рабочих фото",
+        async ({ page }) => {
+            await page.route(
+                "**/api/orders/active-orders",
+                async (route) => {
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            orders: [
+                                {
+                                    ...regularOrder,
+                                    creatorId: 1,
+                                    executorId: 2,
+                                },
+                            ],
+                            notifications: [],
+                        },
+                    });
+                }
+            );
+
+            await page.reload();
+
+            await page.getByRole(
+                "button",
+                {
+                    name: "Мои заказы выполняют",
+                }
+            ).click();
+
+            const card = page.locator(
+                ".order-card"
+            ).first();
+
+            await expect(card).toBeVisible();
+
+            await expect(
+                card.locator(".image-stack img")
+            ).toHaveCount(2);
+
+            await expect(
+                card.locator(".work-photo-section")
+            ).toHaveCount(0);
+        }
+    );
 
     test("переключает вкладку на созданные заказы", async ({ page }) => {
         await page.getByRole("button", { name: /Мои заказы выполняют/i }).click();

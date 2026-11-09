@@ -966,14 +966,10 @@ const ActiveOrdersPage = () => {
                 formData.append("images", file, fileName);
             });
 
-            const endpointMap = {
-                executorBefore:
-                    `/orders/${orderId}/executor-before-photos`,
-                executorAfter:
-                    `/orders/${orderId}/executor-after-photos`,
-            };
-
-            const endpoint = endpointMap[type];
+            const endpoint =
+                type === "executorAfter"
+                    ? `/orders/${orderId}/executor-after-photos`
+                    : null;
 
             if (!endpoint) {
                 alert("Неизвестный тип загрузки");

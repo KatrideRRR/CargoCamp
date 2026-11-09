@@ -1882,7 +1882,7 @@ function CreateOrderPage() {
                             <label className="upload inline">
                                 <input type="file" multiple accept="image/*" onChange={handleImageChange}
                                        style={{display: "none"}}/>
-                                <span>📎 Прикрепить фото</span>
+                                <span>📎 Добавить фото до выполнения работы</span>
                             </label>
 
                             {images.length > 0 ? (

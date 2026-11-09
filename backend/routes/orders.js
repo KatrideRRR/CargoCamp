@@ -48,10 +48,7 @@ const {
 const {
     createRegularOrderRequest,
 } = require("../services/regularOrderRequestService");
-const uploadExecutorBefore = buildOrderPhotoUploader("executor_before");
 const uploadExecutorAfter = buildOrderPhotoUploader("executor_after");
-const uploadCustomerBefore = buildOrderPhotoUploader("customer_before");
-const uploadCustomerAfter = buildOrderPhotoUploader("customer_after");
 const { sendNotifications } = require("../socket");
 const { calculateRecommendedPrice } = require("../services/recommendedPriceService");
 const { collectOrderPhotoAnnex,} = require("../services/orderPhotoAnnexService");
@@ -3161,7 +3158,73 @@ module.exports = (io) => {
         }
     });
 
-    router.post("/:id/executor-before-photos", authenticateToken, uploadExecutorBefore.array("images", 5), async (req, res) => {
+    const rejectLegacyPhotoUpload = (req, res) => {
+        return res.status(410).json({
+            code: "PHOTO_STAGE_DISABLED",
+            message:
+                "Фотографии до работы прикрепляются " +
+                "при создании заказа. " +
+                "Фотографии после работы загружает исполнитель.",
+        });
+    };
+
+    router.post(
+        "/:id/executor-before-photos",
+        authenticateToken,
+        rejectLegacyPhotoUpload
+    );
+
+    router.post(
+        "/:id/executor-after-photos",
+        authenticateToken,
+
+        async (req, res, next) => {
+            try {
+                const order = await Order.findByPk(
+                    req.params.id
+                );
+
+                if (!order) {
+                    return res.status(404).json({
+                        message: "Заказ не найден",
+                    });
+                }
+
+                if (
+                    Number(order.executorId) !==
+                    Number(req.user.id)
+                ) {
+                    return res.status(403).json({
+                        message:
+                            "Фотографии может загружать " +
+                            "только назначенный исполнитель",
+                    });
+                }
+
+                if (order.status !== "active") {
+                    return res.status(409).json({
+                        message:
+                            "Загрузка фотографий доступна " +
+                            "только для активного заказа",
+                    });
+                }
+
+                next();
+            } catch (error) {
+                console.error(
+                    "Ошибка проверки доступа к фотографиям:",
+                    error
+                );
+
+                return res.status(500).json({
+                    message: "Ошибка сервера",
+                });
+            }
+        },
+
+        uploadExecutorAfter.array("images", 5),
+
+        async (req, res) => {
             try {
                 const orderId = req.params.id;
                 const userId = req.user.id;
@@ -3173,48 +3236,12 @@ module.exports = (io) => {
                     return res.status(403).json({ message: "Только назначенный исполнитель может загрузить эти фото" });
                 }
 
-                const existing = Array.isArray(order.executorBeforePhotos) ? order.executorBeforePhotos : [];
-                const photoUrls = (req.files || []).map((f) => `/uploads/orders/order_${orderId}/${f.filename}`);
-
-                order.executorBeforePhotos = [...existing, ...photoUrls];
-                order.executorBeforeUploadedAt = new Date();
-
-                await order.save();
-
-                await req.logAction({
-                    req,
-                    actorUserId: userId,
-                    actorRole: "user",
-                    actionType: "executor_before_photos_uploaded",
-                    entityType: "order",
-                    entityId: order.id,
-                    orderId: order.id,
-                    meta: {
-                        count: photoUrls.length,
-                        photoUrls,
-                    },
-                });
-
-                return res.json({
-                    success: true,
-                    executorBeforePhotos: order.executorBeforePhotos,
-                });
-            } catch (error) {
-                console.error("Ошибка загрузки фото исполнителя ДО:", error);
-                return res.status(500).json({ message: "Ошибка сервера" });
-            }
-        });
-
-    router.post("/:id/executor-after-photos", authenticateToken, uploadExecutorAfter.array("images", 5), async (req, res) => {
-            try {
-                const orderId = req.params.id;
-                const userId = req.user.id;
-
-                const order = await Order.findByPk(orderId);
-                if (!order) return res.status(404).json({ message: "Заказ не найден" });
-
-                if (Number(order.executorId) !== Number(userId)) {
-                    return res.status(403).json({ message: "Только назначенный исполнитель может загрузить эти фото" });
+                if (order.status !== "active") {
+                    return res.status(409).json({
+                        message:
+                            "Загрузка фотографий доступна " +
+                            "только для активного заказа",
+                    });
                 }
 
                 const existing = Array.isArray(order.executorAfterPhotos) ? order.executorAfterPhotos : [];
@@ -3249,93 +3276,17 @@ module.exports = (io) => {
             }
         });
 
-    router.post("/:id/customer-before-photos", authenticateToken, uploadCustomerBefore.array("images", 5), async (req, res) => {
-            try {
-                const orderId = req.params.id;
-                const userId = req.user.id;
+    router.post(
+        "/:id/customer-before-photos",
+        authenticateToken,
+        rejectLegacyPhotoUpload
+    );
 
-                const order = await Order.findByPk(orderId);
-                if (!order) return res.status(404).json({ message: "Заказ не найден" });
-
-                if (Number(order.creatorId) !== Number(userId)) {
-                    return res.status(403).json({ message: "Только заказчик может загрузить эти фото" });
-                }
-
-                const existing = Array.isArray(order.customerBeforePhotos) ? order.customerBeforePhotos : [];
-                const photoUrls = (req.files || []).map((f) => `/uploads/orders/order_${orderId}/${f.filename}`);
-
-                order.customerBeforePhotos = [...existing, ...photoUrls];
-                order.customerBeforeUploadedAt = new Date();
-
-                await order.save();
-
-                await req.logAction({
-                    req,
-                    actorUserId: userId,
-                    actorRole: "user",
-                    actionType: "customer_before_photos_uploaded",
-                    entityType: "order",
-                    entityId: order.id,
-                    orderId: order.id,
-                    meta: {
-                        count: photoUrls.length,
-                        photoUrls,
-                    },
-                });
-
-                return res.json({
-                    success: true,
-                    customerBeforePhotos: order.customerBeforePhotos,
-                });
-            } catch (error) {
-                console.error("Ошибка загрузки фото заказчика ДО:", error);
-                return res.status(500).json({ message: "Ошибка сервера" });
-            }
-        });
-
-    router.post("/:id/customer-after-photos", authenticateToken, uploadCustomerAfter.array("images", 5), async (req, res) => {
-            try {
-                const orderId = req.params.id;
-                const userId = req.user.id;
-
-                const order = await Order.findByPk(orderId);
-                if (!order) return res.status(404).json({ message: "Заказ не найден" });
-
-                if (Number(order.creatorId) !== Number(userId)) {
-                    return res.status(403).json({ message: "Только заказчик может загрузить эти фото" });
-                }
-
-                const existing = Array.isArray(order.customerAfterPhotos) ? order.customerAfterPhotos : [];
-                const photoUrls = (req.files || []).map((f) => `/uploads/orders/order_${orderId}/${f.filename}`);
-
-                order.customerAfterPhotos = [...existing, ...photoUrls];
-                order.customerAfterUploadedAt = new Date();
-
-                await order.save();
-
-                await req.logAction({
-                    req,
-                    actorUserId: userId,
-                    actorRole: "user",
-                    actionType: "customer_after_photos_uploaded",
-                    entityType: "order",
-                    entityId: order.id,
-                    orderId: order.id,
-                    meta: {
-                        count: photoUrls.length,
-                        photoUrls,
-                    },
-                });
-
-                return res.json({
-                    success: true,
-                    customerAfterPhotos: order.customerAfterPhotos,
-                });
-            } catch (error) {
-                console.error("Ошибка загрузки фото заказчика ПОСЛЕ:", error);
-                return res.status(500).json({ message: "Ошибка сервера" });
-            }
-        });
+    router.post(
+        "/:id/customer-after-photos",
+        authenticateToken,
+        rejectLegacyPhotoUpload
+    );
 
     router.post("/:id/start-work", authenticateToken, async (req, res) => {
             try {

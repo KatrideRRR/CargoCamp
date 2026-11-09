@@ -1,77 +1,114 @@
-function OrderWorkPhotos({
-                             order,
-                             userId,
-                             uploading = {},
-                             onUpload,
-                             renderPhotos,
-                         }) {
-    const id = Number(userId);
+import React from "react";
+
+export default function OrderWorkPhotos({
+                                            order,
+                                            userId,
+                                            uploading = {},
+                                            onUpload,
+                                            renderPhotos,
+                                        }) {
+    const currentUserId = Number(userId);
 
     if (
-        !Number.isSafeInteger(id) ||
-        id <= 0 ||
-        Number(order.executorId) !== id
+        !Number.isSafeInteger(currentUserId) ||
+        currentUserId <= 0 ||
+        Number(order?.executorId) !== currentUserId
     ) {
         return null;
     }
 
+    const beforePhotos = Array.isArray(order.images)
+        ? order.images
+        : [];
+
+    const afterPhotos = Array.isArray(
+        order.executorAfterPhotos
+    )
+        ? order.executorAfterPhotos
+        : [];
+
+    const uploadType = "executorAfter";
+
+    const busy = Boolean(
+        uploading[`${order.id}_${uploadType}`]
+    );
+
     return (
         <section className="photo-protocol-section work-photo-section">
-            <h4 className="photo-protocol-title">Мои фотографии</h4>
+            <h4 className="photo-protocol-title">
+                Мои фотографии
+            </h4>
 
             <div className="work-photo-grid">
-                {["Before", "After"].map((stage) => {
-                    const type = `executor${stage}`;
-                    const busy = Boolean(
-                        uploading[`${order.id}_${type}`]
-                    );
+                <div className="photo-protocol-card work-photo-card">
+                    <h5>До работы</h5>
 
-                    return (
-                        <div
-                            className="photo-protocol-card work-photo-card"
-                            key={stage}
-                        >
-                            <h5>
-                                {stage === "Before"
-                                    ? "До работы"
-                                    : "После работы"}
-                            </h5>
+                    {beforePhotos.length > 0 ? (
+                        <p className="photo-empty">
+                            Заказчик прикрепил фотографии
+                            при создании заказа:{" "}
+                            <strong>{beforePhotos.length} шт.</strong>
+                            {" "}Посмотреть их можно
+                            в карточке заказа выше.
+                        </p>
+                    ) : (
+                        <p className="photo-empty">
+                            При создании заказа фотографии
+                            не прикреплялись.
+                        </p>
+                    )}
 
-                            {renderPhotos(order[`${type}Photos`])}
+                    <p className="photo-empty">
+                        Дополнительная загрузка
+                        фотографий до работы
+                        не предусмотрена.
+                    </p>
+                </div>
 
-                            <label
-                                className="photo-upload-button"
-                                onClick={(event) => event.stopPropagation()}
-                            >
-                                {busy ? "Загрузка…" : "Добавить фото"}
+                <div className="photo-protocol-card work-photo-card">
+                    <h5>После работы</h5>
 
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    multiple
-                                    hidden
-                                    disabled={busy}
-                                    onChange={async (event) => {
-                                        const input = event.currentTarget;
-                                        if (!input.files?.length) return;
+                    {renderPhotos(afterPhotos)}
 
-                                        try {
-                                            await onUpload(
-                                                order.id,
-                                                type,
-                                                input.files
-                                            );
-                                        } finally {
-                                            input.value = "";
-                                        }
-                                    }}
-                                />
-                            </label>
-                        </div>
-                    );
-                })}
+                    <label
+                        className="photo-upload-button"
+                        onClick={(event) =>
+                            event.stopPropagation()
+                        }
+                    >
+                        {busy
+                            ? "Загрузка…"
+                            : "Добавить фото"}
+
+                        <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            hidden
+                            disabled={busy}
+                            aria-label="Загрузить фото после работы"
+                            onChange={async (event) => {
+                                const input =
+                                    event.currentTarget;
+
+                                if (!input.files?.length) {
+                                    return;
+                                }
+
+                                try {
+                                    await onUpload(
+                                        order.id,
+                                        uploadType,
+                                        input.files
+                                    );
+                                } finally {
+                                    input.value = "";
+                                }
+                            }}
+                        />
+                    </label>
+                </div>
             </div>
         </section>
     );
 }
-export default OrderWorkPhotos;
