@@ -1599,3 +1599,635 @@ test.describe(
         );
     }
 );
+
+// ============================================================
+// CARGOCAMP — VERIFIED ASSIGNMENT & PEP E2E
+// ============================================================
+
+const TEST_DOCUMENT_HASH = "a".repeat(64);
+const TEST_POLICY_HASH = "b".repeat(64);
+
+const testVerifiedAssignment = {
+    id: 501,
+    orderId: 101,
+    type: "verified_assignment",
+    version: 1,
+    status: "draft",
+    documentNumber: "CC-TEST-101-1",
+    documentHash: TEST_DOCUMENT_HASH,
+    createdAt: "2026-11-09T10:00:00.000Z",
+    fullySignedAt: null,
+    supersededAt: null,
+};
+
+async function openVerifiedSigningScenario(
+    page,
+    {
+        method = "sms",
+        accepted = true,
+        blockedReason = null,
+    } = {}
+) {
+    await openActiveOrdersPage(page);
+
+    const state = {
+        accepted,
+        mySigned: false,
+        method,
+        blockedReason,
+
+        agreementRequest: null,
+        smsRequest: null,
+        smsConfirmation: null,
+        clickRequest: null,
+
+        smsCalls: 0,
+        clickCalls: 0,
+    };
+
+    /*
+     * Возвращаем проект договора.
+     */
+    await page.route(
+        "**/api/contracts/assignments/summary",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    success: true,
+                    assignments: [
+                        {
+                            ...testVerifiedAssignment,
+
+                            status: state.mySigned
+                                ? "partially_signed"
+                                : "draft",
+                        },
+                    ],
+                    acts: [],
+                },
+            });
+        }
+    );
+
+    /*
+     * Текущая редакция правил ПЭП.
+     */
+    await page.route(
+        "**/api/contracts/e-sign/agreement",
+        async (route) => {
+            if (
+                route.request().method() === "POST"
+            ) {
+                state.agreementRequest =
+                    route.request().postDataJSON();
+
+                state.accepted = true;
+
+                await route.fulfill({
+                    status: 200,
+                    json: {
+                        success: true,
+                        agreement: {
+                            id: 701,
+                            acceptedAt:
+                                "2026-11-09T10:10:00.000Z",
+                            policyVersion: "1.1",
+                        },
+                    },
+                });
+
+                return;
+            }
+
+            await route.fulfill({
+                status: 200,
+                json: {
+                    success: true,
+
+                    policy: {
+                        code: "cargocamp_simple_signature",
+                        version: "1.1",
+                        enabled: true,
+                        sha256: TEST_POLICY_HASH,
+                        text:
+                            "Тестовая редакция правил ПЭП CargoCamp.",
+                    },
+
+                    identityVerified: true,
+                    accepted: state.accepted,
+                    canAccept: !state.accepted,
+
+                    agreement: state.accepted
+                        ? {
+                            id: 701,
+                            acceptedAt:
+                                "2026-11-09T10:10:00.000Z",
+                        }
+                        : null,
+                },
+            });
+        }
+    );
+
+    /*
+     * Статус подписания договора.
+     */
+    await page.route(
+        "**/api/contracts/signing/501/status",
+        async (route) => {
+            const canSign =
+                state.accepted &&
+                !state.mySigned &&
+                !state.blockedReason &&
+                state.method !== "reauth";
+
+            await route.fulfill({
+                status: 200,
+                json: {
+                    success: true,
+
+                    enabled: true,
+                    accepted: state.accepted,
+                    identitiesValid: true,
+
+                    signingMethod: state.method,
+
+                    mySigned: state.mySigned,
+                    otherSigned: false,
+
+                    blockedReason:
+                    state.blockedReason,
+
+                    contractStatus: "draft",
+
+                    maskedPhone: "+7 *** ***-11-18",
+
+                    canSign,
+
+                    pendingChallenge: null,
+                },
+            });
+        }
+    );
+
+    /*
+     * Запрос SMS-кода.
+     *
+     * Настоящий SMS.ru не вызывается.
+     */
+    await page.route(
+        "**/api/contracts/signing/501/request-code",
+        async (route) => {
+            state.smsCalls++;
+
+            state.smsRequest =
+                route.request().postDataJSON();
+
+            await route.fulfill({
+                status: 200,
+                json: {
+                    success: true,
+                    challengeId: 901,
+                    maskedPhone: "+7 *** ***-11-18",
+                },
+            });
+        }
+    );
+
+    /*
+     * Подтверждение шестизначного SMS.
+     */
+    await page.route(
+        "**/api/contracts/signing/501/confirm-code",
+        async (route) => {
+            state.smsConfirmation =
+                route.request().postDataJSON();
+
+            state.mySigned = true;
+
+            await route.fulfill({
+                status: 200,
+                json: {
+                    success: true,
+                    fullySigned: false,
+                },
+            });
+        }
+    );
+
+    /*
+     * Подписание действующей ПЭП кнопкой.
+     */
+    await page.route(
+        "**/api/contracts/signing/501/click-sign",
+        async (route) => {
+            state.clickCalls++;
+
+            state.clickRequest =
+                route.request().postDataJSON();
+
+            state.mySigned = true;
+
+            await route.fulfill({
+                status: 200,
+                json: {
+                    success: true,
+                    fullySigned: false,
+                },
+            });
+        }
+    );
+
+    /*
+     * Перезагружаем страницу, чтобы
+     * useVerifiedAssignments получил
+     * договор из нового мока.
+     */
+    await page.reload();
+
+    await expect(
+        page.locator(".cc-verified-assignment")
+    ).toHaveCount(1);
+
+    return state;
+}
+
+async function openSigningPanel(page) {
+    const panel = page.locator(".cc-signing");
+
+    await panel.locator(
+        ".cc-signing-toggle"
+    ).click();
+
+    await expect(
+        panel.locator(".cc-signing-content")
+    ).toBeVisible();
+
+    await expect(
+        panel.getByRole("button", {
+            name: "Обновить статус",
+        })
+    ).toBeVisible();
+
+    return panel;
+}
+
+test.describe(
+    "ActiveOrdersPage — ПЭП договора-задания",
+    () => {
+
+        test(
+            "показывает проект договора и требует согласие перед SMS",
+            async ({ page }) => {
+                const state =
+                    await openVerifiedSigningScenario(page);
+
+                const card = page.locator(
+                    ".cc-verified-assignment"
+                );
+
+                await expect(card).toContainText(
+                    "CC-TEST-101-1"
+                );
+
+                await expect(
+                    card.locator(".cc-va-status")
+                ).toHaveText("Проект");
+
+                await expect(
+                    card.getByRole("button", {
+                        name: /Скачать проект договора/,
+                    })
+                ).toBeVisible();
+
+                const panel =
+                    await openSigningPanel(page);
+
+                const sendButton =
+                    panel.getByRole("button", {
+                        name: "Отправить SMS-код",
+                    });
+
+                await expect(
+                    sendButton
+                ).toBeDisabled();
+
+                await panel.locator(
+                    ".cc-signing-consent input"
+                ).check();
+
+                await expect(
+                    sendButton
+                ).toBeEnabled();
+
+                expect(state.smsCalls).toBe(0);
+            }
+        );
+
+        test(
+            "принимает правила ПЭП с SHA-256 редакции",
+            async ({ page }) => {
+                const state =
+                    await openVerifiedSigningScenario(
+                        page,
+                        {
+                            accepted: false,
+                        }
+                    );
+
+                await page.locator(
+                    ".cc-sa-toggle"
+                ).click();
+
+                const agreement = page.locator(
+                    ".cc-signature-agreement"
+                );
+
+                await expect(agreement).toContainText(
+                    "Редакция 1.1"
+                );
+
+                await expect(agreement).toContainText(
+                    "Тестовая редакция правил ПЭП"
+                );
+
+                const acceptButton =
+                    agreement.getByRole("button", {
+                        name: "Принять соглашение",
+                    });
+
+                await expect(
+                    acceptButton
+                ).toBeDisabled();
+
+                await agreement.locator(
+                    ".cc-sa-accept input"
+                ).check();
+
+                await expect(
+                    acceptButton
+                ).toBeEnabled();
+
+                await acceptButton.click();
+
+                await expect.poll(
+                    () => state.agreementRequest
+                ).not.toBeNull();
+
+                expect(
+                    state.agreementRequest
+                ).toEqual({
+                    accepted: true,
+                    policySha256: TEST_POLICY_HASH,
+                });
+
+                await expect(
+                    agreement.getByText(
+                        "Соглашение принято"
+                    )
+                ).toBeVisible();
+
+                // Принятие правил ещё не
+                // означает подпись договора.
+                expect(state.mySigned).toBe(false);
+                expect(state.smsCalls).toBe(0);
+                expect(state.clickCalls).toBe(0);
+            }
+        );
+
+        test(
+            "первично подписывает договор через SMS",
+            async ({ page }) => {
+                const state =
+                    await openVerifiedSigningScenario(
+                        page,
+                        {
+                            method: "sms",
+                        }
+                    );
+
+                const panel =
+                    await openSigningPanel(page);
+
+                await panel.locator(
+                    ".cc-signing-consent input"
+                ).check();
+
+                await panel.getByRole(
+                    "button",
+                    {
+                        name: "Отправить SMS-код",
+                    }
+                ).click();
+
+                await expect.poll(
+                    () => state.smsRequest
+                ).not.toBeNull();
+
+                expect(state.smsRequest).toEqual({
+                    documentHash: TEST_DOCUMENT_HASH,
+                    intentConfirmed: true,
+                });
+
+                expect(state.smsCalls).toBe(1);
+
+                await expect(
+                    panel.getByText(
+                        "SMS-код отправлен. Он действует 5 минут."
+                    )
+                ).toBeVisible();
+
+                const codeInput =
+                    panel.getByPlaceholder(
+                        "000000"
+                    );
+
+                await expect(
+                    codeInput
+                ).toBeVisible();
+
+                await codeInput.fill("123456");
+
+                await panel.getByRole(
+                    "button",
+                    {
+                        name: "Подписать договор",
+                        exact: true,
+                    }
+                ).click();
+
+                await expect.poll(
+                    () => state.smsConfirmation
+                ).not.toBeNull();
+
+                expect(
+                    state.smsConfirmation
+                ).toEqual({
+                    challengeId: 901,
+                    documentHash: TEST_DOCUMENT_HASH,
+                    code: "123456",
+                });
+
+                // Проверяем обновление статуса договора.
+                await expect(
+                    page.locator(
+                        ".cc-verified-assignment .cc-va-status"
+                    )
+                ).toHaveText("Одна подпись");
+
+// После обновления договора панель могла закрыться.
+// Открываем её повторно.
+                const updatedPanel = await openSigningPanel(page);
+
+// Проверяем подпись текущего пользователя.
+                await expect(
+                    updatedPanel.getByText(
+                        /Вы уже подтвердили этот документ/
+                    )
+                ).toBeVisible();
+
+                expect(state.clickCalls).toBe(0);
+            }
+        );
+
+        test(
+            "действующая ПЭП подписывает кнопкой без SMS",
+            async ({ page }) => {
+                const state =
+                    await openVerifiedSigningScenario(
+                        page,
+                        {
+                            method: "click",
+                        }
+                    );
+
+                const panel =
+                    await openSigningPanel(page);
+
+                await expect(panel).toContainText(
+                    "Подписание без повторной SMS"
+                );
+
+                await panel.locator(
+                    ".cc-signing-consent input"
+                ).check();
+
+                await panel.getByRole(
+                    "button",
+                    {
+                        name: "Подписать документ",
+                    }
+                ).click();
+
+                await expect.poll(
+                    () => state.clickRequest
+                ).not.toBeNull();
+
+                expect(state.clickRequest).toEqual({
+                    documentHash: TEST_DOCUMENT_HASH,
+                    intentConfirmed: true,
+                });
+
+                expect(state.clickCalls).toBe(1);
+                expect(state.smsCalls).toBe(0);
+                expect(state.smsConfirmation).toBeNull();
+
+                // Проверяем обновление статуса договора.
+                await expect(
+                    page.locator(
+                        ".cc-verified-assignment .cc-va-status"
+                    )
+                ).toHaveText("Одна подпись");
+
+// После обновления договора панель могла закрыться.
+// Открываем её повторно.
+                const updatedPanel = await openSigningPanel(page);
+
+// Проверяем подпись текущего пользователя.
+                await expect(
+                    updatedPanel.getByText(
+                        /Вы уже подтвердили этот документ/
+                    )
+                ).toBeVisible();
+            }
+        );
+
+        test(
+            "требует повторный вход при истёкшей сессии",
+            async ({ page }) => {
+                const state =
+                    await openVerifiedSigningScenario(
+                        page,
+                        {
+                            method: "reauth",
+                        }
+                    );
+
+                const panel =
+                    await openSigningPanel(page);
+
+                await expect(panel).toContainText(
+                    "для подписания требуется повторный вход"
+                );
+
+                await expect(
+                    panel.locator(
+                        ".cc-signing-consent input"
+                    )
+                ).toHaveCount(0);
+
+                await expect(
+                    panel.getByRole("button", {
+                        name: "Отправить SMS-код",
+                    })
+                ).toHaveCount(0);
+
+                expect(state.smsCalls).toBe(0);
+                expect(state.clickCalls).toBe(0);
+            }
+        );
+
+        test(
+            "не позволяет подписать заблокированный документ",
+            async ({ page }) => {
+                const reason =
+                    "Документ изменён. Подписание недоступно.";
+
+                const state =
+                    await openVerifiedSigningScenario(
+                        page,
+                        {
+                            method: "sms",
+                            blockedReason: reason,
+                        }
+                    );
+
+                const panel =
+                    await openSigningPanel(page);
+
+                await expect(
+                    panel.locator(
+                        ".cc-signing-error"
+                    )
+                ).toContainText(reason);
+
+                await expect(
+                    panel.locator(
+                        ".cc-signing-consent input"
+                    )
+                ).toHaveCount(0);
+
+                await expect(
+                    panel.getByRole("button", {
+                        name: "Отправить SMS-код",
+                    })
+                ).toHaveCount(0);
+
+                expect(state.smsCalls).toBe(0);
+                expect(state.clickCalls).toBe(0);
+            }
+        );
+    }
+);
+
