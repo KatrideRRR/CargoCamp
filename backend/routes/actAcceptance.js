@@ -1,10 +1,8 @@
 const express = require("express");
 const crypto = require("crypto");
 const {Op} = require("sequelize");
-const {notifyContractWorkflow,} = require("../services/contractWorkflowNotificationService");
 const authenticateToken = require("../middlewares/userAuth");
-const {sequelize, Order, Contract, ContractEvent, Dispute,} = require("../models");
-const {assertVerifiedPdfIntegrity,} = require("../services/verifiedPdfIntegrity");
+const { Order, Contract, ContractEvent, Dispute,} = require("../models");
 
 const router = express.Router();
 
@@ -182,10 +180,7 @@ router.get("/:actId/acceptance", async (req, res) => {
                 documentHash: ctx.act.documentHash,
                 actStatus: ctx.act.status,
 
-                canDecide: canDecide(
-                    ctx,
-                    Boolean(event)
-                ),
+                canDecide: false,
 
                 isCustomer: ctx.isCustomer,
 
@@ -193,8 +188,7 @@ router.get("/:actId/acceptance", async (req, res) => {
                     Boolean(activeDispute),
 
                 decision: serializeDecision(event),
-                canRequestCorrections:
-                    Number(ctx.act.version) === 1,
+                canRequestCorrections: false,
             });
 
         } catch (error) {
@@ -202,290 +196,18 @@ router.get("/:actId/acceptance", async (req, res) => {
         }
     });
 
-router.post("/:actId/acceptance", async (req, res) => {
-        try {
-            const userId = Number(req.user.id);
-
-            const decision = String(
-                req.body?.decision || ""
-            );
-
-            const comment = String(
-                req.body?.comment || ""
-            ).trim();
-
-            const disputeId =
-                req.body?.disputeId == null
-                    ? null
-                    : Number(req.body.disputeId);
-
-            if (!DECISIONS.includes(decision)) {
-                throw fail(
-                    400,
-                    "Выберите результат приёмки"
-                );
-            }
-
-            if (comment.length > 1500) {
-                throw fail(
-                    400,
-                    "Комментарий не должен превышать 1500 символов"
-                );
-            }
-
-            if (
-                ["remarks", "dispute"].includes(decision) &&
-                comment.length < 10
-            ) {
-                throw fail(
-                    400,
-                    "Опишите замечания: минимум 10 символов"
-                );
-            }
-
-            if (
-                decision === "dispute" &&
-                (
-                    !Number.isSafeInteger(disputeId) ||
-                    disputeId <= 0
-                )
-            ) {
-                throw fail(
-                    400,
-                    "Сначала необходимо открыть спор"
-                );
-            }
-
-            const ctxBefore = await getContext(
-                req.params.actId,
-                userId
-            );
-
-            if (
-                decision === "remarks" &&
-                Number(ctxBefore.act.version) > 1
-            ) {
-                throw fail(
-                    409,
-                    "Повторная процедура исправлений для этого акта недоступна. При несогласии откройте спор."
-                );
-            }
-
-            if (!ctxBefore.isCustomer) {
-                throw fail(
-                    403,
-                    "Решение о приёмке принимает заказчик"
-                );
-            }
-
-            if (
-                !sameSha256(
-                    req.body?.documentHash,
-                    ctxBefore.act.documentHash
-                )
-            ) {
-                throw fail(
-                    409,
-                    "Версия акта изменилась. Обновите страницу."
-                );
-            }
-
-            /*
-             * Проверяем фактический PDF,
-             * а не только хеш из запроса.
-             */
-            await assertVerifiedPdfIntegrity(
-                ctxBefore.act
-            );
-
-            const result = await sequelize.transaction(
-                async (transaction) => {
-                    const ctx = await getContext(
-                        req.params.actId,
-                        userId,
-                        transaction,
-                        true
-                    );
-
-                    if (
-                        !sameSha256(
-                            ctxBefore.act.documentHash,
-                            ctx.act.documentHash
-                        )
-                    ) {
-                        throw fail(
-                            409,
-                            "Акт был изменён"
-                        );
-                    }
-
-                    const latestAct =
-                        await Contract.findOne({
-                            where: {
-                                orderId: ctx.order.id,
-                                type: "verified_completion_act",
-                            },
-                            order: [
-                                ["version", "DESC"],
-                                ["id", "DESC"],
-                            ],
-                            transaction,
-                        });
-
-                    if (
-                        String(latestAct?.id) !==
-                        String(ctx.act.id)
-                    ) {
-                        throw fail(
-                            409,
-                            "Для заказа создана новая версия акта"
-                        );
-                    }
-
-                    const existing = await findDecision(
-                        ctx.act.id,
-                        transaction
-                    );
-
-                    if (existing) {
-                        const saved = serializeDecision(existing);
-
-                        /*
-                         * Повтор точно такого же запроса
-                         * безопасен и не создаёт новое событие.
-                         */
-                        if (
-                            saved.decision === decision &&
-                            saved.comment ===
-                            (decision === "accepted"
-                                ? ""
-                                : comment) &&
-                            Number(saved.disputeId || 0) ===
-                            Number(disputeId || 0)
-                        ) {
-                            return {
-                                created: false,
-                                decision: saved,
-                            };
-                        }
-
-                        throw fail(
-                            409,
-                            "Решение уже сохранено. Для изменения потребуется новая версия акта."
-                        );
-                    }
-
-                    if (!canDecide(ctx, false)) {
-                        throw fail(
-                            409,
-                            "Акт недоступен для приёмки"
-                        );
-                    }
-
-                    const activeDispute =
-                        await findActiveDispute(
-                            ctx.order.id,
-                            transaction
-                        );
-
-                    if (
-                        decision === "accepted" &&
-                        activeDispute
-                    ) {
-                        throw fail(
-                            409,
-                            "По заказу открыт спор. Приёмка без замечаний недоступна."
-                        );
-                    }
-
-                    if (decision === "dispute") {
-                        const dispute =
-                            await Dispute.findOne({
-                                where: {
-                                    id: disputeId,
-                                    orderId: ctx.order.id,
-                                    orderType: "regular",
-                                    status: {
-                                        [Op.in]:
-                                        ACTIVE_DISPUTE_STATUSES,
-                                    },
-                                },
-                                transaction,
-                            });
-
-                        if (!dispute) {
-                            throw fail(
-                                409,
-                                "Активный спор не найден"
-                            );
-                        }
-                    }
-
-                    const event =
-                        await ContractEvent.create(
-                            {
-                                contractId: ctx.act.id,
-                                actorUserId: userId,
-                                actorRole: "creator",
-                                eventType:
-                                    "act_customer_decision",
-                                eventAt: new Date(),
-
-                                metadata: {
-                                    decision,
-
-                                    comment:
-                                        decision === "accepted"
-                                            ? ""
-                                            : comment,
-
-                                    disputeId:
-                                        decision === "dispute"
-                                            ? disputeId
-                                            : null,
-
-                                    documentHash:
-                                    ctx.act.documentHash,
-
-                                    documentVersion:
-                                    ctx.act.version,
-
-                                    source:
-                                        "cargocamp_order_history",
-                                },
-                            },
-                            {transaction}
-                        );
-
-                    return {
-                        created: true,
-                        decision: serializeDecision(event),
-                    };
-                }
-            );
-
-            if (
-                result.created &&
-                decision === "remarks"
-            ) {
-                await notifyContractWorkflow({
-                    event: "act_remarks_received",
-
-                    userId: ctxBefore.order.executorId,
-                    orderId: ctxBefore.order.id,
-                    actId: ctxBefore.act.id,
-                    version: ctxBefore.act.version,
-                });
-            }
-
-            return res.json({
-                success: true,
-                ...result,
-            });
-
-        } catch (error) {
-            return respondError(res, error);
-        }
-    });
+router.post(
+    "/:actId/acceptance",
+    (req, res) => {
+        return res.status(410).json({
+            success: false,
+            code: "LEGACY_ACT_ACCEPTANCE_DISABLED",
+            message:
+                "Повторная приёмка через историю отключена. " +
+                "Приёмка работ выполняется при завершении " +
+                "активного заказа.",
+        });
+    }
+);
 
 module.exports = router;

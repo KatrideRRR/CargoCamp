@@ -1,5 +1,7 @@
 import { test, expect } from "./fixtures/safeTest";
 
+import { mockOrderAssets } from "./utils/mockOrderAssets";
+
 const FRONT_URL = "http://localhost:3000";
 
 const testUser = {
@@ -14,7 +16,9 @@ const longDescription =
 const completedOrders = [
     {
         id: 123,
-        type: "Грузоперевозка",
+        category: {
+            name: "Грузоперевозка",
+        },
         description: longDescription,
         address: "Симферополь, улица Пушкина, 1",
         proposedSum: 3000,
@@ -67,6 +71,9 @@ function createFakeJwt(payload) {
 }
 
 async function setFakeAuth(page, user = testUser) {
+
+    await mockOrderAssets(page);
+
     const fakeToken = createFakeJwt({
         id: user.id,
         role: user.role,
@@ -97,6 +104,7 @@ async function setupHistoryMocks(page, options = {}) {
         reviewPostBody = {
             success: true,
         },
+        expressStatus = 200,
     } = options;
 
     page.on("pageerror", (error) => {
@@ -114,6 +122,70 @@ async function setupHistoryMocks(page, options = {}) {
             console.log(`[BROWSER ${msg.type()}]`, text);
         }
     });
+
+    // Профиль тестового пользователя.
+    await page.route(
+        "**/api/auth/profile",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    ...testUser,
+                    debt: 0,
+                },
+            });
+        }
+    );
+
+// Проверка задолженности.
+    await page.route(
+        "**/api/orders/me/status",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    debt: 0,
+                },
+            });
+        }
+    );
+
+// История экспресс-заказов.
+    await page.route(
+        "**/api/express-orders/me**",
+        async (route) => {
+            await route.fulfill({
+                status: expressStatus,
+                json: expressStatus === 200
+                    ? {
+                        success: true,
+                        orders: [],
+                    }
+                    : {
+                        message: "Ошибка истории экспресс-заказов",
+                    },
+            });
+        }
+    );
+
+// Договоры и акты завершённых заказов.
+    await page.route(
+        "**/api/contracts/assignments/summary",
+        async (route) => {
+            expect(
+                route.request().method()
+            ).toBe("POST");
+
+            await route.fulfill({
+                status: 200,
+                json: {
+                    success: true,
+                    assignments: [],
+                    acts: [],
+                },
+            });
+        }
+    );
 
     await page.route(`**/api/orders/completed/${userId}`, async (route) => {
         await route.fulfill({
@@ -177,6 +249,50 @@ function historyCard(page, text) {
     });
 }
 
+async function expectLegacyPdfDownload(page, orderId) {
+    const pdf = Buffer.from(
+        "%PDF-1.4\n" +
+        "1 0 obj\n<<>>\nendobj\n" +
+        "%%EOF\n"
+    );
+
+    await page.route(
+        `**/api/orders/${orderId}/contract-file`,
+        async (route) => {
+            expect(
+                route.request().method()
+            ).toBe("GET");
+
+            await route.fulfill({
+                status: 200,
+                contentType: "application/pdf",
+                body: pdf,
+            });
+        }
+    );
+
+    const card = historyCard(
+        page,
+        `Заказ №${orderId}`
+    );
+
+    const downloadPromise =
+        page.waitForEvent("download");
+
+    await card.getByRole(
+        "button",
+        {
+            name: "Скачать договор (PDF)",
+        }
+    ).click();
+
+    const download = await downloadPromise;
+
+    expect(
+        download.suggestedFilename()
+    ).toBe(`contract_${orderId}.pdf`);
+}
+
 test.describe("OrderHistoryPage", () => {
     test.beforeEach(async ({ page }) => {
         await openHistoryPage(page);
@@ -187,7 +303,7 @@ test.describe("OrderHistoryPage", () => {
 
         await expect(page.locator(".oh-title")).toHaveText("История заказов");
         await expect(page.locator(".oh-subtitle")).toHaveText(
-            "Здесь отображаются завершённые заказы"
+            "Здесь отображаются завершённые обычные и экспресс-заказы"
         );
 
         await expect(page.locator(".oh-count")).toHaveText("3");
@@ -242,7 +358,7 @@ test.describe("OrderHistoryPage", () => {
         await expect(card).toContainText("Грузоперевозка");
         await expect(card).toContainText("Симферополь, улица Пушкина, 1");
         await expect(card).toContainText("3000 ₽");
-        await expect(card).toContainText("ID создателя");
+        await expect(card).toContainText("ID заказчика");
         await expect(card).toContainText("1");
         await expect(card).toContainText("ID исполнителя");
         await expect(card).toContainText("10");
@@ -295,33 +411,28 @@ test.describe("OrderHistoryPage", () => {
         await expect(card).toContainText("Починить розетку");
     });
 
-    test("показывает ссылку на договор PDF", async ({ page }) => {
-        const card = historyCard(page, "Заказ №123");
+    test(
+        "скачивает PDF договора заказа 123",
+        async ({ page }) => {
+            await expectLegacyPdfDownload(page, 123);
+        }
+    );
 
-        const link = card.getByRole("link", {
-            name: /Скачать договор/i,
-        });
-
-        await expect(link).toBeVisible();
-        await expect(link).toHaveAttribute("href", /contracts\/contract_123\.pdf$/);
-        await expect(link).toHaveAttribute("target", "_blank");
-    });
-
-    test("нормализует путь договора, если он уже начинается с contracts", async ({ page }) => {
-        const card = historyCard(page, "Заказ №125");
-
-        const link = card.getByRole("link", {
-            name: /Скачать договор/i,
-        });
-
-        await expect(link).toBeVisible();
-        await expect(link).toHaveAttribute("href", /contracts\/contract_125\.pdf$/);
-    });
+    test(
+        "скачивает PDF договора независимо от старого contractPath",
+        async ({ page }) => {
+            await expectLegacyPdfDownload(page, 125);
+        }
+    );
 
     test("если договора нет, ссылку не показывает", async ({ page }) => {
         const card = historyCard(page, "Заказ №124");
 
-        await expect(card.getByRole("link", { name: /Скачать договор/i })).not.toBeVisible();
+        await expect(
+            card.getByRole("button", {
+                name: /Скачать договор/i,
+            })
+        ).toHaveCount(0);
     });
 
     test("показывает кнопку оставить отзыв, если отзыв ещё не сохранён", async ({ page }) => {
@@ -330,7 +441,7 @@ test.describe("OrderHistoryPage", () => {
         await expect(card.getByRole("button", { name: /Оставить отзыв/i })).toBeVisible();
     });
 
-    test("показывает Отзыв сохранен, если заказ уже есть в моих отзывах", async ({ page }) => {
+    test("показывает Отзыв сохранён, если заказ уже есть в моих отзывах", async ({ page }) => {
         await openHistoryPage(page, {
             reviews: [
                 {
@@ -344,7 +455,7 @@ test.describe("OrderHistoryPage", () => {
 
         const card = historyCard(page, "Заказ №123");
 
-        await expect(card.getByText("Отзыв сохранен")).toBeVisible();
+        await expect(card.getByText("Отзыв сохранён")).toBeVisible();
         await expect(card.getByRole("button", { name: /Оставить отзыв/i })).not.toBeVisible();
     });
 
@@ -367,7 +478,7 @@ test.describe("OrderHistoryPage", () => {
 
         const card = historyCard(page, "Заказ №300");
 
-        await expect(card.getByText("Отзыв сохранен")).toBeVisible();
+        await expect(card.getByText("Отзыв сохранён")).toBeVisible();
         await expect(card.getByRole("button", { name: /Оставить отзыв/i })).not.toBeVisible();
     });
 
@@ -377,7 +488,7 @@ test.describe("OrderHistoryPage", () => {
         await card.getByRole("button", { name: /Оставить отзыв/i }).click();
 
         await expect(page.locator(".oh-modal-overlay")).toBeVisible();
-        await expect(page.locator(".oh-modal-title")).toHaveText("Отзыв по заказу #123");
+        await expect(page.locator(".oh-modal-title")).toHaveText("Отзыв по заказу №123");
 
         await page.getByRole("button", { name: "Закрыть" }).click();
 
@@ -455,13 +566,14 @@ test.describe("OrderHistoryPage", () => {
                 orderId: 123,
                 rating: 5,
                 text: "Отличный исполнитель",
+                orderType: "regular",
             });
 
         await expect(page.locator(".oh-modal-overlay")).not.toBeVisible();
 
         const updatedCard = historyCard(page, "Заказ №123");
 
-        await expect(updatedCard.getByText("Отзыв сохранен")).toBeVisible();
+        await expect(updatedCard.getByText("Отзыв сохранён")).toBeVisible();
     });
 
     test("показывает alert при ошибке отправки отзыва", async ({ page }) => {
@@ -507,7 +619,7 @@ test.describe("OrderHistoryPage", () => {
 
         await expect(page.locator(".oh-empty-title")).toHaveText("Пока пусто");
         await expect(page.locator(".oh-empty-sub")).toHaveText(
-            "Завершённых заказов ещё нет."
+            "Завершённых обычных и экспресс-заказов ещё нет."
         );
         await expect(page.locator(".oh-count")).toHaveText("0");
     });
@@ -515,6 +627,7 @@ test.describe("OrderHistoryPage", () => {
     test("показывает ошибку при сбое загрузки заказов", async ({ page }) => {
         await openHistoryPage(page, {
             ordersStatus: 500,
+            expressStatus: 500,
             ordersBody: {
                 message: "Ошибка сервера",
             },
@@ -538,6 +651,8 @@ test.describe("OrderHistoryPage", () => {
         let completedCalls = 0;
 
         await setFakeAuth(page);
+
+        await setupHistoryMocks(page);
 
         await page.route("**/api/orders/completed/1", async (route) => {
             completedCalls += 1;
@@ -611,4 +726,92 @@ test.describe("OrderHistoryPage", () => {
 
         expect(doneCalled).toBe(true);
     });
+
+    test(
+        "исторический акт доступен для PDF и ПЭП без повторной приёмки",
+        async ({ page }) => {
+            const legacyRequests = [];
+
+            page.on("request", (request) => {
+                const pathname = new URL(
+                    request.url()
+                ).pathname;
+
+                if (
+                    /\/api\/contracts\/acts\/601\/(acceptance|remediation)(\/|$)/
+                        .test(pathname)
+                ) {
+                    legacyRequests.push(pathname);
+                }
+            });
+
+            const act = {
+                id: 601,
+                orderId: 123,
+                parentContractId: 501,
+                type: "verified_completion_act",
+                version: 1,
+                status: "draft",
+                documentNumber: "CC-ACT-123-v1",
+                documentHash: "a".repeat(64),
+                createdAt: "2026-11-09T10:00:00.000Z",
+                fullySignedAt: null,
+            };
+
+            await page.route(
+                "**/api/contracts/assignments/summary",
+                async (route) => {
+                    expect(
+                        route.request().method()
+                    ).toBe("POST");
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                            assignments: [],
+                            acts: [act],
+                        },
+                    });
+                }
+            );
+
+            await page.reload();
+
+            const card = historyCard(
+                page,
+                "Заказ №123"
+            ).locator(".cc-completion-act");
+
+            await expect(card).toBeVisible();
+
+            await expect(card).toContainText(
+                "CC-ACT-123-v1"
+            );
+
+            await expect(
+                card.locator(".cc-va-status")
+            ).toHaveText("Проект");
+
+            await expect(
+                card.getByRole("button", {
+                    name: /Скачать акт/,
+                })
+            ).toBeVisible();
+
+            await expect(
+                card.locator(".cc-signing-toggle")
+            ).toBeVisible();
+
+            // Старых форм больше нет.
+            await expect(
+                card.locator(
+                    ".cc-act-acceptance, .cc-remediation"
+                )
+            ).toHaveCount(0);
+
+            // Их API также не запрашиваются.
+            expect(legacyRequests).toEqual([]);
+        }
+    );
 });

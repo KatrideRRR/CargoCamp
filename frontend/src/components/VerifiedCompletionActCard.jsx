@@ -1,8 +1,7 @@
 import React, {useState} from "react";
 import {downloadVerifiedContract,} from "../utils/downloadVerifiedContract";
 import "../styles/VerifiedAssignmentCard.css";
-import ActAcceptancePanel from "./ActAcceptancePanel";
-import ActRemediationPanel from "./ActRemediationPanel";
+
 import SignatureAgreementPanel
     from "./SignatureAgreementPanel";
 
@@ -29,12 +28,7 @@ export default function VerifiedCompletionActCard({
     const [downloadingPrevious, setDownloadingPrevious] =
         useState(false);
 
-    const [reviewRevision, setReviewRevision] =
-        useState(0);
-
     const [error, setError] = useState("");
-
-    // Далее оставь существующий код компонента.
 
     if (!act) return null;
 
@@ -207,40 +201,22 @@ export default function VerifiedCompletionActCard({
                     </button>
                 )}
 
-            <ActAcceptancePanel
-                act={act}
-                onDecisionSaved={() => {
-                    setReviewRevision((value) => value + 1);
-                }}
-            />
-
             <SignatureAgreementPanel />
 
             <ContractSigningPanel
                 assignment={act}
-                onSigned={() => {
-                    setReviewRevision(
-                        (value) => value + 1
-                    );
-
-                    if (onRevision) {
-                        onRevision();
-                    }
-                }}
+                onSigned={onRevision}
             />
 
-            {Number(act.version) === 1 && (
-                <ActRemediationPanel
-                    act={act}
-                    refreshKey={reviewRevision}
-                    onRevised={onRevision}
-                />
-            )}
-
             <p className="cc-va-footnote">
-                Решение о приёмке фиксируется отдельно
-                от подписания акта. PDF остаётся
-                неизменным. Приёмка работ и электронное подписание акта — разные действия. Для подписания обе стороны отдельно подтверждают соответствующую версию PDF через SMS. До включения сервиса документ остаётся проектом.
+                Приёмка работ, замечания и сведения о расчётах
+                фиксируются при завершении заказа.
+
+                Здесь можно просмотреть акт, скачать PDF
+                и подписать документ с помощью ПЭП.
+
+                Повторная приёмка и изменение замечаний
+                в истории заказов недоступны.
             </p>
         </section>
     );
