@@ -10,6 +10,9 @@ import axiosInstance from "../utils/axiosInstance";
 import Modal from "react-modal";
 import { toast } from "react-toastify";
 import { socket } from "../socketClient";
+import {
+    fetchExecutorBusyState,
+} from "../utils/executorBusyState";
 import TaxiVehicleGateModal from "../components/TaxiVehicleGateModal";
 import "../styles/OrdersPage.css";
 import "../styles/OrdersPageDark.css";
@@ -379,73 +382,40 @@ const OrdersPage = () => {
     const fetchBusyState = useCallback(async () => {
         const token = localStorage.getItem("authToken");
 
-        if (!token) {
+        if (!token || !userId) {
             setBusyState({
                 loading: false,
                 hasBusyRegular: false,
                 hasBusyTaxi: false,
                 hasAnyBusy: false,
             });
+
             return;
         }
 
         try {
-            const [regularRes, expressRes] = await Promise.allSettled([
-                axiosInstance.get("/orders/active-orders", {
-                    headers: { Authorization: `Bearer ${token}` },
-                }),
-                axiosInstance.get("/express/express-orders/me?mode=active", {
-                    headers: { Authorization: `Bearer ${token}` },
-                }),
-            ]);
-
-            let hasBusyRegular = false;
-            let hasBusyTaxi = false;
-
-            if (regularRes.status === "fulfilled") {
-                const regularOrders = regularRes.value?.data?.orders || [];
-                hasBusyRegular = regularOrders.some((o) => {
-                    const isExecutor = Number(o.executorId) === Number(userId);
-                    const activeStatuses = ["active", "in_progress", "pending_payment"];
-                    return isExecutor && activeStatuses.includes(String(o.status));
-                });
-            }
-
-            if (expressRes.status === "fulfilled") {
-                const expressOrders = expressRes.value?.data?.orders || [];
-                hasBusyTaxi = expressOrders.some((o) => {
-                    const isExecutor =
-                        Number(o.executorId) === Number(userId);
-
-                    const activeStatuses = [
-                        "accepted",
-                        "on_the_way_to_A",
-                        "arrived_at_A",
-                        "waiting_at_A",
-                        "picked_up",
-                        "in_progress",
-                    ];
-
-                    return (
-                        isExecutor &&
-                        activeStatuses.includes(String(o.status))
-                    );
-                });
-            }
+            const result =
+                await fetchExecutorBusyState(userId);
 
             setBusyState({
                 loading: false,
-                hasBusyRegular,
-                hasBusyTaxi,
-                hasAnyBusy: hasBusyRegular || hasBusyTaxi,
+                ...result,
             });
-        } catch (e) {
-            console.error("fetchBusyState error:", e);
+        } catch (error) {
+            console.error(
+                "Не удалось проверить занятость:",
+                error
+            );
+
+            /*
+             * Если проверка не состоялась,
+             * действия остаются заблокированными.
+             */
             setBusyState({
-                loading: false,
+                loading: true,
                 hasBusyRegular: false,
                 hasBusyTaxi: false,
-                hasAnyBusy: false,
+                hasAnyBusy: true,
             });
         }
     }, [userId]);
@@ -1179,6 +1149,15 @@ const OrdersPage = () => {
         if (!token) {
             toast.info("Войдите, чтобы запросить выполнение");
             navigate("/login");
+            return;
+        }
+
+        if (busyState.loading) {
+            toast.info(
+                "Не удалось завершить проверку занятости. " +
+                "Обновите страницу и попробуйте снова."
+            );
+
             return;
         }
 

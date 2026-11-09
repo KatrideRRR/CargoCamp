@@ -1,5 +1,9 @@
 import { test, expect } from "./fixtures/safeTest";
 
+import {
+    mockOrderAssets,
+} from "./utils/mockOrderAssets";
+
 const FRONT_URL = "http://localhost:3000";
 
 const viewer = {
@@ -214,6 +218,8 @@ async function setupOrdersMocks(page, options = {}) {
         acceptBody = { success: true },
     } = options;
 
+    await mockOrderAssets(page);
+
     page.on("pageerror", (error) => {
         console.log("[PAGE ERROR]", error.message);
     });
@@ -229,6 +235,62 @@ async function setupOrdersMocks(page, options = {}) {
             console.log(`[BROWSER ${msg.type()}]`, text);
         }
     });
+
+    /*
+ * Переход со списка в детальную страницу
+ * обычного заказа.
+ */
+    await page.route(
+        "**/api/orders/101",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: regularOrders[0],
+            });
+        }
+    );
+
+    /*
+     * Переход со списка в детальную страницу
+     * экспресс-заказа.
+     */
+    await page.route(
+        "**/api/express/express-orders/201",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    success: true,
+                    order: expressOrders[0],
+                },
+            });
+        }
+    );
+
+    /*
+     * Переход на страницу отзывов заказчика.
+     */
+    await page.route(
+        "**/api/auth/user/1",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: creator,
+            });
+        }
+    );
+
+    await page.route(
+        "**/api/auth/reviews/user/1",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    reviews: [],
+                },
+            });
+        }
+    );
 
     await page.route("**/api/auth/profile", async (route) => {
         await route.fulfill({
@@ -481,6 +543,76 @@ test.describe("OrdersPage", () => {
         await expect(page.locator(".orders-page")).toHaveClass(/orders-page--android/);
     });
 
+    test(
+        "активный экспресс-заказ блокирует отклик на обычный",
+        async ({ page }) => {
+            await openOrdersPage(page, {
+                activeExpress: [
+                    {
+                        id: 909,
+                        executorId: 2,
+                        status: "accepted",
+                    },
+                ],
+            });
+
+            const card = orderCard(
+                page,
+                "Заказ №101"
+            );
+
+            await expect(
+                card.getByRole(
+                    "button",
+                    {
+                        name: "Запросить выполнение",
+                    }
+                )
+            ).toBeDisabled();
+
+            await expect(
+                card.locator(".blocked-order-hint")
+            ).toContainText(
+                "активный экспресс-заказ"
+            );
+        }
+    );
+
+    test(
+        "активный обычный заказ блокирует принятие экспресс-заказа",
+        async ({ page }) => {
+            await openOrdersPage(page, {
+                activeRegular: [
+                    {
+                        id: 777,
+                        executorId: 2,
+                        status: "active",
+                    },
+                ],
+            });
+
+            const card = orderCard(
+                page,
+                "Экспресс №201"
+            );
+
+            await expect(
+                card.getByRole(
+                    "button",
+                    {
+                        name: "Принять",
+                    }
+                )
+            ).toBeDisabled();
+
+            await expect(
+                card.locator(".blocked-order-hint")
+            ).toContainText(
+                "активный обычный заказ"
+            );
+        }
+    );
+
     test("показывает обычные заказы в радиусе", async ({ page }) => {
         const card = orderCard(page, "Заказ №101");
 
@@ -548,7 +680,10 @@ test.describe("OrdersPage", () => {
     test("переходит в детальную страницу express-заказа", async ({ page }) => {
         const card = orderCard(page, "Экспресс №201");
 
-        await card.getByRole("button", { name: "Открыть" }).click();
+        await card.getByRole("button", {
+            name: "Открыть",
+            exact: true,
+        }).click();
 
         await expect(page).toHaveURL(/\/express-order\/201/);
     });
@@ -706,11 +841,26 @@ test.describe("OrdersPage", () => {
         await expect(input).toHaveValue("2500");
     });
 
-    test("кнопка отправки заявки отключена без суммы", async ({ page }) => {
-        await openRequestModal(page);
+    test(
+        "кнопка отправки заявки отключена без суммы",
+        async ({ page }) => {
+            await openRequestModal(page);
 
-        await expect(page.getByRole("button", { name: "Отправить запрос" })).toBeDisabled();
-    });
+            const amount = page.getByPlaceholder(
+                "Например: 2500"
+            );
+
+            await expect(amount).not.toBeEmpty();
+
+            await amount.fill("");
+
+            await expect(
+                page.getByRole("button", {
+                    name: "Отправить запрос",
+                })
+            ).toBeDisabled();
+        }
+    );
 
     test("успешно отправляет заявку на обычный заказ", async ({ page }) => {
         let statusCalled = false;
@@ -762,6 +912,7 @@ test.describe("OrdersPage", () => {
             .toEqual({
                 proposedSum: 2500,
                 comment: "Могу приехать сегодня",
+                availableAt: null,
             });
 
         await expect(page.locator(".request-order-content")).not.toBeVisible();
@@ -801,24 +952,115 @@ test.describe("OrdersPage", () => {
         await expect(page).toHaveURL(/\/login/);
     });
 
-    test("блокирует заявки, если есть активный обычный заказ", async ({ page }) => {
-        await openOrdersPage(page, {
-            activeRegular: [
+    test(
+        "при активном обычном заказе разрешает бронь с временем освобождения",
+        async ({ page }) => {
+            await openOrdersPage(page, {
+                activeRegular: [
+                    {
+                        id: 777,
+                        executorId: 2,
+                        status: "active",
+                    },
+                ],
+            });
+
+            const card = orderCard(
+                page,
+                "Заказ №101"
+            );
+
+            await expect(
+                card.locator(".blocked-order-hint")
+            ).toContainText(
+                "предварительный отклик"
+            );
+
+            const button = card.getByRole(
+                "button",
                 {
-                    id: 777,
-                    executorId: 2,
-                    status: "active",
-                },
-            ],
-        });
+                    name: "Запросить выполнение",
+                }
+            );
 
-        const card = orderCard(page, "Заказ №101");
+            await expect(button).toBeEnabled();
 
-        await expect(card.getByRole("button", { name: "Запросить выполнение" })).toBeDisabled();
-        await expect(card.locator(".blocked-order-hint")).toContainText(
-            "У вас уже есть активный обычный заказ"
-        );
-    });
+            await button.click();
+
+            await expect(
+                page.locator(".request-order-content")
+            ).toBeVisible();
+
+            let requestBody = null;
+
+            await page.route(
+                "**/api/orders/101/request",
+                async (route) => {
+                    requestBody =
+                        route.request().postDataJSON();
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                        },
+                    });
+                }
+            );
+
+            await page
+                .getByPlaceholder("Например: 2500")
+                .fill("2500");
+
+            // Без времени освобождения
+            // предварительный отклик не отправляется.
+            await page.getByRole(
+                "button",
+                {
+                    name: "Отправить запрос",
+                }
+            ).click();
+
+            await expect(
+                page.getByText(
+                    "Укажите, когда сможете освободиться " +
+                    "от текущего заказа."
+                )
+            ).toBeVisible();
+
+            expect(requestBody).toBeNull();
+
+            // Указываем время освобождения.
+            await page
+                .locator("#regular-available-at")
+                .fill("2035-04-12T18:30");
+
+            await page.getByRole(
+                "button",
+                {
+                    name: "Отправить запрос",
+                }
+            ).click();
+
+            await expect.poll(
+                () => requestBody
+            ).not.toBeNull();
+
+            expect(requestBody).toMatchObject({
+                proposedSum: 2500,
+                comment: "",
+                availableAt: expect.any(String),
+            });
+
+            expect(
+                new Date(requestBody.availableAt)
+                    .toISOString()
+            ).toBe(
+                new Date("2035-04-12T18:30")
+                    .toISOString()
+            );
+        }
+    );
 
     test("принимает express-заказ после confirm", async ({ page }) => {
         let acceptCalled = false;

@@ -15,6 +15,9 @@ import {
     FaQuestionCircle,
     FaUniversity,
 } from "react-icons/fa";
+import {
+    fetchExecutorBusyState,
+} from "../utils/executorBusyState";
 import { FiAlertTriangle } from "react-icons/fi";
 import { toast } from "react-toastify";
 import ExpressRouteButtons from "../components/ExpressRouteButtons";
@@ -543,6 +546,29 @@ const OrderPage = () => {
         try {
             setRequestSubmitting(true);
 
+            const busy =
+                await fetchExecutorBusyState(userId);
+
+            if (busy.hasBusyTaxi) {
+                toast.info(
+                    "Сначала завершите активный экспресс-заказ."
+                );
+
+                return;
+            }
+
+            if (
+                busy.hasBusyRegular &&
+                !requestAvailableAt
+            ) {
+                toast.info(
+                    "Укажите, когда сможете освободиться " +
+                    "от текущего заказа."
+                );
+
+                return;
+            }
+
             const statusRes = await axiosInstance.get("/orders/me/status", {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -606,6 +632,35 @@ const OrderPage = () => {
             );
 
             navigate("/login");
+            return;
+        }
+
+        let busy;
+
+        try {
+            busy = await fetchExecutorBusyState(
+                userId
+            );
+        } catch (error) {
+            console.error(
+                "Express busy check failed:",
+                error
+            );
+
+            toast.error(
+                "Не удалось проверить занятость. " +
+                "Повторите попытку."
+            );
+
+            return;
+        }
+
+        if (busy.hasAnyBusy) {
+            toast.info(
+                "У вас уже есть активный заказ. " +
+                "Сначала завершите его."
+            );
+
             return;
         }
 

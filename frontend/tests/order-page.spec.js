@@ -1,5 +1,9 @@
 import { test, expect } from "./fixtures/safeTest";
 
+import {
+    mockOrderAssets,
+} from "./utils/mockOrderAssets";
+
 const FRONT_URL = "http://localhost:3000";
 
 const creator = {
@@ -118,7 +122,11 @@ async function setupOrderMocks(page, options = {}) {
         express = false,
         acceptStatus = 200,
         acceptBody = { success: true },
+        activeRegular = [],
+        activeExpress = [],
     } = options;
+
+    await mockOrderAssets(page);
 
     page.on("pageerror", (error) => {
         console.log("[PAGE ERROR]", error.message);
@@ -135,6 +143,55 @@ async function setupOrderMocks(page, options = {}) {
             console.log(`[BROWSER ${msg.type()}]`, text);
         }
     });
+
+    await page.route(
+        "**/api/auth/2",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    ...profileBody,
+                    username: "Артем",
+                    rating: 4.8,
+                },
+            });
+        }
+    );
+
+    await page.route(
+        "**/api/auth/user/1",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: creator,
+            });
+        }
+    );
+
+    await page.route(
+        "**/api/auth/reviews/user/1",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    reviews: [],
+                },
+            });
+        }
+    );
+
+    await page.route(
+        "**/api/orders/pending-act-signatures",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    acts: [],
+                    missingOrderIds: [],
+                },
+            });
+        }
+    );
 
     await page.route("**/api/auth/profile", async (route) => {
         await route.fulfill({
@@ -178,6 +235,31 @@ async function setupOrderMocks(page, options = {}) {
             body: JSON.stringify(requestStatusBody),
         });
     });
+
+    await page.route(
+        "**/api/orders/active-orders",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    orders: activeRegular,
+                },
+            });
+        }
+    );
+
+    await page.route(
+        "**/api/express/express-orders/me?mode=active",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    success: true,
+                    orders: activeExpress,
+                },
+            });
+        }
+    );
 
     await page.route("**/api/orders/101/request", async (route) => {
         await route.fulfill({
@@ -404,11 +486,28 @@ test.describe("OrderPage — обычный заказ", () => {
         await expect(input).toHaveValue("2500");
     });
 
-    test("кнопка отправки запроса отключена без суммы", async ({ page }) => {
-        await openRequestModal(page);
+    test(
+        "кнопка отправки запроса отключена без суммы",
+        async ({ page }) => {
+            await openRequestModal(page);
 
-        await expect(page.getByRole("button", { name: "Отправить запрос" })).toBeDisabled();
-    });
+            const amount = page.getByPlaceholder(
+                "Например: 2500"
+            );
+
+            // Цена подставляется автоматически.
+            await expect(amount).not.toBeEmpty();
+
+            // Исполнитель вручную удалил сумму.
+            await amount.fill("");
+
+            await expect(
+                page.getByRole("button", {
+                    name: "Отправить запрос",
+                })
+            ).toBeDisabled();
+        }
+    );
 
     test("успешно отправляет запрос на выполнение", async ({ page }) => {
         let statusCalled = false;
@@ -460,6 +559,7 @@ test.describe("OrderPage — обычный заказ", () => {
             .toEqual({
                 proposedSum: 2500,
                 comment: "Могу приехать сегодня",
+                availableAt: null,
             });
 
         await expect(page.locator(".request-order-content")).not.toBeVisible();
@@ -603,9 +703,18 @@ test.describe("OrderPage — обычный заказ", () => {
             })
             .toBeGreaterThanOrEqual(2);
 
-        const doneCalled = await page.evaluate(() => window.__pullDone === true);
-
-        expect(doneCalled).toBe(true);
+        await expect
+            .poll(
+                async () => {
+                    return await page.evaluate(
+                        () => window.__pullDone === true
+                    );
+                },
+                {
+                    timeout: 10000,
+                }
+            )
+            .toBe(true);
     });
 });
 
@@ -731,3 +840,238 @@ test.describe("OrderPage — экспресс-заказ", () => {
         );
     });
 });
+
+test.describe(
+    "OrderPage — занятость и бронирование",
+    () => {
+        test(
+            "требует время освобождения при активном обычном заказе",
+            async ({ page }) => {
+                await openRegularOrderPage(page, {
+                    activeRegular: [
+                        {
+                            id: 777,
+                            executorId: 2,
+                            status: "active",
+                        },
+                    ],
+                });
+
+                let requests = 0;
+
+                await page.route(
+                    "**/api/orders/101/request",
+                    async (route) => {
+                        requests++;
+
+                        await route.fulfill({
+                            status: 200,
+                            json: {
+                                success: true,
+                            },
+                        });
+                    }
+                );
+
+                await openRequestModal(page);
+
+                await page
+                    .getByPlaceholder("Например: 2500")
+                    .fill("2500");
+
+                await page.getByRole(
+                    "button",
+                    {
+                        name: "Отправить запрос",
+                    }
+                ).click();
+
+                await expect(
+                    page.getByText(
+                        "Укажите, когда сможете освободиться " +
+                        "от текущего заказа."
+                    )
+                ).toBeVisible();
+
+                expect(requests).toBe(0);
+
+                await expect(
+                    page.locator(".request-order-content")
+                ).toBeVisible();
+            }
+        );
+
+        test(
+            "передаёт availableAt при бронировании следующего заказа",
+            async ({ page }) => {
+                await openRegularOrderPage(page, {
+                    activeRegular: [
+                        {
+                            id: 777,
+                            executorId: 2,
+                            status: "active",
+                        },
+                    ],
+                });
+
+                let requestBody = null;
+
+                await page.route(
+                    "**/api/orders/101/request",
+                    async (route) => {
+                        requestBody =
+                            route.request().postDataJSON();
+
+                        await route.fulfill({
+                            status: 200,
+                            json: {
+                                success: true,
+                            },
+                        });
+                    }
+                );
+
+                await openRequestModal(page);
+
+                await page
+                    .getByPlaceholder("Например: 2500")
+                    .fill("2500");
+
+                await page
+                    .locator("#regular-available-at")
+                    .fill("2035-04-12T18:30");
+
+                await page.getByRole(
+                    "button",
+                    {
+                        name: "Отправить запрос",
+                    }
+                ).click();
+
+                await expect.poll(
+                    () => requestBody
+                ).not.toBeNull();
+
+                expect(requestBody).toMatchObject({
+                    proposedSum: 2500,
+                    comment: "",
+                    availableAt: expect.any(String),
+                });
+
+                expect(
+                    new Date(requestBody.availableAt)
+                        .toISOString()
+                ).toBe(
+                    new Date("2035-04-12T18:30")
+                        .toISOString()
+                );
+            }
+        );
+
+        test(
+            "не отправляет обычный отклик при активном экспресс-заказе",
+            async ({ page }) => {
+                await openRegularOrderPage(page, {
+                    activeExpress: [
+                        {
+                            id: 909,
+                            executorId: 2,
+                            status: "accepted",
+                        },
+                    ],
+                });
+
+                let requests = 0;
+
+                await page.route(
+                    "**/api/orders/101/request",
+                    async (route) => {
+                        requests++;
+
+                        await route.fulfill({
+                            status: 200,
+                            json: {
+                                success: true,
+                            },
+                        });
+                    }
+                );
+
+                await openRequestModal(page);
+
+                await page
+                    .getByPlaceholder("Например: 2500")
+                    .fill("2500");
+
+                await page.getByRole(
+                    "button",
+                    {
+                        name: "Отправить запрос",
+                    }
+                ).click();
+
+                await expect(
+                    page.getByText(
+                        "Сначала завершите активный экспресс-заказ."
+                    )
+                ).toBeVisible();
+
+                expect(requests).toBe(0);
+            }
+        );
+
+        test(
+            "не принимает экспресс-заказ при активном обычном",
+            async ({ page }) => {
+                await openExpressOrderPage(page, {
+                    activeRegular: [
+                        {
+                            id: 777,
+                            executorId: 2,
+                            status: "active",
+                        },
+                    ],
+                });
+
+                let acceptRequests = 0;
+
+                await page.route(
+                    "**/api/express/express-orders/201/accept",
+                    async (route) => {
+                        acceptRequests++;
+
+                        await route.fulfill({
+                            status: 200,
+                            json: {
+                                success: true,
+                            },
+                        });
+                    }
+                );
+
+                await page.getByRole(
+                    "button",
+                    {
+                        name: "Принять",
+                    }
+                ).click();
+
+                await expect(
+                    page.getByText(
+                        "У вас уже есть активный заказ. " +
+                        "Сначала завершите его."
+                    )
+                ).toBeVisible();
+
+                expect(acceptRequests).toBe(0);
+
+                await expect(page).toHaveURL(
+                    /\/express-order\/201/
+                );
+                await expect(
+                    page.locator(".orders-title")
+                ).toHaveText("Экспресс №201");
+            }
+        );
+    }
+);
