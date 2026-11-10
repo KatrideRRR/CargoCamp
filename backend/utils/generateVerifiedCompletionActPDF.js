@@ -84,6 +84,14 @@ function renderHtml(data, photoAnnex) {
         data.paymentType ||
         "Не указан";
 
+    const customerDecision =
+        data.paymentEvidence?.customer;
+
+    const acceptedAfterCorrections =
+        customerDecision?.qualityDecision === "accepted" &&
+        customerDecision?.originalQualityDecision === "remarks" &&
+        Boolean(customerDecision?.acceptedAfterCorrectionsAt);
+
     return `<!doctype html>
 <html lang="ru">
 <head>
@@ -431,12 +439,21 @@ ${row(
 
 ${row(
         "Решение заказчика",
-        data.paymentEvidence.customer?.qualityDecision === "accepted"
-            ? "Работы приняты без замечаний на момент подтверждения"
-            : data.paymentEvidence.customer?.qualityDecision === "remarks"
-                ? "Работы завершены, заявлены замечания"
-                : "Решение не зафиксировано"
+        acceptedAfterCorrections
+            ? "Работы приняты после устранения замечаний"
+            : customerDecision?.qualityDecision === "accepted"
+                ? "Работы приняты без замечаний при первоначальной приёмке"
+                : customerDecision?.qualityDecision === "remarks"
+                    ? "Работы завершены, заявлены замечания"
+                    : "Решение не зафиксировано"
     )}
+
+${acceptedAfterCorrections
+        ? row(
+            "Дата окончательной приёмки",
+            formatDate(customerDecision.acceptedAfterCorrectionsAt)
+        )
+        : ""}
 
 ${data.paymentEvidence.customer?.remarks
         ? row(
@@ -626,3 +643,4 @@ async function generateVerifiedCompletionActPDF(
 }
 
 module.exports = generateVerifiedCompletionActPDF;
+module.exports.renderHtml = renderHtml;
