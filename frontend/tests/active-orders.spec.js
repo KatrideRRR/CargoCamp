@@ -1348,6 +1348,369 @@ test.describe("ActiveOrdersPage", () => {
         }
     );
 
+    async function openCorrectionScenario(
+        page,
+        {
+            customerView = false,
+            phase = "needs_correction",
+        } = {}
+    ) {
+        const state = {
+            order: {
+                ...regularOrder,
+                creatorId: customerView ? 1 : 2,
+                executorId: customerView ? 2 : 1,
+                status: "active",
+                completedBy: [1, 2],
+                completionPhase: phase,
+                completionRemarks:
+                    "При перевозке повреждён корпус шкафа.",
+            },
+
+            requests: [],
+        };
+
+        await page.route(
+            "**/api/orders/active-orders",
+            async (route) => {
+                await route.fulfill({
+                    status: 200,
+                    json: {
+                        orders: state.order
+                            ? [state.order]
+                            : [],
+                        notifications: [],
+                    },
+                });
+            }
+        );
+
+        await page.route(
+            "**/api/orders/101/corrections/submit",
+            async (route) => {
+                const body = route.request().postDataJSON();
+
+                state.requests.push({
+                    type: "submit",
+                    body,
+                });
+
+                state.order = {
+                    ...state.order,
+                    completionPhase: "awaiting_review",
+                };
+
+                await route.fulfill({
+                    status: 200,
+                    json: {
+                        success: true,
+                        phase: "awaiting_review",
+                    },
+                });
+            }
+        );
+
+        await page.route(
+            "**/api/orders/101/corrections/review",
+            async (route) => {
+                const body = route.request().postDataJSON();
+
+                state.requests.push({
+                    type: "review",
+                    body,
+                });
+
+                if (body.decision === "accepted") {
+                    state.order = null;
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            ...regularOrder,
+                            creatorId: 1,
+                            executorId: 2,
+                            completedBy: [1, 2],
+                            status: "completed",
+                            completionPhase: "completed",
+
+                            completionAct: {
+                                id: 601,
+                                orderId: 101,
+                                type: "verified_completion_act",
+                                version: 1,
+                                status: "draft",
+                                documentNumber:
+                                    "CC-ACT-101-V1",
+                                documentHash:
+                                    "a".repeat(64),
+                            },
+
+                            documentPending: false,
+                        },
+                    });
+
+                    return;
+                }
+
+                state.order = {
+                    ...state.order,
+                    completionPhase: "needs_correction",
+                };
+
+                await route.fulfill({
+                    status: 200,
+                    json: {
+                        success: true,
+                        phase: "needs_correction",
+                    },
+                });
+            }
+        );
+
+        // При окончательном завершении автоматически
+        // открывается компонент подписания акта.
+        await page.route(
+            "**/api/contracts/signing/601/status",
+            async (route) => {
+                await route.fulfill({
+                    status: 200,
+                    json: {
+                        success: true,
+                        enabled: true,
+                        accepted: true,
+                        identitiesValid: true,
+                        signingMethod: "sms",
+                        mySigned: false,
+                        otherSigned: false,
+                        blockedReason: null,
+                        contractStatus: "draft",
+                        canSign: false,
+                        pendingChallenge: null,
+                    },
+                });
+            }
+        );
+
+        page.on("dialog", async (dialog) => {
+            await dialog.accept();
+        });
+
+        await page.reload();
+
+        if (customerView) {
+            await page.getByRole("button", {
+                name: "Мои заказы выполняют",
+            }).click();
+        }
+
+        await expect(
+            page.locator(".order-card").first()
+        ).toBeVisible();
+
+        return state;
+    }
+
+
+    test(
+        "исполнитель отправляет исправления заказчику",
+        async ({ page }) => {
+            const state = await openCorrectionScenario(page);
+
+            await page.getByRole("button", {
+                name: "Исправления выполнены",
+            }).click();
+
+            const modal = page.locator(
+                ".completion-work-modal__content"
+            );
+
+            await expect(
+                modal.getByRole("heading", {
+                    name: "Устранение замечаний",
+                })
+            ).toBeVisible();
+
+            await expect(modal).toContainText(
+                "При перевозке повреждён корпус шкафа."
+            );
+
+            const confirm = modal.getByRole("button", {
+                name: "Подтвердить",
+            });
+
+            await expect(confirm).toBeDisabled();
+
+            await modal.getByPlaceholder(
+                "Расскажите, что исправлено"
+            ).fill(
+                "Повреждённая деталь заменена и проверена."
+            );
+
+            await expect(confirm).toBeEnabled();
+
+            await confirm.click();
+
+            await expect.poll(
+                () => state.requests.length
+            ).toBe(1);
+
+            expect(state.requests[0]).toEqual({
+                type: "submit",
+                body: {
+                    comment:
+                        "Повреждённая деталь заменена и проверена.",
+                },
+            });
+
+            await expect(
+                page.getByText("Ожидаем решения заказчика")
+            ).toBeVisible();
+        }
+    );
+
+    test(
+        "заказчик возвращает исправления на доработку",
+        async ({ page }) => {
+            const state = await openCorrectionScenario(
+                page,
+                {
+                    customerView: true,
+                    phase: "awaiting_review",
+                }
+            );
+
+            await page.getByRole("button", {
+                name: "Проверить исправления",
+            }).click();
+
+            const modal = page.locator(
+                ".completion-work-modal__content"
+            );
+
+            await expect(
+                modal.getByRole("heading", {
+                    name: "Проверка исправлений",
+                })
+            ).toBeVisible();
+
+            await modal.getByLabel(
+                "Остались недостатки"
+            ).check();
+
+            const confirm = modal.getByRole("button", {
+                name: "Подтвердить",
+            });
+
+            await expect(confirm).toBeDisabled();
+
+            await modal.getByPlaceholder(
+                "Какие замечания остались?"
+            ).fill(
+                "Дверца шкафа по-прежнему закрывается неправильно."
+            );
+
+            await expect(confirm).toBeEnabled();
+
+            await confirm.click();
+
+            await expect.poll(
+                () => state.requests.length
+            ).toBe(1);
+
+            expect(state.requests[0]).toEqual({
+                type: "review",
+                body: {
+                    decision: "rejected",
+                    comment:
+                        "Дверца шкафа по-прежнему закрывается неправильно.",
+                },
+            });
+
+            await expect(
+                page.getByText(
+                    "Ожидаем исправления от исполнителя"
+                )
+            ).toBeVisible();
+        }
+    );
+
+    test(
+        "заказчик принимает исправления и открывает акт",
+        async ({ page }) => {
+            const state = await openCorrectionScenario(
+                page,
+                {
+                    customerView: true,
+                    phase: "awaiting_review",
+                }
+            );
+
+            await page.getByRole("button", {
+                name: "Проверить исправления",
+            }).click();
+
+            const modal = page.locator(
+                ".completion-work-modal__content"
+            );
+
+            await modal.getByLabel(
+                "Исправления приняты, замечаний больше нет"
+            ).check();
+
+            await modal.getByRole("button", {
+                name: "Подтвердить",
+            }).click();
+
+            await expect.poll(
+                () => state.requests.length
+            ).toBe(1);
+
+            expect(state.requests[0]).toEqual({
+                type: "review",
+                body: {
+                    decision: "accepted",
+                    comment: "",
+                },
+            });
+
+            // Заказ удалён из списка активных.
+            await expect(
+                page.locator(".order-card")
+            ).toHaveCount(0);
+
+            // Открывается акт завершения заказа.
+            const signingModal = page.getByRole(
+                "dialog",
+                {
+                    name: "Подписание акта завершения",
+                }
+            );
+
+            await expect(signingModal).toBeVisible();
+
+            await expect(signingModal).toContainText(
+                "CC-ACT-101-V1"
+            );
+
+            await expect(signingModal).toContainText(
+                "a".repeat(64)
+            );
+
+            await expect(
+                signingModal.getByRole("button", {
+                    name: "Скачать и прочитать акт PDF",
+                })
+            ).toBeVisible();
+
+            await expect(
+                signingModal.locator(
+                    ".cc-signing-toggle"
+                )
+            ).toBeVisible();
+        }
+    );
+
+
 });
 
 // ============================================================
