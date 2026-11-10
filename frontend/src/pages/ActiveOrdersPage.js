@@ -492,8 +492,6 @@ const ActiveOrdersPage = () => {
     const [completionRemarks, setCompletionRemarks] = useState("");
     const [completionCashStatus, setCompletionCashStatus] = useState("");
     const [completionCashAmount, setCompletionCashAmount] = useState("");
-    const [completionPayoutAuthorized, setCompletionPayoutAuthorized] =
-        useState(false);
 
     const [correctionOrder, setCorrectionOrder] = useState(null);
     const [correctionComment, setCorrectionComment] = useState("");
@@ -1085,8 +1083,6 @@ const ActiveOrdersPage = () => {
         setCompletionRemarks("");
         setCompletionCashStatus("");
         setCompletionCashAmount("");
-        setCompletionPayoutAuthorized(false);
-
         setCompletionModalOrder(order);
     };
 
@@ -1123,7 +1119,6 @@ const ActiveOrdersPage = () => {
                     Number(order.creatorId) === Number(user?.id);
 
                 const isCash = order.paymentType === "cash";
-                const isGuarantee = order.paymentType === "guarantee";
 
                 const completion = {
                     workConfirmed: true,
@@ -2728,7 +2723,6 @@ const ActiveOrdersPage = () => {
                                                         checked={completionQuality === "accepted"}
                                                         onChange={() => {
                                                             setCompletionQuality("accepted");
-                                                            setCompletionPayoutAuthorized(false);
                                                         }}
                                                     />
                                                     Работа выполнена, претензий на момент приёмки нет
@@ -2741,7 +2735,6 @@ const ActiveOrdersPage = () => {
                                                         checked={completionQuality === "remarks"}
                                                         onChange={() => {
                                                             setCompletionQuality("remarks");
-                                                            setCompletionPayoutAuthorized(false);
                                                         }}
                                                     />
                                                     Работа завершена, но есть замечания
@@ -2808,41 +2801,6 @@ const ActiveOrdersPage = () => {
                                                     недоступны. Завершение заказа и приёмка
                                                     работ не инициируют списание или перевод денег.
                                                 </p>
-                                            </div>
-                                        )}
-                                        <div className="completion-guarantee-info">
-                                                <strong>Гарантийная оплата</strong>
-
-                                                <p>
-                                                    Завершение работ не означает автоматическую
-                                                    выплату исполнителю.
-                                                </p>
-
-                                                {Number(completionModalOrder.creatorId) ===
-                                                Number(user?.id) ? (
-                                                    completionQuality === "accepted" && (
-                                                        <label>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={completionPayoutAuthorized}
-                                                                onChange={(e) =>
-                                                                    setCompletionPayoutAuthorized(
-                                                                        e.target.checked
-                                                                    )
-                                                                }
-                                                            />
-                                                            Подтверждаю приёмку результата работ
-                                                            и разрешаю выплату исполнителю
-                                                            в рамках гарантийной сделки.
-                                                        </label>
-                                                    )
-                                                ) : (
-                                                    <p>
-                                                        После подтверждения заказчиком приёмки
-                                                        и разрешения выплаты CargoCamp сможет
-                                                        инициировать расчёт с исполнителем.
-                                                    </p>
-                                                )}
                                             </div>
                                         )}
 

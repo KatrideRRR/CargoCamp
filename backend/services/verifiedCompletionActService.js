@@ -372,6 +372,11 @@ async function createVerifiedCompletionActIfEligible(order) {
                 const customerDecision =
                     snapshot.paymentEvidence?.customer;
 
+                const acceptedAfterCorrections =
+                    customerDecision?.originalQualityDecision === "remarks" &&
+                    customerDecision?.qualityDecision === "accepted" &&
+                    Boolean(customerDecision?.acceptedAfterCorrectionsAt);
+
                 if (
                     customerDecision &&
                     ["accepted", "remarks"].includes(
@@ -390,8 +395,9 @@ async function createVerifiedCompletionActIfEligible(order) {
                             eventType:
                                 "act_customer_decision",
 
-                            eventAt:
-                            customerDecision.confirmedAt,
+                            eventAt: acceptedAfterCorrections
+                                ? new Date(customerDecision.acceptedAfterCorrectionsAt)
+                                : customerDecision.confirmedAt,
 
                             metadata: {
                                 decision:
@@ -408,7 +414,21 @@ async function createVerifiedCompletionActIfEligible(order) {
                                 documentHash,
                                 documentVersion: VERSION,
 
-                                source: "completion_modal",
+                                source: acceptedAfterCorrections
+                                    ? "completion_correction_review"
+                                    : "completion_modal",
+
+                                originalQualityDecision:
+                                    customerDecision.originalQualityDecision ||
+                                    customerDecision.qualityDecision,
+
+                                originalRemarks:
+                                    customerDecision.originalRemarks || null,
+
+                                acceptedAfterCorrectionsAt:
+                                    acceptedAfterCorrections
+                                        ? customerDecision.acceptedAfterCorrectionsAt
+                                        : null,
 
                                 payoutAuthorized:
                                 customerDecision.payoutAuthorized,

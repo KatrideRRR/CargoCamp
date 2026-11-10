@@ -1120,6 +1120,234 @@ test.describe("ActiveOrdersPage", () => {
 
         await expect(page.getByText("Не удалось загрузить заказы.")).toBeVisible();
     });
+
+    test(
+        "заказчик подтверждает наличную приёмку без гарантийной выплаты",
+        async ({ page }) => {
+            const order = {
+                ...regularOrder,
+                creatorId: 1,
+                executorId: 2,
+            };
+
+            await page.route(
+                "**/api/orders/active-orders",
+                async (route) => {
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            orders: [order],
+                            notifications: [],
+                        },
+                    });
+                }
+            );
+
+            let requestBody = null;
+
+            await page.route(
+                "**/api/orders/complete/101",
+                async (route) => {
+                    requestBody =
+                        route.request().postDataJSON();
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            ...order,
+                            completedBy: [1],
+                            completionPhase: "awaiting_other",
+                        },
+                    });
+                }
+            );
+
+            page.on("dialog", async (dialog) => {
+                await dialog.accept();
+            });
+
+            await page.reload();
+
+            await page.getByRole("button", {
+                name: "Мои заказы выполняют",
+            }).click();
+
+            await page.getByRole("button", {
+                name: "Завершить",
+                exact: true,
+            }).click();
+
+            const modal = page.locator(
+                ".completion-work-modal__content"
+            );
+
+            await expect(modal).toBeVisible();
+
+            // Гарантийная выплата не относится к наличным.
+            await expect(
+                modal.locator(".completion-guarantee-info")
+            ).toHaveCount(0);
+
+            await modal.getByLabel(
+                "Работа выполнена, претензий на момент приёмки нет"
+            ).check();
+
+            await modal.getByLabel(
+                "Да, полностью"
+            ).check();
+
+            await modal.getByRole("button", {
+                name: "Подтвердить завершение",
+            }).click();
+
+            await expect.poll(
+                () => requestBody
+            ).not.toBeNull();
+
+            expect(requestBody).toEqual({
+                completion: {
+                    workConfirmed: true,
+                    qualityDecision: "accepted",
+                    remarks: null,
+                    payoutAuthorized: false,
+                    cashStatus: "full",
+                    cashAmountKopecks: null,
+                },
+            });
+        }
+    );
+
+    test(
+        "заказчик отправляет замечания и частичную оплату",
+        async ({ page }) => {
+            const order = {
+                ...regularOrder,
+                creatorId: 1,
+                executorId: 2,
+                completedBy: [2],
+            };
+
+            await page.route(
+                "**/api/orders/active-orders",
+                async (route) => {
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            orders: [order],
+                            notifications: [],
+                        },
+                    });
+                }
+            );
+
+            const requests = [];
+            const alerts = [];
+
+            await page.route(
+                "**/api/orders/complete/101",
+                async (route) => {
+                    requests.push(
+                        route.request().postDataJSON()
+                    );
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            ...order,
+                            status: "active",
+                            completedBy: [1, 2],
+                            completionPhase: "needs_correction",
+                        },
+                    });
+                }
+            );
+
+            page.on("dialog", async (dialog) => {
+                if (dialog.type() === "alert") {
+                    alerts.push(dialog.message());
+                }
+
+                await dialog.accept();
+            });
+
+            await page.reload();
+
+            await page.getByRole("button", {
+                name: "Мои заказы выполняют",
+            }).click();
+
+            await page.getByRole("button", {
+                name: "Подтвердить завершение",
+            }).first().click();
+
+            const modal = page.locator(
+                ".completion-work-modal__content"
+            );
+
+            await modal.getByLabel(
+                "Работа завершена, но есть замечания"
+            ).check();
+
+            await modal.getByPlaceholder(
+                "Опишите замечания"
+            ).fill("Плохо");
+
+            await modal.getByLabel("Частично").check();
+
+            await modal.getByPlaceholder(
+                "Полученная или оплаченная сумма, ₽"
+            ).fill("150,25");
+
+            await modal.getByRole("button", {
+                name: "Подтвердить завершение",
+            }).click();
+
+            await expect.poll(
+                () => alerts.some((message) =>
+                    message.includes(
+                        "Опишите замечания: минимум 10 символов"
+                    )
+                )
+            ).toBe(true);
+
+            expect(requests).toHaveLength(0);
+
+            await modal.getByPlaceholder(
+                "Опишите замечания"
+            ).fill(
+                "Исполнитель повредил корпус шкафа при перевозке."
+            );
+
+            await modal.getByRole("button", {
+                name: "Подтвердить завершение",
+            }).click();
+
+            await expect.poll(
+                () => requests.length
+            ).toBe(1);
+
+            expect(requests[0]).toEqual({
+                completion: {
+                    workConfirmed: true,
+                    qualityDecision: "remarks",
+                    remarks:
+                        "Исполнитель повредил корпус шкафа при перевозке.",
+                    payoutAuthorized: false,
+                    cashStatus: "partial",
+                    cashAmountKopecks: 15025,
+                },
+            });
+
+            await expect.poll(
+                () => alerts.some((message) =>
+                    message.includes(
+                        "Заказ остаётся в работе"
+                    )
+                )
+            ).toBe(true);
+        }
+    );
+
 });
 
 // ============================================================
