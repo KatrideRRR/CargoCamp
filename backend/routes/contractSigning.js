@@ -40,6 +40,12 @@ const { assertVerifiedPdfIntegrity } =
     require("../services/verifiedPdfIntegrity");
 
 const {
+    getDocumentSignatureState,
+} = require(
+    "../services/documentSignatureStatusService"
+);
+
+const {
     normalizePhone,
     maskPhone,
     sendSignatureSms,
@@ -1484,21 +1490,13 @@ router.post("/:contractId/confirm-code", async (req, res) => {
                 );
 
 
-                const signatures =
-                    await ContractSignature.count({
-                        where: {
-                            contractId: ctx.contract.id,
-                            userId: {
-                                [Op.in]: [
-                                    ctx.order.creatorId,
-                                    ctx.order.executorId,
-                                ],
-                            },
-                        },
+                const { fullySigned } =
+                    await getDocumentSignatureState({
+                        ContractSignature,
+                        contract: ctx.contract,
+                        order: ctx.order,
                         transaction,
                     });
-
-                const fullySigned = signatures >= 2;
 
                 ctx.contract.status = fullySigned
                     ? "fully_signed"
@@ -1887,20 +1885,13 @@ router.post("/:contractId/click-sign", async (req, res) => {
                     { transaction }
                 );
 
-                const count = await ContractSignature.count({
-                    where: {
-                        contractId: ctx.contract.id,
-                        userId: {
-                            [Op.in]: [
-                                ctx.order.creatorId,
-                                ctx.order.executorId,
-                            ],
-                        },
-                    },
-                    transaction,
-                });
-
-                const fullySigned = count >= 2;
+                const { fullySigned } =
+                    await getDocumentSignatureState({
+                        ContractSignature,
+                        contract: ctx.contract,
+                        order: ctx.order,
+                        transaction,
+                    });
 
                 ctx.contract.status = fullySigned
                     ? "fully_signed"
