@@ -4,6 +4,8 @@ import {
     mockOrderAssets,
 } from "./utils/mockOrderAssets";
 
+import { createMockJwt } from "./utils/mockAuthSession";
+
 const FRONT_URL = "http://localhost:3000";
 
 const creator = {
@@ -73,29 +75,8 @@ const ownExpressOrder = {
     creatorId: 2,
 };
 
-function createFakeJwt(payload) {
-    const header = {
-        alg: "none",
-        typ: "JWT",
-    };
-
-    const base64url = (obj) =>
-        Buffer.from(JSON.stringify(obj))
-            .toString("base64")
-            .replace(/=/g, "")
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_");
-
-    return `${base64url(header)}.${base64url(payload)}.`;
-}
-
 async function setFakeAuth(page, user = viewer) {
-    const fakeToken = createFakeJwt({
-        id: user.id,
-        role: user.role || "executor",
-        name: user.username,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-    });
+    const fakeToken = createMockJwt(user);
 
     await page.addInitScript(({ token, user }) => {
         localStorage.setItem("authToken", token);
@@ -637,6 +618,8 @@ test.describe("OrderPage — обычный заказ", () => {
 
         await setFakeAuth(page);
 
+        await setupOrderMocks(page);
+
         await page.route("**/api/auth/profile", async (route) => {
             await route.fulfill({
                 status: 200,
@@ -1075,3 +1058,238 @@ test.describe(
         );
     }
 );
+
+// ============================================================
+// ЭТАП 5 — ДОПОЛНИТЕЛЬНЫЕ ПРОВЕРКИ ОБЫЧНОГО ЗАКАЗА
+// ============================================================
+
+test.describe("OrderPage — дополнительные сценарии", () => {
+
+    test(
+        "заказ с pending_payment не позволяет отправить отклик",
+        async ({ page }) => {
+            await openRegularOrderPage(page, {
+                order: {
+                    ...regularOrder,
+                    status: "pending_payment",
+                },
+            });
+
+            await expect(
+                page.locator(".badge-payment-pending")
+            ).toHaveText("Ожидает оплаты продвижения");
+
+            await expect(
+                page.getByRole("button", {
+                    name: "Запросить выполнение",
+                })
+            ).toHaveCount(0);
+
+            await expect(
+                page.locator(".badge-can-take")
+            ).toHaveCount(0);
+        }
+    );
+
+    test(
+        "показывает срочный срок выполнения",
+        async ({ page }) => {
+            await openRegularOrderPage(page, {
+                order: {
+                    ...regularOrder,
+                    isAsap: true,
+                    workTime: null,
+                },
+            });
+
+            await expect(
+                page.locator(".order-time-box--asap")
+            ).toContainText("Как можно скорее");
+
+            await expect(
+                page.locator(".order-time-box--scheduled")
+            ).toHaveCount(0);
+        }
+    );
+
+    test(
+        "показывает запланированный срок выполнения",
+        async ({ page }) => {
+            await openRegularOrderPage(page, {
+                order: {
+                    ...regularOrder,
+                    isAsap: false,
+                    workTime: "2035-04-12T12:00:00Z",
+                },
+            });
+
+            const time = page.locator(
+                ".order-time-box--scheduled"
+            );
+
+            await expect(time).toContainText("Выполнить к");
+            await expect(time).toContainText("2035");
+
+            await expect(
+                page.locator(".order-time-box--asap")
+            ).toHaveCount(0);
+        }
+    );
+
+    test(
+        "показывает льготную комиссию пенсионера",
+        async ({ page }) => {
+            await openRegularOrderPage(page, {
+                creatorBody: {
+                    ...creator,
+                    isPensioner: true,
+                },
+            });
+
+            const badge = page.locator(
+                ".badge-pensioner-order"
+            );
+
+            await expect(badge).toBeVisible();
+
+            await expect(badge).toHaveAttribute(
+                "title",
+                "Комиссия исполнителя снижена с 100 ₽ до 50 ₽"
+            );
+
+            await expect(
+                page.locator(".pensioner-order-notice")
+            ).toContainText("50 ₽ вместо 100 ₽");
+        }
+    );
+
+    test(
+        "при задолженности сохраняет отклик вместо отправки",
+        async ({ page }) => {
+            await openRegularOrderPage(page, {
+                requestStatusBody: {
+                    debt: 25000,
+                },
+            });
+
+            let requestCount = 0;
+
+            await page.route(
+                "**/api/orders/101/request",
+                async (route) => {
+                    requestCount++;
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                        },
+                    });
+                }
+            );
+
+            await openRequestModal(page);
+
+            await page.getByPlaceholder(
+                "Например: 2500"
+            ).fill("2500");
+
+            await page.getByPlaceholder(
+                "Например: могу приехать сегодня после 18:00"
+            ).fill("Приеду вечером");
+
+            await page.getByRole("button", {
+                name: "Отправить запрос",
+            }).click();
+
+            await expect(
+                page.locator(".modal-title")
+            ).toHaveText("Есть задолженность по комиссии");
+
+            const saved = await page.evaluate(() => {
+                const raw = sessionStorage.getItem(
+                    "pendingOrderRequestAfterDebtPayment"
+                );
+
+                return raw ? JSON.parse(raw) : null;
+            });
+
+            expect(saved).toMatchObject({
+                orderId: 101,
+                proposedSum: 2500,
+                comment: "Приеду вечером",
+                availableAt: null,
+                returnTo: "/order/101",
+            });
+
+            expect(requestCount).toBe(0);
+        }
+    );
+
+    test(
+        "после погашения долга восстанавливает сохранённый отклик",
+        async ({ page }) => {
+            await openRegularOrderPage(page);
+
+            let requestBody = null;
+
+            await page.route(
+                "**/api/orders/101/request",
+                async (route) => {
+                    requestBody = route.request().postDataJSON();
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                        },
+                    });
+                }
+            );
+
+            await page.evaluate(() => {
+                sessionStorage.setItem(
+                    "pendingOrderRequestAfterDebtPayment",
+                    JSON.stringify({
+                        orderId: 101,
+                        proposedSum: 1800,
+                        comment: "После оплаты комиссии",
+                        availableAt: null,
+                        returnTo: "/order/101",
+                        createdAt: Date.now(),
+                    })
+                );
+            });
+
+            // Имитируем возвращение с платёжной страницы.
+            // Платёжные сервисы не вызываются.
+            await page.goto(
+                `${FRONT_URL}/order/101?platform=web&debtReturn=1&resumeRequest=1`
+            );
+
+            await expect.poll(
+                () => requestBody
+            ).toEqual({
+                proposedSum: 1800,
+                comment: "После оплаты комиссии",
+                availableAt: null,
+            });
+
+            await expect.poll(async () => {
+                return page.evaluate(() =>
+                    sessionStorage.getItem(
+                        "pendingOrderRequestAfterDebtPayment"
+                    )
+                );
+            }).toBeNull();
+
+            await expect.poll(
+                () => page.url()
+            ).not.toContain("resumeRequest=1");
+
+            await expect.poll(
+                () => page.url()
+            ).not.toContain("debtReturn=1");
+        }
+    );
+});
