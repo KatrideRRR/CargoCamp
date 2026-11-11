@@ -163,13 +163,13 @@ const OrderHistoryPage = () => {
                 ),
 
                 axiosInstance.get(
-                    "/express-orders/me",
+                    "/express/express-orders/me",
                     {
                         params: {
                             mode: "history",
                         },
                     }
-                ),
+                )
             ]);
 
             let regularError = null;

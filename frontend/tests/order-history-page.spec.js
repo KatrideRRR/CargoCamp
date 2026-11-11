@@ -2,6 +2,8 @@ import { test, expect } from "./fixtures/safeTest";
 
 import { mockOrderAssets } from "./utils/mockOrderAssets";
 
+import { createMockJwt } from "./utils/mockAuthSession";
+
 const FRONT_URL = "http://localhost:3000";
 
 const testUser = {
@@ -54,32 +56,11 @@ const completedOrders = [
     },
 ];
 
-function createFakeJwt(payload) {
-    const header = {
-        alg: "none",
-        typ: "JWT",
-    };
-
-    const base64url = (obj) =>
-        Buffer.from(JSON.stringify(obj))
-            .toString("base64")
-            .replace(/=/g, "")
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_");
-
-    return `${base64url(header)}.${base64url(payload)}.`;
-}
-
 async function setFakeAuth(page, user = testUser) {
 
     await mockOrderAssets(page);
 
-    const fakeToken = createFakeJwt({
-        id: user.id,
-        role: user.role,
-        name: user.username,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-    });
+    const fakeToken = createMockJwt(user);
 
     await page.addInitScript(({ token, user }) => {
         localStorage.setItem("authToken", token);
@@ -105,6 +86,7 @@ async function setupHistoryMocks(page, options = {}) {
             success: true,
         },
         expressStatus = 200,
+        expressOrders = [],
     } = options;
 
     page.on("pageerror", (error) => {
@@ -152,14 +134,22 @@ async function setupHistoryMocks(page, options = {}) {
 
 // История экспресс-заказов.
     await page.route(
-        "**/api/express-orders/me**",
+        "**/api/express/express-orders/me**",
         async (route) => {
+            const request = route.request();
+            const url = new URL(request.url());
+
+            expect(request.method()).toBe("GET");
+            expect(url.pathname).toBe(
+                "/api/express/express-orders/me"
+            );
+            expect(url.searchParams.get("mode")).toBe("history");
             await route.fulfill({
                 status: expressStatus,
                 json: expressStatus === 200
                     ? {
                         success: true,
-                        orders: [],
+                        orders: expressOrders,
                     }
                     : {
                         message: "Ошибка истории экспресс-заказов",
@@ -812,6 +802,127 @@ test.describe("OrderHistoryPage", () => {
 
             // Их API также не запрашиваются.
             expect(legacyRequests).toEqual([]);
+        }
+    );
+});
+
+// ============================================================
+// ЭТАП 10 — ОБЩАЯ ИСТОРИЯ ОБЫЧНЫХ И ЭКСПРЕСС-ЗАКАЗОВ
+// ============================================================
+
+const completedTaxiOrder = {
+    id: 123,
+    type: "taxi",
+    status: "completed",
+    creatorId: 1,
+    executorId: 20,
+    totalPrice: 900,
+    paymentType: "cash",
+    fromAddress: "Симферополь, вокзал",
+    toAddress: "Симферополь, центр",
+    completedAt: "2026-07-04T12:00:00.000Z",
+};
+
+test.describe("OrderHistoryPage — итоговые сценарии", () => {
+
+    test(
+        "объединяет обычные и экспресс-заказы в правильном порядке",
+        async ({ page }) => {
+            await openHistoryPage(page, {
+                expressOrders: [
+                    completedTaxiOrder,
+                    {
+                        ...completedTaxiOrder,
+                        id: 205,
+                        status: "cancelled",
+                    },
+                ],
+            });
+
+            const cards = page.locator(".oh-card");
+
+            await expect(cards).toHaveCount(4);
+            await expect(page.locator(".oh-count")).toHaveText("4");
+
+            await expect(cards.first()).toContainText(
+                "Экспресс-заказ №123"
+            );
+
+            await expect(cards.nth(1)).toContainText(
+                "Заказ №125"
+            );
+
+            await expect(
+                page.locator(".oh-history-summary__item").first()
+            ).toContainText("3");
+
+            await expect(
+                page.locator(".oh-history-summary__item--express")
+            ).toContainText("1");
+
+            const taxi = page.locator(".oh-card--express");
+
+            await expect(taxi).toContainText("Такси");
+            await expect(taxi).toContainText("900 ₽");
+            await expect(taxi).toContainText("Симферополь, вокзал");
+            await expect(taxi).toContainText("Симферополь, центр");
+        }
+    );
+
+    test(
+        "показывает экспресс-историю при ошибке загрузки обычных заказов",
+        async ({ page }) => {
+            await openHistoryPage(page, {
+                ordersStatus: 500,
+                ordersBody: {
+                    message: "Обычная история недоступна",
+                },
+                expressOrders: [completedTaxiOrder],
+            });
+
+            await expect(
+                page.locator(".oh-state--error")
+            ).toHaveCount(0);
+
+            await expect(
+                page.locator(".oh-card--express")
+            ).toHaveCount(1);
+
+            await expect(
+                page.locator(".oh-count")
+            ).toHaveText("1");
+        }
+    );
+
+    test(
+        "экспресс и обычный заказ с одинаковым ID не смешиваются",
+        async ({ page }) => {
+            await openHistoryPage(page, {
+                expressOrders: [completedTaxiOrder],
+            });
+
+            const regular = page.locator(".oh-card--regular")
+                .filter({ hasText: "Заказ №123" });
+
+            const express = page.locator(".oh-card--express")
+                .filter({ hasText: "Экспресс-заказ №123" });
+
+            await expect(regular).toHaveCount(1);
+            await expect(express).toHaveCount(1);
+
+            // Отзывы через текущую форму поддерживаются
+            // только для обычных заказов.
+            await expect(
+                regular.getByRole("button", {
+                    name: /Оставить отзыв/i,
+                })
+            ).toBeVisible();
+
+            await expect(
+                express.getByRole("button", {
+                    name: /Оставить отзыв/i,
+                })
+            ).toHaveCount(0);
         }
     );
 });

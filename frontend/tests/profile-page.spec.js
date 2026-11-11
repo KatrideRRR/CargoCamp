@@ -184,7 +184,7 @@ async function setupProfileMocks(page, options = {}) {
         ["**/api/auth/reviews/user/123", { reviews: [] }],
         ["**/api/auth/reviews/my", { reviews: [] }],
         ["**/api/orders/completed/123", []],
-        ["**/api/express-orders/me*", { orders: [] }],
+        ["**/api/express/express-orders/me*", { orders: [] }],
     ];
 
     for (const [pattern, body] of linkedPageResponses) {
