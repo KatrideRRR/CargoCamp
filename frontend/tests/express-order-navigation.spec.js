@@ -1,5 +1,6 @@
 import { test, expect } from "./fixtures/safeTest";
-
+import { mockOrderAssets } from "./utils/mockOrderAssets";
+import { createMockJwt } from "./utils/mockAuthSession";
 const FRONT_URL = "http://localhost:3000";
 
 const executorUser = {
@@ -62,29 +63,8 @@ const baseCourierOrder = {
     updatedAt: "2026-07-02T10:00:00.000Z",
 };
 
-function createFakeJwt(payload) {
-    const header = {
-        alg: "none",
-        typ: "JWT",
-    };
-
-    const base64url = (obj) =>
-        Buffer.from(JSON.stringify(obj))
-            .toString("base64")
-            .replace(/=/g, "")
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_");
-
-    return `${base64url(header)}.${base64url(payload)}.`;
-}
-
 async function setFakeAuth(page, user = executorUser) {
-    const fakeToken = createFakeJwt({
-        id: user.id,
-        role: user.role,
-        name: user.username,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-    });
+    const fakeToken = createMockJwt(user);
 
     await page.addInitScript(({ token, user }) => {
         localStorage.setItem("authToken", token);
@@ -102,6 +82,21 @@ async function setupMocks(page, options = {}) {
         user = executorUser,
         expressOrders = [baseTaxiOrder],
     } = options;
+
+    await mockOrderAssets(page);
+
+    await page.route(
+        "**/api/orders/pending-act-signatures",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    acts: [],
+                    missingOrderIds: [],
+                },
+            });
+        }
+    );
 
     page.on("pageerror", (error) => {
         console.log("[PAGE ERROR]", error.message);

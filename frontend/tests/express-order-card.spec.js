@@ -1,5 +1,6 @@
 import { test, expect } from "./fixtures/safeTest";
-
+import { mockOrderAssets } from "./utils/mockOrderAssets";
+import { createMockJwt } from "./utils/mockAuthSession";
 const FRONT_URL = "http://localhost:3000";
 
 const executorUser = {
@@ -62,29 +63,8 @@ const baseCourierOrder = {
     updatedAt: "2026-07-02T10:00:00.000Z",
 };
 
-function createFakeJwt(payload) {
-    const header = {
-        alg: "none",
-        typ: "JWT",
-    };
-
-    const base64url = (obj) =>
-        Buffer.from(JSON.stringify(obj))
-            .toString("base64")
-            .replace(/=/g, "")
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_");
-
-    return `${base64url(header)}.${base64url(payload)}.`;
-}
-
 async function setFakeAuth(page, user = executorUser) {
-    const fakeToken = createFakeJwt({
-        id: user.id,
-        role: user.role,
-        name: user.username,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-    });
+    const fakeToken = createMockJwt(user);
 
     await page.addInitScript(({ token, user }) => {
         localStorage.setItem("authToken", token);
@@ -115,6 +95,31 @@ async function setupExpressCardMocks(page, options = {}) {
         activeRegular = [],
         onAction,
     } = options;
+
+    await mockOrderAssets(page);
+
+    await page.route(
+        "**/api/orders/me/status",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: { debt: 0 },
+            });
+        }
+    );
+
+    await page.route(
+        "**/api/orders/pending-act-signatures",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    acts: [],
+                    missingOrderIds: [],
+                },
+            });
+        }
+    );
 
     page.on("pageerror", (error) => {
         console.log("[PAGE ERROR]", error.message);
@@ -362,7 +367,13 @@ async function openActiveOrdersPage(page, options = {}) {
         throw new Error("ActiveOrdersPage редиректит на /login. Fake JWT не применился.");
     }
 
-    await expect(page.locator(".order-card.express-card").first()).toBeVisible({
+    if (options.expectCard === false) {
+        return;
+    }
+
+    await expect(
+        page.locator(".order-card.express-card").first()
+    ).toBeVisible({
         timeout: 15000,
     });
 }
@@ -792,38 +803,51 @@ test.describe("ExpressOrderCard", () => {
         await expect(card.locator(".express-primaryActionBtn")).not.toBeVisible();
     });
 
-    test("completed не показывает primary action и отмену", async ({ page }) => {
-        await openActiveOrdersPage(page, {
-            expressOrders: [
-                {
-                    ...baseTaxiOrder,
-                    status: "completed",
-                },
-            ],
-        });
+    test(
+        "завершённый экспресс-заказ отсутствует среди активных",
+        async ({ page }) => {
+            await openActiveOrdersPage(page, {
+                expressOrders: [
+                    {
+                        ...baseTaxiOrder,
+                        status: "completed",
+                    },
+                ],
+                expectCard: false,
+            });
 
-        const card = expressCard(page);
+            await expect(
+                page.getByText("Нет активных заказов.")
+            ).toBeVisible();
 
-        await expect(card.locator(".express-primaryActionBtn")).not.toBeVisible();
-        await expect(card.getByRole("button", { name: /Отменить/i })).not.toBeVisible();
-        await expect(card.locator(".express-statusBar")).toHaveText("Заказ завершён");
-    });
+            await expect(
+                page.locator(".order-card.express-card")
+            ).toHaveCount(0);
+        }
+    );
 
-    test("cancelled не показывает отмену", async ({ page }) => {
-        await openActiveOrdersPage(page, {
-            expressOrders: [
-                {
-                    ...baseTaxiOrder,
-                    status: "cancelled",
-                },
-            ],
-        });
+    test(
+        "отменённый экспресс-заказ отсутствует среди активных",
+        async ({ page }) => {
+            await openActiveOrdersPage(page, {
+                expressOrders: [
+                    {
+                        ...baseTaxiOrder,
+                        status: "cancelled",
+                    },
+                ],
+                expectCard: false,
+            });
 
-        const card = expressCard(page);
+            await expect(
+                page.getByText("Нет активных заказов.")
+            ).toBeVisible();
 
-        await expect(card.getByRole("button", { name: /Отменить/i })).not.toBeVisible();
-        await expect(card.locator(".express-statusBar")).toHaveText("Заказ отменён");
-    });
+            await expect(
+                page.locator(".order-card.express-card")
+            ).toHaveCount(0);
+        }
+    );
 
     test("действие Еду к точке A вызывает API", async ({ page }) => {
         let action = null;
@@ -1052,4 +1076,205 @@ test.describe("ExpressOrderCard", () => {
 
         expect(dialogs).toContain("Подтвердить, что вы выехали к точке A?");
     });
+});
+
+// ============================================================
+// ЭТАП 8 — ДОПОЛНИТЕЛЬНЫЕ СЦЕНАРИИ ЭКСПРЕСС-ЗАКАЗОВ
+// ============================================================
+
+test.describe("ExpressOrderCard — дополнительные сценарии", () => {
+
+    test(
+        "такси: начало ожидания вызывает правильный API",
+        async ({ page }) => {
+            let action = null;
+
+            await openActiveOrdersPage(page, {
+                expressOrders: [
+                    {
+                        ...baseTaxiOrder,
+                        status: "arrived_at_A",
+                    },
+                ],
+                onAction: (name) => {
+                    action = name;
+                },
+            });
+
+            await confirmAndClick(
+                page,
+                expressCard(page).getByRole("button", {
+                    name: "Начать ожидание",
+                }),
+                "Подтвердить начало ожидания клиента?"
+            );
+
+            await expect.poll(
+                () => action
+            ).toBe("start-waiting");
+        }
+    );
+
+    test(
+        "такси: посадка клиента запускает поездку",
+        async ({ page }) => {
+            let action = null;
+
+            await openActiveOrdersPage(page, {
+                expressOrders: [
+                    {
+                        ...baseTaxiOrder,
+                        status: "waiting_at_A",
+                    },
+                ],
+                onAction: (name) => {
+                    action = name;
+                },
+            });
+
+            await confirmAndClick(
+                page,
+                expressCard(page).getByRole("button", {
+                    name: "Клиент в машине",
+                }),
+                "Подтвердить, что клиент сел в машину и поездка началась?"
+            );
+
+            await expect.poll(
+                () => action
+            ).toBe("start");
+        }
+    );
+
+    test(
+        "курьер: начинает доставку после получения заказа",
+        async ({ page }) => {
+            let action = null;
+
+            await openActiveOrdersPage(page, {
+                expressOrders: [
+                    {
+                        ...baseCourierOrder,
+                        status: "picked_up",
+                    },
+                ],
+                onAction: (name) => {
+                    action = name;
+                },
+            });
+
+            await confirmAndClick(
+                page,
+                expressCard(
+                    page,
+                    "Экспресс №202"
+                ).getByRole("button", {
+                    name: "Начать доставку",
+                }),
+                "Подтвердить начало доставки?"
+            );
+
+            await expect.poll(
+                () => action
+            ).toBe("start");
+        }
+    );
+
+    test(
+        "заказчик видит данные автомобиля водителя",
+        async ({ page }) => {
+            await openActiveOrdersPage(page, {
+                user: creatorUser,
+                query: "platform=web&view=created",
+                expressOrders: [
+                    {
+                        ...baseTaxiOrder,
+                        executorVehicleBrand: "Lada",
+                        executorVehicleModel: "Vesta",
+                        executorVehicleColor: "Белый",
+                        executorVehiclePlate: "А123ВС82",
+                    },
+                ],
+            });
+
+            const card = expressCard(page);
+
+            const vehicle = card.locator(
+                ".express-driver-vehicle-card"
+            );
+
+            await expect(vehicle).toBeVisible();
+
+            await expect(vehicle).toContainText(
+                "Белый Lada Vesta"
+            );
+
+            await expect(vehicle).toContainText(
+                "А123ВС82"
+            );
+
+            await expect(vehicle).toContainText(
+                "Сверьте марку, цвет"
+            );
+        }
+    );
+
+    test(
+        "заказчик не может отменить начатую поездку через карточку",
+        async ({ page }) => {
+            await openActiveOrdersPage(page, {
+                user: creatorUser,
+                query: "platform=web&view=created",
+                expressOrders: [
+                    {
+                        ...baseTaxiOrder,
+                        status: "in_progress",
+                    },
+                ],
+            });
+
+            const card = expressCard(page);
+
+            await expect(
+                card.getByText("Вы заказчик")
+            ).toBeVisible();
+
+            await expect(
+                card.getByRole("button", {
+                    name: "Отменить",
+                })
+            ).toHaveCount(0);
+
+            await expect(
+                card.locator(".express-primaryActionBtn")
+            ).toHaveCount(0);
+        }
+    );
+
+    test(
+        "исполнителю отображается только один активный экспресс-заказ",
+        async ({ page }) => {
+            await openActiveOrdersPage(page, {
+                expressOrders: [
+                    baseTaxiOrder,
+                    {
+                        ...baseCourierOrder,
+                        status: "accepted",
+                    },
+                ],
+            });
+
+            await expect(
+                page.locator(".order-card.express-card")
+            ).toHaveCount(1);
+
+            await expect(
+                expressCard(page, "Экспресс №201")
+            ).toBeVisible();
+
+            await expect(
+                expressCard(page, "Экспресс №202")
+            ).toHaveCount(0);
+        }
+    );
 });
