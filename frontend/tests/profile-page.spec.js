@@ -1,5 +1,12 @@
 import { test, expect } from "./fixtures/safeTest";
 
+import {
+    createMockJwt,
+    mockAnonymousRefresh,
+} from "./utils/mockAuthSession";
+
+import { mockOrderAssets } from "./utils/mockOrderAssets";
+
 const FRONT_URL = "http://localhost:3000";
 
 const profile = {
@@ -62,29 +69,8 @@ async function mockPaymentNavigation(page) {
     };
 }
 
-function createFakeJwt(payload) {
-    const header = {
-        alg: "none",
-        typ: "JWT",
-    };
-
-    const base64url = (obj) =>
-        Buffer.from(JSON.stringify(obj))
-            .toString("base64")
-            .replace(/=/g, "")
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_");
-
-    return `${base64url(header)}.${base64url(payload)}.`;
-}
-
 async function setFakeAuth(page, user = profile) {
-    const fakeToken = createFakeJwt({
-        id: user.id,
-        role: user.role || "customer",
-        name: user.username,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-    });
+    const fakeToken = createMockJwt(user);
 
     await page.addInitScript(({ token, user }) => {
         localStorage.setItem("authToken", token);
@@ -122,7 +108,99 @@ async function setupProfileMocks(page, options = {}) {
             success: true,
             confirmationUrl: "https://payment.example.test/debt",
         },
+        identityBody = {
+            success: true,
+            verification: null,
+        },
+        benefitsBody = {
+            success: true,
+            benefits: [],
+        },
     } = options;
+
+    await mockOrderAssets(page);
+    await mockAnonymousRefresh(page);
+
+// Аватары подменяем настоящим локальным PNG.
+// Реальный сервер изображений не вызывается.
+    const mockAvatar = Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
+        "base64"
+    );
+
+    for (const filename of [
+        "avatar_123.jpg",
+        "new_avatar.jpg",
+    ]) {
+        await page.route(
+            `**/uploads/avatars/${filename}`,
+            async (route) => {
+                if (route.request().method() !== "GET") {
+                    await route.fallback();
+                    return;
+                }
+
+                await route.fulfill({
+                    status: 200,
+                    contentType: "image/png",
+                    body: mockAvatar,
+                });
+            }
+        );
+    }
+
+// Актуальная верификация личности.
+    await page.route("**/api/identity/me", async (route) => {
+        if (route.request().method() !== "GET") {
+            await route.fallback();
+            return;
+        }
+
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify(identityBody),
+        });
+    });
+
+// Актуальные социальные льготы.
+    await page.route("**/api/benefits/me", async (route) => {
+        if (route.request().method() !== "GET") {
+            await route.fallback();
+            return;
+        }
+
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify(benefitsBody),
+        });
+    });
+
+// Загрузка данных на страницах, куда ведут кнопки профиля.
+    const linkedPageResponses = [
+        ["**/api/support/messages", []],
+        ["**/api/auth/user/123", profile],
+        ["**/api/auth/reviews/user/123", { reviews: [] }],
+        ["**/api/auth/reviews/my", { reviews: [] }],
+        ["**/api/orders/completed/123", []],
+        ["**/api/express-orders/me*", { orders: [] }],
+    ];
+
+    for (const [pattern, body] of linkedPageResponses) {
+        await page.route(pattern, async (route) => {
+            if (route.request().method() !== "GET") {
+                await route.fallback();
+                return;
+            }
+
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify(body),
+            });
+        });
+    }
 
     page.on("pageerror", (error) => {
         console.log("[PAGE ERROR]", error.message);
@@ -404,13 +482,15 @@ test.describe("ProfilePage", () => {
     });
 
     test("показывает привязанную карту", async ({ page }) => {
-        const paymentsCard = page.locator(".profile-card").filter({
-            hasText: "Платежи",
-        });
+        const paymentsCard = page.locator(".profile-finance-card")
 
-        await expect(paymentsCard).toContainText("Карта привязана");
-        await expect(paymentsCard).toContainText("VISA •••• 1234");
-        await expect(paymentsCard.getByRole("button", { name: "Удалить" })).toBeVisible();
+        await expect(paymentsCard).toContainText("Привязана");
+        await expect(paymentsCard).toContainText("VISA");
+        await expect(paymentsCard).toContainText("•••• 1234");
+
+        await expect(
+            paymentsCard.getByRole("button", { name: "Отвязать" })
+        ).toBeVisible();
     });
 
     test("если карта не привязана, показывает кнопку Привязать карту", async ({ page }) => {
@@ -418,19 +498,15 @@ test.describe("ProfilePage", () => {
             profileBody: profileWithoutCard,
         });
 
-        const paymentsCard = page.locator(".profile-card").filter({
-            hasText: "Платежи",
-        });
+        const paymentsCard =page.locator(".profile-finance-card")
 
-        await expect(paymentsCard.getByRole("button", { name: "Привязать карту" })).toBeVisible();
+        await expect(paymentsCard.getByRole("button", { name: /Привязать карту/ })).toBeVisible();
     });
 
     test("открывает подтверждение удаления карты и отменяет", async ({ page }) => {
-        const paymentsCard = page.locator(".profile-card").filter({
-            hasText: "Платежи",
-        });
+        const paymentsCard = page.locator(".profile-finance-card")
 
-        await paymentsCard.getByRole("button", { name: "Удалить" }).click();
+        await paymentsCard.getByRole("button", { name: "Отвязать" }).click();
 
         await expect(page.locator(".modal-window-compact")).toBeVisible();
         await expect(page.locator(".modal-window-compact")).toContainText("Удалить карту?");
@@ -456,11 +532,9 @@ test.describe("ProfilePage", () => {
             });
         });
 
-        const paymentsCard = page.locator(".profile-card").filter({
-            hasText: "Платежи",
-        });
+        const paymentsCard = page.locator(".profile-finance-card")
 
-        await paymentsCard.getByRole("button", { name: "Удалить" }).click();
+        await paymentsCard.getByRole("button", { name: "Отвязать" }).click();
         await page.locator(".modal-window-compact").getByRole("button", { name: "Удалить карту" }).click();
 
         await expect
@@ -470,7 +544,7 @@ test.describe("ProfilePage", () => {
             .toBe(true);
 
         await expect(page.locator(".modal-window-compact")).not.toBeVisible();
-        await expect(paymentsCard.getByRole("button", { name: "Привязать карту" })).toBeVisible();
+        await expect(paymentsCard.getByRole("button", { name: /Привязать карту/ })).toBeVisible();
     });
 
     test("показывает задолженность и кнопку оплаты", async ({ page }) => {
@@ -478,14 +552,12 @@ test.describe("ProfilePage", () => {
             debt: 25000,
         });
 
-        const paymentsCard = page.locator(".profile-card").filter({
-            hasText: "Платежи",
-        });
+        const paymentsCard = page.locator(".profile-finance-card")
 
         await expect(paymentsCard.locator(".alert-danger")).toBeVisible();
         await expect(paymentsCard.locator(".alert-title")).toHaveText("Задолженность по комиссии");
         await expect(paymentsCard.locator(".alert-text")).toHaveText("250.00 ₽");
-        await expect(paymentsCard.getByRole("button", { name: "Оплатить" })).toBeVisible();
+        await expect(paymentsCard.getByRole("button", { name: "Оплатить задолженность" })).toBeVisible();
     });
 
     test("создаёт оплату задолженности и переходит на оплату", async ({ page }) => {
@@ -495,12 +567,10 @@ test.describe("ProfilePage", () => {
 
         const paymentNavigation = await mockPaymentNavigation(page);
 
-        const paymentsCard = page.locator(".profile-card").filter({
-            hasText: "Платежи",
-        });
+        const paymentsCard = page.locator(".profile-finance-card")
 
         await paymentsCard
-            .getByRole("button", { name: "Оплатить" })
+            .getByRole("button", { name: "Оплатить задолженность" })
             .click();
 
         await expect
@@ -566,87 +636,261 @@ test.describe("ProfilePage", () => {
         );
     });
 
-    test("показывает блок верификации", async ({ page }) => {
-        const verificationCard = page.locator(".profile-card").filter({
-            hasText: "Верификация",
-        });
+    test("показывает актуальные секции подтверждений", async ({ page }) => {
+        const card = page.locator(".profile-verification-card");
 
-        await expect(verificationCard).toContainText("Пройдена");
-        await expect(verificationCard.getByRole("button", { name: "Подробнее" })).toBeVisible();
-        await expect(verificationCard).toContainText("Загрузить документы");
+        await expect(card).toContainText("Подтверждения и льготы");
+
+        await expect(
+            card.locator(".cc-identity .verification-panel-title")
+        ).toHaveText("Подтверждение личности");
+
+        await expect(
+            card.locator(".cc-benefits .verification-panel-title")
+        ).toHaveText("Социальные льготы");
+
+        await expect(
+            card.locator(".verification-panel-vehicle")
+        ).toBeVisible();
     });
 
-    test("открывает и закрывает модалку о верификации", async ({ page }) => {
-        const verificationCard = page.locator(".profile-card").filter({
-            hasText: "Верификация",
-        });
+    test("открывает информацию о подтверждениях", async ({ page }) => {
+        const card = page.locator(".profile-verification-card");
 
-        await verificationCard.getByRole("button", { name: "Подробнее" }).click();
+        await card.getByRole("button", { name: "Подробнее" }).click();
 
-        await expect(page.locator(".modal-window")).toBeVisible();
-        await expect(page.locator(".modal-window")).toContainText("О верификации пользователя");
+        const modal = page.locator(".modal-window");
 
-        await page.locator(".modal-window").getByRole("button", { name: "Закрыть" }).click();
+        await expect(modal).toBeVisible();
+        await expect(modal).toContainText("О верификации пользователя");
 
-        await expect(page.locator(".modal-window")).not.toBeVisible();
+        await modal.getByRole("button", { name: "Закрыть" }).click();
+
+        await expect(modal).not.toBeVisible();
     });
 
-    test("показывает загруженные документы", async ({ page }) => {
-        const verificationCard = page.locator(".profile-card").filter({
-            hasText: "Верификация",
-        });
+    test("отображает неподтверждённую личность", async ({ page }) => {
+        const identity = page.locator(".cc-identity");
 
-        await expect(verificationCard).toContainText("Загруженные документы");
-        await expect(verificationCard).toContainText("2 шт.");
-        await expect(verificationCard).toContainText("Фото 1");
-        await expect(verificationCard).toContainText("PDF");
-        await expect(verificationCard).toContainText("Документ 2");
+        await expect(
+            identity.locator(".verification-summary-status")
+        ).toHaveText("Не подтверждена");
+
+        await identity.locator(".verification-panel-head").click();
+
+        await expect(
+            identity.locator("select")
+        ).toHaveValue("passport_rf");
+
+        await expect(
+            identity.locator(".cc-identity-submit")
+        ).toBeDisabled();
     });
 
-    test("если документов нет, показывает пустое состояние", async ({ page }) => {
+    test("для подтверждённой личности скрывает повторную подачу", async ({ page }) => {
         await openProfilePage(page, {
-            profileBody: profileWithoutDocs,
+            identityBody: {
+                success: true,
+                verification: {
+                    status: "verified",
+                    verifiedAt: "2026-11-01T12:00:00Z",
+                },
+            },
         });
 
-        const verificationCard = page.locator(".profile-card").filter({
-            hasText: "Верификация",
-        });
+        const identity = page.locator(".cc-identity");
 
-        await expect(verificationCard).toContainText("Документы ещё не загружены");
+        await expect(
+            identity.locator(".verification-summary-status")
+        ).toHaveText("Подтверждена");
+
+        await identity.locator(".verification-panel-head").click();
+
+        await expect(
+            identity.locator(".cc-identity-form")
+        ).toHaveCount(0);
     });
 
-    test("загружает документы", async ({ page }) => {
-        let uploadCalled = false;
+    test("при проверке личности блокирует повторную заявку", async ({ page }) => {
+        await openProfilePage(page, {
+            identityBody: {
+                success: true,
+                verification: {
+                    status: "pending",
+                },
+            },
+        });
 
-        await page.route("**/api/auth/upload-documents", async (route) => {
-            uploadCalled = true;
+        const identity = page.locator(".cc-identity");
+
+        await identity.locator(".verification-panel-head").click();
+
+        await expect(identity).toContainText("На проверке");
+
+        await expect(
+            identity.locator(".cc-identity-form")
+        ).toHaveCount(0);
+
+        await expect(
+            identity.locator(".cc-identity-note")
+        ).toContainText("после рассмотрения заявки");
+    });
+
+    test("отклоняет недопустимый файл для проверки личности", async ({ page }) => {
+        const identity = page.locator(".cc-identity");
+
+        await identity.locator(".verification-panel-head").click();
+
+        await identity.locator('input[type="file"]').setInputFiles({
+            name: "document.exe",
+            mimeType: "application/octet-stream",
+            buffer: Buffer.from("invalid-file"),
+        });
+
+        await expect(
+            identity.locator(".cc-identity-error")
+        ).toContainText("Поддерживаются только PDF, JPG и PNG");
+
+        await expect(
+            identity.locator(".cc-identity-submit")
+        ).toBeDisabled();
+    });
+
+    test("отправляет документы личности через multipart API", async ({ page }) => {
+        let submittedBody = null;
+
+        await page.route("**/api/identity/me/apply", async (route) => {
+            submittedBody = route.request().postData();
 
             await route.fulfill({
                 status: 200,
                 contentType: "application/json",
-                body: JSON.stringify({
-                    success: true,
-                }),
+                body: JSON.stringify({ success: true }),
             });
         });
 
-        const verificationCard = page.locator(".profile-card").filter({
-            hasText: "Верификация",
-        });
+        const identity = page.locator(".cc-identity");
 
-        const fileInput = verificationCard.locator('input[type="file"]');
+        await identity.locator(".verification-panel-head").click();
 
-        await fileInput.setInputFiles({
+        await identity.locator('input[type="file"]').setInputFiles({
             name: "passport.jpg",
             mimeType: "image/jpeg",
-            buffer: Buffer.from("fake-image"),
+            buffer: Buffer.from("mock-passport"),
         });
 
+        await identity.locator('input[type="checkbox"]').check();
+
+        page.once("dialog", (dialog) => dialog.accept());
+
+        await identity.locator(".cc-identity-submit").click();
+
         await expect
-            .poll(() => uploadCalled, {
-                timeout: 10000,
-            })
-            .toBe(true);
+            .poll(() => submittedBody)
+            .toContain('name="documentType"');
+
+        expect(submittedBody).toContain("passport_rf");
+
+        await expect(
+            identity.locator(".cc-identity-success")
+        ).toContainText("Документы отправлены на проверку");
+    });
+
+    test("отображает статусы подтверждённых и ожидающих льгот", async ({ page }) => {
+        await openProfilePage(page, {
+            benefitsBody: {
+                success: true,
+                benefits: [
+                    {
+                        code: "pension_recipient",
+                        status: "verified",
+                    },
+                    {
+                        code: "disability_status",
+                        status: "pending",
+                    },
+                ],
+            },
+        });
+
+        const section = page.locator(".cc-benefits");
+
+        await expect(
+            section.locator(".cc-benefits-header-status")
+        ).toHaveText("Подтверждено: 1");
+
+        await section.locator(".cc-benefits-heading").click();
+
+        const pension = section.locator(".cc-benefit-item").filter({
+            hasText: "Пенсионер",
+        });
+
+        const disability = section.locator(".cc-benefit-item").filter({
+            hasText: "Льгота по инвалидности",
+        });
+
+        await expect(
+            pension.locator(".cc-benefit-status")
+        ).toContainText("Подтверждена");
+
+        await expect(
+            disability.locator(".cc-benefit-status")
+        ).toContainText("На проверке");
+
+        await expect(
+            pension.locator('input[type="file"]')
+        ).toHaveCount(0);
+
+        await expect(
+            disability.locator('input[type="file"]')
+        ).toHaveCount(0);
+    });
+
+    test("отправляет документ на социальную льготу", async ({ page }) => {
+        let submittedBody = null;
+
+        await page.route(
+            "**/api/benefits/me/pension_recipient/apply",
+            async (route) => {
+                submittedBody = route.request().postData();
+
+                await route.fulfill({
+                    status: 200,
+                    contentType: "application/json",
+                    body: JSON.stringify({ success: true }),
+                });
+            }
+        );
+
+        const section = page.locator(".cc-benefits");
+
+        await section.locator(".cc-benefits-heading").click();
+
+        const pension = section.locator(".cc-benefit-item").filter({
+            hasText: "Пенсионер",
+        });
+
+        await pension.locator('input[type="file"]').setInputFiles({
+            name: "pension.pdf",
+            mimeType: "application/pdf",
+            buffer: Buffer.from("mock-pdf"),
+        });
+
+        await expect(
+            pension.locator(".cc-benefit-submit")
+        ).toBeEnabled();
+
+        page.once("dialog", (dialog) => dialog.accept());
+
+        await pension.locator(".cc-benefit-submit").click();
+
+        await expect
+            .poll(() => submittedBody)
+            .toContain('name="document"');
+
+        await expect(
+            section.locator(".cc-benefits-success")
+        ).toContainText("Документ успешно отправлен");
     });
 
     test("загружает аватар", async ({ page }) => {
@@ -865,9 +1109,33 @@ test.describe("ProfilePage", () => {
     });
 
     test("выходит из аккаунта", async ({ page }) => {
+        let logoutBody = null;
+
+        await page.route("**/api/auth/session/logout", async (route) => {
+            logoutBody = route.request().postDataJSON();
+
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({ success: true }),
+            });
+        });
+
         await page.getByRole("button", { name: "Выйти" }).click();
 
         await expect(page).toHaveURL(/\/login/);
+
+        await expect
+            .poll(() => logoutBody)
+            .toEqual({
+                sessionClient: "web",
+            });
+
+        const storedToken = await page.evaluate(() =>
+            localStorage.getItem("authToken")
+        );
+
+        expect(storedToken).toBeNull();
     });
 
     test("редиректит на login, если нет токена", async ({ page }) => {
@@ -908,6 +1176,8 @@ test.describe("ProfilePage", () => {
         let categoryCalls = 0;
 
         await setFakeAuth(page);
+
+        await setupProfileMocks(page);
 
         await page.route("**/api/auth/profile", async (route) => {
             profileCalls += 1;
