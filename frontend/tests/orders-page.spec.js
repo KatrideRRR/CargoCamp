@@ -4,6 +4,8 @@ import {
     mockOrderAssets,
 } from "./utils/mockOrderAssets";
 
+import { createMockJwt } from "./utils/mockAuthSession";
+
 const FRONT_URL = "http://localhost:3000";
 
 const viewer = {
@@ -166,29 +168,8 @@ const expressOrders = [
     },
 ];
 
-function createFakeJwt(payload) {
-    const header = {
-        alg: "none",
-        typ: "JWT",
-    };
-
-    const base64url = (obj) =>
-        Buffer.from(JSON.stringify(obj))
-            .toString("base64")
-            .replace(/=/g, "")
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_");
-
-    return `${base64url(header)}.${base64url(payload)}.`;
-}
-
 async function setFakeAuth(page, user = viewer) {
-    const fakeToken = createFakeJwt({
-        id: user.id,
-        role: user.role || "executor",
-        name: user.username,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-    });
+    const fakeToken = createMockJwt(user);
 
     await page.addInitScript(({ token, user }) => {
         localStorage.setItem("authToken", token);
@@ -204,6 +185,7 @@ async function setFakeAuth(page, user = viewer) {
 async function setupOrdersMocks(page, options = {}) {
     const {
         profileBody = viewer,
+        creatorBody = creator,
         profileStatus = 200,
         orders = regularOrders,
         express = expressOrders,
@@ -275,7 +257,7 @@ async function setupOrdersMocks(page, options = {}) {
         async (route) => {
             await route.fulfill({
                 status: 200,
-                json: creator,
+                json: creatorBody,
             });
         }
     );
@@ -339,7 +321,7 @@ async function setupOrdersMocks(page, options = {}) {
         await route.fulfill({
             status: 200,
             contentType: "application/json",
-            body: JSON.stringify(creator),
+            body: JSON.stringify(creatorBody),
         });
     });
 
@@ -1351,4 +1333,258 @@ test.describe("OrdersPage", () => {
             })
             .toBe(true);
     });
+});
+
+// ============================================================
+// ЭТАП 4 — ДОПОЛНИТЕЛЬНЫЕ E2E-ТЕСТЫ СПИСКА ЗАКАЗОВ
+// ============================================================
+
+test.describe("OrdersPage — фильтры, время и ограничения", () => {
+
+    test(
+        "можно отключить и повторно включить профессии из профиля",
+        async ({ page }) => {
+            await openOrdersPage(page);
+
+            // В профиле выбрана только категория «Грузы».
+            await expect(
+                orderCard(page, "Заказ №101")
+            ).toBeVisible();
+
+            await expect(
+                orderCard(page, "Заказ №102")
+            ).toHaveCount(0);
+
+            // Экспресс-заказы остаются доступными.
+            await expect(
+                orderCard(page, "Экспресс №201")
+            ).toBeVisible();
+
+            await openFilters(page);
+
+            await page.getByRole("button", {
+                name: "Сбросить профессии",
+            }).click();
+
+            await expect(
+                orderCard(page, "Заказ №102")
+            ).toBeVisible();
+
+            await expect(
+                page.locator(".drawer-status-pill")
+            ).toContainText("Отключено");
+
+            await page.getByRole("button", {
+                name: "Включить профессии",
+            }).click();
+
+            await expect(
+                orderCard(page, "Заказ №102")
+            ).toHaveCount(0);
+
+            await expect(
+                page.locator(".drawer-status-pill")
+            ).toContainText("Включено");
+        }
+    );
+
+    test(
+        "сортирует ближайшие заказы по расстоянию, а не по продвижению",
+        async ({ page }) => {
+            await openOrdersPage(page, {
+                profileBody: {
+                    ...viewer,
+                    preferredCategoryIds: [],
+                },
+                orders: [
+                    {
+                        ...regularOrders[0],
+                        coordinates: "44.9700,34.1300",
+                        is_recommended: true,
+                    },
+                    {
+                        ...regularOrders[1],
+                        coordinates: "44.9523,34.1026",
+                        is_recommended: false,
+                    },
+                ],
+                express: [],
+            });
+
+            // Ближайший заказ должен идти первым,
+            // хотя другой имеет продвижение.
+            await expect(
+                page.locator(
+                    ".orders-list .order-number"
+                )
+            ).toHaveText([
+                "Заказ №102",
+                "Заказ №101",
+            ]);
+        }
+    );
+
+    test(
+        "различает срочные и запланированные заказы",
+        async ({ page }) => {
+            await openOrdersPage(page, {
+                profileBody: {
+                    ...viewer,
+                    preferredCategoryIds: [],
+                },
+                orders: [
+                    {
+                        ...regularOrders[0],
+                        isAsap: true,
+                    },
+                    {
+                        ...regularOrders[1],
+                        isAsap: false,
+                        workTime: "2035-04-12T12:00:00Z",
+                    },
+                ],
+                express: [],
+            });
+
+            const urgent = orderCard(
+                page,
+                "Заказ №101"
+            );
+
+            const scheduled = orderCard(
+                page,
+                "Заказ №102"
+            );
+
+            await expect(
+                urgent.locator(".order-time-box--asap")
+            ).toContainText("Как можно скорее");
+
+            await expect(
+                scheduled.locator(".order-time-box--scheduled")
+            ).toContainText("Выполнить к");
+
+            await expect(
+                scheduled.locator(".order-time-box--scheduled")
+            ).toContainText("2035");
+        }
+    );
+
+    test(
+        "показывает скидку 50 процентов на комиссию для заказа пенсионера",
+        async ({ page }) => {
+            await openOrdersPage(page, {
+                profileBody: {
+                    ...viewer,
+                    preferredCategoryIds: [],
+                },
+                creatorBody: {
+                    ...creator,
+                    isPensioner: true,
+                },
+                orders: [
+                    regularOrders[0],
+                    regularOrders[1],
+                ],
+                express: [],
+            });
+
+            const recommended = orderCard(
+                page,
+                "Заказ №101"
+            );
+
+            const standard = orderCard(
+                page,
+                "Заказ №102"
+            );
+
+            await expect(
+                recommended.locator(".badge-pensioner-order")
+            ).toHaveAttribute(
+                "title",
+                "Комиссия исполнителя 50 ₽ вместо 100 ₽"
+            );
+
+            await expect(
+                standard.locator(".badge-pensioner-order")
+            ).toHaveAttribute(
+                "title",
+                "Комиссия исполнителя 100 ₽ вместо 200 ₽"
+            );
+        }
+    );
+
+    test(
+        "при задолженности не отправляет отклик и сохраняет его до оплаты",
+        async ({ page }) => {
+            await openOrdersPage(page, {
+                statusDebt: 25000,
+            });
+
+            let requestCount = 0;
+
+            await page.route(
+                "**/api/orders/101/request",
+                async (route) => {
+                    requestCount++;
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                        },
+                    });
+                }
+            );
+
+            await openRequestModal(
+                page,
+                "Заказ №101"
+            );
+
+            await page.getByPlaceholder(
+                "Например: 2500"
+            ).fill("2500");
+
+            await page.getByPlaceholder(
+                "Например: могу приехать сегодня после 18:00"
+            ).fill("Могу приехать вечером");
+
+            await page.getByRole("button", {
+                name: "Отправить запрос",
+            }).click();
+
+            // Вместо отправки отклика открывается
+            // модальное окно погашения долга.
+            await expect(
+                page.locator(".modal-title")
+            ).toHaveText(
+                "Есть задолженность по комиссии"
+            );
+
+            await expect(
+                page.locator(".request-order-content")
+            ).not.toBeVisible();
+
+            const savedRequest = await page.evaluate(() => {
+                const raw = sessionStorage.getItem(
+                    "pendingOrderRequestAfterDebtPayment"
+                );
+
+                return raw ? JSON.parse(raw) : null;
+            });
+
+            expect(savedRequest).toMatchObject({
+                orderId: 101,
+                proposedSum: 2500,
+                comment: "Могу приехать вечером",
+                availableAt: null,
+            });
+
+            // До оплаты запрос не должен
+            // поступить заказчику.
+            expect(requestCount).toBe(0);
+        }
+    );
 });
