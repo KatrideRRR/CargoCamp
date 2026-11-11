@@ -1,5 +1,13 @@
 import { test, expect } from "./fixtures/safeTest";
 
+import {
+    createMockJwt,
+    mockAnonymousRefresh,
+    mockProfileAfterAuth,
+} from "./utils/mockAuthSession";
+
+import { mockOrderAssets } from "./utils/mockOrderAssets";
+
 const FRONT_URL = "http://localhost:3000";
 const LOGIN_URL = `${FRONT_URL}/login?platform=web`;
 
@@ -19,35 +27,8 @@ const bannedUser = {
     phone: "79780801637",
 };
 
-function createFakeJwt(payload) {
-    const header = {
-        alg: "none",
-        typ: "JWT",
-    };
-
-    const base64url = (obj) =>
-        Buffer.from(JSON.stringify(obj))
-            .toString("base64")
-            .replace(/=/g, "")
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_");
-
-    return `${base64url(header)}.${base64url(payload)}.`;
-}
-
-const activeToken = createFakeJwt({
-    id: activeUser.id,
-    role: activeUser.role,
-    name: activeUser.username,
-    exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-});
-
-const bannedToken = createFakeJwt({
-    id: bannedUser.id,
-    role: bannedUser.role,
-    name: bannedUser.username,
-    exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-});
+const activeToken = createMockJwt(activeUser);
+const bannedToken = createMockJwt(bannedUser);
 
 async function setupLoginMocks(page, options = {}) {
     const {
@@ -71,6 +52,11 @@ async function setupLoginMocks(page, options = {}) {
             message: "Пароль изменён. Теперь войдите.",
         },
     } = options;
+
+    await mockOrderAssets(page);
+
+    await mockAnonymousRefresh(page);
+    await mockProfileAfterAuth(page, activeUser);
 
     page.on("pageerror", (error) => {
         console.log("[PAGE ERROR]", error.message);
@@ -117,15 +103,6 @@ async function setupLoginMocks(page, options = {}) {
             status: resetStatus,
             contentType: "application/json",
             body: JSON.stringify(resetBody),
-        });
-    });
-
-    // На случай, если /profile после входа грузит профиль через общий контекст.
-    await page.route("**/api/auth/profile", async (route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify(activeUser),
         });
     });
 }
@@ -315,6 +292,7 @@ test.describe("LoginPage", () => {
         expect(loginRequestBody).toEqual({
             phone: "79780032978",
             password: "password123",
+            sessionClient: "web",
         });
 
         await expect(page).toHaveURL(/\/profile/);
@@ -477,9 +455,44 @@ test.describe("LoginPage", () => {
             .toEqual({
                 phone: "79780032978",
                 smsCode: "1234",
+                sessionClient: "web",
             });
 
         await expect(page).toHaveURL(/\/profile/);
+    });
+
+    test("отклоняет некорректный JWT после входа", async ({ page }) => {
+        await page.route("**/api/auth/login", async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({
+                    token: "invalid-jwt",
+                    user: activeUser,
+                }),
+            });
+        });
+
+        await fillPhone(page);
+        await selectPasswordMode(page);
+
+        await page.locator("#password").fill("password123");
+
+        await page.getByRole("button", {
+            name: /^Войти$/,
+        }).click();
+
+        await expect(
+            page.locator(".login-error")
+        ).toHaveText("Ошибка авторизации");
+
+        await expect(page).toHaveURL(/\/login/);
+
+        const storedToken = await page.evaluate(() =>
+            localStorage.getItem("authToken")
+        );
+
+        expect(storedToken).toBeNull();
     });
 
     test("показывает ошибку при неправильном SMS-коде", async ({ page }) => {

@@ -1,5 +1,23 @@
 import { test, expect } from "./fixtures/safeTest";
 
+import {
+    createMockJwt,
+    mockAnonymousRefresh,
+    mockProfileAfterAuth,
+} from "./utils/mockAuthSession";
+
+import { mockOrderAssets } from "./utils/mockOrderAssets";
+
+const registerUser = {
+    id: 73,
+    username: "TestUser",
+    name: "TestUser",
+    role: "user",
+    phone: "79780032978",
+};
+
+const registerToken = createMockJwt(registerUser);
+
 const FRONT_URL = "http://localhost:3000";
 
 function formatPhoneForMask(raw) {
@@ -80,9 +98,15 @@ async function setupRegisterMocks(page, options = {}) {
         },
         registerStatus = 200,
         registerBody = {
-            token: "mock-token",
+            token: registerToken,
+            user: registerUser,
         },
     } = options;
+
+    await mockOrderAssets(page);
+
+    await mockAnonymousRefresh(page);
+    await mockProfileAfterAuth(page, registerUser);
 
     page.on("pageerror", (error) => {
         console.log("[PAGE ERROR]", error.message);
@@ -119,7 +143,23 @@ async function setupRegisterMocks(page, options = {}) {
 
 async function openRegisterPage(page, options = {}) {
     if (options.withCaptcha !== false) {
-        await mockRecaptcha(page, options.captchaToken || "mock-captcha-token");
+        await mockRecaptcha(
+            page,
+            options.captchaToken || "mock-captcha-token"
+        );
+    } else {
+        // CAPTCHA намеренно не активируется.
+        // При этом внешний Google API не вызывается.
+        await page.route(
+            "**/recaptcha/api.js**",
+            async (route) => {
+                await route.fulfill({
+                    status: 200,
+                    contentType: "application/javascript",
+                    body: "",
+                });
+            }
+        );
     }
 
     await setupRegisterMocks(page, options);
@@ -384,7 +424,8 @@ test.describe("RegisterPage", () => {
                 status: 200,
                 contentType: "application/json",
                 body: JSON.stringify({
-                    token: "mock-token",
+                    token: registerToken,
+                    user: registerUser,
                 }),
             });
         });
@@ -411,12 +452,47 @@ test.describe("RegisterPage", () => {
                 phone: "+7 (978) 003-29-78",
                 password: "Password123",
                 smsCode: "123456",
+                sessionClient: "web",
             });
 
         await expect(page).toHaveURL(/\/profile/);
 
-        const token = await page.evaluate(() => localStorage.getItem("authToken"));
-        expect(token).toBe("mock-token");
+        const token = await page.evaluate(() =>
+            localStorage.getItem("authToken")
+        );
+
+        expect(token).toBe(registerToken);
+    });
+
+    test("не сохраняет сессию при повреждённом JWT", async ({ page }) => {
+        await openRegisterPage(page, {
+            registerBody: {
+                token: "invalid-jwt",
+                user: registerUser,
+            },
+        });
+
+        await fillBaseFields(page);
+        await acceptAgreement(page);
+        await sendSmsSuccessfully(page);
+
+        await page.getByPlaceholder("Введите код").fill("123456");
+
+        await page.getByRole("button", {
+            name: "Зарегистрироваться",
+        }).click();
+
+        await expect(
+            page.locator(".register-error")
+        ).toHaveText("Ошибка регистрации");
+
+        await expect(page).toHaveURL(/\/register/);
+
+        const token = await page.evaluate(() =>
+            localStorage.getItem("authToken")
+        );
+
+        expect(token).toBeNull();
     });
 
     test("показывает ошибку при неудачной регистрации", async ({ page }) => {
