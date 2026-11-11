@@ -3,6 +3,7 @@ import { test, expect } from "./fixtures/safeTest";
 import {
     mockOrderAssets,
 } from "./utils/mockOrderAssets";
+import { createMockJwt } from "./utils/mockAuthSession";
 
 const FRONT_URL = "http://localhost:3000";
 
@@ -44,29 +45,8 @@ const regularOrder = {
     customerAfterPhotos: [],
 };
 
-function createFakeJwt(payload) {
-    const header = {
-        alg: "none",
-        typ: "JWT",
-    };
-
-    const base64url = (obj) =>
-        Buffer.from(JSON.stringify(obj))
-            .toString("base64")
-            .replace(/=/g, "")
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_");
-
-    return `${base64url(header)}.${base64url(payload)}.`;
-}
-
 async function setFakeAuthToken(page) {
-    const fakeToken = createFakeJwt({
-        id: testUser.id,
-        role: testUser.role,
-        name: testUser.username,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-    });
+    const fakeToken = createMockJwt(testUser);
 
     await page.addInitScript((token) => {
         localStorage.setItem("authToken", token);
@@ -2822,3 +2802,279 @@ test.describe(
     }
 );
 
+// ============================================================
+// ЭТАП 7 — РОЛИ И НАЧАЛО РАБОТЫ
+// ============================================================
+
+async function prepareUnstartedRegularOrder(
+    page,
+    {
+        customerView = false,
+        rejectStart = false,
+        finalPriceKopecks,
+    } = {}
+) {
+    const state = {
+        started: false,
+        startCalls: 0,
+    };
+
+    await page.route(
+        "**/api/orders/active-orders",
+        async (route) => {
+            const order = {
+                ...regularOrder,
+                creatorId: customerView ? 1 : 2,
+                executorId: customerView ? 2 : 1,
+                workStartedAt: state.started
+                    ? "2026-11-11T12:00:00.000Z"
+                    : null,
+            };
+
+            if (finalPriceKopecks !== undefined) {
+                order.finalPriceKopecks = finalPriceKopecks;
+            }
+
+            await route.fulfill({
+                status: 200,
+                json: {
+                    orders: [order],
+                    notifications: [],
+                },
+            });
+        }
+    );
+
+    await page.route(
+        "**/api/orders/101/start-work",
+        async (route) => {
+            expect(route.request().method()).toBe("POST");
+
+            state.startCalls++;
+
+            if (rejectStart) {
+                await route.fulfill({
+                    status: 409,
+                    json: {
+                        message: "Начало работы отклонено",
+                    },
+                });
+
+                return;
+            }
+
+            state.started = true;
+
+            await route.fulfill({
+                status: 200,
+                json: {
+                    success: true,
+                },
+            });
+        }
+    );
+
+    await page.reload();
+
+    if (customerView) {
+        await page.getByRole("button", {
+            name: "Мои заказы выполняют",
+        }).click();
+    }
+
+    const card = page.locator(".order-card").first();
+
+    await expect(card).toBeVisible();
+
+    return {
+        state,
+        card,
+    };
+}
+
+test.describe("ActiveOrdersPage — роли и начало работы", () => {
+
+    test.beforeEach(async ({ page }) => {
+        await openActiveOrdersPage(page);
+    });
+
+    test(
+        "заказчик не видит маршрут и кнопку начала работы",
+        async ({ page }) => {
+            const { state, card } =
+                await prepareUnstartedRegularOrder(page, {
+                    customerView: true,
+                });
+
+            await expect(
+                card.getByText("Вы заказчик")
+            ).toBeVisible();
+
+            await expect(
+                card.locator(".route-button")
+            ).toHaveCount(0);
+
+            await expect(
+                card.locator(".start-main-button")
+            ).toHaveCount(0);
+
+            await expect(
+                card.locator(".message-button")
+            ).toBeVisible();
+
+            expect(state.startCalls).toBe(0);
+        }
+    );
+
+    test(
+        "исполнитель может отменить начало работы",
+        async ({ page }) => {
+            const { state, card } =
+                await prepareUnstartedRegularOrder(page);
+
+            const startButton =
+                card.locator(".start-main-button");
+
+            await expect(startButton).toBeVisible();
+
+            page.once("dialog", async (dialog) => {
+                expect(dialog.type()).toBe("confirm");
+                expect(dialog.message()).toContain(
+                    "Отметить работу как начатую?"
+                );
+
+                await dialog.dismiss();
+            });
+
+            await startButton.click();
+
+            expect(state.startCalls).toBe(0);
+
+            await expect(startButton).toBeVisible();
+        }
+    );
+
+    test(
+        "исполнитель успешно начинает работу",
+        async ({ page }) => {
+            const { state, card } =
+                await prepareUnstartedRegularOrder(page);
+
+            page.on("dialog", async (dialog) => {
+                await dialog.accept();
+            });
+
+            await card.locator(
+                ".start-main-button"
+            ).click();
+
+            await expect.poll(
+                () => state.startCalls
+            ).toBe(1);
+
+            await expect(
+                card.locator(".start-main-button")
+            ).toHaveCount(0);
+
+            await expect(
+                card.locator(".complete-button")
+            ).toBeVisible();
+
+            expect(state.started).toBe(true);
+        }
+    );
+
+    test(
+        "при отказе сервера работа не считается начатой",
+        async ({ page }) => {
+            const { state, card } =
+                await prepareUnstartedRegularOrder(page, {
+                    rejectStart: true,
+                });
+
+            const messages = [];
+
+            page.on("dialog", async (dialog) => {
+                messages.push(dialog.message());
+                await dialog.accept();
+            });
+
+            await card.locator(
+                ".start-main-button"
+            ).click();
+
+            await expect.poll(
+                () => state.startCalls
+            ).toBe(1);
+
+            await expect.poll(() =>
+                messages.some((message) =>
+                    message.includes(
+                        "Начало работы отклонено"
+                    )
+                )
+            ).toBe(true);
+
+            await expect(
+                card.locator(".start-main-button")
+            ).toBeVisible();
+
+            expect(state.started).toBe(false);
+        }
+    );
+
+    test(
+        "сворачивает и разворачивает активный заказ",
+        async ({ page }) => {
+            const card = page.locator(
+                ".order-card"
+            ).first();
+
+            const toggle = card.locator(
+                ".cc-collapse-toggle"
+            );
+
+            await expect(
+                card.locator(".order-details")
+            ).toBeVisible();
+
+            await toggle.click();
+
+            await expect(
+                card.locator(".order-details")
+            ).toHaveCount(0);
+
+            await expect(toggle).toContainText(
+                "Развернуть"
+            );
+
+            await toggle.click();
+
+            await expect(
+                card.locator(".order-details")
+            ).toBeVisible();
+
+            await expect(toggle).toContainText(
+                "Свернуть"
+            );
+        }
+    );
+
+    test(
+        "показывает итоговую стоимость вместо первоначальной",
+        async ({ page }) => {
+            const { card } =
+                await prepareUnstartedRegularOrder(page, {
+                    finalPriceKopecks: 25050,
+                });
+
+            await expect(
+                card.locator(".pay-price")
+            ).toContainText("250,5 ₽");
+
+            await expect(
+                card.locator(".pay-type")
+            ).toHaveText("Наличные");
+        }
+    );
+});
