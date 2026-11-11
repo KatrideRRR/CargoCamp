@@ -1,5 +1,7 @@
 import { test, expect } from "./fixtures/safeTest";
 
+import { createMockJwt } from "./utils/mockAuthSession";
+
 const FRONT_URL = "http://localhost:3000";
 
 const testUser = {
@@ -26,22 +28,6 @@ const profileLocation = {
     locationLng: 34.1024,
 };
 
-function createFakeJwt(payload) {
-    const header = {
-        alg: "none",
-        typ: "JWT",
-    };
-
-    const base64url = (obj) =>
-        Buffer.from(JSON.stringify(obj))
-            .toString("base64")
-            .replace(/=/g, "")
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_");
-
-    return `${base64url(header)}.${base64url(payload)}.`;
-}
-
 async function mockPaymentNavigation(page) {
     let openedPaymentUrl = null;
 
@@ -61,12 +47,7 @@ async function mockPaymentNavigation(page) {
 }
 
 async function setFakeAuth(page) {
-    const fakeToken = createFakeJwt({
-        id: testUser.id,
-        role: testUser.role,
-        name: testUser.username,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-    });
+    const fakeToken = createMockJwt(testUser);
 
     await page.addInitScript(({ token, user }) => {
         localStorage.setItem("authToken", token);
@@ -668,7 +649,7 @@ test.describe("CreateOrderPage", () => {
         await clickCreateOrderButton(page);
 
         await expect(
-            page.locator(".alert-text")
+            page.locator(".createOrderErrorToast__message")
         ).toContainText("Адрес обязателен");
     });
 
@@ -680,7 +661,7 @@ test.describe("CreateOrderPage", () => {
         await clickCreateOrderButton(page);
 
         await expect(
-            page.locator(".alert-text")
+            page.locator(".createOrderErrorToast__message")
         ).toContainText("Нужно указать адрес текстом");
     });
 
@@ -694,7 +675,7 @@ test.describe("CreateOrderPage", () => {
             await clickCreateOrderButton(page);
 
             await expect(
-                page.locator(".alert-text")
+                page.locator(".createOrderErrorToast__message")
             ).toContainText(
                 "Выберите подходящую услугу из подсказки"
             );
@@ -709,7 +690,7 @@ test.describe("CreateOrderPage", () => {
             await clickCreateOrderButton(page);
 
             await expect(
-                page.locator(".alert-text")
+                page.locator(".createOrderErrorToast__message")
             ).toContainText(
                 "Укажите корректную сумму за работу"
             );
@@ -784,7 +765,7 @@ test.describe("CreateOrderPage", () => {
         await clickCreateOrderButton(page);
 
         await expect(
-            page.locator(".alert-text")
+            page.locator(".createOrderErrorToast__message")
         ).toContainText(
             "Ошибка сервера при создании заказа"
         );
@@ -1152,7 +1133,7 @@ test.describe(
                 await clickCreateOrderButton(page);
 
                 await expect(
-                    page.locator(".alert-text")
+                    page.locator(".createOrderErrorToast__message")
                 ).toContainText(
                     "Заполните поле «Количество точек»"
                 );
@@ -1177,7 +1158,7 @@ test.describe(
                 await clickCreateOrderButton(page);
 
                 await expect(
-                    page.locator(".alert-text")
+                    page.locator(".createOrderErrorToast__message")
                 ).toContainText(
                     "Максимальное значение поля «Количество точек» — 5"
                 );
@@ -1217,7 +1198,7 @@ test.describe(
                 await clickCreateOrderButton(page);
 
                 await expect(
-                    page.locator(".alert-text")
+                    page.locator(".createOrderErrorToast__message")
                 ).toContainText(
                     "Заполните поле «Комментарий помощнику»"
                 );
@@ -1566,7 +1547,7 @@ test.describe(
                 await clickCreateOrderButton(page);
 
                 await expect(
-                    page.locator(".alert-text")
+                    page.locator(".createOrderErrorToast__message")
                 ).toContainText(
                     "Тестовый платёж отклонён"
                 );
@@ -1580,6 +1561,335 @@ test.describe(
                         name: "Создать заказ",
                     })
                 ).toBeEnabled();
+            }
+        );
+    }
+);
+
+// ============================================================
+// ДОПОЛНИТЕЛЬНЫЕ E2E-ТЕСТЫ ОБЫЧНОГО ЗАКАЗА
+// Границы оплаты, координаты и данные отправки.
+// ============================================================
+
+function readMultipartText(request, fieldName) {
+    const body = request.postData() || "";
+
+    const pattern = new RegExp(
+        `name="${fieldName}"\\r?\\n\\r?\\n([^\\r\\n]*)`
+    );
+
+    const match = body.match(pattern);
+
+    if (!match) {
+        throw new Error(
+            `Поле "${fieldName}" отсутствует в FormData`
+        );
+    }
+
+    return match[1];
+}
+
+test.describe(
+    "CreateOrderPage — дополнительные проверки",
+    () => {
+        test.beforeEach(async ({ page }) => {
+            await openCreateOrderPage(page);
+        });
+
+        test(
+            "гарантийная оплата недоступна до подключения",
+            async ({ page }) => {
+                const cash = page.locator(
+                    'input[name="paymentType"][value="cash"]'
+                );
+
+                const guarantee = page.locator(
+                    'input[name="paymentType"][value="guarantee"]'
+                );
+
+                await expect(cash).toBeChecked();
+
+                await expect(guarantee).toBeDisabled();
+
+                await expect(
+                    page.getByText(
+                        "Гарантийные расчёты находятся на этапе подключения."
+                    )
+                ).toBeVisible();
+            }
+        );
+
+        test(
+            "не отправляет заказ с адресом без подтверждённых координат",
+            async ({ page }) => {
+                let createRequests = 0;
+
+                await page.route(
+                    "**/api/orders/",
+                    async (route) => {
+                        createRequests++;
+
+                        await route.fulfill({
+                            status: 200,
+                            json: {
+                                success: true,
+                                id: 777,
+                            },
+                        });
+                    }
+                );
+
+                await fillRequiredOrderFields(page);
+
+                await clickAddressCard(page);
+
+                const addressInput = page.getByPlaceholder(
+                    "Введите адрес"
+                );
+
+                // Меняем адрес, но не выбираем
+                // географическую подсказку.
+                await addressInput.fill(
+                    "Симферополь, неизвестная улица, 999"
+                );
+
+                await clickCreateOrderButton(page);
+
+                await expect(
+                    page.locator(
+                        ".createOrderErrorToast__message"
+                    )
+                ).toContainText(
+                    "Не удалось определить координаты адреса"
+                );
+
+                expect(createRequests).toBe(0);
+            }
+        );
+
+        test(
+            "передаёт основные поля заказа через multipart",
+            async ({ page }) => {
+                let createRequest = null;
+
+                await page.route(
+                    "**/api/orders/",
+                    async (route) => {
+                        createRequest = route.request();
+
+                        await route.fulfill({
+                            status: 200,
+                            json: {
+                                success: true,
+                                id: 777,
+                            },
+                        });
+                    }
+                );
+
+                page.on("dialog", (dialog) => {
+                    dialog.accept();
+                });
+
+                await fillRequiredOrderFields(page);
+
+                await clickCreateOrderButton(page);
+
+                await expect.poll(
+                    () => createRequest
+                ).not.toBeNull();
+
+                expect(createRequest.method()).toBe("POST");
+
+                expect(
+                    createRequest.headers()["content-type"]
+                ).toContain("multipart/form-data");
+
+                expect(
+                    readMultipartText(createRequest, "categoryId")
+                ).toBe("1");
+
+                expect(
+                    readMultipartText(createRequest, "subcategoryId")
+                ).toBe("10");
+
+                expect(
+                    readMultipartText(createRequest, "proposedSum")
+                ).toBe("1500");
+
+                expect(
+                    readMultipartText(createRequest, "paymentType")
+                ).toBe("cash");
+
+                expect(
+                    readMultipartText(createRequest, "isAsap")
+                ).toBe("true");
+
+                expect(
+                    readMultipartText(createRequest, "coordinates")
+                ).toBe("44.9521,34.1024");
+
+                expect(
+                    readMultipartText(createRequest, "description")
+                ).toBe(
+                    "Нужно перевезти мебель аккуратно"
+                );
+
+                expect(
+                    readMultipartJson(createRequest, "promotion")
+                ).toEqual({
+                    highlight: false,
+                    recommended: false,
+                    push: false,
+                });
+            }
+        );
+
+        test(
+            "при заказе ко времени передаёт дату выполнения",
+            async ({ page }) => {
+                let createRequest = null;
+
+                await page.route(
+                    "**/api/orders/",
+                    async (route) => {
+                        createRequest = route.request();
+
+                        await route.fulfill({
+                            status: 200,
+                            json: {
+                                success: true,
+                                id: 777,
+                            },
+                        });
+                    }
+                );
+
+                page.on("dialog", (dialog) => {
+                    dialog.accept();
+                });
+
+                await fillRequiredOrderFields(page);
+
+                await clickAsapToggle(page);
+
+                await expect(
+                    page.locator(".timeChipValue")
+                ).toHaveText("Ко времени");
+
+                await clickCreateOrderButton(page);
+
+                await expect.poll(
+                    () => createRequest
+                ).not.toBeNull();
+
+                expect(
+                    readMultipartText(createRequest, "isAsap")
+                ).toBe("false");
+
+                const workTime = readMultipartText(
+                    createRequest,
+                    "workTime"
+                );
+
+                expect(workTime).toMatch(
+                    /^\d{4}-\d{2}-\d{2}T/
+                );
+
+                expect(
+                    Number.isNaN(Date.parse(workTime))
+                ).toBe(false);
+            }
+        );
+
+        test(
+            "суммирует три продвижения и отправляет их в платёж",
+            async ({ page }) => {
+                const promotionNames = [
+                    "Выделить цветом",
+                    "Рекомендуемый заказ",
+                    "Push-уведомление исполнителям",
+                ];
+
+                for (const name of promotionNames) {
+                    const option = page
+                        .locator(".promoBox .promoOption")
+                        .filter({ hasText: name });
+
+                    await option.click();
+
+                    await expect(
+                        option.locator('input[type="checkbox"]')
+                    ).toBeChecked();
+                }
+
+                await expect(
+                    page.locator(".totalAmount")
+                ).toHaveText("300 ₽");
+
+                let createRequest = null;
+                let paymentBody = null;
+
+                await page.route(
+                    "**/api/orders/",
+                    async (route) => {
+                        createRequest = route.request();
+
+                        await route.fulfill({
+                            status: 200,
+                            json: {
+                                success: true,
+                                id: 777,
+                            },
+                        });
+                    }
+                );
+
+                await page.route(
+                    "**/api/payments/order/promotion/create",
+                    async (route) => {
+                        paymentBody = route.request().postDataJSON();
+
+                        await route.fulfill({
+                            status: 200,
+                            json: {
+                                success: true,
+                                paidBySavedCard: true,
+                                paid: true,
+                            },
+                        });
+                    }
+                );
+
+                page.on("dialog", (dialog) => {
+                    dialog.accept();
+                });
+
+                await fillRequiredOrderFields(page);
+
+                await clickCreateOrderButton(page);
+
+                await expect.poll(
+                    () => createRequest
+                ).not.toBeNull();
+
+                expect(
+                    readMultipartJson(createRequest, "promotion")
+                ).toEqual({
+                    highlight: true,
+                    recommended: true,
+                    push: true,
+                });
+
+                await expect.poll(
+                    () => paymentBody
+                ).toEqual({
+                    orderId: 777,
+                });
+
+                await expect(page).toHaveURL(
+                    /\/orders(?:\?|$)/
+                );
             }
         );
     }
