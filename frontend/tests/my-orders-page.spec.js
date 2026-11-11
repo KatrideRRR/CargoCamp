@@ -1,5 +1,11 @@
 import { test, expect } from "./fixtures/safeTest";
 
+import { mockOrderAssets } from "./utils/mockOrderAssets";
+import {
+    createMockJwt,
+    mockAnonymousRefresh,
+} from "./utils/mockAuthSession";
+
 const FRONT_URL = "http://localhost:3000";
 
 const testUser = {
@@ -141,29 +147,8 @@ async function mockPaymentNavigation(page) {
     };
 }
 
-function createFakeJwt(payload) {
-    const header = {
-        alg: "none",
-        typ: "JWT",
-    };
-
-    const base64url = (obj) =>
-        Buffer.from(JSON.stringify(obj))
-            .toString("base64")
-            .replace(/=/g, "")
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_");
-
-    return `${base64url(header)}.${base64url(payload)}.`;
-}
-
 async function setFakeAuth(page, user = testUser) {
-    const fakeToken = createFakeJwt({
-        id: user.id,
-        role: user.role,
-        name: user.username,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-    });
+    const fakeToken = createMockJwt(user);
 
     await page.addInitScript(({ token, user }) => {
         localStorage.setItem("authToken", token);
@@ -187,6 +172,37 @@ async function setupMyOrdersMocks(page, options = {}) {
         regularStatus = 200,
         expressStatus = 200,
     } = options;
+
+    await mockOrderAssets(page);
+
+    await page.route("**/api/orders/me/status", async (route) => {
+        await route.fulfill({
+            status: 200,
+            json: {
+                debt: 0,
+            },
+        });
+    });
+
+    await page.route("**/api/auth/user/2", async (route) => {
+        await route.fulfill({
+            status: 200,
+            json: {
+                id: 2,
+                username: "executor1",
+                rating: 4.8,
+            },
+        });
+    });
+
+    await page.route("**/api/auth/reviews/user/2", async (route) => {
+        await route.fulfill({
+            status: 200,
+            json: {
+                reviews: [],
+            },
+        });
+    });
 
     page.on("pageerror", (error) => {
         console.log("[PAGE ERROR]", error.message);
@@ -477,7 +493,7 @@ test.describe("MyOrdersPage", () => {
         await expect(card).toContainText("executor2");
         await expect(card).toContainText("4.8");
         await expect(card).toContainText("Сделаю быстро и аккуратно");
-        await expect(card).toContainText("✔ Верифицирован");
+        await expect(card).toContainText("✓ Верифицирован");
 
         await card.getByRole("button", { name: "Скрыть" }).click();
 
@@ -748,6 +764,9 @@ test.describe("MyOrdersPage", () => {
     });
 
     test("редиректит на login, если профиль не загрузился", async ({ page }) => {
+        // Сервер отклонил попытку обновить сессию.
+        await mockAnonymousRefresh(page);
+
         await openMyOrdersPage(page, {
             profileStatus: 401,
             profileBody: {
@@ -775,4 +794,227 @@ test.describe("MyOrdersPage", () => {
         await expect(firstCard).toContainText("executor1");
         await expect(firstCard).toContainText("Нужно аккуратно перевезти мебель");
     });
+});
+
+// ============================================================
+// ЭТАП 6 — БРОНИРОВАНИЕ, ПЛАТЕЖИ И ОШИБКИ ЗАКАЗЧИКА
+// ============================================================
+
+const waitingExecutor = {
+    ...requestedExecutors[101][0],
+    sourceOrderId: 777,
+    availableAt: "2035-04-12T18:30:00.000Z",
+};
+
+test.describe("MyOrdersPage — дополнительные сценарии", () => {
+
+    test.beforeEach(async ({ page }) => {
+        await openMyOrdersPage(page, {
+            executors: {
+                ...requestedExecutors,
+                101: [waitingExecutor],
+            },
+        });
+    });
+
+    test(
+        "показывает время освобождения занятого исполнителя",
+        async ({ page }) => {
+            const card = orderCard(page, "Заказ №101");
+
+            await card.getByRole("button", {
+                name: "Показать",
+            }).click();
+
+            await expect(card).toContainText(
+                "Завершает предыдущий заказ"
+            );
+
+            await expect(card).toContainText(
+                "Готов приступить"
+            );
+
+            await expect(
+                card.getByRole("button", {
+                    name: "Одобрить с ожиданием",
+                })
+            ).toBeVisible();
+        }
+    );
+
+    test(
+        "бронирует исполнителя после согласия заказчика",
+        async ({ page }) => {
+            let reserveBody = null;
+
+            await page.route(
+                "**/api/orders/101/reserve",
+                async (route) => {
+                    reserveBody = route.request().postDataJSON();
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                        },
+                    });
+                }
+            );
+
+            const card = orderCard(page, "Заказ №101");
+
+            await card.getByRole("button", {
+                name: "Показать",
+            }).click();
+
+            page.once("dialog", async (dialog) => {
+                expect(dialog.message()).toContain(
+                    "Вы согласны подождать"
+                );
+
+                await dialog.accept();
+            });
+
+            await card.getByRole("button", {
+                name: "Одобрить с ожиданием",
+            }).click();
+
+            await expect.poll(
+                () => reserveBody
+            ).toEqual({
+                executorId: 2,
+            });
+
+            await expect(page).toHaveURL(
+                /\/active-orders\?view=created&orderId=101&orderType=regular&reason=reserved/
+            );
+        }
+    );
+
+    test(
+        "не бронирует исполнителя при отказе заказчика",
+        async ({ page }) => {
+            let reserveRequests = 0;
+
+            await page.route(
+                "**/api/orders/101/reserve",
+                async (route) => {
+                    reserveRequests++;
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                        },
+                    });
+                }
+            );
+
+            const card = orderCard(page, "Заказ №101");
+
+            await card.getByRole("button", {
+                name: "Показать",
+            }).click();
+
+            page.once("dialog", async (dialog) => {
+                await dialog.dismiss();
+            });
+
+            await card.getByRole("button", {
+                name: "Одобрить с ожиданием",
+            }).click();
+
+            expect(reserveRequests).toBe(0);
+
+            await expect(page).toHaveURL(
+                /\/my-orders\/1/
+            );
+
+            await expect(card).toBeVisible();
+        }
+    );
+
+    test(
+        "не предлагает бронирование с ожиданием для гарантийного заказа",
+        async ({ page }) => {
+            await openMyOrdersPage(page, {
+                regular: [
+                    {
+                        ...regularOrders[0],
+                        paymentType: "guarantee",
+                    },
+                ],
+                express: [],
+                executors: {
+                    101: [waitingExecutor],
+                },
+            });
+
+            const card = orderCard(page, "Заказ №101");
+
+            await card.getByRole("button", {
+                name: "Показать",
+            }).click();
+
+            await expect(
+                card.getByRole("button", {
+                    name: "Одобрить",
+                    exact: true,
+                })
+            ).toBeVisible();
+
+            await expect(
+                card.getByRole("button", {
+                    name: "Одобрить с ожиданием",
+                })
+            ).toHaveCount(0);
+        }
+    );
+
+    test(
+        "успешно обрабатывает оплату продвижения сохранённой картой",
+        async ({ page }) => {
+            let paymentRequests = 0;
+
+            await page.route(
+                "**/api/payments/order/promotion/create",
+                async (route) => {
+                    paymentRequests++;
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                            paidBySavedCard: true,
+                            paid: true,
+                        },
+                    });
+                }
+            );
+
+            const card = orderCard(page, "Заказ №102");
+
+            page.once("dialog", async (dialog) => {
+                expect(dialog.message()).toContain(
+                    "Продвижение оплачено с привязанной карты"
+                );
+
+                await dialog.accept();
+            });
+
+            await card.getByRole("button", {
+                name: "Оплатить",
+            }).click();
+
+            await expect.poll(
+                () => paymentRequests
+            ).toBe(1);
+
+            // При оплате сохранённой картой
+            // переход на внешний сайт не требуется.
+            await expect(page).toHaveURL(
+                /\/my-orders\/1/
+            );
+        }
+    );
 });
