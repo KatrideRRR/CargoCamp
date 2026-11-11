@@ -7,6 +7,8 @@ const {
     mockChatSocket,
 } = require("./utils/mockChatSocket");
 
+import { createMockJwt } from "./utils/mockAuthSession";
+
 const {
     mockSuccessfulChatSend,
     mockChatSendAfterFailure,
@@ -79,29 +81,8 @@ const initialMessages = [
     },
 ];
 
-function createFakeJwt(payload) {
-    const header = {
-        alg: "none",
-        typ: "JWT",
-    };
-
-    const base64url = (obj) =>
-        Buffer.from(JSON.stringify(obj))
-            .toString("base64")
-            .replace(/=/g, "")
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_");
-
-    return `${base64url(header)}.${base64url(payload)}.`;
-}
-
 async function setFakeAuth(page) {
-    const fakeToken = createFakeJwt({
-        id: testUser.id,
-        role: testUser.role,
-        name: testUser.username,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-    });
+    const fakeToken = createMockJwt(testUser);
 
     await page.addInitScript(({ token, user }) => {
         localStorage.setItem("authToken", token);
@@ -2397,4 +2378,133 @@ test.describe("ChatPage", () => {
             }
         );
     });
+});
+
+// ============================================================
+// ЭТАП 9 — ИЗОЛЯЦИЯ ЧАТОВ И SOCKET.IO
+// ============================================================
+
+test.describe("ChatPage — изоляция переписки", () => {
+
+    test(
+        "игнорирует сообщения чужих заказов и посторонних пользователей",
+        async ({ page }) => {
+            const socket = await openSocketChat(page);
+
+            const message = {
+                id: 301,
+                content: "Проверка изоляции чата",
+                senderId: customerUser.id,
+                receiverId: testUser.id,
+                orderId: 101,
+                orderType: "regular",
+                createdAt: "2026-07-01T12:00:00.000Z",
+            };
+
+            // Сообщение относится к другому заказу.
+            socket.emit("receiveMessage", {
+                ...message,
+                id: 301,
+                orderId: 999,
+            });
+
+            // Сообщение от экспресс-заказа.
+            socket.emit("receiveMessage", {
+                ...message,
+                id: 302,
+                orderType: "express",
+            });
+
+            // Участники сообщения не имеют
+            // отношения к текущему пользователю.
+            socket.emit("receiveMessage", {
+                ...message,
+                id: 303,
+                senderId: 777,
+                receiverId: 888,
+            });
+
+            // Правильное сообщение этого чата.
+            socket.emit("receiveMessage", {
+                ...message,
+                id: 304,
+            });
+
+            await expect(
+                page.locator('[data-message-id="304"]')
+            ).toBeVisible();
+
+            for (const id of [301, 302, 303]) {
+                await expect(
+                    page.locator(
+                        `[data-message-id="${id}"]`
+                    )
+                ).toHaveCount(0);
+            }
+
+            await expect(
+                page.locator('[data-message-id="304"]')
+            ).toContainText(message.content);
+        }
+    );
+
+    test(
+        "не показывает печать постороннего пользователя",
+        async ({ page }) => {
+            const socket = await openSocketChat(page);
+
+            const subtitle = page.locator(
+                ".chat-header-subtitle"
+            );
+
+            // Правильный собеседник начал печатать.
+            socket.emit("chat:typing", {
+                orderId: 101,
+                orderType: "regular",
+                senderId: customerUser.id,
+                isTyping: true,
+            });
+
+            await expect(subtitle).toContainText(
+                "Печатает"
+            );
+
+            // Чужой пользователь отправляет
+            // событие остановки печати.
+            socket.emit("chat:typing", {
+                orderId: 101,
+                orderType: "regular",
+                senderId: 999,
+                isTyping: false,
+            });
+
+            // Событие другого заказа.
+            socket.emit("chat:typing", {
+                orderId: 999,
+                orderType: "regular",
+                senderId: customerUser.id,
+                isTyping: false,
+            });
+
+            await page.waitForTimeout(100);
+
+            // Оба посторонних события
+            // не должны изменить индикатор.
+            await expect(subtitle).toContainText(
+                "Печатает"
+            );
+
+            // Настоящий собеседник закончил печатать.
+            socket.emit("chat:typing", {
+                orderId: 101,
+                orderType: "regular",
+                senderId: customerUser.id,
+                isTyping: false,
+            });
+
+            await expect(subtitle).toHaveText(
+                "Заказ #101"
+            );
+        }
+    );
 });

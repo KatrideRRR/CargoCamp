@@ -7,6 +7,8 @@ const {
     mockChatSocket,
 } = require("./utils/mockChatSocket");
 
+import { createMockJwt } from "./utils/mockAuthSession";
+
 const FRONT_URL = "http://localhost:3000";
 
 const UUID_V4 =
@@ -34,29 +36,8 @@ const initialMessages = [
     },
 ];
 
-function createFakeJwt(payload) {
-    const header = {
-        alg: "none",
-        typ: "JWT",
-    };
-
-    const base64url = (obj) =>
-        Buffer.from(JSON.stringify(obj))
-            .toString("base64")
-            .replace(/=/g, "")
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_");
-
-    return `${base64url(header)}.${base64url(payload)}.`;
-}
-
 async function setFakeAuth(page, user = testUser) {
-    const fakeToken = createFakeJwt({
-        id: user.id,
-        role: user.role,
-        name: user.username,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-    });
+    const fakeToken = createMockJwt(user);
 
     await page.addInitScript(({ token, user }) => {
         localStorage.setItem("authToken", token);
@@ -1222,4 +1203,99 @@ test.describe("SupportChatPage", () => {
 
         await expect(myMessage.locator(".support-message-meta span")).toHaveText(/\d{2}:\d{2}/);
     });
+});
+
+// ============================================================
+// ЭТАП 9 — ДОПОЛНИТЕЛЬНЫЕ ПРОВЕРКИ ПОДДЕРЖКИ
+// ============================================================
+
+test.describe("SupportChatPage — дополнительные сценарии", () => {
+
+    test(
+        "не отправляет подтверждение прочтения собственных сообщений",
+        async ({ page }) => {
+            const readRequests = [];
+
+            await openSupportChatPage(page, {
+                messages: [
+                    initialMessages[0],
+                ],
+
+                onRead: (request) => {
+                    readRequests.push(request);
+                },
+            });
+
+            await expect(
+                page.locator(".support-message-row.mine")
+            ).toHaveCount(1);
+
+            await expect(
+                page.locator(".support-message-row.admin")
+            ).toHaveCount(0);
+
+            expect(readRequests).toHaveLength(0);
+        }
+    );
+
+    test(
+        "сортирует историю и объединяет сообщения с одинаковым ID",
+        async ({ page }) => {
+            await openSupportChatPage(page, {
+                messages: [
+                    initialMessages[1],
+
+                    initialMessages[0],
+
+                    {
+                        ...initialMessages[1],
+                        text: "Обновлённый ответ поддержки",
+                    },
+                ],
+            });
+
+            const rows = page.locator(
+                ".support-message-row"
+            );
+
+            await expect(rows).toHaveCount(2);
+
+            await expect(rows.nth(0)).toContainText(
+                initialMessages[0].text
+            );
+
+            await expect(rows.nth(1)).toContainText(
+                "Обновлённый ответ поддержки"
+            );
+
+            await expect(
+                page.getByText(
+                    initialMessages[1].text,
+                    { exact: true }
+                )
+            ).toHaveCount(0);
+        }
+    );
+
+    test(
+        "использует единый рабочий телефон поддержки",
+        async ({ page }) => {
+            await openSupportChatPage(page);
+
+            const phone = page.locator(
+                ".support-chat-phone"
+            );
+
+            await expect(phone).toBeVisible();
+
+            await expect(phone).toHaveAttribute(
+                "href",
+                "tel:+79790199979"
+            );
+
+            await expect(phone).toContainText(
+                "+7 (979) 019-99-79"
+            );
+        }
+    );
 });
