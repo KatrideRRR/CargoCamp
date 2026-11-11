@@ -1,5 +1,6 @@
 import { test, expect } from "./fixtures/safeTest";
-
+import { mockAppShell } from "./utils/mockAppShell";
+import { createMockJwt } from "./utils/mockAuthSession";
 const FRONT_URL = "http://localhost:3000";
 
 const testUser = {
@@ -8,29 +9,8 @@ const testUser = {
     role: "customer",
 };
 
-function createFakeJwt(payload) {
-    const header = {
-        alg: "none",
-        typ: "JWT",
-    };
-
-    const base64url = (obj) =>
-        Buffer.from(JSON.stringify(obj))
-            .toString("base64")
-            .replace(/=/g, "")
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_");
-
-    return `${base64url(header)}.${base64url(payload)}.`;
-}
-
 async function setFakeAuth(page, user = testUser) {
-    const fakeToken = createFakeJwt({
-        id: user.id,
-        role: user.role,
-        name: user.username,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-    });
+    const fakeToken = createMockJwt(user);
 
     await page.addInitScript(({ token, user }) => {
         localStorage.setItem("authToken", token);
@@ -45,6 +25,8 @@ async function setFakeAuth(page, user = testUser) {
 
 async function openServiceInfoPage(page) {
     await setFakeAuth(page);
+
+    await mockAppShell(page);
 
     await page.route("**/api/auth/profile", async (route) => {
         await route.fulfill({
@@ -285,7 +267,7 @@ test.describe("ServiceInfoPage", () => {
         });
 
         await expect(section).toContainText("partner@cargocamp.ru");
-        await expect(section).toContainText("+7 (978) 686-41-18");
+        await expect(section).toContainText("+7 (979) 019-99-79");
         await expect(section).toContainText("ИП: Аджиаметов Аким Ибришевич");
         await expect(section).toContainText("ИНН: 9109 0845 7603");
         await expect(section).toContainText("ОГРНИП: 325911200109660");

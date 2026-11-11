@@ -1,5 +1,6 @@
 import { test, expect } from "./fixtures/safeTest";
-
+import { mockAppShell } from "./utils/mockAppShell";
+import { createMockJwt } from "./utils/mockAuthSession";
 const FRONT_URL = "http://localhost:3000";
 
 const testUser = {
@@ -32,29 +33,8 @@ const reviews = [
     },
 ];
 
-function createFakeJwt(payload) {
-    const header = {
-        alg: "none",
-        typ: "JWT",
-    };
-
-    const base64url = (obj) =>
-        Buffer.from(JSON.stringify(obj))
-            .toString("base64")
-            .replace(/=/g, "")
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_");
-
-    return `${base64url(header)}.${base64url(payload)}.`;
-}
-
 async function setFakeAuth(page, user = testUser) {
-    const fakeToken = createFakeJwt({
-        id: user.id,
-        role: user.role,
-        name: user.username,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-    });
+    const fakeToken = createMockJwt(user);
 
     await page.addInitScript(({ token, user }) => {
         localStorage.setItem("authToken", token);
@@ -74,6 +54,8 @@ async function setupReviewsMocks(page, options = {}) {
         reviewsBody = { reviews },
         reviewsStatus = 200,
     } = options;
+
+    await mockAppShell(page);
 
     page.on("pageerror", (error) => {
         console.log("[PAGE ERROR]", error.message);

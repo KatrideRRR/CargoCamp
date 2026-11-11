@@ -1,32 +1,16 @@
 import { test, expect } from "./fixtures/safeTest";
-
+import { mockAppShell } from "./utils/mockAppShell";
+import { createMockJwt } from "./utils/mockAuthSession";
 const FRONT_URL = "http://localhost:3000";
 
 // Если у тебя маршрут другой — поменяй только эту строку.
 const INFO_URL = `${FRONT_URL}/info?platform=web`;
 
-function createFakeJwt(payload) {
-    const header = {
-        alg: "none",
-        typ: "JWT",
-    };
-
-    const base64url = (obj) =>
-        Buffer.from(JSON.stringify(obj))
-            .toString("base64")
-            .replace(/=/g, "")
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_");
-
-    return `${base64url(header)}.${base64url(payload)}.`;
-}
-
 async function setFakeAuth(page) {
-    const fakeToken = createFakeJwt({
+    const fakeToken = createMockJwt({
         id: 1,
+        username: "test-user",
         role: "customer",
-        name: "test-user",
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
     });
 
     await page.addInitScript((token) => {
@@ -36,6 +20,14 @@ async function setFakeAuth(page) {
 
 async function openInfoPage(page, platform = "web") {
     await setFakeAuth(page);
+
+    await mockAppShell(page, {
+        profile: {
+            id: 1,
+            username: "test-user",
+            role: "customer",
+        },
+    });
 
     await page.goto(`${FRONT_URL}/info?platform=${platform}`, {
 
@@ -178,7 +170,7 @@ test.describe("InfoPage", () => {
         await expect(details).toContainText("4. Передача данных третьим лицам");
         await expect(details).toContainText("Мы не продаём персональные данные.");
         await expect(details).toContainText("partner@cargocamp.ru");
-        await expect(details).toContainText("+7 (978) 686 41 18");
+        await expect(details).toContainText("+7 (979) 019-99-79");
     });
 
     test("закрывает политику конфиденциальности повторным кликом", async ({ page }) => {
@@ -262,7 +254,7 @@ test.describe("InfoPage", () => {
         await expect(footer).toContainText("partner@cargocamp.ru");
 
         await expect(footer).toContainText("Телефон");
-        await expect(footer).toContainText("+7 (978) 686 41 18");
+        await expect(footer).toContainText("+7 (979) 019-99-79");
 
         await expect(footer).toContainText("ИП");
         await expect(footer).toContainText("Аджиаметов Аким Ибришевич");

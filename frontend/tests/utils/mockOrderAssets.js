@@ -22,6 +22,9 @@ const MOCK_PHOTO_PATHS = [
 
     "/uploads/express/201/photo1.jpg",
     "/uploads/express/201/photo2.jpg",
+
+    "/uploads/orders/1/photo1.jpg",
+    "/uploads/orders/1/photo2.jpg",
 ];
 
 export async function mockOrderAssets(page) {

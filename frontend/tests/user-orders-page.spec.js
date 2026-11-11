@@ -1,5 +1,6 @@
 import { test, expect } from "./fixtures/safeTest";
-
+import { mockAppShell } from "./utils/mockAppShell";
+import { createMockJwt } from "./utils/mockAuthSession";
 const FRONT_URL = "http://localhost:3000";
 
 const viewer = {
@@ -69,29 +70,8 @@ const orders = [
     },
 ];
 
-function createFakeJwt(payload) {
-    const header = {
-        alg: "none",
-        typ: "JWT",
-    };
-
-    const base64url = (obj) =>
-        Buffer.from(JSON.stringify(obj))
-            .toString("base64")
-            .replace(/=/g, "")
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_");
-
-    return `${base64url(header)}.${base64url(payload)}.`;
-}
-
 async function setFakeAuth(page, user = viewer) {
-    const fakeToken = createFakeJwt({
-        id: user.id,
-        role: user.role || "executor",
-        name: user.username,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-    });
+    const fakeToken = createMockJwt(user);
 
     await page.addInitScript(({ token, user }) => {
         localStorage.setItem("authToken", token);
@@ -114,6 +94,8 @@ async function setupUserOrdersMocks(page, options = {}) {
         requestStatus = 200,
         requestBody = { success: true },
     } = options;
+
+    await mockAppShell(page);
 
     page.on("pageerror", (error) => {
         console.log("[PAGE ERROR]", error.message);
@@ -189,7 +171,7 @@ async function openUserOrdersPage(page, options = {}) {
         throw new Error("UserOrdersPage редиректит на /login. Fake JWT не применился или роут другой.");
     }
 
-    await expect(page.locator(".all-orders")).toBeVisible({
+    await expect(page.locator(".orders-page.user-orders-page")).toBeVisible({
         timeout: 15000,
     });
 
@@ -199,7 +181,7 @@ async function openUserOrdersPage(page, options = {}) {
 }
 
 function orderCard(page, text) {
-    return page.locator(".floatingCard").filter({
+    return page.locator(".order-card").filter({
         hasText: text,
     });
 }
@@ -228,16 +210,24 @@ test.describe("UserOrdersPage", () => {
     });
 
     test("отображает страницу заказов пользователя", async ({ page }) => {
-        await expect(page.locator(".all-orders")).toBeVisible();
-        await expect(page.locator(".pageContainer")).toBeVisible();
-        await expect(page.locator(".all-orders-page")).toBeVisible();
+        const root = page.locator(".user-orders-page");
 
-        await expect(page.getByText("Заказы, размещенные пользователем Executor (ID: 2)")).toBeVisible();
+        await expect(root).toBeVisible();
+        await expect(root.locator(".orders-shell")).toBeVisible();
+
+        await expect(root.locator(".orders-title")).toHaveText(
+            "Заказы пользователя"
+        );
+
+        const subtitle = root.locator(".orders-subtitle").first();
+
+        await expect(subtitle).toContainText("Иван");
+        await expect(subtitle).toContainText("ID: 1");
     });
 
     test("загружает и отображает список заказов", async ({ page }) => {
         await expect(page.locator(".orders-list")).toBeVisible();
-        await expect(page.locator(".floatingCard")).toHaveCount(3);
+        await expect(page.locator(".order-card")).toHaveCount(3);
 
         await expect(page.getByText("Заказ №1")).toBeVisible();
         await expect(page.getByText("Заказ №2")).toBeVisible();
@@ -259,9 +249,8 @@ test.describe("UserOrdersPage", () => {
     test("показывает данные заказчика", async ({ page }) => {
         const card = orderCard(page, "Заказ №1");
 
-        await expect(card).toContainText("ID заказчика: 1");
-        await expect(card).toContainText("Имя заказчика: Иван");
-        await expect(card).toContainText("Рейтинг заказчика: 4.5");
+        await expect(card.locator(".order-grid")).toContainText("Иван");
+        await expect(card.locator(".order-grid")).toContainText("4.5");
     });
 
     test("показывает ссылку на жалобы заказчика", async ({ page }) => {
@@ -286,15 +275,17 @@ test.describe("UserOrdersPage", () => {
     test("подсвечивает highlighted заказ", async ({ page }) => {
         const card = orderCard(page, "Заказ №1");
 
-        await expect(card).toHaveClass(/highlighted-order/);
+        await expect(card).toHaveClass(/highlighted/);
     });
 
     test("показывает fallback для отсутствующих категории, подкатегории и услуги", async ({ page }) => {
         const card = orderCard(page, "Заказ №3");
 
-        await expect(card).toContainText("Категория: Не указано");
-        await expect(card).toContainText("Подкатегория: Не указано");
-        await expect(card).toContainText("Услуга: Не указано");
+        await expect(
+            card.locator(".order-grid .v").filter({
+                hasText: "Не указано",
+            })
+        ).toHaveCount(3);
     });
 
     test("показывает иконки типов оплаты", async ({ page }) => {
@@ -302,9 +293,17 @@ test.describe("UserOrdersPage", () => {
         const guaranteeCard = orderCard(page, "Заказ №2");
         const installmentsCard = orderCard(page, "Заказ №3");
 
-        await expect(cashCard.locator(".payment-icon svg title")).toHaveText("Наличные");
-        await expect(guaranteeCard.locator(".payment-icon svg title")).toHaveText("Tinkoff");
-        await expect(installmentsCard.locator(".payment-icon svg title")).toHaveText("Карта");
+        await expect(
+            cashCard.locator(".pay-icon svg title")
+        ).toHaveText("Наличные");
+
+        await expect(
+            guaranteeCard.locator(".pay-icon svg title")
+        ).toHaveText("Безопасная оплата");
+
+        await expect(
+            installmentsCard.locator(".pay-icon svg title")
+        ).toHaveText("Оплата картой");
     });
 
     test("показывает кнопку запроса только для чужого pending заказа без исполнителя", async ({ page }) => {
@@ -336,38 +335,21 @@ test.describe("UserOrdersPage", () => {
         await expect(card.getByRole("button", { name: /Запросить выполнение/i })).not.toBeVisible();
     });
 
-    test("отправляет запрос на выполнение заказа", async ({ page }) => {
-        let requestCalled = false;
-
-        await page.route("**/api/orders/1/request", async (route) => {
-            requestCalled = true;
-
+    test("открывает детали заказа для отклика", async ({ page }) => {
+        await page.route("**/api/orders/1", async (route) => {
             await route.fulfill({
                 status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    success: true,
-                }),
+                json: orders[0],
             });
         });
 
         const card = orderCard(page, "Заказ №1");
 
-        const dialogPromise = page.waitForEvent("dialog");
+        await card.getByRole("button", {
+            name: "Запросить выполнение",
+        }).click();
 
-        await card.getByRole("button", { name: /Запросить выполнение/i }).click();
-
-        const dialog = await dialogPromise;
-
-        expect(dialog.message()).toBe("Запрос отправлен заказчику!");
-
-        await dialog.accept();
-
-        await expect
-            .poll(() => requestCalled, {
-                timeout: 10000,
-            })
-            .toBe(true);
+        await expect(page).toHaveURL(/\/order\/1$/);
     });
 
     test("если нет токена, при запросе редиректит на login", async ({ page }) => {
@@ -390,7 +372,7 @@ test.describe("UserOrdersPage", () => {
     test("открывает модалку изображения", async ({ page }) => {
         const card = orderCard(page, "Заказ №1");
 
-        await card.locator(".order-image").first().click();
+        await card.locator(".thumb").first().click();
 
         await expect(page.locator(".custom-modal-content")).toBeVisible();
         await expect(page.locator(".custom-modal-image")).toHaveAttribute("src", /photo1\.jpg/);
@@ -399,7 +381,7 @@ test.describe("UserOrdersPage", () => {
     test("переключает изображения в модалке", async ({ page }) => {
         const card = orderCard(page, "Заказ №1");
 
-        await card.locator(".order-image").first().click();
+        await card.locator(".thumb").first().click();
 
         const modalImage = page.locator(".custom-modal-image");
 
@@ -417,7 +399,7 @@ test.describe("UserOrdersPage", () => {
     test("закрывает модалку изображения", async ({ page }) => {
         const card = orderCard(page, "Заказ №1");
 
-        await card.locator(".order-image").first().click();
+        await card.locator(".thumb").first().click();
 
         await expect(page.locator(".custom-modal-content")).toBeVisible();
 
@@ -436,11 +418,11 @@ test.describe("UserOrdersPage", () => {
         });
 
         await expect(page.locator(".error-message")).toHaveText(
-            "Ошибка: Нет доступа к заказам"
+            "Нет доступа к заказам"
         );
     });
 
-    test("если создатель не загрузился, показывает Неизвестно", async ({ page }) => {
+    test("если создатель не загрузился, показывает резервные данные", async ({ page }) => {
         await openUserOrdersPage(page, {
             creatorStatus: 500,
             creatorBody: {
@@ -450,17 +432,25 @@ test.describe("UserOrdersPage", () => {
 
         const card = orderCard(page, "Заказ №1");
 
-        await expect(card).toContainText("от Неизвестно");
-        await expect(card).toContainText("Имя заказчика: Неизвестно");
-        await expect(card).toContainText("Рейтинг заказчика: Нет данных");
+        await expect(card.locator(".order-grid")).toContainText(
+            "Без имени"
+        );
+
+        await expect(card.locator(".order-grid")).toContainText(
+            "Нет данных"
+        );
     });
 
-    test("при пустом списке сейчас показывает Загрузка", async ({ page }) => {
+    test("показывает пустое состояние, если заказов нет", async ({ page }) => {
         await openUserOrdersPage(page, {
             ordersBody: [],
             waitForPage: false,
         });
 
-        await expect(page.locator(".loading-message")).toHaveText("Загрузка...");
+        await expect(page.locator(".empty-title")).toHaveText(
+            "Заказов пока нет"
+        );
+
+        await expect(page.locator(".order-card")).toHaveCount(0);
     });
 });

@@ -1,5 +1,6 @@
 import { test, expect } from "./fixtures/safeTest";
-
+import { mockAppShell } from "./utils/mockAppShell";
+import { createMockJwt } from "./utils/mockAuthSession";
 const FRONT_URL = "http://localhost:3000";
 
 // Если у тебя маршрут называется иначе — поменяй только эту строку.
@@ -30,29 +31,8 @@ const savedAddresses = [
     },
 ];
 
-function createFakeJwt(payload) {
-    const header = {
-        alg: "none",
-        typ: "JWT",
-    };
-
-    const base64url = (obj) =>
-        Buffer.from(JSON.stringify(obj))
-            .toString("base64")
-            .replace(/=/g, "")
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_");
-
-    return `${base64url(header)}.${base64url(payload)}.`;
-}
-
 async function setFakeAuth(page) {
-    const fakeToken = createFakeJwt({
-        id: testUser.id,
-        role: testUser.role,
-        name: testUser.username,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-    });
+    const fakeToken = createMockJwt(testUser);
 
     await page.addInitScript(({ token, user }) => {
         localStorage.setItem("authToken", token);
@@ -76,6 +56,25 @@ async function setupExpressMocks(page, options = {}) {
         },
         createOrderStatus = 200,
     } = options;
+
+    await mockAppShell(page);
+
+    await page.route("**/api/orders/creator/1", async (route) => {
+        await route.fulfill({
+            status: 200,
+            json: [],
+        });
+    });
+
+    await page.route("**/api/express/express-orders/me?mode=created", async (route) => {
+        await route.fulfill({
+            status: 200,
+            json: {
+                success: true,
+                orders: [],
+            },
+        });
+    });
 
     page.on("pageerror", (error) => {
         console.log("[PAGE ERROR]", error.message);
@@ -290,7 +289,7 @@ async function fillValidExpressOrder(page) {
         timeout: 10000,
     });
 
-    await page.getByPlaceholder("Например 500").fill("700");
+    await page.getByPlaceholder("Укажите свою цену").fill("700");
 }
 
 test.describe("CreateExpressOrder", () => {
@@ -311,9 +310,9 @@ test.describe("CreateExpressOrder", () => {
         await expect(page.getByPlaceholder("Адрес точки B")).toBeVisible();
 
         await expect(page.locator(".exo-cardTitle")).toHaveText("Маршрут");
-        await expect(page.locator(".exo-label").filter({ hasText: "Цена" })).toBeVisible();
+        await expect(page.locator(".exo-label").filter({ hasText: "Ваша цена" })).toBeVisible();
 
-        await expect(page.getByPlaceholder("Например 500")).toBeVisible();
+        await expect(page.getByPlaceholder("Укажите свою цену")).toBeVisible();
 
         await expect(page.locator(".exo-btnPrimary")).toHaveText("Создать заказ");
     });
@@ -379,7 +378,7 @@ test.describe("CreateExpressOrder", () => {
     });
 
     test("позволяет вручную указать цену", async ({ page }) => {
-        const priceInput = page.getByPlaceholder("Например 500");
+        const priceInput = page.getByPlaceholder("Укажите свою цену");
 
         await priceInput.fill("650");
 
@@ -444,7 +443,7 @@ test.describe("CreateExpressOrder", () => {
 
         await clickCreateExpressOrder(page);
 
-        await expect(page.locator(".exo-alertText")).toHaveText("Укажите цену");
+        await expect(page.locator(".exo-alertText")).toHaveText("Укажите корректную цену");
     });
 
     test("успешно создаёт такси-заказ", async ({ page }) => {
@@ -496,8 +495,8 @@ test.describe("CreateExpressOrder", () => {
         expect(createRequestBody.toLat).toBeCloseTo(44.9489, 3);
         expect(createRequestBody.toLng).toBeCloseTo(34.0987, 3);
 
-        expect(createRequestBody.basePrice).toBe(0);
-        expect(createRequestBody.pricePerKm).toBe(0);
+        expect(createRequestBody.clientPricingVersion).toBe(1);
+        expect(createRequestBody.distanceKm).toBeGreaterThan(0);
 
         await expect
             .poll(() => alertText, {
