@@ -217,10 +217,12 @@ function DynamicAddressField({
             ref={fieldRef}
             className="glass field dynamicAddressField"
         >
-            <div className="label">
+            <label
+                htmlFor={`dynamic-address-${field.key}`}
+                className="cc-sr-only"
+            >
                 {field.label}
-                {field.required ? " *" : ""}
-            </div>
+            </label>
 
             <div className="dynamicAddressControlWrap">
                 <input
@@ -229,9 +231,10 @@ function DynamicAddressField({
                             ? "dynamicAddressSelected"
                             : ""
                     }`}
+                    id={`dynamic-address-${field.key}`}
                     type="text"
                     value={value || ""}
-                    placeholder={field.placeholder || ""}
+                    placeholder={field.placeholder || field.label || "Введите адрес"}
                     autoComplete="off"
                     onChange={handleInputChange}
                     onFocus={() => {

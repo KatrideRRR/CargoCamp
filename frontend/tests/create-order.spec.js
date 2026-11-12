@@ -1100,6 +1100,52 @@ test.describe(
             await openCreateOrderPage(page);
         });
 
+
+        test(
+            "динамические поля используют подсказки без верхних подписей",
+            async ({ page }) => {
+                await selectDynamicTestService(page);
+
+                const fields = page.locator(".dynamicServiceFields");
+
+                await expect(fields.locator(".label")).toHaveCount(0);
+
+                const workType = fields.getByRole("combobox", {
+                    name: "Тип работы",
+                });
+
+                await expect(workType).toBeVisible();
+
+                await expect(
+                    workType.locator('option[value=""]')
+                ).toHaveText("Выберите: Тип работы");
+
+                const count = fields.getByRole("spinbutton", {
+                    name: "Количество точек",
+                });
+
+                await expect(count).toHaveAttribute(
+                    "placeholder",
+                    "Количество точек"
+                );
+
+                await fields.getByRole("checkbox", {
+                    name: "Нужен помощник",
+                }).check();
+
+                const note = fields.getByRole("textbox", {
+                    name: "Комментарий помощнику",
+                });
+
+                await expect(note).toBeVisible();
+
+                await expect(note).toHaveAttribute(
+                    "placeholder",
+                    "Комментарий помощнику"
+                );
+            }
+        );
+
         // ------------------------------------------------
         // 1. ОБЯЗАТЕЛЬНЫЕ ПОЛЯ
         // ------------------------------------------------

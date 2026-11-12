@@ -909,30 +909,25 @@ const CreateExpressOrder = () => {
                         style={{ marginTop: 10 }}
                     >
                         <div className="exo-labelRow">
+
                             <label htmlFor="express-price" className="cc-sr-only">
                                 Ваша цена
                             </label>
 
                             {recommended?.recommendedPrice ? (
-                                <button
-                                    type="button"
-                                    className="exo-miniBtn"
-                                    onClick={applyRecommended}
-                                    title="Установить рекомендуемую цену"
-                                >
-                                    Рекомендуем{" "}
-                                    {recommended
-                                        .recommendedPrice
-                                        .toLocaleString(
-                                            "ru-RU"
-                                        )}{" "}
-                                    ₽
-                                </button>
-                            ) : (
-                                <div className="exo-recoMini">
-                                    {coordsOk ? "—" : ""}
+                                <div className="exo-labelRow">
+                                    <button
+                                        type="button"
+                                        className="exo-miniBtn"
+                                        onClick={applyRecommended}
+                                        title="Установить рекомендуемую цену"
+                                    >
+                                        Рекомендуем{" "}
+                                        {recommended.recommendedPrice.toLocaleString("ru-RU")} ₽
+                                    </button>
                                 </div>
-                            )}
+                            ) : null}
+
                         </div>
 
                         <input
