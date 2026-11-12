@@ -535,7 +535,7 @@ test.describe("OrderHistoryPage", () => {
         });
 
         page.once("dialog", async (dialog) => {
-            expect(dialog.message()).toBe("Отзыв сохранён ✅");
+            expect(dialog.message()).toBe("Отзыв сохранён");
             await dialog.accept();
         });
 

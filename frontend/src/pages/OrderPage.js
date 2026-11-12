@@ -16,6 +16,13 @@ import {
     FaUniversity,
 } from "react-icons/fa";
 import {
+    Zap,
+    Clock3,
+    X,
+    ChevronLeft,
+    ChevronRight,
+} from "lucide-react";
+import {
     fetchExecutorBusyState,
 } from "../utils/executorBusyState";
 import { FiAlertTriangle } from "react-icons/fi";
@@ -203,7 +210,7 @@ const OrderPage = () => {
             const response = await axiosInstance.get("/auth/profile");
             setProfile(response.data);
         } catch (err) {
-            console.error("❌ Ошибка получения профиля:", err);
+            console.error("Ошибка получения профиля:", err);
             setProfile(null);
         }
     };
@@ -1029,9 +1036,15 @@ const OrderPage = () => {
                                         : "order-time-box--scheduled"
                                 }`}
                             >
-        <span className="order-time-icon">
-            {orderTiming.type === "asap" ? "⚡" : "🕒"}
-        </span>
+
+<span className="order-time-icon" aria-hidden="true">
+    {orderTiming.type === "asap" ? (
+        <Zap size={20} strokeWidth={1.9} />
+    ) : (
+        <Clock3 size={20} strokeWidth={1.9} />
+    )}
+</span>
+
 
                                 <div className="order-time-content">
             <span className="order-time-label">
@@ -1173,8 +1186,8 @@ const OrderPage = () => {
                     isOpen={requestModalOpen}
                     onRequestClose={closeRequestModal}
                     contentLabel="Запросить выполнение"
-                    className="request-order-modal"
-                    overlayClassName="request-order-overlay"
+                    className="custom-modal order-photo-modal"
+                    overlayClassName="custom-modal-overlay order-photo-overlay"
                     parentSelector={() => document.body}
                 >
                     <div className="request-order-content">
@@ -1254,12 +1267,21 @@ const OrderPage = () => {
                     isOpen={isModalOpen}
                     onRequestClose={closeModal}
                     contentLabel="Full Image Modal"
-                    className="custom-modal"
-                    overlayClassName="custom-modal-overlay"
+                    className="custom-modal order-photo-modal"
+                    overlayClassName="custom-modal-overlay order-photo-overlay"
                     parentSelector={() => document.body}
                 >
                     <div className="custom-modal-content">
-                        <button onClick={closeModal} className="custom-close-button">✖</button>
+
+                        <button
+                            type="button"
+                            onClick={closeModal}
+                            className="custom-close-button"
+                            aria-label="Закрыть фотографии"
+                        >
+                            <X size={20} aria-hidden="true" />
+                        </button>
+
 
                         {currentImages.length > 0 && (
                             <img
@@ -1271,8 +1293,25 @@ const OrderPage = () => {
 
                         {currentImages.length > 1 && (
                             <div className="custom-image-navigation">
-                                <button onClick={prevImage} className="custom-nav-button">◀</button>
-                                <button onClick={nextImage} className="custom-nav-button">▶</button>
+
+                                <button
+                                    type="button"
+                                    onClick={prevImage}
+                                    className="custom-nav-button"
+                                    aria-label="Предыдущее изображение"
+                                >
+                                    <ChevronLeft size={22} aria-hidden="true" />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={nextImage}
+                                    className="custom-nav-button"
+                                    aria-label="Следующее изображение"
+                                >
+                                    <ChevronRight size={22} aria-hidden="true" />
+                                </button>
+
                             </div>
                         )}
                     </div>

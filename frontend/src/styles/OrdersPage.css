@@ -3828,3 +3828,83 @@
     background: #1971c2;
     color: #fff;
 }
+
+.custom-close-button,
+.custom-nav-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.custom-close-button svg,
+.custom-nav-button svg {
+    flex: 0 0 auto;
+}
+
+
+/* ==========================================
+   ORDER PHOTO GALLERY
+   ========================================== */
+
+.ReactModal__Overlay.order-photo-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.ReactModal__Overlay.order-photo-overlay
+> .ReactModal__Content.order-photo-modal {
+    position: relative;
+    inset: auto;
+
+    box-sizing: border-box;
+    width: min(820px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+    min-height: 160px;
+    max-height: calc(100dvh - 32px);
+
+    overflow: hidden;
+}
+
+.order-photo-overlay .custom-modal-content {
+    position: relative;
+
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 12px;
+
+    min-height: 160px;
+    padding: 54px 14px 14px;
+}
+
+.order-photo-overlay .custom-modal-image {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: calc(100dvh - 160px);
+    object-fit: contain;
+}
+
+.order-photo-overlay .custom-image-navigation {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.order-photo-overlay .custom-close-button {
+    z-index: 5;
+}
+
+.order-photo-overlay .custom-nav-button {
+    position: relative;
+    z-index: 2;
+}

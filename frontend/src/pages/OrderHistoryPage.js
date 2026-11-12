@@ -519,9 +519,7 @@ const OrderHistoryPage = () => {
                 setReviewRating(0);
                 setReviewText("");
 
-                alert(
-                    "Отзыв сохранён ✅"
-                );
+                alert("Отзыв сохранён");
             } catch (submitError) {
                 console.error(
                     "submitReview error:",

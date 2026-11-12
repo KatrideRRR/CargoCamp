@@ -336,24 +336,6 @@ async function openRequestModal(page) {
     });
 }
 
-async function clickByDom(page, selector, textIncludes) {
-    await page.evaluate(({ selector, textIncludes }) => {
-        const items = Array.from(document.querySelectorAll(selector));
-        const element = textIncludes
-            ? items.find((item) => item.textContent?.includes(textIncludes))
-            : items[0];
-
-        if (!element) {
-            throw new Error(`Элемент не найден: ${selector} ${textIncludes || ""}`);
-        }
-
-        element.click();
-    }, {
-        selector,
-        textIncludes,
-    });
-}
-
 test.describe("OrderPage — обычный заказ", () => {
     test.beforeEach(async ({ page }) => {
         await openRegularOrderPage(page);
@@ -587,15 +569,21 @@ test.describe("OrderPage — обычный заказ", () => {
         await expect(modal).toBeVisible();
         await expect(modalImage).toHaveAttribute("src", /photo1\.jpg/);
 
-        await clickByDom(page, ".custom-nav-button", "▶");
+        await page.getByRole("button", {
+            name: "Следующее изображение",
+        }).click();
 
         await expect(modalImage).toHaveAttribute("src", /photo2\.jpg/);
 
-        await clickByDom(page, ".custom-nav-button", "◀");
+        await page.getByRole("button", {
+            name: "Предыдущее изображение",
+        }).click();
 
         await expect(modalImage).toHaveAttribute("src", /photo1\.jpg/);
 
-        await clickByDom(page, ".custom-close-button");
+        await page.getByRole("button", {
+            name: "Закрыть фотографии",
+        }).click();
 
         await expect(modal).not.toBeVisible();
     });

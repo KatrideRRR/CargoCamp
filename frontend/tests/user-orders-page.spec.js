@@ -186,24 +186,6 @@ function orderCard(page, text) {
     });
 }
 
-async function clickByDom(page, selector, textIncludes) {
-    await page.evaluate(({ selector, textIncludes }) => {
-        const items = Array.from(document.querySelectorAll(selector));
-        const element = textIncludes
-            ? items.find((item) => item.textContent?.includes(textIncludes))
-            : items[0];
-
-        if (!element) {
-            throw new Error(`Элемент не найден: ${selector} ${textIncludes || ""}`);
-        }
-
-        element.click();
-    }, {
-        selector,
-        textIncludes,
-    });
-}
-
 test.describe("UserOrdersPage", () => {
     test.beforeEach(async ({ page }) => {
         await openUserOrdersPage(page);
@@ -264,13 +246,39 @@ test.describe("UserOrdersPage", () => {
         await expect(link).toContainText("2");
     });
 
+
     test("переходит на страницу жалоб", async ({ page }) => {
+        await page.route("**/api/auth/user/1", async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: creator,
+            });
+        });
+
+        await page.route("**/api/auth/reviews/user/1", async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    reviews: [],
+                },
+            });
+        });
+
         const card = orderCard(page, "Заказ №1");
 
         await card.getByRole("link", { name: /Жалобы/i }).click();
 
         await expect(page).toHaveURL(/\/complaints\/1/);
+
+        await expect(
+            page.getByRole("heading", { name: "Отзывы" })
+        ).toBeVisible();
+
+        await expect(
+            page.getByText("Пока нет отзывов.")
+        ).toBeVisible();
     });
+
 
     test("подсвечивает highlighted заказ", async ({ page }) => {
         const card = orderCard(page, "Заказ №1");
@@ -387,11 +395,15 @@ test.describe("UserOrdersPage", () => {
 
         await expect(modalImage).toHaveAttribute("src", /photo1\.jpg/);
 
-        await clickByDom(page, ".custom-nav-button", "▶");
+        await page.getByRole("button", {
+            name: "Следующее изображение",
+        }).click();
 
         await expect(modalImage).toHaveAttribute("src", /photo2\.jpg/);
 
-        await clickByDom(page, ".custom-nav-button", "◀");
+        await page.getByRole("button", {
+            name: "Предыдущее изображение",
+        }).click();
 
         await expect(modalImage).toHaveAttribute("src", /photo1\.jpg/);
     });
@@ -403,7 +415,9 @@ test.describe("UserOrdersPage", () => {
 
         await expect(page.locator(".custom-modal-content")).toBeVisible();
 
-        await clickByDom(page, ".custom-close-button");
+        await page.getByRole("button", {
+            name: "Закрыть фотографии",
+        }).click();
 
         await expect(page.locator(".custom-modal-content")).not.toBeVisible();
     });

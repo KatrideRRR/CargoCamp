@@ -10,7 +10,11 @@ import {
     useNavigate,
     useParams,
 } from "react-router-dom";
-
+import {
+    X,
+    ChevronLeft,
+    ChevronRight,
+} from "lucide-react";
 import Modal from "react-modal";
 
 import {
@@ -818,8 +822,8 @@ const UserOrdersPage = () => {
                 isOpen={isModalOpen}
                 onRequestClose={closeModal}
                 contentLabel="Просмотр фотографий заказа"
-                className="custom-modal"
-                overlayClassName="custom-modal-overlay"
+                className="custom-modal order-photo-modal"
+                overlayClassName="custom-modal-overlay order-photo-overlay"
             >
                 <div className="custom-modal-content">
                     <button
@@ -828,7 +832,7 @@ const UserOrdersPage = () => {
                         className="custom-close-button"
                         aria-label="Закрыть фотографии"
                     >
-                        ×
+                        <X size={20} aria-hidden="true" />
                     </button>
 
                     {currentImages.length >
@@ -856,7 +860,7 @@ const UserOrdersPage = () => {
                                     className="custom-nav-button"
                                     aria-label="Предыдущее изображение"
                                 >
-                                    ◀
+                                    <ChevronLeft size={22} aria-hidden="true" />
                                 </button>
 
                                 <button
@@ -867,7 +871,7 @@ const UserOrdersPage = () => {
                                     className="custom-nav-button"
                                     aria-label="Следующее изображение"
                                 >
-                                    ▶
+                                    <ChevronRight size={22} aria-hidden="true" />
                                 </button>
                             </div>
                         )}
