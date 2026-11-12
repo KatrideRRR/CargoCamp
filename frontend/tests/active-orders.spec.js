@@ -399,14 +399,14 @@ test.describe("ActiveOrdersPage", () => {
             /test-image\.jpg/
         );
 
-        await page.getByRole("button", { name: "▶" }).click();
+        await page.getByRole("button", { name: "Следующее изображение" }).click();
 
         await expect(page.locator(".custom-modal-image")).toHaveAttribute(
             "src",
             /test-image-2\.jpg/
         );
 
-        await page.getByRole("button", { name: "◀" }).click();
+        await page.getByRole("button", { name: "Предыдущее изображение" }).click();
 
         await expect(page.locator(".custom-modal-image")).toHaveAttribute(
             "src",

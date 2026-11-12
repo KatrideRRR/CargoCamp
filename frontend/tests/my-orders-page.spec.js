@@ -512,7 +512,13 @@ test.describe("MyOrdersPage", () => {
         await expect(card).toContainText("executor2");
         await expect(card).toContainText("4.8");
         await expect(card).toContainText("Сделаю быстро и аккуратно");
-        await expect(card).toContainText("✓ Верифицирован");
+        await expect(
+            card.getByText("Верифицирован", { exact: true })
+        ).toBeVisible();
+
+        await expect(
+            card.getByText("Верифицирован", { exact: true }).locator("svg")
+        ).toHaveCount(1);
 
         await card.getByRole("button", { name: "Скрыть" }).click();
 
@@ -721,7 +727,7 @@ test.describe("MyOrdersPage", () => {
 
         await page.evaluate(() => {
             const button = Array.from(document.querySelectorAll(".custom-nav-button"))
-                .find((item) => item.textContent?.includes("▶"));
+                .find((item) => item.getAttribute("aria-label") === "Следующее изображение");
 
             if (!button) {
                 throw new Error("Кнопка следующего изображения не найдена");
@@ -734,7 +740,7 @@ test.describe("MyOrdersPage", () => {
 
         await page.evaluate(() => {
             const button = Array.from(document.querySelectorAll(".custom-nav-button"))
-                .find((item) => item.textContent?.includes("◀"));
+                .find((item) => item.getAttribute("aria-label") === "Предыдущее изображение");
 
             if (!button) {
                 throw new Error("Кнопка предыдущего изображения не найдена");

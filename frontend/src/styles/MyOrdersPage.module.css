@@ -706,7 +706,9 @@
     position: absolute;
     top: 12px;
     right: 12px;
-
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 40px;
     height: 40px;
     border-radius: 14px;
@@ -743,7 +745,9 @@
     background: rgba(255, 255, 255, 0.56);
     cursor: pointer;
     font-weight: 900;
-
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
 }
@@ -1088,7 +1092,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-
+    gap: 5px;
     width: fit-content;
     min-height: 27px;
     padding: 6px 9px;

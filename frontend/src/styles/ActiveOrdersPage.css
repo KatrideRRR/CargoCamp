@@ -4868,3 +4868,16 @@ body {
     font: inherit;
     cursor: pointer;
 }
+
+.active-orders .custom-close-button,
+.active-orders .custom-nav-button,
+.completion-work-modal__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.active-orders .contract-download-icon {
+    display: inline-flex;
+    align-items: center;
+}

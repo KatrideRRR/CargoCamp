@@ -12,6 +12,7 @@ import YandexMapModal from "../components/YandexMapModal";
 import PaymentProviderSelect from "../components/PaymentProviderSelect";
 import DynamicServiceFields, {isDynamicFieldVisible} from "../components/DynamicServiceFields";
 import {calculateRecommendedPrice} from "../utils/calculateRecommendedPrice";
+import { Check, Paperclip, Timer } from "lucide-react";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -1665,7 +1666,9 @@ function CreateOrderPage() {
                             {selectedService && (
                                 <div className="selectedServiceCard">
                                     <div className="selectedServiceTop">
-                                        <div className="selectedServiceCheck">✓</div>
+                                        <div className="selectedServiceCheck" aria-hidden="true">
+                                            <Check size={16} strokeWidth={2.4} />
+                                        </div>
 
                                         <div className="selectedServiceContent">
                                             <div className="selectedServiceName">
@@ -1882,7 +1885,10 @@ function CreateOrderPage() {
                             <label className="upload inline">
                                 <input type="file" multiple accept="image/*" onChange={handleImageChange}
                                        style={{display: "none"}}/>
-                                <span>📎 Добавить фото до выполнения работы</span>
+                                <span className="order-photo-add">
+    <Paperclip size={17} strokeWidth={1.9} aria-hidden="true" />
+    Добавить фото до выполнения работы
+</span>
                             </label>
 
                             {images.length > 0 ? (
@@ -2098,8 +2104,8 @@ function CreateOrderPage() {
 
                             {isHourlyCargo && (
                                 <div className="cargoHourlyNotice">
-                                    <div className="cargoHourlyNoticeIcon">
-                                        ⏱
+                                    <div className="cargoHourlyNoticeIcon" aria-hidden="true">
+                                        <Timer size={18} strokeWidth={1.9} />
                                     </div>
 
                                     <div>
@@ -2264,7 +2270,7 @@ function CreateOrderPage() {
                             <div className="totalAmount">{promotionTotal} ₽</div>
                         </div>
 
-                        <div className="muted">💡 Если продвижение не выбрано — оплата сейчас = 0 ₽.</div>
+                        <div className="muted"> Если продвижение не выбрано — оплата сейчас = 0 ₽.</div>
                     </div>
 
                     {/* actions */}

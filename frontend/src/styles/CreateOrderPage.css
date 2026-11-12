@@ -2377,3 +2377,8 @@
         height: 32px;
     }
 }
+.create-page .order-photo-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}

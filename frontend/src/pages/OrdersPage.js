@@ -22,6 +22,7 @@ import RegularAdvanceTimeField from "../components/RegularAdvanceTimeField";
 import { FaMapMarkedAlt, FaSlidersH, FaLocationArrow } from "react-icons/fa";
 import { FiAlertTriangle } from "react-icons/fi";
 import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
+import { Zap, Clock3 } from "lucide-react";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 const publicApi = axios.create({
@@ -274,7 +275,7 @@ const OrdersPage = () => {
                 const res = await axiosInstance.get(`/payments/status?paymentId=${encodeURIComponent(paymentId)}`);
 
                 if (res.data?.status === "succeeded") {
-                    toast.success("Продвижение оплачено ✅");
+                    toast.success("Продвижение оплачено");
                 } else if (res.data?.status === "pending") {
                     toast.info("Платёж обрабатывается… обновите страницу через пару секунд");
                 } else {
@@ -1524,9 +1525,13 @@ const OrdersPage = () => {
                                                         : "order-time-box--scheduled"
                                                 }`}
                                             >
-        <span className="order-time-icon">
-            {orderTiming.type === "asap" ? "⚡" : "🕒"}
-        </span>
+        <span className="order-time-icon" aria-hidden="true">
+    {orderTiming.type === "asap" ? (
+        <Zap size={20} strokeWidth={1.9} />
+    ) : (
+        <Clock3 size={20} strokeWidth={1.9} />
+    )}
+</span>
 
                                                 <div className="order-time-content">
             <span className="order-time-label">

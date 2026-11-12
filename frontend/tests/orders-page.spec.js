@@ -346,6 +346,22 @@ async function setupOrdersMocks(page, options = {}) {
         });
     });
 
+
+    await page.route(
+        "**/api/orders/pending-act-signatures",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({
+                    acts: [],
+                    missingOrderIds: [],
+                }),
+            });
+        }
+    );
+
+
     await page.route("**/api/express/express-orders/me?mode=active", async (route) => {
         await route.fulfill({
             status: 200,

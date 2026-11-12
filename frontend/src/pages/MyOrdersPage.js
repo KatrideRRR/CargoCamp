@@ -11,6 +11,18 @@ import { FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity } from "r
 import { Capacitor } from "@capacitor/core";
 import PromotionRetryPayment from "../components/PromotionRetryPayment";
 
+import {
+    Zap,
+    Clock3,
+    Star,
+    BadgeCheck,
+    Award,
+    Circle,
+    X,
+    ChevronLeft,
+    ChevronRight,
+} from "lucide-react";
+
 const apiUrl = process.env.REACT_APP_API_URL;
 
 const getRouteOrAddress = (order) => {
@@ -824,9 +836,13 @@ const MyOrdersPage = () => {
                                                         : styles.orderTimeScheduled
                                                 }`}
                                             >
-        <span className={styles.orderTimeIcon}>
-            {orderTiming.type === "asap" ? "⚡" : "🕒"}
-        </span>
+        <span className={styles.orderTimeIcon} aria-hidden="true">
+    {orderTiming.type === "asap" ? (
+        <Zap size={20} strokeWidth={1.9} />
+    ) : (
+        <Clock3 size={20} strokeWidth={1.9} />
+    )}
+</span>
 
                                                 <div className={styles.orderTimeContent}>
             <span className={styles.orderTimeLabel}>
@@ -964,8 +980,15 @@ const MyOrdersPage = () => {
                                                                                         {Number(executor.rating) > 0
                                                                                             ? Number(executor.rating).toFixed(1)
                                                                                             : "—"}{" "}
-                                                                                        ⭐ • {Number(executor.ratingCount || 0)}
-                    </span>
+                                                                                        <Star
+                                                                                            size={13}
+                                                                                            fill="currentColor"
+                                                                                            strokeWidth={1.7}
+                                                                                            style={{ verticalAlign: "-2px" }}
+                                                                                            aria-hidden="true"
+                                                                                        />
+                                                                                        {" "}• {Number(executor.ratingCount || 0)}
+                                                                                    </span>
                                                                                 </div>
 
                                                                                 <div className={styles.executorStatusRow}>
@@ -985,9 +1008,15 @@ const MyOrdersPage = () => {
                             .filter(Boolean)
                             .join(" ")}
                     >
-                        {verification.status === "verified" && "✓ "}
-                        {verification.status === "pensioner" && "◆ "}
-                        {verification.status === "unverified" && "○ "}
+{verification.status === "verified" && (
+    <BadgeCheck size={14} aria-hidden="true" />
+)}
+                        {verification.status === "pensioner" && (
+                            <Award size={14} aria-hidden="true" />
+                        )}
+                        {verification.status === "unverified" && (
+                            <Circle size={13} aria-hidden="true" />
+                        )}
 
                         {verification.label}
                     </span>
@@ -1122,9 +1151,16 @@ const MyOrdersPage = () => {
                                             overlayClassName="custom-modal-overlay"
                                         >
                                             <div className="custom-modal-content">
-                                                <button onClick={closeModal} className="custom-close-button">
-                                                    ✖
+
+                                                <button
+                                                    type="button"
+                                                    onClick={closeModal}
+                                                    className="custom-close-button"
+                                                    aria-label="Закрыть просмотр"
+                                                >
+                                                    <X size={20} aria-hidden="true" />
                                                 </button>
+
 
                                                 <img
                                                     src={`${apiUrl}${currentImages[currentImageIndex]}`}
@@ -1133,12 +1169,26 @@ const MyOrdersPage = () => {
                                                 />
 
                                                 <div className="custom-image-navigation">
-                                                    <button onClick={prevImage} className="custom-nav-button">
-                                                        ◀
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={prevImage}
+                                                        className="custom-nav-button"
+                                                        aria-label="Предыдущее изображение"
+                                                    >
+                                                        <ChevronLeft size={22} aria-hidden="true" />
                                                     </button>
-                                                    <button onClick={nextImage} className="custom-nav-button">
-                                                        ▶
+
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={nextImage}
+                                                        className="custom-nav-button"
+                                                        aria-label="Следующее изображение"
+                                                    >
+                                                        <ChevronRight size={22} aria-hidden="true" />
                                                     </button>
+
                                                 </div>
                                             </div>
                                         </Modal>

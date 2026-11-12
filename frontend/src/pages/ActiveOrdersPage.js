@@ -27,7 +27,13 @@ import ContractSigningPanel
 import "../styles/ActiveOrdersPageDark.css";
 import SignatureAgreementPanel
     from "../components/SignatureAgreementPanel";
-
+import {
+    FileText,
+    X,
+    Timer,
+    ChevronLeft,
+    ChevronRight,
+} from "lucide-react";
 import {
     downloadVerifiedContract,
 } from "../utils/downloadVerifiedContract";
@@ -994,8 +1000,8 @@ const ActiveOrdersPage = () => {
 
             alert(
                 files.length === 1
-                    ? "Фотография успешно загружена ✅"
-                    : `Фотографии успешно загружены: ${files.length} ✅`
+                    ? "Фотография успешно загружена"
+                    : `Фотографии успешно загружены: ${files.length}`
             );
         } catch (e) {
             console.error("Ошибка загрузки фото:", {
@@ -1034,7 +1040,7 @@ const ActiveOrdersPage = () => {
 
             await fetchActiveOrders();
             alert(
-                "Работа начата. Таймер запущен у обеих сторон ✅"
+                "Работа начата. Таймер запущен у обеих сторон"
             );
         } catch (e) {
             console.error("Ошибка начала работы:", e);
@@ -2318,9 +2324,9 @@ const ActiveOrdersPage = () => {
                                                                         }
                                                                     }}
                                                                 >
-            <span className="contract-download-icon">
-                📄
-            </span>
+            <span className="contract-download-icon" aria-hidden="true">
+    <FileText size={17} strokeWidth={1.9} />
+</span>
 
                                                                     <span className="contract-download-text">
     Скачать договор
@@ -2508,8 +2514,8 @@ const ActiveOrdersPage = () => {
                         overlayClassName="custom-modal-overlay"
                     >
                         <div className="custom-modal-content dispute-modal-content">
-                            <button onClick={closeDisputeModal} className="custom-close-button">
-                                ✖
+                            <button onClick={closeDisputeModal} aria-label="Закрыть" className="custom-close-button">
+                                <X size={20} aria-hidden="true" />
                             </button>
 
                             <h2 className="dispute-modal-title">
@@ -2692,11 +2698,11 @@ const ActiveOrdersPage = () => {
                                             )
                                         }
                                     >
-                                        ✖
+                                        <X size={20} aria-hidden="true" />
                                     </button>
 
-                                    <div className="completion-work-modal__icon">
-                                        ⏱
+                                    <div className="completion-work-modal__icon" aria-hidden="true">
+                                        <Timer size={25} strokeWidth={1.8} />
                                     </div>
 
                                     <h2 className="completion-work-modal__title">
@@ -3167,7 +3173,7 @@ const ActiveOrdersPage = () => {
                                     className="completion-work-modal__close"
                                     onClick={() => setSigningAct(null)}
                                 >
-                                    ✖
+                                    <X size={20} aria-hidden="true" />
                                 </button>
 
                                 <h2 className="completion-work-modal__title">
@@ -3242,8 +3248,8 @@ const ActiveOrdersPage = () => {
                         overlayClassName="custom-modal-overlay"
                     >
                         <div className="custom-modal-content">
-                            <button onClick={closeModal} className="custom-close-button">
-                                ✖
+                            <button onClick={closeModal} aria-label="Закрыть" className="custom-close-button">
+                                <X size={20} aria-hidden="true" />
                             </button>
 
                             {currentImages.length > 0 && (
@@ -3256,12 +3262,25 @@ const ActiveOrdersPage = () => {
 
                             {currentImages.length > 1 && (
                                 <div className="custom-image-navigation">
-                                    <button onClick={prevImage} className="custom-nav-button">
-                                        ◀
+
+                                    <button
+                                        type="button"
+                                        onClick={prevImage}
+                                        className="custom-nav-button"
+                                        aria-label="Предыдущее изображение"
+                                    >
+                                        <ChevronLeft size={22} aria-hidden="true" />
                                     </button>
-                                    <button onClick={nextImage} className="custom-nav-button">
-                                        ▶
+
+                                    <button
+                                        type="button"
+                                        onClick={nextImage}
+                                        className="custom-nav-button"
+                                        aria-label="Следующее изображение"
+                                    >
+                                        <ChevronRight size={22} aria-hidden="true" />
                                     </button>
+
                                 </div>
                             )}
                         </div>
