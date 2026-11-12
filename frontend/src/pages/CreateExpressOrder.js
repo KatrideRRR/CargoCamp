@@ -816,7 +816,9 @@ const CreateExpressOrder = () => {
                     <div className="exo-grid2">
                         <div className="exo-field">
                             <div className="exo-labelRow">
-                                <div className="exo-label">Откуда (A)</div>
+                                <label htmlFor="express-from" className="cc-sr-only">
+                                    Откуда
+                                </label>
                                 <div className="exo-miniActions">
                                     <button type="button" className="exo-miniBtn" onClick={detectGpsForFrom}>
                                         <Navigation size={16} strokeWidth={1.9} aria-hidden="true" /> GPS
@@ -829,9 +831,10 @@ const CreateExpressOrder = () => {
 
                             <input
                                 className="exo-control"
+                                id="express-from"
                                 value={form.fromAddress}
                                 onChange={(e) => onAddressInput("from", e.target.value)}
-                                placeholder="Адрес точки A"
+                                placeholder="Откуда — адрес точки A"
                             />
 
                             {addrSug.from.length > 0 && (
@@ -850,7 +853,9 @@ const CreateExpressOrder = () => {
 
                         <div className="exo-field">
                             <div className="exo-labelRow">
-                                <div className="exo-label">Куда (B)</div>
+                                <label htmlFor="express-to" className="cc-sr-only">
+                                    Куда
+                                </label>
                                 <div className="exo-miniActions">
                                     <button type="button" className="exo-miniBtn" onClick={() => setShowMapFor("to")}>
                                         <MapPin size={16} strokeWidth={1.9} aria-hidden="true" /> Карта
@@ -860,9 +865,10 @@ const CreateExpressOrder = () => {
 
                             <input
                                 className="exo-control"
+                                id="express-to"
                                 value={form.toAddress}
                                 onChange={(e) => onAddressInput("to", e.target.value)}
-                                placeholder="Адрес точки B"
+                                placeholder="Куда — адрес точки B"
                             />
 
                             {addrSug.to.length > 0 && (
@@ -903,9 +909,9 @@ const CreateExpressOrder = () => {
                         style={{ marginTop: 10 }}
                     >
                         <div className="exo-labelRow">
-                            <div className="exo-label">
+                            <label htmlFor="express-price" className="cc-sr-only">
                                 Ваша цена
-                            </div>
+                            </label>
 
                             {recommended?.recommendedPrice ? (
                                 <button
@@ -932,6 +938,7 @@ const CreateExpressOrder = () => {
                         <input
                             className="exo-control"
                             type="number"
+                            id="express-price"
                             min="1"
                             max="300000"
                             step="1"
@@ -977,7 +984,7 @@ const CreateExpressOrder = () => {
                                     value
                                 );
                             }}
-                            placeholder="Укажите свою цену"
+                            placeholder="Ваша цена, ₽"
                         />
 
                         {recommended && (
@@ -1106,6 +1113,7 @@ const CreateExpressOrder = () => {
 
                                 <div className="exo-field" style={{ marginTop: 10 }}>
                   <textarea
+                      aria-label="Комментарий к экспресс-заказу"
                       className="exo-control exo-textarea"
                       value={form.description}
                       onChange={(e) => setField("description", e.target.value)}

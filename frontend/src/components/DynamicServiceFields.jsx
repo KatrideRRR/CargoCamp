@@ -380,8 +380,7 @@ function DynamicServiceFields({
                                 }
                             >
                                 <option value="">
-                                    {field.placeholder ||
-                                        "Выберите вариант"}
+                                    {field.placeholder || `Выберите: ${field.label}`}
                                 </option>
 
                                 {(field.options ||

@@ -254,8 +254,8 @@ async function clickCourierType(page) {
 }
 
 async function fillRouteBySuggestions(page) {
-    const fromInput = page.getByPlaceholder("Адрес точки A");
-    const toInput = page.getByPlaceholder("Адрес точки B");
+    const fromInput = page.getByPlaceholder("Откуда — адрес точки A");
+    const toInput = page.getByPlaceholder("Куда — адрес точки B");
 
     await fromInput.fill("Пушкина 1");
 
@@ -289,7 +289,7 @@ async function fillValidExpressOrder(page) {
         timeout: 10000,
     });
 
-    await page.getByPlaceholder("Укажите свою цену").fill("700");
+    await page.locator("#express-price").fill("700");
 }
 
 test.describe("CreateExpressOrder", () => {
@@ -306,13 +306,15 @@ test.describe("CreateExpressOrder", () => {
         await expect(page.locator(".exo-typeBtn").filter({ hasText: "Такси" })).toBeVisible();
         await expect(page.locator(".exo-typeBtn").filter({ hasText: "Курьер" })).toBeVisible();
 
-        await expect(page.getByPlaceholder("Адрес точки A")).toBeVisible();
-        await expect(page.getByPlaceholder("Адрес точки B")).toBeVisible();
+        await expect(page.getByPlaceholder("Откуда — адрес точки A")).toBeVisible();
+        await expect(page.getByPlaceholder("Куда — адрес точки B")).toBeVisible();
 
         await expect(page.locator(".exo-cardTitle")).toHaveText("Маршрут");
-        await expect(page.locator(".exo-label").filter({ hasText: "Ваша цена" })).toBeVisible();
+        await expect(
+            page.getByRole("spinbutton", { name: "Ваша цена" })
+        ).toBeVisible();
 
-        await expect(page.getByPlaceholder("Укажите свою цену")).toBeVisible();
+        await expect(page.locator("#express-price")).toBeVisible();
 
         await expect(page.locator(".exo-btnPrimary")).toHaveText("Создать заказ");
     });
@@ -336,7 +338,7 @@ test.describe("CreateExpressOrder", () => {
     });
 
     test("показывает адресные подсказки для точки A и выбирает адрес", async ({ page }) => {
-        const fromInput = page.getByPlaceholder("Адрес точки A");
+        const fromInput = page.getByPlaceholder("Откуда — адрес точки A");
 
         await fromInput.fill("Пушкина 1");
 
@@ -352,7 +354,7 @@ test.describe("CreateExpressOrder", () => {
     });
 
     test("показывает адресные подсказки для точки B и выбирает адрес", async ({ page }) => {
-        const toInput = page.getByPlaceholder("Адрес точки B");
+        const toInput = page.getByPlaceholder("Куда — адрес точки B");
 
         await toInput.fill("Кирова 10");
 
@@ -380,7 +382,7 @@ test.describe("CreateExpressOrder", () => {
     });
 
     test("позволяет вручную указать цену", async ({ page }) => {
-        const priceInput = page.getByPlaceholder("Укажите свою цену");
+        const priceInput = page.locator("#express-price");
 
         await priceInput.fill("650");
 

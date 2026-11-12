@@ -1403,8 +1403,11 @@ function CreateOrderPage() {
                                     {timeOpen && (
                                         <div className="miniDrop">
                                             <div className="glass field">
-                                                <div className="label">Ко времени</div>
+                                                <label htmlFor="order-work-time" className="cc-sr-only">
+                                                    Дата и время выполнения
+                                                </label>
                                                 <DatePicker
+                                                    id="order-work-time"
                                                     selected={formData.workTime}
                                                     onChange={(date) => setFormData((p) => ({...p, workTime: date}))}
                                                     showTimeSelect
@@ -1458,8 +1461,11 @@ function CreateOrderPage() {
                                     {addressOpen && (
                                         <div className="miniDrop">
                                             <div className="glass field">
-                                                <div className="label">Адрес</div>
+                                                <label htmlFor="order-address" className="cc-sr-only">
+                                                    Адрес заказа
+                                                </label>
                                                 <input
+                                                    id="order-address"
                                                     className="control"
                                                     type="text"
                                                     placeholder="Введите адрес"
@@ -1618,13 +1624,16 @@ function CreateOrderPage() {
                             className="glass field serviceSearchField"
                             ref={serviceSearchBoxRef}
                         >
-                            <div className="label">Услуга</div>
+                            <label htmlFor="order-service-search" className="cc-sr-only">
+                                Услуга
+                            </label>
 
                             <div className="serviceSearchControlWrap">
                                 <input
                                     className={`control serviceSearchControl ${
                                         selectedService ? "selected" : ""
                                     }`}
+                                    id="order-service-search"
                                     type="text"
                                     value={serviceQuery}
                                     onChange={handleServiceQueryChange}
@@ -1862,7 +1871,7 @@ function CreateOrderPage() {
 
                         <div className="glass field">
                             <label
-                                className="label"
+                                className="cc-sr-only"
                                 htmlFor="order-description"
                             >
                                 Описание задачи
@@ -2058,22 +2067,36 @@ function CreateOrderPage() {
                                 </div>
                             )}
 
-                            <div className="label">
+
+                            <label
+                                htmlFor="order-proposed-sum"
+                                className="cc-sr-only"
+                            >
                                 {isHourlyCargo
                                     ? "Ориентировочная сумма"
                                     : isIntercityCargo
                                         ? "Ориентировочная сумма за перевозку"
                                         : "Сумма за работу"}
-                            </div>
+                            </label>
+
 
                             <input
                                 className="control"
                                 type="number"
+                                id="order-proposed-sum"
                                 min="1"
                                 max="300000"
                                 step="1"
                                 inputMode="numeric"
-                                placeholder="Например 1500"
+
+                                placeholder={
+                                    isHourlyCargo
+                                        ? "Ориентировочная сумма, ₽"
+                                        : isIntercityCargo
+                                            ? "Сумма за перевозку, ₽"
+                                            : "Сумма за работу, ₽"
+                                }
+
                                 value={formData.proposedSum}
                                 onChange={(e) => {
                                     const value = e.target.value;

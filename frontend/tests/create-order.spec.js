@@ -1065,7 +1065,7 @@ async function fillDynamicTestFields(
     }
 
     await page
-        .getByPlaceholder("Например 1500")
+        .locator("#order-proposed-sum")
         .fill(amount);
 }
 
@@ -1336,9 +1336,7 @@ test.describe(
                 ).click();
 
                 await expect(
-                    page.getByPlaceholder(
-                        "Например 1500"
-                    )
+                    page.locator("#order-proposed-sum")
                 ).toHaveValue("1400");
             }
         );
