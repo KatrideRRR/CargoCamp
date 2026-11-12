@@ -45,6 +45,7 @@ db.ContractEvent = require("./ContractEvent")(sequelize, DataTypes);
 db.OrderChangeRequest = require("./OrderChangeRequest")(sequelize, DataTypes);
 db.OrderCompletionDecision = require("./OrderCompletionDecision")(sequelize, DataTypes);
 db.OrderCompletionCorrection = require("./OrderCompletionCorrection")(sequelize, DataTypes);
+db.PublicOfferAcceptance = require("./PublicOfferAcceptance")(sequelize, DataTypes);
 // ✅ Express (такси/курьер)
 db.ExpressOrder = require("./ExpressOrder")(sequelize, DataTypes);
 db.ExpressSavedAddress = require("./ExpressSavedAddress")(sequelize, DataTypes);

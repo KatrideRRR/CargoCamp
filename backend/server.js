@@ -65,9 +65,8 @@ const actAcceptanceRoutes = require("./routes/actAcceptance");
 const actRemediationRoutes = require("./routes/actRemediation");
 const orderChangesRoutes = require("./routes/orderChanges");
 const adminPepRoutes = require("./routes/adminPep");
-const orderCompletionFlowRoutes =
-    require("./routes/orderCompletionFlow");
-
+const orderCompletionFlowRoutes = require("./routes/orderCompletionFlow");
+const publicOfferRoutes = require("./routes/publicOffer");
 const db = require("./models");
 const sequelize = require("./config/database");
 
@@ -262,6 +261,7 @@ app.use("/api/orders", orderRoutes(io));
 app.use("/api/order-changes", orderChangesRoutes);
 app.use("/api/disputes", disputeRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/legal/offer", publicOfferRoutes);
 app.use("/api/messages", messagesRoutes);
 app.use("/api/category", categoryRouter);
 app.use("/api/identity", identityRoutes);
