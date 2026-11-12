@@ -28,6 +28,9 @@ const {
     recordPromotionPaymentIntent,
     existingPromotionPaymentResponse,
 } = require("../services/promotionPaymentIntentService");
+const {
+    preparePromotionPaymentRetry,
+} = require("../services/promotionPaymentRetryService");
 
 function notifyPaymentProblem({provider, type, title, message, userId = null, orderId = null,}) {
     const buttonUrl =
@@ -458,6 +461,40 @@ router.post('/debt/create', authenticateToken, async (req, res) => {
         });
     }
 });
+
+router.post(
+    "/order/promotion/retry/prepare",
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const result = await preparePromotionPaymentRetry({
+                orderId: req.body?.orderId,
+                userId: req.user.id,
+            });
+
+            res.setHeader("Cache-Control", "no-store");
+
+            return res.json({
+                success: true,
+                ...result,
+            });
+        } catch (error) {
+            console.error(
+                "Promotion retry preparation error:",
+                error
+            );
+
+            return res.status(error.httpStatus || 502).json({
+                success: false,
+                error:
+                    error.httpStatus
+                        ? error.message
+                        : "Не удалось проверить предыдущий платёж. " +
+                        "Новая операция не создавалась.",
+            });
+        }
+    }
+);
 
 router.post('/card/bind/create', authenticateToken, async (req, res) => {
     try {
