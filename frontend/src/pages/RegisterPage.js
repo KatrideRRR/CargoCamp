@@ -185,10 +185,12 @@ const RegisterPage = () => {
                             />
                         </div>
 
+
                         <div className="field">
-                            <label htmlFor="phone" className="label">
-                                Телефон
+                            <label htmlFor="phone" className="cc-sr-only">
+                                Номер телефона
                             </label>
+
                             <InputMask
                                 mask="+7 (999) 999-99-99"
                                 value={phone}
@@ -199,6 +201,8 @@ const RegisterPage = () => {
                                         {...inputProps}
                                         id="phone"
                                         type="tel"
+                                        inputMode="tel"
+                                        autoComplete="tel"
                                         required
                                         className="input"
                                         placeholder="+7 (___) ___-__-__"
@@ -206,6 +210,7 @@ const RegisterPage = () => {
                                 )}
                             </InputMask>
                         </div>
+
 
                         <div className="field">
                             <label htmlFor="password" className="label">

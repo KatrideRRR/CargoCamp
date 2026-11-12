@@ -264,8 +264,12 @@ const LoginPage = () => {
                     {message && <div className="login-success">{message}</div>}
 
                     <div className="login-form">
+
                         <div className="field">
-                            <label htmlFor="phone" className="label">Телефон</label>
+                            <label htmlFor="phone" className="cc-sr-only">
+                                Номер телефона
+                            </label>
+
                             <InputMask
                                 mask="+7 (999) 999-99-99"
                                 value={phone}
@@ -276,6 +280,8 @@ const LoginPage = () => {
                                         {...inputProps}
                                         id="phone"
                                         type="tel"
+                                        inputMode="tel"
+                                        autoComplete="tel"
                                         required
                                         className="input"
                                         placeholder="+7 (___) ___-__-__"
@@ -283,6 +289,7 @@ const LoginPage = () => {
                                 )}
                             </InputMask>
                         </div>
+
 
                         <div className="modeRow">
                             <button
