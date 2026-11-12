@@ -99,13 +99,19 @@ function DynamicServiceFields({
                             key={field.key}
                             className="glass field"
                         >
-                            <div className="label">
+
+                            <label
+                                htmlFor={`dynamic-field-${field.key}`}
+                                className="cc-sr-only"
+                            >
                                 {field.label}
-                                {field.required ? " *" : ""}
-                            </div>
+                                {field.required ? " (обязательное поле)" : ""}
+                            </label>
+
 
                             <select
                                 className="control"
+                                id={`dynamic-field-${field.key}`}
                                 value={fieldValue}
                                 required={!!field.required}
                                 onChange={(event) =>
@@ -140,21 +146,25 @@ function DynamicServiceFields({
                             key={field.key}
                             className="glass field"
                         >
-                            <div className="label">
+
+                            <label
+                                htmlFor={`dynamic-field-${field.key}`}
+                                className="cc-sr-only"
+                            >
                                 {field.label}
-                                {field.required ? " *" : ""}
-                            </div>
+                                {field.required ? " (обязательное поле)" : ""}
+                            </label>
+
 
                             <textarea
                                 className="control textarea"
+                                id={`dynamic-field-${field.key}`}
                                 value={fieldValue}
                                 required={!!field.required}
                                 maxLength={
                                     field.maxLength || undefined
                                 }
-                                placeholder={
-                                    field.placeholder || ""
-                                }
+                                placeholder={field.placeholder || field.label}
                                 onChange={(event) =>
                                     updateField(
                                         field.key,
@@ -171,12 +181,18 @@ function DynamicServiceFields({
                         key={field.key}
                         className="glass field"
                     >
-                        <div className="label">
+
+                        <label
+                            htmlFor={`dynamic-field-${field.key}`}
+                            className="cc-sr-only"
+                        >
                             {field.label}
-                            {field.required ? " *" : ""}
-                        </div>
+                            {field.required ? " (обязательное поле)" : ""}
+                        </label>
+
 
                         <input
+                            id={`dynamic-field-${field.key}`}
                             className="control"
                             type={
                                 field.type === "number"
@@ -198,9 +214,7 @@ function DynamicServiceFields({
                             maxLength={
                                 field.maxLength || undefined
                             }
-                            placeholder={
-                                field.placeholder || ""
-                            }
+                            placeholder={field.placeholder || field.label}
                             onChange={(event) => {
                                 const nextValue =
                                     field.type === "number"
