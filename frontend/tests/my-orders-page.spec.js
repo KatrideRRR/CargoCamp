@@ -288,6 +288,20 @@ async function setupMyOrdersMocks(page, options = {}) {
         });
     });
 
+    await page.route(
+        "**/api/payments/order/promotion/retry/prepare",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    success: true,
+                    ready: true,
+                    restarted: false,
+                },
+            });
+        }
+    );
+
     await page.route("**/api/payments/order/promotion/create", async (route) => {
         await route.fulfill({
             status: 200,
@@ -445,12 +459,17 @@ test.describe("MyOrdersPage", () => {
             .getByRole("button", { name: "Оплатить" })
             .click();
 
+        await card
+            .getByRole("button", { name: "Продолжить оплату" })
+            .click();
+
         await expect
             .poll(() => paymentRequestBody, {
                 timeout: 10000,
             })
             .toEqual({
                 orderId: 102,
+                paymentMode: "redirect",
             });
 
         await expect
@@ -972,14 +991,22 @@ test.describe("MyOrdersPage — дополнительные сценарии", 
     );
 
     test(
-        "успешно обрабатывает оплату продвижения сохранённой картой",
+        "успешно обрабатывает оплату сохранённой картой",
         async ({ page }) => {
-            let paymentRequests = 0;
+            await openMyOrdersPage(page, {
+                profileBody: {
+                    ...testUser,
+                    yookassaPaymentMethodId: "pm_saved_1",
+                    cardLastFour: "1234",
+                },
+            });
+
+            let paymentBody = null;
 
             await page.route(
                 "**/api/payments/order/promotion/create",
                 async (route) => {
-                    paymentRequests++;
+                    paymentBody = route.request().postDataJSON();
 
                     await route.fulfill({
                         status: 200,
@@ -994,27 +1021,186 @@ test.describe("MyOrdersPage — дополнительные сценарии", 
 
             const card = orderCard(page, "Заказ №102");
 
-            page.once("dialog", async (dialog) => {
-                expect(dialog.message()).toContain(
-                    "Продвижение оплачено с привязанной карты"
-                );
-
-                await dialog.accept();
-            });
-
             await card.getByRole("button", {
                 name: "Оплатить",
             }).click();
 
-            await expect.poll(
-                () => paymentRequests
-            ).toBe(1);
+            await card.getByRole("radio", {
+                name: /Привязанная карта/,
+            }).check();
 
-            // При оплате сохранённой картой
-            // переход на внешний сайт не требуется.
-            await expect(page).toHaveURL(
-                /\/my-orders\/1/
+            await card.getByRole("button", {
+                name: "Продолжить оплату",
+            }).click();
+
+            await expect.poll(() => paymentBody).toEqual({
+                orderId: 102,
+                paymentMode: "saved",
+            });
+
+            await expect(
+                page.getByRole("status")
+            ).toContainText(
+                "Продвижение оплачено с привязанной карты"
             );
         }
     );
+
+
+    test("оплачивает продвижение через Т-Банк", async ({ page }) => {
+        let paymentBody = null;
+
+        const navigation = await mockPaymentNavigation(page);
+
+        await page.route(
+            "**/api/tbank-payments/order/promotion/create",
+            async (route) => {
+                paymentBody = route.request().postDataJSON();
+
+                await route.fulfill({
+                    status: 200,
+                    json: {
+                        success: true,
+                        provider: "tbank",
+                        confirmationUrl:
+                            "https://payment.example.test/confirm",
+                    },
+                });
+            }
+        );
+
+        const card = orderCard(page, "Заказ №102");
+
+        await card.getByRole("button", {
+            name: "Оплатить",
+        }).click();
+
+        await card.getByRole("button", {
+            name: /Т-Банк/,
+        }).click();
+
+        await card.getByRole("button", {
+            name: "Продолжить оплату",
+        }).click();
+
+        await expect.poll(() => paymentBody).toEqual({
+            orderId: 102,
+        });
+
+        await expect.poll(
+            () => navigation.getOpenedUrl()
+        ).toBe("https://payment.example.test/confirm");
+    });
+
+    test("не создаёт повторный платёж, пока первый ожидает банк", async ({ page }) => {
+        let createRequests = 0;
+
+        await page.route(
+            "**/api/payments/order/promotion/retry/prepare",
+            async (route) => {
+                await route.fulfill({
+                    status: 200,
+                    json: {
+                        success: true,
+                        ready: false,
+                        provider: "yookassa",
+                        status: "pending",
+                        confirmationUrl:
+                            "https://payment.example.test/confirm",
+                    },
+                });
+            }
+        );
+
+        await page.route(
+            "**/api/payments/order/promotion/create",
+            async (route) => {
+                createRequests++;
+                await route.fulfill({
+                    status: 200,
+                    json: { success: true },
+                });
+            }
+        );
+
+        const card = orderCard(page, "Заказ №102");
+
+        await card.getByRole("button", {
+            name: "Оплатить",
+        }).click();
+
+        await card.getByRole("button", {
+            name: "Продолжить оплату",
+        }).click();
+
+        await expect(card.getByRole("status"))
+            .toContainText("Создание нового платежа заблокировано");
+
+        await expect(
+            card.getByRole("link", {
+                name: "Продолжить предыдущую оплату",
+            })
+        ).toBeVisible();
+
+        expect(createRequests).toBe(0);
+    });
+
+    test("открывает новую оплату после подтверждённой отмены", async ({ page }) => {
+        let preparationBody = null;
+        let paymentBody = null;
+
+        await page.route(
+            "**/api/payments/order/promotion/retry/prepare",
+            async (route) => {
+                preparationBody = route.request().postDataJSON();
+
+                await route.fulfill({
+                    status: 200,
+                    json: {
+                        success: true,
+                        ready: true,
+                        restarted: true,
+                        previousPaymentId: "cancelled_1",
+                    },
+                });
+            }
+        );
+
+        await page.route(
+            "**/api/payments/order/promotion/create",
+            async (route) => {
+                paymentBody = route.request().postDataJSON();
+
+                await route.fulfill({
+                    status: 200,
+                    json: {
+                        success: true,
+                        paymentId: "new_payment_2",
+                        paidBySavedCard: true,
+                        paid: false,
+                    },
+                });
+            }
+        );
+
+        const card = orderCard(page, "Заказ №102");
+
+        await card.getByRole("button", {
+            name: "Оплатить",
+        }).click();
+
+        await card.getByRole("button", {
+            name: "Продолжить оплату",
+        }).click();
+
+        await expect.poll(() => preparationBody).toEqual({
+            orderId: 102,
+        });
+
+        await expect.poll(() => paymentBody).toEqual({
+            orderId: 102,
+            paymentMode: "redirect",
+        });
+    });
+
 });

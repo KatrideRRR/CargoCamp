@@ -9,6 +9,7 @@ import { AuthContext } from "../utils/authContext";
 import Modal from "react-modal";
 import { FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity } from "react-icons/fa";
 import { Capacitor } from "@capacitor/core";
+import PromotionRetryPayment from "../components/PromotionRetryPayment";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -164,6 +165,9 @@ const MyOrdersPage = () => {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+
+    const [paymentProfile, setPaymentProfile] = useState(null);
+    const [promotionNotice, setPromotionNotice] = useState("");
 
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -328,6 +332,73 @@ const MyOrdersPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.search]);
 
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const promoReturn = params.get("promoReturn");
+        const orderId = Number(params.get("orderId"));
+
+        if (
+            promoReturn === null ||
+            !Number.isSafeInteger(orderId) ||
+            orderId <= 0
+        ) {
+            return;
+        }
+
+        let cancelled = false;
+
+        (async () => {
+            try {
+                const response = await axiosInstance.get(
+                    "/payments/promotion/status",
+                    { params: { orderId } }
+                );
+
+                if (cancelled) return;
+
+                const status = response.data?.status;
+
+                if (status === "succeeded") {
+                    setPromotionNotice(
+                        `Продвижение заказа №${orderId} оплачено.`
+                    );
+                } else {
+                    setPromotionNotice(
+                        `Платёж заказа №${orderId}: ${status || "не подтверждён"}. ` +
+                        "Повторное списание не создавалось."
+                    );
+                }
+
+                await fetchOrders();
+            } catch {
+                if (!cancelled) {
+                    setPromotionNotice(
+                        "Не удалось подтвердить результат оплаты. " +
+                        "Новая операция не создавалась."
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    const next = new URLSearchParams(location.search);
+                    next.delete("promoReturn");
+                    next.delete("paymentId");
+                    next.delete("provider");
+
+                    navigate(
+                        `${location.pathname}?${next.toString()}`,
+                        { replace: true }
+                    );
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.pathname, location.search, navigate]);
+
     const approveExecutor = async (orderId, executorId) => {
         if (approving) return;
         setApproving(true);
@@ -485,6 +556,8 @@ const MyOrdersPage = () => {
                     return;
                 }
 
+                setPaymentProfile(profileResponse.data);
+
                 const normalizedUserId = String(profileResponse.data.id);
 
                 socket.emit("register", normalizedUserId);
@@ -596,6 +669,11 @@ const MyOrdersPage = () => {
     return (
         <div className={`cc-my-orders ${styles.container} ${platform === "ios" ? styles.iosContainer : ""}`}>
             <div className={styles.ordersWrapper}>
+                {promotionNotice && (
+                    <div role="status" className={styles.noOrders}>
+                        {promotionNotice}
+                    </div>
+                )}
                 {/* Top bar */}
                 <div className={styles.topBar}>
                     <div className={styles.topLeft}>
@@ -839,49 +917,19 @@ const MyOrdersPage = () => {
                                         {!isExpress ? (
                                             order.status === "pending_payment" ? (
                                                 <div className={styles.cardActions}>
-                                                    <span className={styles.pillWarn}>Продвижение не оплачено</span>
-
-                                                    <button
-                                                        className={styles.primaryBtn}
-                                                        onClick={async () => {
-                                                            try {
-                                                                const res = await axiosInstance.post(
-                                                                    "/payments/order/promotion/create",
-                                                                    { orderId: order.id }
-                                                                );
-
-                                                                if (!res.data?.success) {
-                                                                    alert(res.data?.error || "Не удалось оплатить продвижение");
-                                                                    return;
-                                                                }
-
-                                                                if (res.data.paidBySavedCard) {
-                                                                    if (res.data.paid) {
-                                                                        alert("Продвижение оплачено с привязанной карты");
-                                                                        await fetchOrders();
-                                                                        return;
-                                                                    }
-
-                                                                    alert("Платёж с привязанной карты обрабатывается. Статус обновится после подтверждения.");
-                                                                    setTimeout(fetchOrders, 2000);
-                                                                    return;
-                                                                }
-
-                                                                const url = res.data?.confirmationUrl;
-
-                                                                if (url) {
-                                                                    window.location.href = url;
-                                                                    return;
-                                                                }
-
-                                                                alert("Не удалось получить ссылку на оплату");
-                                                            } catch (e) {
-                                                                alert(e.response?.data?.error || "Ошибка при создании оплаты");
-                                                            }
-                                                        }}
-                                                    >
-                                                        Оплатить
-                                                    </button>
+                                                    {order.promotionPaidAt ? (
+                                                        <span className={styles.pillWarn}>
+                    Продвижение оплачено. Заказ ожидает
+                    дальнейшего оформления оплаты.
+                </span>
+                                                    ) : (
+                                                        <PromotionRetryPayment
+                                                            order={order}
+                                                            profile={paymentProfile}
+                                                            onUpdated={fetchOrders}
+                                                            onNotice={setPromotionNotice}
+                                                        />
+                                                    )}
                                                 </div>
                                             ) : (
                                                 <div className={styles.section}>

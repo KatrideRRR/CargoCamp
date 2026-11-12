@@ -625,7 +625,7 @@ router.post('/card/unbind', authenticateToken, async (req, res) => {
 router.post('/order/promotion/create', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
-        const { orderId } = req.body;
+        const { orderId, paymentMode = null } = req.body || {};
 
         if (!orderId) {
             return res.status(400).json({
@@ -664,14 +664,38 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
             });
         }
 
+        if (
+            paymentMode !== null &&
+            !["redirect", "saved"].includes(paymentMode)
+        ) {
+            return res.status(400).json({
+                success: false,
+                error: "Недопустимый способ оплаты",
+            });
+        }
+
+        if (
+            paymentMode === "saved" &&
+            !user.yookassa_payment_method_id
+        ) {
+            return res.status(409).json({
+                success: false,
+                error: "Привязанная карта ЮKassa не найдена",
+            });
+        }
+
+// Старые вызовы без paymentMode сохраняют прежнее поведение.
+        const useSavedCard =
+            paymentMode === "redirect"
+                ? false
+                : Boolean(user.yookassa_payment_method_id);
+
         const intent = await claimPromotionPaymentIntent({
             orderId: order.id,
             userId,
             provider: "yookassa",
 
-            mode: user.yookassa_payment_method_id
-                ? "saved"
-                : "redirect",
+            mode: useSavedCard ? "saved" : "redirect",
         });
 
         if (!intent.created) {
@@ -723,7 +747,7 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
         /**
          * ✅ 1) Если карта привязана — пробуем списать сразу.
          */
-        if (user.yookassa_payment_method_id) {
+        if (useSavedCard) {
             const payment = await yooKassa.createPayment(
                 {
                     ...basePayload,
@@ -868,7 +892,7 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
                 ...basePayload,
                 confirmation: {
                     type: 'redirect',
-                    return_url: `${process.env.FRONTEND_URL}/orders?promoReturn=1&orderId=${orderId}&paymentId={payment_id}`,
+                    return_url: `${process.env.FRONTEND_URL}/my-orders/${userId}?promoReturn=1&orderId=${orderId}`,
                 },
             },
             idempotenceKey

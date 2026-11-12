@@ -1,0 +1,90 @@
+.cc-promo-retry {
+    display: grid;
+    gap: 10px;
+    width: 100%;
+}
+
+.cc-promo-retry-heading {
+    font-size: 13px;
+    font-weight: 800;
+    color: #b45309;
+}
+
+.cc-promo-retry-panel {
+    display: grid;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+    padding: 12px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    color: #0f172a;
+}
+
+.cc-promo-retry-modes {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+}
+
+.cc-promo-retry-modes legend {
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.cc-promo-retry-modes label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.cc-promo-retry-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.cc-promo-retry-actions button {
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+}
+
+.cc-promo-retry-primary {
+    border: 0;
+    border-radius: 10px;
+    background: #2563eb;
+    color: #ffffff;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.cc-promo-retry button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.cc-promo-retry-message {
+    margin: 0;
+    padding: 10px;
+    border-radius: 10px;
+    background: #f1f5f9;
+    color: #334155;
+    font-size: 12px;
+}
+
+.cc-promo-retry-existing {
+    color: #1d4ed8;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: underline;
+}

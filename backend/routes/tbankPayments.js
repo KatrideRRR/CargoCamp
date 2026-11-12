@@ -385,8 +385,8 @@ router.post("/order/promotion/create", authenticateToken, async (req, res) => {
             Amount: amountKopecks,
             OrderId: tbankOrderId,
             Description: description,
-            SuccessURL: `${process.env.FRONTEND_URL}/orders?promoReturn=1&orderId=${orderId}&provider=tbank`,
-            FailURL: `${process.env.FRONTEND_URL}/orders?promoReturn=0&orderId=${orderId}&provider=tbank`,
+            SuccessURL: `${process.env.FRONTEND_URL}/my-orders/${userId}?promoReturn=1&orderId=${orderId}&provider=tbank`,
+            FailURL: `${process.env.FRONTEND_URL}/my-orders/${userId}?promoReturn=0&orderId=${orderId}&provider=tbank`,
             NotificationURL: `${process.env.BACKEND_URL}/api/tbank-payments/webhook`,
             DATA: {
                 type: "order_promotion",
