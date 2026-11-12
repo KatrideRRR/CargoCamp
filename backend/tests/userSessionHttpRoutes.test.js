@@ -244,6 +244,13 @@ async function createTestServer() {
 
             "../services/smsCodeStore": {},
 
+            "../services/publicOfferConsentService": {
+                CURRENT_OFFER: {
+                    version: "2026-11-09",
+                    sha256: "a".repeat(64),
+                },
+            },
+
             "../services/publicUserBadgesService": {
                 async getPublicUserBadges() {
                     return {
