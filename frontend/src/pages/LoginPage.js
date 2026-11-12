@@ -260,8 +260,16 @@ const LoginPage = () => {
                         <p className="login-subtitle">Выберите способ входа</p>
                     </div>
 
-                    {error && <div className="login-error">{error}</div>}
-                    {message && <div className="login-success">{message}</div>}
+                    {error && (
+                        <div className="login-error" role="alert">
+                            {error}
+                        </div>
+                    )}
+                    {message && (
+                        <div className="login-success" role="status">
+                            {message}
+                        </div>
+                    )}
 
                     <div className="login-form">
 
@@ -320,11 +328,15 @@ const LoginPage = () => {
                         {/* ---- LOGIN: PASSWORD ---- */}
                         {mode === "password" && (
                             <form onSubmit={handleLoginPassword} className="innerForm">
+
                                 <div className="field">
-                                    <label htmlFor="password" className="label">Пароль</label>
+                                    <label htmlFor="password" className="cc-sr-only">
+                                        Пароль
+                                    </label>
                                     <input
                                         id="password"
                                         type="password"
+                                        autoComplete="current-password"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                         required
@@ -332,6 +344,7 @@ const LoginPage = () => {
                                         placeholder="Введите пароль"
                                     />
                                 </div>
+
 
                                 {/* Кнопка теперь переводит в режим "reset", а не делает генерацию пароля */}
                                 <button type="button" className="linkButton" onClick={() => switchMode("reset")}>
@@ -353,10 +366,16 @@ const LoginPage = () => {
                                     </button>
                                 ) : (
                                     <>
+
                                         <div className="field">
-                                            <label className="label">Код из SMS</label>
+                                            <label htmlFor="login-sms-code" className="cc-sr-only">
+                                                Код из SMS
+                                            </label>
                                             <input
+                                                id="login-sms-code"
                                                 type="text"
+                                                inputMode="numeric"
+                                                autoComplete="one-time-code"
                                                 value={smsCode}
                                                 onChange={(e) => setSmsCode(e.target.value)}
                                                 required
@@ -364,6 +383,7 @@ const LoginPage = () => {
                                                 placeholder="Введите код"
                                             />
                                         </div>
+
 
                                         <div className="smsActions">
                                             <button type="button" className="btn btn-ghost" onClick={sendSmsCode} disabled={busy}>
@@ -392,10 +412,16 @@ const LoginPage = () => {
                                     </>
                                 ) : (
                                     <>
+
                                         <div className="field">
-                                            <label className="label">Код из SMS</label>
+                                            <label htmlFor="reset-sms-code" className="cc-sr-only">
+                                                Код из SMS
+                                            </label>
                                             <input
+                                                id="reset-sms-code"
                                                 type="text"
+                                                inputMode="numeric"
+                                                autoComplete="one-time-code"
                                                 value={resetCode}
                                                 onChange={(e) => setResetCode(e.target.value)}
                                                 required
@@ -405,9 +431,13 @@ const LoginPage = () => {
                                         </div>
 
                                         <div className="field">
-                                            <label className="label">Новый пароль</label>
+                                            <label htmlFor="new-password" className="cc-sr-only">
+                                                Новый пароль
+                                            </label>
                                             <input
+                                                id="new-password"
                                                 type="password"
+                                                autoComplete="new-password"
                                                 value={newPassword}
                                                 onChange={(e) => setNewPassword(e.target.value)}
                                                 required
@@ -417,9 +447,13 @@ const LoginPage = () => {
                                         </div>
 
                                         <div className="field">
-                                            <label className="label">Повторите пароль</label>
+                                            <label htmlFor="confirm-password" className="cc-sr-only">
+                                                Повторите пароль
+                                            </label>
                                             <input
+                                                id="confirm-password"
                                                 type="password"
+                                                autoComplete="new-password"
                                                 value={newPassword2}
                                                 onChange={(e) => setNewPassword2(e.target.value)}
                                                 required
@@ -427,6 +461,7 @@ const LoginPage = () => {
                                                 placeholder="Повторите пароль"
                                             />
                                         </div>
+
 
                                         <div className="smsActions">
                                             <button type="button" className="btn btn-ghost" onClick={sendResetCode} disabled={busy}>

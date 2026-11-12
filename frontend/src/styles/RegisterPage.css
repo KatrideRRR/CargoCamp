@@ -669,3 +669,16 @@
         padding-top: 10px;
     }
 }
+
+
+.register-success {
+    margin-bottom: 12px;
+    padding: 11px 13px;
+    border-radius: 16px;
+    background: rgba(22, 163, 74, 0.08);
+    border: 1px solid rgba(22, 163, 74, 0.2);
+    color: #166534;
+    font-size: 0.92rem;
+    font-weight: 650;
+    line-height: 1.4;
+}

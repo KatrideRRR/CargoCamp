@@ -18,6 +18,7 @@ const RegisterPage = () => {
     const [phone, setPhone] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
+    const [message, setMessage] = useState("");
     const [captchaValue, setCaptchaValue] = useState(null);
     const [smsCode, setSmsCode] = useState("");
     const [isSmsSent, setIsSmsSent] = useState(false);
@@ -66,6 +67,7 @@ const RegisterPage = () => {
         if (smsLoading || smsCooldown > 0) return;
 
         setError("");
+        setMessage("");
 
         if (!phone || phone.replace(/\D/g, "").length < 11) {
             setError("Введите корректный номер телефона");
@@ -89,7 +91,7 @@ const RegisterPage = () => {
             setIsSmsSent(true);
             setSmsCooldown(Number(res.data?.cooldownSec || 60));
 
-            alert("Код подтверждения отправлен на ваш номер");
+            setMessage("Код подтверждения отправлен на ваш номер");
         } catch (err) {
             console.error("Ошибка отправки SMS:", err);
 
@@ -112,7 +114,8 @@ const RegisterPage = () => {
         e.preventDefault();
 
         if (!isAgreementChecked) {
-            alert("Пожалуйста, примите пользовательское соглашение");
+            setMessage("");
+            setError("Пожалуйста, примите пользовательское соглашение");
             return;
         }
 
@@ -140,7 +143,6 @@ const RegisterPage = () => {
                 role: tokenUser?.role || "user",
             });
 
-            alert("Пользователь успешно создан");
 
             navigate("/profile", {
                 replace: true,
@@ -167,23 +169,36 @@ const RegisterPage = () => {
                         <p className="register-subtitle">Создайте аккаунт за минуту</p>
                     </div>
 
-                    {error && <div className="register-error">{error}</div>}
+                    {error && (
+                        <div className="register-error" role="alert">
+                            {error}
+                        </div>
+                    )}
+
+                    {message && (
+                        <div className="register-success" role="status">
+                            {message}
+                        </div>
+                    )}
 
                     <form onSubmit={handleRegister} className="register-form">
+
                         <div className="field">
-                            <label htmlFor="username" className="label">
+                            <label htmlFor="username" className="cc-sr-only">
                                 Имя пользователя
                             </label>
                             <input
                                 id="username"
                                 type="text"
+                                autoComplete="username"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
                                 required
                                 className="input"
-                                placeholder="Например: Akim"
+                                placeholder="Имя пользователя"
                             />
                         </div>
+
 
 
                         <div className="field">
@@ -212,20 +227,23 @@ const RegisterPage = () => {
                         </div>
 
 
+
                         <div className="field">
-                            <label htmlFor="password" className="label">
+                            <label htmlFor="password" className="cc-sr-only">
                                 Пароль
                             </label>
                             <input
                                 id="password"
                                 type="password"
+                                autoComplete="new-password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                                 className="input"
-                                placeholder="Минимум 6–8 символов"
+                                placeholder="Придумайте пароль"
                             />
                         </div>
+
 
                         <div className="captchaWrap">
                             <ReCAPTCHA sitekey={siteKey} onChange={handleCaptchaChange} />
@@ -272,10 +290,16 @@ const RegisterPage = () => {
                             </button>
                         ) : (
                             <>
+
                                 <div className="field">
-                                    <label className="label">Код из SMS</label>
+                                    <label htmlFor="register-sms-code" className="cc-sr-only">
+                                        Код из SMS
+                                    </label>
                                     <input
+                                        id="register-sms-code"
                                         type="text"
+                                        inputMode="numeric"
+                                        autoComplete="one-time-code"
                                         value={smsCode}
                                         onChange={(e) => setSmsCode(e.target.value)}
                                         required
@@ -283,6 +307,7 @@ const RegisterPage = () => {
                                         placeholder="Введите код"
                                     />
                                 </div>
+
 
                                 <div className="smsActions">
                                     <button

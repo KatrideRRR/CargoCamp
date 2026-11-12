@@ -327,3 +327,12 @@
         background: #1b2636;
     }
 }
+
+
+@media (prefers-color-scheme: dark) {
+    html .register-page .register-success {
+        background: rgba(74, 222, 128, 0.1);
+        border-color: rgba(74, 222, 128, 0.2);
+        color: #86efac;
+    }
+}

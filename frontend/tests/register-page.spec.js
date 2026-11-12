@@ -211,18 +211,23 @@ async function clickGetCode(page) {
     await button.click();
 }
 
-async function sendSmsSuccessfully(page) {
-    page.once("dialog", async (dialog) => {
-        expect(dialog.message()).toBe("Код подтверждения отправлен на ваш номер");
-        await dialog.accept();
-    });
 
+async function sendSmsSuccessfully(page) {
     await clickGetCode(page);
 
-    await expect(page.getByPlaceholder("Введите код")).toBeVisible({
+    await expect(
+        page.locator(".register-success")
+    ).toHaveText(
+        "Код подтверждения отправлен на ваш номер"
+    );
+
+    await expect(
+        page.getByPlaceholder("Введите код")
+    ).toBeVisible({
         timeout: 10000,
     });
 }
+
 
 test.describe("RegisterPage", () => {
     test("отображает страницу регистрации", async ({ page }) => {
@@ -313,12 +318,13 @@ test.describe("RegisterPage", () => {
 
         await fillBaseFields(page);
 
-        page.once("dialog", async (dialog) => {
-            expect(dialog.message()).toBe("Код подтверждения отправлен на ваш номер");
-            await dialog.accept();
-        });
+// Сообщение проверяется после нажатия кнопки.
 
         await clickGetCode(page);
+
+        await expect(page.locator(".register-success")).toHaveText(
+            "Код подтверждения отправлен на ваш номер"
+        );
 
         await expect
             .poll(() => smsRequestBody, {
@@ -397,12 +403,12 @@ test.describe("RegisterPage", () => {
 
         await page.getByPlaceholder("Введите код").fill("123456");
 
-        page.once("dialog", async (dialog) => {
-            expect(dialog.message()).toBe("Пожалуйста, примите пользовательское соглашение");
-            await dialog.accept();
-        });
 
         await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+
+        await expect(page.locator(".register-error")).toHaveText(
+            "Пожалуйста, примите пользовательское соглашение"
+        );
 
         expect(registerCalled).toBe(false);
 
@@ -435,11 +441,6 @@ test.describe("RegisterPage", () => {
         await sendSmsSuccessfully(page);
 
         await page.getByPlaceholder("Введите код").fill("123456");
-
-        page.once("dialog", async (dialog) => {
-            expect(dialog.message()).toBe("Пользователь успешно создан");
-            await dialog.accept();
-        });
 
         await page.getByRole("button", { name: "Зарегистрироваться" }).click();
 
