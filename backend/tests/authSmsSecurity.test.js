@@ -45,6 +45,9 @@ async function createHarness() {
     const sessionRequests = [];
     const passwordResets = [];
 
+    const offerAcceptances = [];
+    const offerActionLogs = [];
+
     const smsStates = new Map();
 
     const fakeSmsCodeStore = {
@@ -305,6 +308,30 @@ async function createHarness() {
                 Order: {},
                 Category: {},
                 ExpressOrder: {},
+                sequelize: {
+                    transaction: async (callback) => callback({}),
+                },
+
+                PublicOfferAcceptance: {
+                    async create(values) {
+                        offerAcceptances.push(values);
+                        return values;
+                    },
+                },
+
+                ActionLog: {
+                    async create(values) {
+                        offerActionLogs.push(values);
+                        return values;
+                    },
+                },
+            },
+
+            "../services/publicOfferConsentService": {
+                CURRENT_OFFER: {
+                    version: "2026-11-09",
+                    sha256: "a".repeat(64),
+                },
             },
 
             "../middlewares/userAuth": (
@@ -479,6 +506,8 @@ async function createHarness() {
         smsRequests,
         sessionRequests,
         passwordResets,
+        offerAcceptances,
+        offerActionLogs,
         setSmsRecipientAccepted(value) {
             smsRecipientAccepted = Boolean(value);
         },
@@ -760,6 +789,8 @@ test("Регистрация: действующий код создаёт по�
                 phone: NEW_PHONE,
                 password: "password-123",
                 smsCode: api.lastCode(),
+                offerVersion: "2026-11-09",
+                offerAccepted: true,
             }
         );
 
@@ -778,6 +809,79 @@ test("Регистрация: действующий код создаёт по�
             user.subscription_type,
             "premium"
         );
+        assert.equal(api.offerAcceptances.length, 1);
+        assert.equal(api.offerActionLogs.length, 1);
+
+        assert.equal(
+            api.offerAcceptances[0].source,
+            "registration"
+        );
+
+        assert.equal(
+            api.offerAcceptances[0].offerVersion,
+            "2026-11-09"
+        );
+
+        assert.equal(
+            api.offerActionLogs[0].actionType,
+            "public_offer_accepted"
+        );
+    });
+});
+
+
+test("Регистрация: без согласия аккаунт не создаётся", async () => {
+    await withHarness(async (api) => {
+        const sent = await api.sendSms(
+            "register",
+            NEW_PHONE
+        );
+
+        assert.equal(sent.status, 200);
+
+        const response = await api.request(
+            "/api/auth/register",
+            {
+                username: "Новый пользователь",
+                phone: NEW_PHONE,
+                password: "password-123",
+                smsCode: api.lastCode(),
+                offerVersion: "2026-11-09",
+                offerAccepted: false,
+            }
+        );
+
+        assert.equal(response.status, 400);
+        assert.equal(api.users.has(NEW_PHONE), false);
+        assert.equal(api.offerAcceptances.length, 0);
+        assert.equal(api.offerActionLogs.length, 0);
+    });
+});
+
+test("Регистрация: устаревшая оферта отклоняется", async () => {
+    await withHarness(async (api) => {
+        const sent = await api.sendSms(
+            "register",
+            NEW_PHONE
+        );
+
+        assert.equal(sent.status, 200);
+
+        const response = await api.request(
+            "/api/auth/register",
+            {
+                username: "Новый пользователь",
+                phone: NEW_PHONE,
+                password: "password-123",
+                smsCode: api.lastCode(),
+                offerVersion: "2026-01-01",
+                offerAccepted: true,
+            }
+        );
+
+        assert.equal(response.status, 409);
+        assert.equal(api.users.has(NEW_PHONE), false);
+        assert.equal(api.offerAcceptances.length, 0);
     });
 });
 

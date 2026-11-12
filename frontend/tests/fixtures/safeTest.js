@@ -46,6 +46,27 @@ const test = base.extend({
                 await route.abort("blockedbyclient");
             });
 
+            await context.route(
+                "**/api/legal/offer/status",
+                async (route) => {
+                    if (route.request().method() !== "GET") {
+                        await route.fallback();
+                        return;
+                    }
+
+                    await route.fulfill({
+                        status: 200,
+                        contentType: "application/json",
+                        body: JSON.stringify({
+                            version: "2026-11-09",
+                            sha256: "isolated-playwright-offer",
+                            accepted: true,
+                            acceptedAt: "2026-11-12T00:00:00.000Z",
+                        }),
+                    });
+                }
+            );
+
             await context.routeWebSocket(
                 "**/*",
                 (webSocket) => {

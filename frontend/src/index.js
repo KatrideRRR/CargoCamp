@@ -21,6 +21,7 @@ import "./utils/axiosInstance";
 import "./styles/global.css";
 import "./styles/darkTheme.css";
 import "./styles/NotificationsDark.css";
+import PublicOfferGate from "./components/PublicOfferGate";
 
 Modal.setAppElement('#root');
 
@@ -555,7 +556,8 @@ function App() {
                 <PushBootstrap />
                 <PullToRefresh />
                 <UserProvider>
-                    <Suspense
+                    <PublicOfferGate>
+                        <Suspense
                         fallback={
                             <div className="app-loading">
                                 Загрузка...
@@ -593,7 +595,8 @@ function App() {
                             pauseOnHover
                         />
 
-                    </Suspense>
+                        </Suspense>
+                    </PublicOfferGate>
                 </UserProvider>
             </ModalProvider>
             </AuthBootGate>

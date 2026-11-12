@@ -2,7 +2,19 @@ require('dotenv').config();
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const {User, OrderReview, Order, Category, ExpressOrder} = require('../models');
+const {
+    sequelize,
+    User,
+    OrderReview,
+    Order,
+    Category,
+    ExpressOrder,
+    PublicOfferAcceptance,
+    ActionLog,
+} = require("../models");
+const {
+    CURRENT_OFFER,
+} = require("../services/publicOfferConsentService");
 const authenticateToken = require('../middlewares/userAuth');
 const router = express.Router();
 const multer = require('multer');
@@ -486,13 +498,32 @@ router.post("/upload-documents", authenticateToken, (req, res) => {
 });
 
 router.post('/register', async (req, res) => {
-    const {username, phone, password, smsCode} = req.body;
+    const {
+        username,
+        phone,
+        password,
+        smsCode,
+        offerVersion,
+        offerAccepted,
+    } = req.body || {};
 
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 дней
 
     const phoneKey = normalizePhone(phone);
     const codeFromUser = String(smsCode || "").trim();
+
+    if (offerAccepted !== true) {
+        return res.status(400).json({
+            message: "Необходимо принять публичную оферту CargoCamp",
+        });
+    }
+
+    if (offerVersion !== CURRENT_OFFER.version) {
+        return res.status(409).json({
+            message: "Редакция оферты изменилась. Ознакомьтесь с актуальными условиями.",
+        });
+    }
 
     try {
         // Проверка на существующего пользователя
@@ -521,15 +552,62 @@ router.post('/register', async (req, res) => {
         // Хеширование пароля
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Создание нового пользователя
-        const newUser = await User.create({
-            username,
-            phone: phoneKey,
-            password: hashedPassword,
-            verified: true,
-            subscription_type: "premium",
-            subscription_expires_at: expiresAt,
-        });
+
+        // Создание пользователя, запись акцепта и ActionLog
+        // выполняются в одной транзакции MySQL.
+        const newUser = await sequelize.transaction(
+            async (transaction) => {
+                const createdUser = await User.create(
+                    {
+                        username,
+                        phone: phoneKey,
+                        password: hashedPassword,
+                        verified: true,
+                        subscription_type: "premium",
+                        subscription_expires_at: expiresAt,
+                    },
+                    { transaction }
+                );
+
+                await PublicOfferAcceptance.create(
+                    {
+                        userId: createdUser.id,
+                        offerVersion: CURRENT_OFFER.version,
+                        offerSha256: CURRENT_OFFER.sha256,
+                        source: "registration",
+                        ipAddress: req.ip || null,
+                        userAgent: String(
+                            req.get("user-agent") || ""
+                        ).slice(0, 2048),
+                    },
+                    { transaction }
+                );
+
+                await ActionLog.create(
+                    {
+                        actorUserId: createdUser.id,
+                        actorRole: "user",
+                        actionType: "public_offer_accepted",
+                        entityType: "user",
+                        entityId: createdUser.id,
+                        severity: "info",
+                        success: true,
+                        ip: req.ip || null,
+                        ua: String(
+                            req.get("user-agent") || ""
+                        ).slice(0, 2048),
+                        meta: {
+                            version: CURRENT_OFFER.version,
+                            sha256: CURRENT_OFFER.sha256,
+                            source: "registration",
+                        },
+                    },
+                    { transaction }
+                );
+
+                return createdUser;
+            }
+        );
 
         let authResponse;
 

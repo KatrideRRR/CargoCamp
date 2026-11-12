@@ -454,6 +454,8 @@ test.describe("RegisterPage", () => {
                 password: "Password123",
                 smsCode: "123456",
                 sessionClient: "web",
+                offerVersion: "2026-11-09",
+                offerAccepted: true,
             });
 
         await expect(page).toHaveURL(/\/profile/);

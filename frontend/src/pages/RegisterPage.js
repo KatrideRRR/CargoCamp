@@ -9,7 +9,9 @@ import InputMask from "react-input-mask";
 import { useAuth } from "../utils/authContext";
 import { useUser } from "../utils/userContext";
 import {postUserAuth, getJwtUser,} from "../utils/userSession";
-import PublicOffer from "../components/PublicOffer";
+import PublicOffer, {
+    PUBLIC_OFFER_VERSION,
+} from "../components/PublicOffer";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 const siteKey = process.env.REACT_APP_RECAPTCHA_SITE_KEY;
@@ -128,6 +130,8 @@ const RegisterPage = () => {
                     phone,
                     password,
                     smsCode,
+                    offerVersion: PUBLIC_OFFER_VERSION,
+                    offerAccepted: isAgreementChecked,
                 }
             );
 

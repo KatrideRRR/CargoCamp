@@ -1,0 +1,90 @@
+
+.cc-offer-gate-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 16px;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(8px);
+}
+
+.cc-offer-gate-dialog {
+    width: min(100%, 680px);
+    max-height: 94dvh;
+    overflow: auto;
+    background: #fff;
+    color: #0f172a;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 20px 70px rgba(0, 0, 0, 0.3);
+}
+
+.cc-offer-gate-dialog h2 {
+    margin: 0 0 12px;
+    font-size: 1.3rem;
+}
+
+.cc-offer-gate-document {
+    max-height: 48dvh;
+    overflow: auto;
+    padding: 14px;
+    margin: 14px 0;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.cc-offer-gate-document h4 {
+    margin: 16px 0 8px;
+}
+
+.cc-offer-gate-checkbox {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 14px 0;
+    cursor: pointer;
+}
+
+.cc-offer-gate-checkbox input {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.cc-offer-gate-accept,
+.cc-offer-gate-exit,
+.cc-offer-gate-dialog button {
+    cursor: pointer;
+}
+
+.cc-offer-gate-accept {
+    width: 100%;
+    padding: 13px;
+    border: 0;
+    border-radius: 12px;
+    background: #2563eb;
+    color: #fff;
+    font-weight: 700;
+}
+
+.cc-offer-gate-accept:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.cc-offer-gate-exit {
+    display: block;
+    margin: 14px auto 0;
+    background: transparent;
+    border: 0;
+    color: #64748b;
+}
+
+.cc-offer-gate-dialog [role="alert"] {
+    color: #dc2626;
+}
