@@ -849,7 +849,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
                 'tbankCardMask',
                 'autoCommissionProvider',
                 'rating', 'createdAt',
-                'userStatus', 'documentPhotos',
+                'documentPhotos',
                 'subscription_type', 'subscription_expires_at',
                 'preferredCategoryIds',
                 'locationAddress', 'locationLat', 'locationLng', 'locationSource', 'locationUpdatedAt',
