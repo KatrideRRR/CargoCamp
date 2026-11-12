@@ -558,6 +558,9 @@ test.describe("ChatPage", () => {
 
         await expect(page.getByText("Сообщений пока нет")).toBeVisible();
         await expect(page.getByText("Напишите первым по этому заказу")).toBeVisible();
+        await expect(
+            page.locator(".chat-empty-icon svg.lucide-message-circle")
+        ).toBeVisible();
     });
 
     test("кнопка отправки заблокирована при пустом сообщении", async ({ page }) => {
@@ -1576,7 +1579,9 @@ test.describe("ChatPage", () => {
             "Прочитано собеседником"
         );
 
-        await expect(checks).toContainText("✓✓");
+        await expect(
+            checks.locator("svg.lucide-check-check")
+        ).toBeVisible();
     });
 
     test("загружает историю чата двумя страницами", async ({ page }) => {
@@ -1932,10 +1937,9 @@ test.describe("ChatPage", () => {
             '[data-message-id="2"] .chat-checks'
         );
 
-        await expect(checks).toHaveAttribute(
-            "title",
-            "Сохранено на сервере"
-        );
+        await expect(
+            checks.locator("svg.lucide-check")
+        ).toBeVisible();
 
         socket.emit("chat:read", {
             orderId: 101,
@@ -1950,7 +1954,9 @@ test.describe("ChatPage", () => {
             "Прочитано собеседником"
         );
 
-        await expect(checks).toContainText("✓✓");
+        await expect(
+            checks.locator("svg.lucide-check-check")
+        ).toBeVisible();
     });
 
     test("отправляет индикатор печати через Socket.IO", async ({ page }) => {

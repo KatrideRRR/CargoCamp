@@ -17,6 +17,14 @@ import Modal from "react-modal";
 import { openOrderRoute } from "../utils/orderNavigation";
 import ReliableChatComposer from "../components/ReliableChatComposer";
 import ChatReadTracker from "../components/ChatReadTracker";
+import {
+    ChevronLeft,
+    Reply,
+    MessageCircle,
+    Check,
+    CheckCheck,
+    X,
+} from "lucide-react";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -662,7 +670,7 @@ const ChatPage = () => {
                         onClick={handleBack}
                         aria-label="Назад"
                     >
-                        ‹
+                        <ChevronLeft size={22} aria-hidden="true" />
                     </button>
 
                     <div className="chat-user">
@@ -858,29 +866,44 @@ const ChatPage = () => {
                                             )}
 
                                             <p>{msg.content}</p>
+
                                             <span className="chat-message-time">
-                                                <button
-                                                    type="button"
-                                                    className="chat-reply-action"
-                                                    onClick={() => selectReply(msg)}
-                                                    aria-label="Ответить на сообщение"
-                                                >
-    ↩ Ответить
-</button>
-                                            {msg.timeLabel}
+    <button
+        type="button"
+        className="chat-reply-action"
+        onClick={() => selectReply(msg)}
+        aria-label="Ответить на сообщение"
+    >
+        <Reply size={14} strokeWidth={1.9} aria-hidden="true" />
+        <span>Ответить</span>
+    </button>
+
+                                                {msg.timeLabel}
+
                                                 {isMine && (
                                                     <span
                                                         className="chat-checks"
+                                                        role="img"
+                                                        aria-label={
+                                                            msg.readAt
+                                                                ? "Прочитано собеседником"
+                                                                : "Сохранено на сервере"
+                                                        }
                                                         title={
                                                             msg.readAt
                                                                 ? "Прочитано собеседником"
                                                                 : "Сохранено на сервере"
                                                         }
                                                     >
-        {msg.readAt ? " ✓✓" : " ✓"}
-    </span>
+            {msg.readAt ? (
+                <CheckCheck size={15} strokeWidth={2} aria-hidden="true" />
+            ) : (
+                <Check size={15} strokeWidth={2} aria-hidden="true" />
+            )}
+        </span>
                                                 )}
-                                            </span>
+</span>
+
                                         </div>
                                     </div>
                                 </React.Fragment>
@@ -896,7 +919,9 @@ const ChatPage = () => {
                         </div>
                     ) : (
                         <div className="chat-empty">
-                            <div className="chat-empty-icon">💬</div>
+                            <div className="chat-empty-icon" aria-hidden="true">
+                                <MessageCircle size={34} strokeWidth={1.8} />
+                            </div>
                             <div>Сообщений пока нет</div>
                             <small>Напишите первым по этому заказу</small>
                         </div>
@@ -947,10 +972,11 @@ const ChatPage = () => {
                     <div className="chat-dispute-content">
                         <button
                             type="button"
+                            aria-label="Закрыть спор"
                             onClick={closeDisputeModal}
                             className="chat-dispute-close"
                         >
-                            ✖
+                            <X size={20} strokeWidth={1.9} aria-hidden="true" />
                         </button>
 
                         <h2 className="chat-dispute-title">Открыть спор</h2>

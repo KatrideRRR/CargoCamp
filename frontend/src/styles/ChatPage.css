@@ -407,9 +407,15 @@ body,
 }
 
 .chat-checks {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    margin-left: 4px;
     color: #2563eb;
-    letter-spacing: -3px;
-    padding-left: 4px;
+}
+
+.chat-checks svg {
+    display: block;
 }
 
 .chat-message-sent {
@@ -948,4 +954,21 @@ body,
 
 .chat-page--ios .chat-input-container {
     padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+}
+.chat-empty-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chat-back-button,
+.chat-dispute-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chat-back-button svg,
+.chat-dispute-close svg {
+    flex: 0 0 auto;
 }

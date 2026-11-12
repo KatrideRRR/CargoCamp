@@ -70,7 +70,9 @@
 /* Кнопка ответа */
 
 .chat-page .chat-reply-action {
-    display: block;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
 
     margin-top: 7px;
     padding: 3px 0;
@@ -84,6 +86,10 @@
     font-weight: 750;
 
     cursor: pointer;
+}
+
+.chat-page .chat-reply-action svg {
+    flex: 0 0 auto;
 }
 
 .chat-page .chat-reply-action:hover {
