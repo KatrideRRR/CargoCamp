@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
+import {
+    ReceiptText,
+    CarFront,
+    ClipboardList,
+} from "lucide-react";
 
 import "../styles/StartPage.css";
 
@@ -116,7 +121,9 @@ export default function StartPage() {
                         className="start-page-role-button"
                         type="button"
                     >
-                        <div className="start-page-emoji">🧾</div>
+                        <div className="start-page-icon" aria-hidden="true">
+                            <ReceiptText size={24} strokeWidth={1.8} />
+                        </div>
 
                         <div className="start-page-role-text">
                             <h2 className="start-page-role-title">
@@ -134,7 +141,9 @@ export default function StartPage() {
                         className="start-page-role-button"
                         type="button"
                     >
-                        <div className="start-page-emoji">🚕</div>
+                        <div className="start-page-icon" aria-hidden="true">
+                            <CarFront size={24} strokeWidth={1.8} />
+                        </div>
 
                         <div className="start-page-role-text">
                             <h2 className="start-page-role-title">
@@ -155,7 +164,9 @@ export default function StartPage() {
                         "
                         type="button"
                     >
-                        <div className="start-page-emoji">📋</div>
+                        <div className="start-page-icon" aria-hidden="true">
+                            <ClipboardList size={24} strokeWidth={1.8} />
+                        </div>
 
                         <div className="start-page-role-text">
                             <h2 className="start-page-role-title">

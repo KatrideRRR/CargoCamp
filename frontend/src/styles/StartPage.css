@@ -194,7 +194,7 @@ body {
     outline-offset: 3px;
 }
 
-.start-page-emoji {
+.start-page-icon {
     width: 52px;
     height: 52px;
     flex: 0 0 52px;
@@ -203,7 +203,7 @@ body {
     align-items: center;
     justify-content: center;
     background: #f1f5f9;
-    font-size: 1.45rem;
+    color: #2563eb;
 }
 
 .start-page-role-text {
@@ -412,11 +412,10 @@ body {
         border-radius: 16px;
     }
 
-    .start-page-emoji {
+    .start-page-icon {
         width: 48px;
         height: 48px;
         flex-basis: 48px;
-        font-size: 1.3rem;
     }
 
     .start-page-role-subtitle {

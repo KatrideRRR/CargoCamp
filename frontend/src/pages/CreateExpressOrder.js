@@ -6,22 +6,58 @@ import axiosInstance from "../utils/axiosInstance";
 import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrentLocation";
 import YandexMapModal from "../components/YandexMapModal";
 import ExpressRouteMapModal from "../components/ExpressRouteMapModal";
-import { FaTaxi, FaBox, FaLocationArrow, FaMapMarkedAlt } from "react-icons/fa";
+
+import {
+    CarFront,
+    Package,
+    Navigation,
+    MapPin,
+    Baby,
+    PawPrint,
+    Route,
+    Flower2,
+    ShoppingBasket,
+    FileText,
+} from "lucide-react";
+
 import { useNavigate } from "react-router-dom";
 
 const subcategoryOptions = {
     taxi: [
-        { label: "Перевозка пассажиров", icon: "🚕" },
-        { label: "Перевозка детей", icon: "🧒" },
-        { label: "Перевозка животных", icon: "🐶" },
-        { label: "Между городами", icon: "🛣️" },
+        {
+            label: "Перевозка пассажиров",
+            icon: CarFront,
+        },
+        {
+            label: "Перевозка детей",
+            icon: Baby,
+        },
+        {
+            label: "Перевозка животных",
+            icon: PawPrint,
+        },
+        {
+            label: "Между городами",
+            icon: Route,
+        },
     ],
     courier: [
-        { label: "Цветы", icon: "💐" },
-        { label: "Еда/продукты", icon: "🍔" },
-        { label: "Документы", icon: "📄" },
+        {
+            label: "Цветы",
+            icon: Flower2,
+        },
+        {
+            label: "Еда/продукты",
+            icon: ShoppingBasket,
+        },
+        {
+            label: "Документы",
+            icon: FileText,
+        },
     ],
 };
+
+
 
 function toNum(v) {
     const n = typeof v === "string" ? Number(v) : v;
@@ -712,7 +748,27 @@ const CreateExpressOrder = () => {
                         </div>
                         <div className="exo-badges">
                             <span className="exo-pill">{savedLoading ? "Адреса…" : `Адреса: ${saved.length}`}</span>
-                            <span className="exo-pill">{type === "taxi" ? "🚕 Такси" : "📦 Курьер"}</span>
+
+                            <span className="exo-pill exo-pill--type">
+    {type === "taxi" ? (
+        <CarFront
+            size={16}
+            strokeWidth={1.9}
+            aria-hidden="true"
+        />
+    ) : (
+        <Package
+            size={16}
+            strokeWidth={1.9}
+            aria-hidden="true"
+        />
+    )}
+
+                                <span>
+        {type === "taxi" ? "Такси" : "Курьер"}
+    </span>
+</span>
+
                         </div>
                     </div>
 
@@ -722,7 +778,9 @@ const CreateExpressOrder = () => {
                             className={`exo-typeBtn ${type === "taxi" ? "isActive" : ""}`}
                             onClick={() => { setType("taxi"); setField("subcategory", ""); }}
                         >
-                            <span className="exo-typeIcon"><FaTaxi /></span>
+<span className="exo-typeIcon" aria-hidden="true">
+    <CarFront size={21} strokeWidth={1.9} />
+</span>
                             <span>Такси</span>
                         </button>
 
@@ -731,7 +789,9 @@ const CreateExpressOrder = () => {
                             className={`exo-typeBtn ${type === "courier" ? "isActive" : ""}`}
                             onClick={() => { setType("courier"); setField("subcategory", ""); }}
                         >
-                            <span className="exo-typeIcon"><FaBox /></span>
+<span className="exo-typeIcon" aria-hidden="true">
+    <Package size={21} strokeWidth={1.9} />
+</span>
                             <span>Курьер</span>
                         </button>
                     </div>
@@ -759,10 +819,10 @@ const CreateExpressOrder = () => {
                                 <div className="exo-label">Откуда (A)</div>
                                 <div className="exo-miniActions">
                                     <button type="button" className="exo-miniBtn" onClick={detectGpsForFrom}>
-                                        <FaLocationArrow /> GPS
+                                        <Navigation size={16} strokeWidth={1.9} aria-hidden="true" /> GPS
                                     </button>
                                     <button type="button" className="exo-miniBtn" onClick={() => setShowMapFor("from")}>
-                                        <FaMapMarkedAlt /> Карта
+                                        <MapPin size={16} strokeWidth={1.9} aria-hidden="true" /> Карта
                                     </button>
                                 </div>
                             </div>
@@ -793,7 +853,7 @@ const CreateExpressOrder = () => {
                                 <div className="exo-label">Куда (B)</div>
                                 <div className="exo-miniActions">
                                     <button type="button" className="exo-miniBtn" onClick={() => setShowMapFor("to")}>
-                                        <FaMapMarkedAlt /> Карта
+                                        <MapPin size={16} strokeWidth={1.9} aria-hidden="true" /> Карта
                                     </button>
                                 </div>
                             </div>
@@ -822,7 +882,10 @@ const CreateExpressOrder = () => {
 
                     {/* Route status + open route */}
                     <div className="exo-note" style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-                        <div>🧭 {routeStatus}</div>
+                        <div className="exo-routeStatus">
+                            <Route size={17} strokeWidth={1.9} aria-hidden="true" />
+                            <span>{routeStatus}</span>
+                        </div>
                         <button
                             type="button"
                             className="exo-miniBtn"
@@ -1021,15 +1084,19 @@ const CreateExpressOrder = () => {
                                     <div className="exo-chips">
                                         {subcategoryOptions[type].map((opt) => {
                                             const selected = form.subcategory === opt.label;
+                                            const OptionIcon = opt.icon;
                                             return (
                                                 <button
                                                     key={opt.label}
                                                     type="button"
+                                                    aria-pressed={selected}
                                                     className={`exo-chip ${selected ? "selected" : ""}`}
                                                     onClick={() => setField("subcategory", selected ? "" : opt.label)}
                                                     title={opt.label}
                                                 >
-                                                    <span className="exo-chipEmoji">{opt.icon}</span>
+<span className="exo-chipIcon" aria-hidden="true">
+    <OptionIcon size={17} strokeWidth={1.9} />
+</span>
                                                     <span className="exo-chipText">{opt.label}</span>
                                                 </button>
                                             );

@@ -179,7 +179,7 @@ test.describe("StartPage", () => {
         });
 
         await expect(button).toBeVisible();
-        await expect(button).toContainText("🧾");
+        await expect(button.locator(".start-page-icon svg")).toHaveCount(1);
         await expect(button).toContainText("Создать заказ");
         await expect(button).toContainText("Обычный заказ на услугу");
     });
@@ -190,7 +190,7 @@ test.describe("StartPage", () => {
         });
 
         await expect(button).toBeVisible();
-        await expect(button).toContainText("🚕");
+        await expect(button.locator(".start-page-icon svg")).toHaveCount(1);
         await expect(button).toContainText("Такси / Курьер");
         await expect(button).toContainText("Быстрый заказ «здесь и сейчас»");
     });
@@ -202,7 +202,7 @@ test.describe("StartPage", () => {
 
         await expect(button).toBeVisible();
         await expect(button).toHaveClass(/start-page-role-button-soft/);
-        await expect(button).toContainText("📋");
+        await expect(button.locator(".start-page-icon svg")).toHaveCount(1);
         await expect(button).toContainText("Все заказы");
         await expect(button).toContainText("Найти заказ и откликнуться");
     });

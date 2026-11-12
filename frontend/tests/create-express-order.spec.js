@@ -319,14 +319,16 @@ test.describe("CreateExpressOrder", () => {
 
     test("по умолчанию выбран тип Такси", async ({ page }) => {
         await expect(page.locator(".exo-typeBtn.isActive")).toContainText("Такси");
-        await expect(page.locator(".exo-pill").filter({ hasText: "🚕 Такси" })).toBeVisible();
+        await expect(page.locator(".exo-pill--type")).toContainText("Такси");
+        await expect(page.locator(".exo-pill--type svg")).toHaveCount(1);
     });
 
     test("переключает тип на Курьер и обратно", async ({ page }) => {
         await clickCourierType(page);
 
         await expect(page.locator(".exo-typeBtn.isActive")).toContainText("Курьер");
-        await expect(page.locator(".exo-pill").filter({ hasText: "📦 Курьер" })).toBeVisible();
+        await expect(page.locator(".exo-pill--type")).toContainText("Курьер");
+        await expect(page.locator(".exo-pill--type svg")).toHaveCount(1);
 
         await clickTaxiType(page);
 
