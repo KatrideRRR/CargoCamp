@@ -682,3 +682,14 @@
     font-weight: 650;
     line-height: 1.4;
 }
+
+.terms-content .cc-public-offer h4 {
+    margin: 18px 0 8px;
+    color: #0f172a;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.terms-content .cc-offer-version {
+    margin-bottom: 16px;
+}

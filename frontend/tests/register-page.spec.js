@@ -407,7 +407,7 @@ test.describe("RegisterPage", () => {
         await page.getByRole("button", { name: "Зарегистрироваться" }).click();
 
         await expect(page.locator(".register-error")).toHaveText(
-            "Пожалуйста, примите пользовательское соглашение"
+            "Пожалуйста, примите публичную оферту"
         );
 
         expect(registerCalled).toBe(false);
@@ -518,19 +518,37 @@ test.describe("RegisterPage", () => {
         await expect(page).toHaveURL(/\/register/);
     });
 
-    test("открывает и закрывает пользовательское соглашение", async ({ page }) => {
+
+    test("открывает и закрывает публичную оферту", async ({ page }) => {
         await openRegisterPage(page);
 
-        await page.getByRole("button", { name: "пользовательское соглашение" }).click();
+        await page.getByRole("button", {
+            name: "публичную оферту",
+        }).click();
 
-        await expect(page.locator(".modal-content-agreement")).toBeVisible();
-        await expect(page.locator(".modal-content-agreement")).toContainText("1. Общие положения");
-        await expect(page.locator(".modal-content-agreement")).toContainText("CargoCamp");
+        const modal = page.locator(".modal-content-agreement");
 
-        await page.locator(".modal-content-agreement").getByRole("button", { name: "Закрыть" }).click();
+        await expect(modal).toBeVisible();
 
-        await expect(page.locator(".modal-content-agreement")).not.toBeVisible();
+        await expect(
+            modal.locator('[data-offer-version="2026-11-09"]')
+        ).toBeVisible();
+
+        await expect(modal).toContainText(
+            "4. Порядок оплаты и выплаты"
+        );
+
+        await expect(modal).toContainText(
+            "5. Отмена, возвраты и споры"
+        );
+
+        await modal.getByRole("button", {
+            name: "Закрыть",
+        }).click();
+
+        await expect(modal).not.toBeVisible();
     });
+
 
     test("переходит на Политику конфиденциальности", async ({ page }) => {
         await openRegisterPage(page);

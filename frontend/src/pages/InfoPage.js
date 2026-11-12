@@ -4,6 +4,7 @@ import { Capacitor } from "@capacitor/core";
 import "../styles/InfoPage.css";
 import "../styles/InfoPageDark.css";
 import SupportPhoneLink from "../components/SupportPhoneLink";
+import PublicOffer from "../components/PublicOffer";
 
 export default function InfoPage() {
     const navigate = useNavigate();
@@ -55,7 +56,11 @@ export default function InfoPage() {
                             <li>Заказчик размещает заказ с описанием задачи.</li>
                             <li>Исполнители откликаются и предлагают условия.</li>
                             <li>Стороны договариваются о стоимости и сроках.</li>
-                            <li>Сервис берёт оплату только за услуги платформы.</li>
+                            <li>
+                                Способ оплаты зависит от заказа: напрямую исполнителю
+                                либо через платёжного провайдера, когда такой способ доступен.
+                                Вознаграждение CargoCamp учитывается отдельно.
+                            </li>
                         </ol>
                     </div>
 
@@ -138,7 +143,14 @@ export default function InfoPage() {
                         </summary>
 
                         <div className="info-doc">
-                            <h4>1. Общие положения</h4>
+                            <PublicOffer />
+
+                            <details className="info-offer-archive">
+                                <summary>Архив предыдущей редакции оферты</summary>
+
+                                <div className="info-offer-archive-content">
+
+                                <h4>1. Общие положения</h4>
                             <p>
                                 Настоящая Публичная оферта является предложением заключить договор на использование веб-сервиса CargoCamp.
                                 Используя Сервис, пользователь подтверждает согласие с условиями Оферты.
@@ -216,6 +228,9 @@ export default function InfoPage() {
 
                             <h4>12. Заключительные положения</h4>
                             <p>Споры решаются в соответствии с законодательством Российской Федерации.</p>
+
+                                </div>
+                            </details>
                         </div>
                     </details>
                 </div>

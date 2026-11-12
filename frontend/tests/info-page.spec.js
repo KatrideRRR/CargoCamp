@@ -135,7 +135,7 @@ test.describe("InfoPage", () => {
             "Стороны договариваются о стоимости и сроках."
         );
         await expect(card).toContainText(
-            "Сервис берёт оплату только за услуги платформы."
+            "Способ оплаты зависит от заказа"
         );
     });
 
@@ -199,51 +199,91 @@ test.describe("InfoPage", () => {
         await expect(details).not.toHaveAttribute("open", "");
 
         await expect(
-            details.getByText("Настоящая Публичная оферта является предложением")
+            details.locator('[data-offer-version="2026-11-09"]')
         ).not.toBeVisible();
     });
 
+
     test("открывает публичную оферту", async ({ page }) => {
-        const details = page.locator("details").filter({
+        const details = page.locator("details.info-details").filter({
             has: page.locator(".info-card-title", {
                 hasText: "Публичная оферта",
             }),
         });
 
-        await details.locator("summary").click();
+        await details.locator(":scope > summary").click();
 
         await expect(details).toHaveAttribute("open", "");
 
-        await expect(details).toContainText("1. Общие положения");
-        await expect(details).toContainText("2. Предмет оферты");
-        await expect(details).toContainText("6. Платные услуги сервиса и порядок оформления");
-        await expect(details).toContainText("8. Возвраты");
-        await expect(details).toContainText("10. Доставка");
-        await expect(details).toContainText("Споры решаются в соответствии с законодательством Российской Федерации.");
+        await expect(
+            details.locator('[data-offer-version="2026-11-09"]')
+        ).toBeVisible();
+
+        for (const heading of [
+            "1. Стороны и предмет",
+            "2. Заказ и роли участников",
+            "3. Цена заказа и услуги Платформы",
+            "4. Порядок оплаты и выплаты",
+            "5. Отмена, возвраты и споры",
+            "6. Обращения и данные",
+            "7. Действие оферты и реквизиты",
+        ]) {
+            await expect(details).toContainText(heading);
+        }
     });
 
     test("может открыть оба документа одновременно", async ({ page }) => {
-        const privacy = page.locator("details").filter({
+        const privacy = page.locator("details.info-details").filter({
             has: page.locator(".info-card-title", {
                 hasText: "Политика конфиденциальности",
             }),
         });
 
-        const offer = page.locator("details").filter({
+        const offer = page.locator("details.info-details").filter({
             has: page.locator(".info-card-title", {
                 hasText: "Публичная оферта",
             }),
         });
 
-        await privacy.locator("summary").click();
-        await offer.locator("summary").click();
+        await privacy.locator(":scope > summary").click();
+        await offer.locator(":scope > summary").click();
 
         await expect(privacy).toHaveAttribute("open", "");
         await expect(offer).toHaveAttribute("open", "");
 
-        await expect(privacy).toContainText("Какие данные мы собираем");
-        await expect(offer).toContainText("Предмет оферты");
+        await expect(privacy).toContainText(
+            "Какие данные мы собираем"
+        );
+
+        await expect(offer).toContainText(
+            "Цена заказа и услуги Платформы"
+        );
     });
+
+
+
+    test("сохраняет предыдущую редакцию оферты в архиве", async ({ page }) => {
+        const offer = page.locator("details.info-details").filter({
+            has: page.locator(".info-card-title", {
+                hasText: "Публичная оферта",
+            }),
+        });
+
+        await offer.locator(":scope > summary").click();
+
+        const archive = offer.locator("details.info-offer-archive");
+
+        await expect(archive).not.toHaveAttribute("open", "");
+
+        await archive.locator("summary").click();
+
+        await expect(archive).toHaveAttribute("open", "");
+        await expect(archive).toContainText(
+            "6. Платные услуги сервиса и порядок оформления"
+        );
+        await expect(archive).toContainText("12. Заключительные положения");
+    });
+
 
     test("показывает контакты и реквизиты в футере", async ({ page }) => {
         const footer = page.locator(".info-footer-card");

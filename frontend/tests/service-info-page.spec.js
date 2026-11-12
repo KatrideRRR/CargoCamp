@@ -67,31 +67,121 @@ test.describe("ServiceInfoPage", () => {
     });
 
     test("отображает страницу услуг сервиса", async ({ page }) => {
-        await expect(page.locator(".info-page-container")).toBeVisible();
-        await expect(page.locator(".info-page-card")).toBeVisible();
+        await expect(
+            page.locator(".info-page-container")
+        ).toBeVisible();
 
-        await expect(page.locator(".info-title")).toHaveText(
-            "Услуги сервиса CargoCamp и цены"
-        );
+        await expect(
+            page.locator(".info-page-card")
+        ).toBeVisible();
 
-        await expect(page.locator(".info-subtitle")).toContainText(
-            "CargoCamp — онлайн-платформа"
-        );
+        await expect(
+            page.locator(".info-title")
+        ).toHaveText("Услуги сервиса CargoCamp и цены");
 
-        await expect(page.locator(".info-subtitle")).toContainText(
-            "Платежи через интернет-эквайринг принимаются только за услуги сервиса"
+        await expect(
+            page.locator(".info-subtitle")
+        ).toContainText("CargoCamp — онлайн-платформа");
+
+        await expect(
+            page.locator(".info-subtitle")
+        ).toContainText(
+            "Для конкретного заказа доступны способы оплаты"
         );
     });
 
     test("показывает все основные разделы страницы", async ({ page }) => {
-        await expect(page.locator(".info-section-title")).toHaveCount(6);
+        await expect(
+            page.locator(".info-section-title")
+        ).toHaveCount(6);
 
-        await expect(page.getByText("1. О сервисе")).toBeVisible();
-        await expect(page.getByText("2. Услуги сервиса и фиксированные цены")).toBeVisible();
-        await expect(page.getByText("3. За что мы не принимаем оплату")).toBeVisible();
-        await expect(page.getByText("4. Как проходят платежи")).toBeVisible();
-        await expect(page.getByText("5. Условия оказания услуг")).toBeVisible();
-        await expect(page.getByText("6. Контакты и реквизиты")).toBeVisible();
+        for (const title of [
+            "1. О сервисе",
+            "2. Услуги сервиса и фиксированные цены",
+            "3. Способы расчётов по заказам",
+            "4. Как проходят платежи",
+            "5. Условия оказания услуг",
+            "6. Контакты и реквизиты",
+        ]) {
+            await expect(
+                page.getByRole("heading", { name: title })
+            ).toBeVisible();
+        }
+    });
+
+
+    test("объясняет доступные способы расчётов", async ({ page }) => {
+        const section = page.locator(".info-section").filter({
+            hasText: "3. Способы расчётов по заказам",
+        });
+
+        await expect(section).toContainText(
+            "При прямом расчёте заказчик оплачивает работу исполнителю"
+        );
+
+        await expect(section).toContainText(
+            "После подключения соответствующей платёжной схемы"
+        );
+
+        await expect(section).toContainText(
+            "через платёжного провайдера"
+        );
+    });
+
+    test("показывает порядок платежей", async ({ page }) => {
+        const section = page.locator(".info-section").filter({
+            hasText: "4. Как проходят платежи",
+        });
+
+        await expect(section.locator("li")).toHaveCount(4);
+
+        await expect(section).toContainText(
+            "Пользователь выбирает способ расчёта"
+        );
+
+        await expect(section).toContainText(
+            "До подтверждения платежа отображаются стоимость"
+        );
+
+        await expect(section).toContainText(
+            "средства могут резервироваться или списываться"
+        );
+
+        await expect(section).toContainText(
+            "Дополнительные платные функции CargoCamp"
+        );
+    });
+
+    test("показывает условия будущих мультирасчётов", async ({ page }) => {
+        const section = page.locator(".info-section").filter({
+            hasText: "5. Условия оказания услуг",
+        });
+
+        await expect(section).toContainText(
+            "При подключении мультирасчётов будет доступна также оплата услуг исполнителей"
+        );
+
+        await expect(section).toContainText(
+            "Способ расчёта, стоимость заказа, комиссия и итоговая сумма"
+        );
+    });
+
+    test("показывает условия возврата", async ({ page }) => {
+        const section = page.locator(".info-section").filter({
+            hasText: "5. Условия оказания услуг",
+        });
+
+        await expect(section).toContainText(
+            "Требования о возврате рассматриваются"
+        );
+
+        await expect(section).toContainText(
+            "полный или частичный возврат"
+        );
+
+        await expect(section).toContainText(
+            "partner@cargocamp.ru"
+        );
     });
 
     test("показывает описание сервиса", async ({ page }) => {
@@ -106,17 +196,6 @@ test.describe("ServiceInfoPage", () => {
         await expect(section).toContainText(
             "Стоимость работ по заказу определяется сторонами самостоятельно"
         );
-    });
-
-    test("показывает список тарифов", async ({ page }) => {
-        await expect(page.locator(".tariff-item")).toHaveCount(6);
-
-        await expect(page.getByText("Размещение заказа в системе")).toBeVisible();
-        await expect(page.getByText("Продвижение заказа в выдаче")).toBeVisible();
-        await expect(page.getByText(/Комиссия сервиса за взятие заказа/i)).toBeVisible();
-        await expect(page.getByText("Сервисный сбор при безопасной сделке")).toBeVisible();
-        await expect(page.getByText("Погашение задолженности перед сервисом")).toBeVisible();
-        await expect(page.getByText("Покупка статуса Premium")).toBeVisible();
     });
 
     test("показывает цену размещения заказа", async ({ page }) => {
@@ -190,33 +269,6 @@ test.describe("ServiceInfoPage", () => {
         await expect(tariff).toContainText("без комиссии");
     });
 
-    test("объясняет, за что сервис не принимает оплату", async ({ page }) => {
-        const section = page.locator(".info-section").filter({
-            hasText: "3. За что мы не принимаем оплату",
-        });
-
-        await expect(section).toContainText(
-            "CargoCamp не принимает оплату за сами работы или услуги исполнителей"
-        );
-
-        await expect(section).toContainText(
-            "осуществляются напрямую между ними"
-        );
-    });
-
-    test("показывает порядок платежей", async ({ page }) => {
-        const section = page.locator(".info-section").filter({
-            hasText: "4. Как проходят платежи",
-        });
-
-        await expect(section.locator("li")).toHaveCount(4);
-
-        await expect(section).toContainText("Пользователь выбирает услугу сервиса");
-        await expect(section).toContainText("Перед оплатой всегда показана конкретная сумма");
-        await expect(section).toContainText("Оплата проводится через платёжного провайдера");
-        await expect(section).toContainText("После успешной оплаты пользователь видит подтверждение");
-    });
-
     test("показывает условия оказания услуг", async ({ page }) => {
         const section = page.locator(".info-section").filter({
             hasText: "5. Условия оказания услуг",
@@ -232,33 +284,6 @@ test.describe("ServiceInfoPage", () => {
         await expect(section).toContainText("активируется сразу после оплаты");
         await expect(section).toContainText("Срок действия — 24 часа");
         await expect(section).toContainText("7 дней / 30 дней");
-    });
-
-    test("показывает, что онлайн-оплата не принимается за работы исполнителей", async ({ page }) => {
-        const section = page.locator(".info-section").filter({
-            hasText: "Порядок оплаты",
-        });
-
-        await expect(section).toContainText(
-            "Оплата работ исполнителей онлайн не принимается"
-        );
-
-        await expect(section).toContainText(
-            "рассчитываются между собой наличными напрямую"
-        );
-    });
-
-    test("показывает условия возврата", async ({ page }) => {
-        const section = page.locator(".info-section").filter({
-            hasText: "Возвраты",
-        });
-
-        await expect(section).toContainText(
-            "Возврат возможен, если услуга фактически не была предоставлена"
-        );
-
-        await expect(section).toContainText("partner@cargocamp.ru");
-        await expect(section).toContainText("до 10 календарных дней");
     });
 
     test("показывает контакты и реквизиты", async ({ page }) => {

@@ -302,3 +302,24 @@
         padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)) !important;
     }
 }
+
+.cc-offer-version {
+    font-weight: 600;
+    margin-bottom: 18px !important;
+}
+
+.info-offer-archive {
+    margin-top: 24px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(100, 116, 139, 0.25);
+}
+
+.info-offer-archive summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: #2563eb;
+}
+
+.info-offer-archive-content {
+    padding-top: 14px;
+}
