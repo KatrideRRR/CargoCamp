@@ -8,46 +8,51 @@ import PublicOffer, {
 } from "./PublicOffer";
 import "../styles/PublicOfferGate.css";
 
+const initialStatus = {
+    userId: null,
+    phase: "idle",
+    version: null,
+    sha256: null,
+    message: "",
+};
+
 export default function PublicOfferGate({ children }) {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
 
-    const [attempt, setAttempt] = useState(0);
-    const [status, setStatus] = useState({
-        phase: "loading",
-        version: null,
-        sha256: null,
-        message: "",
-    });
+    const userId =
+        user?.id == null ? null : String(user.id);
 
+    const [attempt, setAttempt] = useState(0);
+    const [status, setStatus] = useState(initialStatus);
     const [checked, setChecked] = useState(false);
 
     useEffect(() => {
         let active = true;
 
-        if (!user?.id) {
-            setStatus({
-                phase: "idle",
-                version: null,
-                sha256: null,
-                message: "",
-            });
-            setChecked(false);
-            return;
+        setChecked(false);
+
+        if (!userId) {
+            setStatus(initialStatus);
+            return () => {
+                active = false;
+            };
         }
 
         setStatus({
+            userId,
             phase: "loading",
             version: null,
             sha256: null,
             message: "",
         });
 
-        setChecked(false);
+        const checkOffer = async () => {
+            try {
+                const { data } = await axiosInstance.get(
+                    "/legal/offer/status"
+                );
 
-        axiosInstance
-            .get("/legal/offer/status")
-            .then(({ data }) => {
                 if (!active) return;
 
                 if (
@@ -56,6 +61,7 @@ export default function PublicOfferGate({ children }) {
                     data.version !== PUBLIC_OFFER_VERSION
                 ) {
                     setStatus({
+                        userId,
                         phase: "error",
                         version: null,
                         sha256: null,
@@ -67,6 +73,7 @@ export default function PublicOfferGate({ children }) {
                 }
 
                 setStatus({
+                    userId,
                     phase: data.accepted
                         ? "accepted"
                         : "required",
@@ -74,34 +81,52 @@ export default function PublicOfferGate({ children }) {
                     sha256: data.sha256,
                     message: "",
                 });
-            })
-            .catch(() => {
+            } catch (error) {
                 if (!active) return;
 
                 setStatus({
+                    userId,
                     phase: "error",
                     version: null,
                     sha256: null,
                     message:
                         "Не удалось проверить принятие оферты. Проверьте соединение и повторите.",
                 });
-            });
+            }
+        };
+
+        checkOffer();
 
         return () => {
             active = false;
         };
-    }, [user?.id, attempt]);
+    }, [userId, attempt]);
+
+    // Состояние относится только к текущему пользователю.
+    // Результат проверки другой сессии не используется.
+    const currentPhase =
+        !userId
+            ? "idle"
+            : status.userId === userId
+                ? status.phase
+                : "loading";
+
+    const canUseApp =
+        !userId || currentPhase === "accepted";
+
+    const showDialog = Boolean(userId) && !canUseApp;
 
     const acceptOffer = async () => {
         if (
             !checked ||
-            status.phase !== "required"
+            currentPhase !== "required" ||
+            !status.sha256
         ) {
             return;
         }
 
-        setStatus((prev) => ({
-            ...prev,
+        setStatus((previous) => ({
+            ...previous,
             phase: "submitting",
             message: "",
         }));
@@ -118,21 +143,23 @@ export default function PublicOfferGate({ children }) {
 
             if (
                 data?.accepted !== true ||
-                data?.version !== PUBLIC_OFFER_VERSION
+                data.version !== PUBLIC_OFFER_VERSION
             ) {
                 throw new Error(
-                    "Сервер не подтвердил сохранение согласия"
+                    "Сервер не подтвердил принятие оферты"
                 );
             }
 
-            setStatus((prev) => ({
-                ...prev,
+            setStatus((previous) => ({
+                ...previous,
+                userId,
                 phase: "accepted",
                 message: "",
             }));
         } catch (error) {
-            setStatus((prev) => ({
-                ...prev,
+            setStatus((previous) => ({
+                ...previous,
+                userId,
                 phase: "required",
                 message:
                     error.response?.data?.message ||
@@ -146,19 +173,15 @@ export default function PublicOfferGate({ children }) {
         try {
             await logout();
         } finally {
-            navigate("/login", { replace: true });
+            navigate("/login", {
+                replace: true,
+            });
         }
     };
 
-    const showDialog =
-        Boolean(user?.id) &&
-        ["required", "submitting", "error"].includes(
-            status.phase
-        );
-
     return (
         <>
-            {children}
+            {canUseApp ? children : null}
 
             {showDialog && (
                 <div className="cc-offer-gate-overlay">
@@ -172,7 +195,13 @@ export default function PublicOfferGate({ children }) {
                             Принятие публичной оферты
                         </h2>
 
-                        {status.phase === "error" ? (
+                        {currentPhase === "loading" ||
+                        currentPhase === "idle" ? (
+                            <p role="status">
+                                Проверяем принятие публичной
+                                оферты...
+                            </p>
+                        ) : currentPhase === "error" ? (
                             <>
                                 <p role="alert">
                                     {status.message}
@@ -204,11 +233,12 @@ export default function PublicOfferGate({ children }) {
                                         type="checkbox"
                                         checked={checked}
                                         disabled={
-                                            status.phase === "submitting"
+                                            currentPhase ===
+                                            "submitting"
                                         }
-                                        onChange={(e) =>
+                                        onChange={(event) =>
                                             setChecked(
-                                                e.target.checked
+                                                event.target.checked
                                             )
                                         }
                                     />
@@ -229,11 +259,11 @@ export default function PublicOfferGate({ children }) {
                                     className="cc-offer-gate-accept"
                                     disabled={
                                         !checked ||
-                                        status.phase === "submitting"
+                                        currentPhase !== "required"
                                     }
                                     onClick={acceptOffer}
                                 >
-                                    {status.phase === "submitting"
+                                    {currentPhase === "submitting"
                                         ? "Сохраняем..."
                                         : "Принять оферту"}
                                 </button>

@@ -1,4 +1,4 @@
-
+const vm = require("node:vm");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -42,4 +42,71 @@ test("хеш действующей оферты соответствует ар
 
     assert.equal(CURRENT_OFFER.sha256, hash);
     assert.equal(CURRENT_OFFER.version, "2026-11-09");
+});
+
+
+test("текст фронтенда точно совпадает с архивом", () => {
+    const frontendPath = path.resolve(
+        __dirname,
+        "../../frontend/src/components/PublicOffer.jsx"
+    );
+
+    const source = fs.readFileSync(
+        frontendPath,
+        "utf8"
+    );
+
+    const prefix = "const sections = ";
+
+    const start = source.indexOf(prefix);
+    const end = source.indexOf("\n];", start);
+
+    assert.ok(start >= 0);
+    assert.ok(end > start);
+
+    const sections = vm.runInNewContext(
+        source.slice(
+            start + prefix.length,
+            end + 2
+        ),
+        {},
+        { timeout: 1000 }
+    );
+
+    assert.equal(sections.length, 7);
+
+    const effectiveDate = source.match(
+        /export const PUBLIC_OFFER_EFFECTIVE_DATE = "([^"]+)"/
+    )?.[1];
+
+    assert.ok(effectiveDate);
+
+    assert.match(
+        source,
+        /редакция от 9 ноября 2026 года/
+    );
+
+    const renderedText = [
+        "Публичная оферта CargoCamp",
+        "Редакция от 9 ноября 2026 года",
+        `Дата начала действия: ${effectiveDate}`,
+        "",
+        ...sections.flatMap((section) => [
+            section.title,
+            "",
+            ...section.paragraphs.flatMap(
+                (paragraph) => [
+                    paragraph,
+                    "",
+                ]
+            ),
+        ]),
+    ].join("\n");
+
+    const archivedText = fs.readFileSync(
+        archivePath,
+        "utf8"
+    );
+
+    assert.equal(renderedText, archivedText);
 });

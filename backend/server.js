@@ -44,6 +44,9 @@ const messagesRoutes = require("./routes/messages");
 const categoryRouter = require("./routes/category");
 const adminRoutes = require("./routes/admin");
 const payments = require("./routes/payments");
+const authenticateUser = require("./middlewares/userAuth");
+const {CURRENT_OFFER,} = require("./services/publicOfferConsentService");
+const {createOfferGuard,} = require("./services/publicOfferAccessPolicy");
 const disputeRoutes = require("./routes/disputes");
 const expressOrdersRoutes = require("./routes/expressorders");
 const logActionMiddleware = require("./middlewares/logActionMiddleware");
@@ -250,6 +253,25 @@ app.use("/contracts", (req, res) => {
 
 console.log("Uploads directory:", uploadsRoot);
 console.log("Contracts directory:", contractsRoot);
+
+
+app.use(
+    "/api",
+    createOfferGuard({
+        authenticate: authenticateUser,
+        currentOffer: CURRENT_OFFER,
+
+        findAcceptance: async (userId, offer) =>
+            db.PublicOfferAcceptance.findOne({
+                attributes: ["id"],
+                where: {
+                    userId,
+                    offerVersion: offer.version,
+                    offerSha256: offer.sha256,
+                },
+            }),
+    })
+);
 
 app.use("/api/contracts/acts", actRemediationRoutes);
 app.use("/api/contracts/acts", actAcceptanceRoutes);
