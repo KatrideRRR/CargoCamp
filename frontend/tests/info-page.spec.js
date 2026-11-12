@@ -1,58 +1,36 @@
 import { test, expect } from "./fixtures/safeTest";
 import { mockAppShell } from "./utils/mockAppShell";
-import { createMockJwt } from "./utils/mockAuthSession";
+import { mockAnonymousRefresh } from "./utils/mockAuthSession";
 const FRONT_URL = "http://localhost:3000";
 
 // Если у тебя маршрут другой — поменяй только эту строку.
 const INFO_URL = `${FRONT_URL}/info?platform=web`;
 
-async function setFakeAuth(page) {
-    const fakeToken = createMockJwt({
-        id: 1,
-        username: "test-user",
-        role: "customer",
-    });
-
-    await page.addInitScript((token) => {
-        localStorage.setItem("authToken", token);
-    }, fakeToken);
-}
 
 async function openInfoPage(page, platform = "web") {
-    await setFakeAuth(page);
+    // Публичная страница: пользователь не авторизован.
+    // Ответ refresh изолирован, реальный API недоступен.
+    await mockAnonymousRefresh(page);
 
-    await mockAppShell(page, {
-        profile: {
-            id: 1,
-            username: "test-user",
-            role: "customer",
-        },
-    });
+    await mockAppShell(page);
 
-    await page.goto(`${FRONT_URL}/info?platform=${platform}`, {
+    await page.goto(
+        `${FRONT_URL}/info?platform=${platform}`,
+        {
+            waitUntil: "domcontentloaded",
+            timeout: 30000,
+        }
+    );
 
-        waitUntil: "domcontentloaded",
-
-        timeout: 30000,
-
-    });
-
-    if (page.url().includes("/login")) {
-        await page.screenshot({
-            path: `info-page-redirected-to-login-${platform}.png`,
-            fullPage: true,
-        });
-
-        throw new Error("InfoPage редиректит на /login. Fake JWT не применился.");
-    }
-
-    await expect(page.locator(".info-page")).toBeVisible({
+    await expect(
+        page.locator(".info-page")
+    ).toBeVisible({
         timeout: 15000,
     });
 
-    await expect(page.locator(".info-title")).toHaveText("Информация", {
-        timeout: 15000,
-    });
+    await expect(
+        page.locator(".info-title")
+    ).toHaveText("Информация");
 }
 
 test.describe("InfoPage", () => {
