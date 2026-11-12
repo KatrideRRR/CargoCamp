@@ -2,6 +2,11 @@ import React, {useEffect, useState,
 } from "react";
 import "../styles/ContractSigningPanel.css";
 import axiosInstance from "../utils/axiosInstance";
+import {
+    PenLine,
+    ChevronDown,
+    ChevronRight,
+} from "lucide-react";
 
 export default function ContractSigningPanel({
                                                  assignment,
@@ -182,9 +187,8 @@ export default function ContractSigningPanel({
             >
                 <span>
 <strong>
-    {isAct
-        ? "✍️ Подписать акт"
-        : "✍️ Подписать договор"}
+    <PenLine size={17} aria-hidden="true" />{" "}
+    {isAct ? "Подписать акт" : "Подписать договор"}
 </strong>
                     <small>
     {state?.signingMethod === "click"
@@ -194,7 +198,11 @@ export default function ContractSigningPanel({
                 </span>
 
                 <span aria-hidden="true">
-                    {opened ? "⌄" : "›"}
+{opened ? (
+    <ChevronDown size={18} aria-hidden="true" />
+) : (
+    <ChevronRight size={18} aria-hidden="true" />
+)}
                 </span>
             </button>
 

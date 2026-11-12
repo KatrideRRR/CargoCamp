@@ -430,6 +430,18 @@ test.describe("OrderPage — обычный заказ", () => {
     test("открывает и закрывает модалку запроса выполнения", async ({ page }) => {
         await openRequestModal(page);
 
+        await expect(
+            page.locator(".request-order-modal")
+        ).toBeVisible();
+
+        await expect(
+            page.locator(".request-order-overlay")
+        ).toBeVisible();
+
+        await expect(
+            page.locator(".order-photo-modal")
+        ).toHaveCount(0);
+
         await expect(page.locator(".request-order-title")).toHaveText("Запросить выполнение");
         await expect(page.getByPlaceholder("Например: 2500")).toBeVisible();
         await expect(page.getByPlaceholder("Например: могу приехать сегодня после 18:00")).toBeVisible();

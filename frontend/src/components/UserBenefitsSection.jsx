@@ -8,6 +8,14 @@ import axios from "axios";
 import axiosInstance from "../utils/axiosInstance";
 
 import "../styles/UserBenefitsSection.css";
+import {
+    UserRound,
+    ShieldCheck,
+    UsersRound,
+    Award,
+    Paperclip,
+    ChevronRight,
+} from "lucide-react";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -16,21 +24,21 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const BENEFIT_PROGRAMS = [
     {
         code: "pension_recipient",
-        icon: "👴",
+        icon: UserRound,
         title: "Пенсионер",
         description:
             "Подтверждение пенсионного статуса",
     },
     {
         code: "disability_status",
-        icon: "🛡️",
+        icon: ShieldCheck,
         title: "Льгота по инвалидности",
         description:
             "Подтверждение права на социальную льготу",
     },
     {
         code: "large_family_parent",
-        icon: "👨‍👩‍👧‍👦",
+        icon: UsersRound,
         title: "Многодетная семья",
         description:
             "Подтверждение статуса многодетной семьи",
@@ -329,7 +337,7 @@ function UserBenefitsSection({
             className="verification-panel-icon"
             aria-hidden="true"
         >
-            🎖️
+<Award size={22} aria-hidden="true" />
         </span>
 
         <span className="verification-panel-heading">
@@ -370,7 +378,7 @@ function UserBenefitsSection({
             }`}
             aria-hidden="true"
         >
-            ›
+            <ChevronRight size={18} aria-hidden="true" />
         </span>
     </span>
             </button>
@@ -452,6 +460,8 @@ function UserBenefitsSection({
                                         benefit?.expiresAt
                                     );
 
+                                const ProgramIcon = program.icon;
+
                                 return (
                                     <article
                                         className="cc-benefit-item"
@@ -462,7 +472,7 @@ function UserBenefitsSection({
                                                 className="cc-benefit-icon"
                                                 aria-hidden="true"
                                             >
-                                                {program.icon}
+<ProgramIcon size={22} aria-hidden="true" />
                                             </span>
 
                                             <div className="cc-benefit-details">
@@ -532,7 +542,8 @@ function UserBenefitsSection({
                                                         uploadingCode ? "is-disabled" : ""
                                                     }`}
                                                 >
-                                                    <span aria-hidden="true">📎</span>
+                                                    <span aria-hidden="true"><Paperclip size={16} aria-hidden="true" />
+                                                    </span>
 
                                                     Выбрать файл
                                                 </label>

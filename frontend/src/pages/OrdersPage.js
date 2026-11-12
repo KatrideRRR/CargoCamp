@@ -22,7 +22,7 @@ import RegularAdvanceTimeField from "../components/RegularAdvanceTimeField";
 import { FaMapMarkedAlt, FaSlidersH, FaLocationArrow } from "react-icons/fa";
 import { FiAlertTriangle } from "react-icons/fi";
 import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
-import { Zap, Clock3 } from "lucide-react";
+import { Zap, Clock3, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 const publicApi = axios.create({
@@ -2090,26 +2090,37 @@ const OrdersPage = () => {
                         },
                     }}
                 >
-                    <button className="img-close" onClick={closeModal}>×</button>
+                    <button
+                        type="button"
+                        className="img-close"
+                        onClick={closeModal}
+                        aria-label="Закрыть фотографии"
+                    >
+                        <X size={20} aria-hidden="true" />
+                    </button>
 
                     <button
                         className="img-nav left"
+                        type="button"
+                        aria-label="Предыдущее изображение"
                         onClick={() =>
                             setCurrentImageIndex((prev) => (prev === 0 ? currentImages.length - 1 : prev - 1))
                         }
                     >
-                        ‹
+                        <ChevronLeft size={18} aria-hidden="true" />
                     </button>
 
                     <img src={`${apiUrl}${currentImages[currentImageIndex]}`} alt="full" className="img-full" />
 
                     <button
                         className="img-nav right"
+                        type="button"
+                        aria-label="Следующее изображение"
                         onClick={() =>
                             setCurrentImageIndex((prev) => (prev === currentImages.length - 1 ? 0 : prev + 1))
                         }
                     >
-                        ›
+                        <ChevronRight size={18} aria-hidden="true" />
                     </button>
                 </Modal>
             </div>

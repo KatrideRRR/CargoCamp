@@ -6,7 +6,11 @@ import React, {
     useRef,
     useState,
 } from "react";
-
+import {
+    UserRound,
+    Paperclip,
+    ChevronRight,
+} from "lucide-react";
 import axios from "axios";
 import axiosInstance from "../utils/axiosInstance";
 
@@ -30,6 +34,7 @@ const CAN_APPLY = new Set([
     "revoked",
     "invalid",
 ]);
+
 
 const STATUS = {
     not_requested: {
@@ -349,7 +354,7 @@ export default function UserIdentityVerification({
                         className="verification-panel-icon"
                         aria-hidden="true"
                     >
-                        👤
+<UserRound size={22} aria-hidden="true" />
                     </span>
 
                     <span className="verification-panel-heading">
@@ -386,7 +391,8 @@ export default function UserIdentityVerification({
                         }`}
                         aria-hidden="true"
                     >
-                        ›
+                        <ChevronRight size={18} aria-hidden="true" />
+
                     </span>
                 </span>
             </button>
@@ -515,7 +521,8 @@ export default function UserIdentityVerification({
                                             : ""
                                     }`}
                                 >
-                                    <span aria-hidden="true">📎</span>
+                                    <span aria-hidden="true"><Paperclip size={16} aria-hidden="true" />
+                                    </span>
                                     Выбрать файлы
                                 </label>
 

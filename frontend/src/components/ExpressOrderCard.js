@@ -13,6 +13,7 @@ import {
     FaExclamationTriangle,
     FaClipboardCheck,
 } from "react-icons/fa";
+import { Landmark, Banknote } from "lucide-react";
 
 import {
     getExpressNavigationTarget,
@@ -146,7 +147,12 @@ const ExpressOrderCard = ({
                 ? "Наличные"
                 : "Оплата";
 
-    const paymentIcon = currentOrder.paymentType === "guarantee" ? "🏦" : "💵";
+    const paymentIcon =
+        currentOrder.paymentType === "guarantee" ? (
+            <Landmark size={20} aria-hidden="true" />
+        ) : (
+            <Banknote size={20} aria-hidden="true" />
+        );
 
     const steps = useMemo(
         () => getExpressSteps(currentOrder.type),

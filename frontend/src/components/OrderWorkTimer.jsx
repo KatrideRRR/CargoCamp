@@ -3,7 +3,9 @@ import React, {
     useMemo,
     useState,
 } from "react";
-
+import {
+    Timer, Check
+} from "lucide-react";
 function getDurationMs(
     startedAt,
     endedAt
@@ -121,7 +123,7 @@ function OrderWorkTimer({
             }`}
         >
             <div className="order-work-timer__icon">
-                {isRunning ? "⏱" : "✓"}
+                {isRunning ? <Timer size={20} /> : <Check size={20} />}
             </div>
 
             <div className="order-work-timer__content">

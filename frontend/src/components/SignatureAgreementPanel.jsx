@@ -3,7 +3,7 @@ import React, {
     useEffect,
     useState,
 } from "react";
-
+import { PenLine, ChevronRight } from "lucide-react";
 import axiosInstance
     from "../utils/axiosInstance";
 
@@ -190,9 +190,10 @@ export default function SignatureAgreementPanel() {
                 }
             >
                 <span>
-                    <strong>
-                        ✍️ Электронное подписание
-                    </strong>
+                   <strong>
+    <PenLine size={17} aria-hidden="true" />{" "}
+                       Электронное подписание
+</strong>
 
                     <small>
                         Правила использования
@@ -208,7 +209,7 @@ export default function SignatureAgreementPanel() {
                     }
                     aria-hidden="true"
                 >
-                    ›
+<ChevronRight size={18} aria-hidden="true" />
                 </span>
             </button>
 

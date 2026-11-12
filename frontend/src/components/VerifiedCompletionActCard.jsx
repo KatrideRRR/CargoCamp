@@ -1,6 +1,7 @@
 import React, {useState} from "react";
 import {downloadVerifiedContract,} from "../utils/downloadVerifiedContract";
 import "../styles/VerifiedAssignmentCard.css";
+import { ClipboardCheck, FileText } from "lucide-react";
 
 import SignatureAgreementPanel
     from "./SignatureAgreementPanel";
@@ -176,7 +177,7 @@ export default function VerifiedCompletionActCard({
                 disabled={downloading}
                 onClick={handleDownload}
             >
-                📄{" "}
+                <FileText size={17} aria-hidden="true" />{" "}
                 {downloading
                     ? "Скачиваем..."
                     : "Скачать акт (PDF)"}

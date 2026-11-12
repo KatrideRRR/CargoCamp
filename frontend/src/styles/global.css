@@ -481,3 +481,43 @@ body.hide-bottom-menu .active-orders .pageContainer {
     white-space: nowrap;
     border: 0;
 }
+
+
+/* CargoCamp — consistent SVG icon alignment */
+
+.modal-icon svg,
+.verification-panel-icon svg,
+.cc-benefit-icon svg,
+.cc-va-icon svg,
+.pay-icon svg,
+.order-work-timer__icon svg {
+    display: block;
+    flex-shrink: 0;
+}
+
+.profile-card .card-title svg,
+.cc-va-download svg,
+.cc-benefit-file-picker svg,
+.cc-identity-file-picker svg,
+.cc-signing-toggle strong svg,
+.cc-sa-toggle strong svg {
+    vertical-align: middle;
+    margin-right: 5px;
+}
+
+.modal-close svg,
+.profile-suggestion-close svg,
+.agreement-close svg,
+.glass-icon-btn svg,
+.exo-x svg,
+.img-close svg,
+.img-nav svg {
+    display: block;
+    margin: auto;
+}
+
+.dynamicAddressCheck svg,
+.promoOptionCheck svg {
+    display: inline-block;
+    vertical-align: middle;
+}

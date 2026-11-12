@@ -12,7 +12,7 @@ import YandexMapModal from "../components/YandexMapModal";
 import PaymentProviderSelect from "../components/PaymentProviderSelect";
 import DynamicServiceFields, {isDynamicFieldVisible} from "../components/DynamicServiceFields";
 import {calculateRecommendedPrice} from "../utils/calculateRecommendedPrice";
-import { Check, Paperclip, Timer } from "lucide-react";
+import { Check, Paperclip, Timer, X, ChevronUp, ChevronDown } from "lucide-react";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -1361,7 +1361,7 @@ function CreateOrderPage() {
                         onClick={() => setError("")}
                         aria-label="Закрыть уведомление"
                     >
-                        ×
+                        <X size={18} aria-hidden="true" />
                     </button>
                 </div>
             )}
@@ -1440,7 +1440,12 @@ function CreateOrderPage() {
                                     >
                                         <div className="miniTop">
                                             <span className="miniLabel">Адрес</span>
-                                            <span className="miniChevron">{addressOpen ? "⌃" : "⌄"}</span>
+                                            <span className="miniChevron">{addressOpen ? (
+                                                <ChevronUp size={17} aria-hidden="true" />
+                                            ) : (
+                                                <ChevronDown size={17} aria-hidden="true" />
+                                            )}
+                                            </span>
                                         </div>
 
                                         <div className={`miniValue ${formData.address ? "" : "danger"}`}>
@@ -1667,7 +1672,7 @@ function CreateOrderPage() {
                                         aria-label="Очистить выбранную услугу"
                                         title="Очистить"
                                     >
-                                        ×
+                                        <X size={18} aria-hidden="true" />
                                     </button>
                                 )}
                             </div>

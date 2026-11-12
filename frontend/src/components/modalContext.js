@@ -16,6 +16,17 @@ import {
 import {
     downloadVerifiedContract,
 } from "../utils/downloadVerifiedContract";
+import {
+    Rocket,
+    HardHat,
+    Ban,
+    Star,
+    Hourglass,
+    PartyPopper,
+    AlertTriangle,
+    Check,
+    X,
+} from "lucide-react";
 
 export const ModalContext = createContext(null);
 
@@ -1087,7 +1098,7 @@ export const ModalProvider = ({ children }) => {
                         if (freshDebt === 0) {
                             setDebtModalData(null);
                             setNotificationData(null);
-                            toast.success("Комиссия оплачена ✅");
+                            toast.success("Комиссия оплачена");
                         } else {
                             toast.warning(
                                 "Платёж не завершён или не прошёл. Задолженность осталась."
@@ -1214,10 +1225,12 @@ export const ModalProvider = ({ children }) => {
                             aria-label="Закрыть"
                             type="button"
                         >
-                            ×
+                            <X size={18} aria-hidden="true" />
                         </button>
 
-                        <div className="modal-icon">🚀</div>
+                        <div className="modal-icon">
+                            <Rocket size={26} aria-hidden="true" />
+                        </div>
                         <h2 className="modal-title">{expressAcceptedData.title}</h2>
                         <p className="modal-text">{expressAcceptedData.description}</p>
 
@@ -1256,10 +1269,12 @@ export const ModalProvider = ({ children }) => {
                             aria-label="Закрыть"
                             type="button"
                         >
-                            ×
+                            <X size={18} aria-hidden="true" />
                         </button>
 
-                        <div className="modal-icon">👷</div>
+                        <div className="modal-icon">
+                            <HardHat size={26} aria-hidden="true" />
+                        </div>
 
                         <h2 className="modal-title">
                             {orderRequestData.title || "Новый отклик"}
@@ -1302,10 +1317,12 @@ export const ModalProvider = ({ children }) => {
                             aria-label="Закрыть"
                             type="button"
                         >
-                            ×
+                            <X size={18} aria-hidden="true" />
                         </button>
 
-                        <div className="modal-icon">✓</div>
+                        <div className="modal-icon">
+                            <Check size={26} aria-hidden="true" />
+                        </div>
                         <h2 className="modal-title">{notificationData.title}</h2>
                         <p className="modal-text">{notificationData.description}</p>
 
@@ -1324,7 +1341,7 @@ export const ModalProvider = ({ children }) => {
                         ) : notificationData.autoPaymentPaid ? (
                             <>
                                 <div className="modal-note modal-note-success">
-                                    Комиссия списана с привязанной карты ✅
+                                    Комиссия списана с привязанной карты
                                 </div>
 
                                 <div className="modal-actions">
@@ -1400,10 +1417,12 @@ export const ModalProvider = ({ children }) => {
                             aria-label="Закрыть"
                             type="button"
                         >
-                            ×
+                            <X size={18} aria-hidden="true" />
                         </button>
 
-                        <div className="modal-icon">🚫</div>
+                        <div className="modal-icon">
+                            <Ban size={26} aria-hidden="true" />
+                        </div>
 
                         <h2 className="modal-title">
                             {expressCancelledData.title || "Экспресс-заказ отменён"}
@@ -1458,11 +1477,15 @@ export const ModalProvider = ({ children }) => {
                             aria-label="Закрыть"
                             type="button"
                         >
-                            ×
+                            <X size={18} aria-hidden="true" />
                         </button>
 
                         <div className="modal-icon">
-                            {completionNotificationData.orderType === "express" ? "⭐" : "⏳"}
+                            {completionNotificationData.orderType === "express" ? (
+                                <Star size={26} aria-hidden="true" />
+                            ) : (
+                                <Hourglass size={26} aria-hidden="true" />
+                            )}
                         </div>
 
                         <h2 className="modal-title">
@@ -1516,10 +1539,12 @@ export const ModalProvider = ({ children }) => {
                             aria-label="Закрыть"
                             type="button"
                         >
-                            ×
+                            <X size={18} aria-hidden="true" />
                         </button>
 
-                        <div className="modal-icon modal-icon-party">🎉</div>
+                        <div className="modal-icon modal-icon-party">
+                            <PartyPopper size={26} aria-hidden="true" />
+                        </div>
                         <h2 className="modal-title">Заказ успешно завершён</h2>
                         <p className="modal-text">{completionSuccessData.title}</p>
 
@@ -1602,10 +1627,12 @@ export const ModalProvider = ({ children }) => {
                             aria-label="Закрыть"
                             type="button"
                         >
-                            ×
+                            <X size={18} aria-hidden="true" />
                         </button>
 
-                        <div className="modal-icon">⚠️</div>
+                        <div className="modal-icon">
+                            <AlertTriangle size={26} aria-hidden="true" />
+                        </div>
                         <h2 className="modal-title">{debtModalData.title}</h2>
                         <p className="modal-text">{debtModalData.description}</p>
 

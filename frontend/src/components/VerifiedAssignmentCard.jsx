@@ -3,6 +3,7 @@ import {downloadVerifiedContract,} from "../utils/downloadVerifiedContract";
 import "../styles/VerifiedAssignmentCard.css";
 import SignatureAgreementPanel from "./SignatureAgreementPanel";
 import ContractSigningPanel from "./ContractSigningPanel";
+import { ShieldCheck, FileText } from "lucide-react";
 
 function formatDate(value) {
     if (!value) return "—";
@@ -127,7 +128,7 @@ export default function VerifiedAssignmentCard({
                         className="cc-va-icon"
                         aria-hidden="true"
                     >
-                        🛡️
+<ShieldCheck size={22} aria-hidden="true" />
                     </span>
 
                     <div className="cc-va-heading">
@@ -206,7 +207,7 @@ export default function VerifiedAssignmentCard({
                 onClick={handleDownload}
             >
                 <span aria-hidden="true">
-                    📄
+<FileText size={17} aria-hidden="true" />
                 </span>
 
                 {downloading

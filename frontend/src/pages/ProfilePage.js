@@ -15,6 +15,15 @@ import AgreementModal from "../components/AgreementModal";
 import YandexMapModal from "../components/YandexMapModal";
 import PaymentProviderSelect from "../components/PaymentProviderSelect";
 import SupportPhoneLink from "../components/SupportPhoneLink";
+import {
+    CreditCard,
+    Sparkles,
+    ShieldCheck,
+    CarFront,
+    Check,
+    ChevronRight,
+    X,
+} from "lucide-react";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -1148,7 +1157,7 @@ const ProfilePage = () => {
              */
             if (res.data.paidBySavedCard) {
                 if (res.data.paid) {
-                    toast.success("Premium оплачен с привязанной карты ✅");
+                    toast.success("Premium оплачен с привязанной карты ");
 
                     try {
                         const refreshed = await axios.get(`${apiUrl}/api/auth/profile`, {
@@ -1176,7 +1185,7 @@ const ProfilePage = () => {
                         setPaymentMethodId(refreshed.data.yookassaPaymentMethodId || null);
 
                         if (refreshed.data.subscriptionType === "premium") {
-                            toast.success("Premium активирован ✅");
+                            toast.success("Premium активирован");
                         } else {
                             toast.info("Платёж ещё обрабатывается");
                         }
@@ -1769,7 +1778,7 @@ const ProfilePage = () => {
                     <div className="card-head profile-finance-header">
                         <div>
                             <h2 className="card-title">
-                                💳 Оплата и Premium
+                                <CreditCard size={20} aria-hidden="true" />{" "}Оплата и Premium
                             </h2>
 
                             <p className="card-subtitle">
@@ -1786,7 +1795,7 @@ const ProfilePage = () => {
 
                         <div className="profile-finance-section-head">
                             <div className="profile-finance-section-icon">
-                                💳
+                                <CreditCard size={22} aria-hidden="true" />
                             </div>
 
                             <div className="profile-finance-section-heading">
@@ -1980,7 +1989,7 @@ const ProfilePage = () => {
 
                         <div className="profile-finance-section-head">
                             <div className="profile-finance-section-icon premium">
-                                ✨
+                                <Sparkles size={22} aria-hidden="true" />
                             </div>
 
                             <div className="profile-finance-section-heading">
@@ -2238,7 +2247,7 @@ const ProfilePage = () => {
                     <div className="card-head">
                         <div>
                             <h2 className="card-title">
-                                🛡️ Подтверждения и льготы
+                                <ShieldCheck size={20} aria-hidden="true" />{" "}Подтверждения и льготы
                             </h2>
 
                             <p className="card-subtitle">
@@ -2288,7 +2297,7 @@ const ProfilePage = () => {
                             >
                                 <div className="verification-panel-head-main">
                                     <div className="verification-panel-icon verification-panel-icon-car">
-                                        🚗
+                                        <CarFront size={22} aria-hidden="true" />
                                     </div>
 
                                     <div className="verification-panel-heading">
@@ -2343,8 +2352,8 @@ const ProfilePage = () => {
                                                 : ""
                                         }`}
                                     >
-                        ›
-                    </span>
+<ChevronRight size={18} aria-hidden="true" />
+                                    </span>
                                 </div>
                             </button>
 
@@ -2390,7 +2399,8 @@ const ProfilePage = () => {
                                         "verified" && (
                                             <div className="vehicle-verified-note">
                                                 <strong>
-                                                    ✓ Автомобиль подтверждён
+                                                    <Check size={16} aria-hidden="true" />{" "}
+                                                    Автомобиль подтверждён
                                                 </strong>
 
                                                 <span>
@@ -2660,7 +2670,7 @@ const ProfilePage = () => {
                             disabled={suggestionSending}
                             aria-label="Закрыть"
                         >
-                            ×
+                            <X size={18} aria-hidden="true" />
                         </button>
 
                         <div className="profile-suggestion-head">

@@ -1,6 +1,8 @@
 
 import React, { useEffect, useMemo } from "react";
-
+import {
+    Camera
+} from "lucide-react";
 const MAX_PHOTOS = 5;
 const MAX_SIZE = 8 * 1024 * 1024;
 
@@ -76,7 +78,7 @@ export default function DisputeEvidenceInput({
                     fontWeight: 600,
                 }}
             >
-                📷 Прикрепить фото
+                <Camera size={16} aria-hidden="true" /> Прикрепить фото
 
                 <input
                     type="file"

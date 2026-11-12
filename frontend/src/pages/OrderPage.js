@@ -1186,8 +1186,8 @@ const OrderPage = () => {
                     isOpen={requestModalOpen}
                     onRequestClose={closeRequestModal}
                     contentLabel="Запросить выполнение"
-                    className="custom-modal order-photo-modal"
-                    overlayClassName="custom-modal-overlay order-photo-overlay"
+                    className="request-order-modal"
+                    overlayClassName="request-order-overlay"
                     parentSelector={() => document.body}
                 >
                     <div className="request-order-content">
