@@ -225,3 +225,79 @@ test("неизвестная программа не даёт льготу", asy
         false
     );
 });
+
+
+for (const benefitCode of [
+    "pension_recipient",
+    "disability_status",
+    "large_family_parent",
+]) {
+    test(
+        `Социальная комиссия: ${benefitCode} даёт скидку`,
+        async () => {
+            const service = makeService([
+                verification(1, "verified", {
+                    benefitCode,
+                }),
+            ]);
+
+            assert.equal(
+                await service.hasSocialCommissionBenefit({
+                    userId: 42,
+                }),
+                true
+            );
+        }
+    );
+}
+
+test("Несколько льгот дают одно право на скидку", async () => {
+    const service = makeService([
+        verification(1, "verified", {
+            benefitCode: "pension_recipient",
+        }),
+        verification(2, "verified", {
+            benefitCode: "disability_status",
+        }),
+        verification(3, "verified", {
+            benefitCode: "large_family_parent",
+        }),
+    ]);
+
+    const active =
+        await service.getActiveCommissionBenefitCodes({
+            userId: 42,
+        });
+
+    assert.equal(active.length, 3);
+
+    assert.equal(
+        await service.hasSocialCommissionBenefit({
+            userId: 42,
+        }),
+        true
+    );
+});
+
+test("Отозванные и истёкшие льготы не дают скидку", async () => {
+    const service = makeService([
+        verification(1, "revoked", {
+            benefitCode: "pension_recipient",
+            revokedAt: date(-1),
+        }),
+        verification(2, "verified", {
+            benefitCode: "disability_status",
+            expiresAt: date(-1),
+        }),
+        verification(3, "rejected", {
+            benefitCode: "large_family_parent",
+        }),
+    ]);
+
+    assert.equal(
+        await service.hasSocialCommissionBenefit({
+            userId: 42,
+        }),
+        false
+    );
+});

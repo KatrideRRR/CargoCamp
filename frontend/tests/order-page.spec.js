@@ -366,6 +366,31 @@ test.describe("OrderPage — обычный заказ", () => {
         await expect(page.locator(".orders-page")).toHaveClass(/orders-page--web/);
     });
 
+    test("страница экспресс-заказа показывает социальную скидку", async ({ page }) => {
+        await openExpressOrderPage(page, {
+            creatorBody: {
+                ...creator,
+                hasSocialBenefit: true,
+            },
+            order: {
+                ...expressOrder,
+                creatorSocialBenefitAtCreation: true,
+            },
+        });
+
+        await expect(
+            page.locator(".badge-pensioner-order")
+        ).toHaveAttribute(
+            "title",
+            "Комиссия исполнителя снижена с 70 ₽ до 35 ₽"
+        );
+
+        await expect(
+            page.locator(".pensioner-order-notice")
+        ).toContainText("35 ₽ вместо 70 ₽");
+    });
+
+
     test("ставит ios-класс при platform=ios", async ({ page }) => {
         await openRegularOrderPage(page, {
             query: "platform=ios",

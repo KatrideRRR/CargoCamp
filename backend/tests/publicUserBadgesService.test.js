@@ -1,3 +1,4 @@
+
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
@@ -7,7 +8,7 @@ const {
 
 function createService({
                            identityVerified = false,
-                           pensionVerified = false,
+                           benefitCodes = [],
                        } = {}) {
     const calls = {
         identity: [],
@@ -28,22 +29,18 @@ function createService({
             },
 
             "./benefitService": {
-                async hasVerifiedBenefit(input) {
-                    calls.benefits.push(input);
-
-                    return pensionVerified;
+                async getActiveCommissionBenefitCodes({ userId }) {
+                    calls.benefits.push(userId);
+                    return benefitCodes;
                 },
             },
         }
     );
 
-    return {
-        service,
-        calls,
-    };
+    return { service, calls };
 }
 
-test("Неподтверждённый пользователь не получает значки", async () => {
+test("Без подтверждений публичные бейджи отсутствуют", async () => {
     const { service } = createService();
 
     assert.deepEqual(
@@ -51,13 +48,40 @@ test("Неподтверждённый пользователь не получ�
         {
             identityVerified: false,
             isPensioner: false,
+            hasSocialBenefit: false,
         }
     );
 });
 
-test("Проверка личности не создаёт пенсионную льготу", async () => {
-    const { service } = createService({
+for (const benefitCode of [
+    "pension_recipient",
+    "disability_status",
+    "large_family_parent",
+]) {
+    test(
+        `Подтверждение ${benefitCode} даёт единый льготный бейдж`,
+        async () => {
+            const { service } = createService({
+                benefitCodes: [benefitCode],
+            });
+
+            assert.deepEqual(
+                await service.getPublicUserBadges(101),
+                {
+                    identityVerified: false,
+                    isPensioner:
+                        benefitCode === "pension_recipient",
+                    hasSocialBenefit: true,
+                }
+            );
+        }
+    );
+}
+
+test("Верификация личности и социальная льгота независимы", async () => {
+    const { service, calls } = createService({
         identityVerified: true,
+        benefitCodes: ["large_family_parent"],
     });
 
     assert.deepEqual(
@@ -65,47 +89,10 @@ test("Проверка личности не создаёт пенсионную
         {
             identityVerified: true,
             isPensioner: false,
-        }
-    );
-});
-
-test("Пенсионная льгота не подтверждает личность", async () => {
-    const { service } = createService({
-        pensionVerified: true,
-    });
-
-    assert.deepEqual(
-        await service.getPublicUserBadges(101),
-        {
-            identityVerified: false,
-            isPensioner: true,
-        }
-    );
-});
-
-test("Два независимых подтверждения могут действовать одновременно", async () => {
-    const { service, calls } = createService({
-        identityVerified: true,
-        pensionVerified: true,
-    });
-
-    assert.deepEqual(
-        await service.getPublicUserBadges(101),
-        {
-            identityVerified: true,
-            isPensioner: true,
+            hasSocialBenefit: true,
         }
     );
 
     assert.deepEqual(calls.identity, [101]);
-
-    assert.deepEqual(
-        calls.benefits,
-        [
-            {
-                userId: 101,
-                benefitCode: "pension_recipient",
-            },
-        ]
-    );
+    assert.deepEqual(calls.benefits, [101]);
 });

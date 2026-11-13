@@ -15,6 +15,13 @@ module.exports = (sequelize, DataTypes) => {
                 field: 'creator_id',
             },
 
+            creatorSocialBenefitAtCreation: {
+                type: DataTypes.BOOLEAN,
+                allowNull: true,
+                defaultValue: null,
+                field: "creator_social_benefit_at_creation",
+            },
+
             executorId: {
                 type: DataTypes.INTEGER.UNSIGNED,
                 allowNull: true,

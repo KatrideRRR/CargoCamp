@@ -21,7 +21,7 @@ const scenarios = [
     {
         name: "Обычный заказ пенсионера",
         input: {
-            isPensioner: true,
+            hasSocialBenefit: true,
         },
         expected: 10000,
     },
@@ -29,7 +29,7 @@ const scenarios = [
         name: "Рекомендованный заказ пенсионера",
         input: {
             isRecommended: true,
-            isPensioner: true,
+            hasSocialBenefit: true,
         },
         expected: 5000,
     },
@@ -44,7 +44,7 @@ const scenarios = [
         name: "Premium с пенсионной льготой",
         input: {
             isPremium: true,
-            isPensioner: true,
+            hasSocialBenefit: true,
         },
         expected: 0,
     },
@@ -59,7 +59,7 @@ const scenarios = [
         name: "Гарантийная сделка пенсионера",
         input: {
             isCash: false,
-            isPensioner: true,
+            hasSocialBenefit: true,
         },
         expected: 0,
     },

@@ -8,6 +8,12 @@ const {
     getBenefitProgram,
 } = require("../config/benefitPrograms");
 
+const COMMISSION_DISCOUNT_BENEFIT_CODES = Object.freeze([
+    "pension_recipient",
+    "disability_status",
+    "large_family_parent",
+]);
+
 function isActiveVerification(record, now = new Date()) {
     if (
         !record ||
@@ -164,9 +170,45 @@ async function getMyBenefitOverview(userId) {
     });
 }
 
+
+async function getActiveCommissionBenefitCodes({
+                                                   userId,
+                                                   countryCode = "RU",
+                                                   transaction = null,
+                                               }) {
+    const checks = await Promise.all(
+        COMMISSION_DISCOUNT_BENEFIT_CODES.map(
+            async (benefitCode) => ({
+                benefitCode,
+                active: await hasVerifiedBenefit({
+                    userId,
+                    benefitCode,
+                    countryCode,
+                    transaction,
+                }),
+            })
+        )
+    );
+
+    return checks
+        .filter((item) => item.active)
+        .map((item) => item.benefitCode);
+}
+
+async function hasSocialCommissionBenefit(options) {
+    const codes =
+        await getActiveCommissionBenefitCodes(options);
+
+    return codes.length > 0;
+}
+
+
 module.exports = {
     isActiveVerification,
     getCurrentBenefitVerification,
     hasVerifiedBenefit,
     getMyBenefitOverview,
+    COMMISSION_DISCOUNT_BENEFIT_CODES,
+    getActiveCommissionBenefitCodes,
+    hasSocialCommissionBenefit,
 };

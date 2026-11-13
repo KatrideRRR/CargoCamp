@@ -12,7 +12,7 @@ const {
 } = require("./orderCommissionService");
 
 const {
-    hasVerifiedBenefit,
+    hasSocialCommissionBenefit,
 } = require("./benefitService");
 
 const {
@@ -361,19 +361,22 @@ async function assignCashRegularOrder({
             throw fail(404, "Заказчик не найден");
         }
 
-        const isPensionerCreator =
-            await hasVerifiedBenefit({
-                userId: creator.id,
-                benefitCode: "pension_recipient",
-                transaction,
-            });
+        const hasSocialBenefitCreator =
+            order.creatorSocialBenefitAtCreation == null
+                ? await hasSocialCommissionBenefit({
+                    userId: creator.id,
+                    transaction,
+                })
+                : Boolean(
+                    order.creatorSocialBenefitAtCreation
+                );
 
         const commissionKopecks =
             calculateRegularCommissionKopecks({
                 isCash: true,
                 isPremium: Boolean(isPremium),
                 isRecommended: Boolean(order.is_recommended),
-                isPensioner: isPensionerCreator,
+                hasSocialBenefit: hasSocialBenefitCreator,
             });
 
         // Назначение исполнителя.
@@ -413,7 +416,7 @@ async function assignCashRegularOrder({
             activatedFromReservation: activation,
             approvedSum: price,
             isPremium: Boolean(isPremium),
-            isPensionerCreator,
+            hasSocialBenefitCreator,
             commissionKopecks,
             commissionAccrual,
         };

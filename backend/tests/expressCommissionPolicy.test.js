@@ -84,3 +84,39 @@ test("Стоимость выше лимита отклоняется", () => {
         RangeError
     );
 });
+
+
+test("Социальная льгота уменьшает экспресс-комиссию с 10% до 5%", () => {
+    const result = calculateExpressCommission({
+        totalPriceRub: 1000,
+        subscriptionType: "free",
+        hasSocialBenefit: true,
+        now,
+    });
+
+    assert.equal(result.feeKopecks, 5000);
+});
+
+test("Социальная скидка не суммируется с Premium", () => {
+    const result = calculateExpressCommission({
+        totalPriceRub: 1000,
+        subscriptionType: "premium",
+        subscriptionExpiresAt:
+            "2026-12-01T00:00:00Z",
+        hasSocialBenefit: true,
+        now,
+    });
+
+    assert.equal(result.feeKopecks, 0);
+});
+
+test("Социальная экспресс-комиссия округляется до копейки", () => {
+    const result = calculateExpressCommission({
+        totalPriceRub: 351.23,
+        subscriptionType: "free",
+        hasSocialBenefit: true,
+        now,
+    });
+
+    assert.equal(result.feeKopecks, 1756);
+});

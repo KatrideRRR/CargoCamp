@@ -1496,11 +1496,14 @@ test.describe("OrdersPage — фильтры, время и ограничени
                 },
                 creatorBody: {
                     ...creator,
-                    isPensioner: true,
+                    hasSocialBenefit: true,
                 },
                 orders: [
                     regularOrders[0],
-                    regularOrders[1],
+                    {
+                        ...regularOrders[1],
+                        paymentType: "cash",
+                    },
                 ],
                 express: [],
             });
@@ -1530,6 +1533,57 @@ test.describe("OrdersPage — фильтры, время и ограничени
             );
         }
     );
+
+
+    test("показывает социальную скидку для экспресс-заказа", async ({ page }) => {
+        await openOrdersPage(page, {
+            profileBody: {
+                ...viewer,
+                preferredCategoryIds: [],
+            },
+            creatorBody: {
+                ...creator,
+                hasSocialBenefit: true,
+            },
+            orders: [],
+            express: [expressOrders[0]],
+        });
+
+        const card = orderCard(
+            page,
+            "Экспресс №201"
+        );
+
+        await expect(
+            card.locator(".badge-pensioner-order")
+        ).toHaveAttribute(
+            "title",
+            "Комиссия исполнителя 35 ₽ вместо 70 ₽"
+        );
+    });
+
+    test("зафиксированное отсутствие льготы важнее текущего статуса", async ({ page }) => {
+        await openOrdersPage(page, {
+            profileBody: {
+                ...viewer,
+                preferredCategoryIds: [],
+            },
+            creatorBody: {
+                ...creator,
+                hasSocialBenefit: true,
+            },
+            orders: [{
+                ...regularOrders[0],
+                creatorSocialBenefitAtCreation: false,
+            }],
+            express: [],
+        });
+
+        await expect(
+            orderCard(page, "Заказ №101")
+                .locator(".badge-pensioner-order")
+        ).toHaveCount(0);
+    });
 
     test(
         "при задолженности не отправляет отклик и сохраняет его до оплаты",

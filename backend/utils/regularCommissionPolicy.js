@@ -1,8 +1,9 @@
+
 function calculateRegularCommissionKopecks({
                                                isCash = true,
                                                isPremium = false,
                                                isRecommended = false,
-                                               isPensioner = false,
+                                               hasSocialBenefit = false,
                                            } = {}) {
     if (!isCash || isPremium) {
         return 0;
@@ -12,7 +13,7 @@ function calculateRegularCommissionKopecks({
         ? 10000
         : 20000;
 
-    return isPensioner
+    return hasSocialBenefit
         ? Math.round(baseKopecks / 2)
         : baseKopecks;
 }

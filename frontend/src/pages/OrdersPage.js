@@ -23,6 +23,10 @@ import { FaMapMarkedAlt, FaSlidersH, FaLocationArrow } from "react-icons/fa";
 import { FiAlertTriangle } from "react-icons/fi";
 import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
 import { Zap, Clock3, X, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+    orderHasSocialDiscount,
+    getSocialCommissionPreview,
+} from "../utils/socialCommissionPreview";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 const publicApi = axios.create({
@@ -33,10 +37,6 @@ const publicApi = axios.create({
 
 const RADIUS_KM = 50;
 const HIDE_FROM_DRAWER = new Set(["Такси", "Курьер"]);
-
-function isPensionerUser(user) {
-    return user?.isPensioner === true;
-}
 
 function normalizeBoolean(value) {
     if (
@@ -545,6 +545,10 @@ const OrdersPage = () => {
                 e.created_at,
 
             creatorId: e.creatorId,
+            creatorSocialBenefitAtCreation:
+                e.creatorSocialBenefitAtCreation ??
+                e.creator_social_benefit_at_creation ??
+                null,
             executorId: e.executorId,
 
             status:
@@ -1394,17 +1398,12 @@ const OrdersPage = () => {
                                 const isCreator = Number(order.creatorId) === Number(userId);
                                 const isExpress = !!order.express;
 
-                                const isPensionerOrder =
-                                    !isExpress &&
-                                    isPensionerUser(creator);
+                                const commissionPreview =
+                                    getSocialCommissionPreview(order);
 
-                                const baseCommissionRub =
-                                    order.is_recommended
-                                        ? 100
-                                        : 200;
-
-                                const discountedCommissionRub =
-                                    baseCommissionRub / 2;
+                                const isSocialDiscountOrder =
+                                    commissionPreview !== null &&
+                                    orderHasSocialDiscount(order, creator);
 
                                 const orderTiming = isExpress
                                     ? null
@@ -1465,14 +1464,20 @@ const OrdersPage = () => {
 
                                                     {canTakeOrder && <span className="badge badge-can-take">Можно взять</span>}
 
-                                                    {isPensionerOrder && (
+
+                                                    {isSocialDiscountOrder && (
                                                         <span
                                                             className="badge badge-pensioner-order"
-                                                            title={`Комиссия исполнителя ${discountedCommissionRub} ₽ вместо ${baseCommissionRub} ₽`}
+                                                            title={
+                                                                `Комиссия исполнителя ` +
+                                                                `${commissionPreview.discountedRubles} ₽ ` +
+                                                                `вместо ${commissionPreview.baseRubles} ₽`
+                                                            }
                                                         >
         Льготный · −50% комиссии
     </span>
                                                     )}
+
 
                                                     {order.is_recommended && <span className="badge badge-priority">В приоритете</span>}
                                                     {order.taxi_courier && <span className="badge badge-courier">{courierBadgeText}</span>}

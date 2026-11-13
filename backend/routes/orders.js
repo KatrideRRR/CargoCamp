@@ -23,7 +23,7 @@ const {
     Service,
 } = require("../models");
 const {
-    hasVerifiedBenefit,
+    hasSocialCommissionBenefit,
 } = require("../services/benefitService");
 
 const {
@@ -1538,6 +1538,11 @@ module.exports = (io) => {
                 };
             }
 
+            const creatorSocialBenefitAtCreation =
+                await hasSocialCommissionBenefit({
+                    userId,
+                });
+
             // 3) Сначала создаём заказ БЕЗ финальных путей картинок
             const newOrder = await Order.create({
                 userId,
@@ -1552,6 +1557,7 @@ module.exports = (io) => {
                 createdAt: new Date(),
                 images: [],
                 creatorId: userId,
+                creatorSocialBenefitAtCreation,
                 status,
                 categoryId: catId,
                 subcategoryId: normalizedSubId,
@@ -1616,6 +1622,8 @@ module.exports = (io) => {
                     coords: newOrder.coordinates,
                     imagesCount: photoUrls.length,
                     imagePaths: photoUrls,
+                    socialCommissionDiscountEligible:
+                    creatorSocialBenefitAtCreation,
                     recommendedPrice:
                         serverRecommendedPrice
                             ?.recommendedPrice || null,
@@ -2670,12 +2678,15 @@ module.exports = (io) => {
             const isCash = order.paymentType === "cash";
             const isRecommended = Boolean(order.is_recommended);
 
-            const isPensionerCreator = cashAssignment
-                ? cashAssignment.isPensionerCreator
-                : await hasVerifiedBenefit({
-                    userId: creator.id,
-                    benefitCode: "pension_recipient",
-                });
+            const hasSocialBenefitCreator = cashAssignment
+                ? cashAssignment.hasSocialBenefitCreator
+                : order.creatorSocialBenefitAtCreation == null
+                    ? await hasSocialCommissionBenefit({
+                        userId: creator.id,
+                    })
+                    : Boolean(
+                        order.creatorSocialBenefitAtCreation
+                    );
 
 // Базовая комиссия:
 // обычный заказ — 200 ₽
@@ -2690,7 +2701,7 @@ module.exports = (io) => {
                     isCash,
                     isPremium,
                     isRecommended,
-                    isPensioner: isPensionerCreator,
+                    hasSocialBenefit: hasSocialBenefitCreator,
                 });
 
             let finalDebtKopecks = Number(executor.debt || 0);
@@ -2760,10 +2771,12 @@ module.exports = (io) => {
                     status: order.status,
                     dealStatus: order.dealStatus,
 
-                    creatorBenefitCode: isPensionerCreator
-                        ? "pension_recipient"
-                        : null,
-                    isPensionerCreator,
+                    creatorHasSocialBenefit:
+                    hasSocialBenefitCreator,
+                    socialCommissionDiscountApplied:
+                        hasSocialBenefitCreator &&
+                        isCash &&
+                        !isPremium,
 
                     baseCommissionKopecks: baseFeeRub * 100,
                     commissionKopecks,
@@ -2929,23 +2942,23 @@ module.exports = (io) => {
                 const commissionRub =
                     commissionKopecks / 100;
 
-                const pensionerText =
-                    isPensionerCreator
-                        ? " Комиссия уменьшена вдвое, поскольку заказчик имеет статус пенсионера."
+                const socialBenefitText =
+                    hasSocialBenefitCreator
+                        ? " Комиссия уменьшена вдвое: заказ оформлен со специальной социальной льготой."
                         : "";
 
                 if (commissionPayment.autoPaymentPaid) {
                     executorMessage =
-                        `Ваш запрос одобрен! Комиссия ${commissionRub} ₽ списана с привязанной карты ✅${pensionerText}`;
+                        `Ваш запрос одобрен! Комиссия ${commissionRub} ₽ списана с привязанной карты ${socialBenefitText}`;
                 } else if (commissionPayment.autoPaymentProcessing) {
                     executorMessage =
-                        `Ваш запрос одобрен! Пробуем списать комиссию ${commissionRub} ₽ с привязанной карты.${pensionerText}`;
+                        `Ваш запрос одобрен! Пробуем списать комиссию ${commissionRub} ₽ с привязанной карты.${socialBenefitText}`;
                 } else if (commissionPayment.autoPaymentTried) {
                     executorMessage =
-                        `Ваш запрос одобрен! Автоматическое списание не прошло, комиссия ${commissionRub} ₽ осталась в задолженности.${pensionerText}`;
+                        `Ваш запрос одобрен! Автоматическое списание не прошло, комиссия ${commissionRub} ₽ осталась в задолженности.${socialBenefitText}`;
                 } else {
                     executorMessage =
-                        `Ваш запрос одобрен! Комиссия ${commissionRub} ₽ начислена в задолженность.${pensionerText}`;
+                        `Ваш запрос одобрен! Комиссия ${commissionRub} ₽ начислена в задолженность.${socialBenefitText}`;
                 }
             } else if (isPremium) {
                 executorMessage =

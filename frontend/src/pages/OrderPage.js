@@ -29,12 +29,12 @@ import { FiAlertTriangle } from "react-icons/fi";
 import { toast } from "react-toastify";
 import ExpressRouteButtons from "../components/ExpressRouteButtons";
 import RegularAdvanceTimeField from "../components/RegularAdvanceTimeField";
+import {
+    orderHasSocialDiscount,
+    getSocialCommissionPreview,
+} from "../utils/socialCommissionPreview";
 
 const apiUrl = process.env.REACT_APP_API_URL;
-
-function isPensionerUser(user) {
-    return user?.isPensioner === true;
-}
 
 function normalizeBoolean(value) {
     if (
@@ -835,17 +835,12 @@ const OrderPage = () => {
     const isExpress = !!order.express;
     const displayId = isExpress ? order.expressId : order.id;
 
-    const isPensionerOrder =
-        !isExpress &&
-        isPensionerUser(creator);
+    const commissionPreview =
+        getSocialCommissionPreview(order);
 
-    const baseCommissionRub =
-        order.is_recommended
-            ? 100
-            : 200;
-
-    const discountedCommissionRub =
-        baseCommissionRub / 2;
+    const isSocialDiscountOrder =
+        commissionPreview !== null &&
+        orderHasSocialDiscount(order, creator);
 
     const orderTiming = isExpress
         ? null
@@ -948,10 +943,14 @@ const OrderPage = () => {
                                         <span className="badge badge-can-take">Можно взять</span>
                                     )}
 
-                                    {isPensionerOrder && (
+                                    {isSocialDiscountOrder && (
                                         <span
                                             className="badge badge-pensioner-order"
-                                            title={`Комиссия исполнителя снижена с ${baseCommissionRub} ₽ до ${discountedCommissionRub} ₽`}
+                                            title={
+                                                `Комиссия исполнителя снижена с ` +
+                                                `${commissionPreview.baseRubles} ₽ ` +
+                                                `до ${commissionPreview.discountedRubles} ₽`
+                                            }
                                         >
         Льготный заказ · комиссия −50%
     </span>
@@ -1102,7 +1101,8 @@ const OrderPage = () => {
                             />
                         )}
 
-                        {isPensionerOrder && (
+
+                        {isSocialDiscountOrder && (
                             <div className="pensioner-order-notice">
         <span className="pensioner-order-notice__icon">
             %
@@ -1114,15 +1114,19 @@ const OrderPage = () => {
             </span>
 
                                     <span className="pensioner-order-notice__text">
-                Заказ создан пользователем со статусом пенсионера.
-                Комиссия исполнителя снижена вдвое:{" "}
+                Заказ оформлен с подтверждённой
+                социальной льготой. Комиссия
+                исполнителя снижена вдвое:{" "}
                                         <strong>
-                    {discountedCommissionRub} ₽ вместо {baseCommissionRub} ₽
+                    {commissionPreview.discountedRubles} ₽
+                                            {" "}вместо{" "}
+                                            {commissionPreview.baseRubles} ₽
                 </strong>.
             </span>
                                 </div>
                             </div>
                         )}
+
 
                         <div className="order-actions">
                             <Link

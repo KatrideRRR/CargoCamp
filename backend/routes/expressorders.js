@@ -13,6 +13,9 @@ const {
     advanceExpressOrder,
     cancelExpressOrder,
 } = require("../services/expressOrderLifecycleService");
+const {
+    hasSocialCommissionBenefit,
+} = require("../services/benefitService");
 
 const {
     calculateExpressCommission,
@@ -851,9 +854,16 @@ router.post("/express-orders", authenticateToken, async (req, res) => {
 
         const tp = Math.round(tpRaw * 100) / 100;
 
+        const creatorSocialBenefitAtCreation =
+            await hasSocialCommissionBenefit({
+                userId: creatorId,
+                transaction: t,
+            });
+
         const order = await ExpressOrder.create(
             {
                 creatorId,
+                creatorSocialBenefitAtCreation,
                 executorId: null,
                 type,
                 fromAddress,
@@ -924,6 +934,9 @@ router.post("/express-orders", authenticateToken, async (req, res) => {
 
                 offeredPrice:
                 order.totalPrice,
+
+                socialCommissionDiscountEligible:
+                creatorSocialBenefitAtCreation,
 
                 recommendedPrice:
                 order.recommendedPrice,
@@ -2100,11 +2113,22 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
 
             const totalRubles = Number(order.totalPrice);
 
+            const hasSocialBenefitCreator =
+                order.creatorSocialBenefitAtCreation == null
+                    ? await hasSocialCommissionBenefit({
+                        userId: order.creatorId,
+                        transaction: t,
+                    })
+                    : Boolean(
+                        order.creatorSocialBenefitAtCreation
+                    );
+
             let commission;
 
             try {
                 commission = calculateExpressCommission({
                     totalPriceRub: totalRubles,
+                    hasSocialBenefit: hasSocialBenefitCreator,
 
                     subscriptionType:
                     executor.subscription_type,
@@ -2226,6 +2250,12 @@ try{
 
                     to:
                     order.status,
+
+                    creatorHasSocialBenefit:
+                    hasSocialBenefitCreator,
+
+                    socialCommissionDiscountApplied:
+                        hasSocialBenefitCreator && !premiumActive,
 
                     totalRubles,
 

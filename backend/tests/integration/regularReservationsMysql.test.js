@@ -276,7 +276,7 @@ test("Бронирование обычных заказов: MySQL", async (t) 
                 },
                 "./orderCommissionService": commission,
                 "./benefitService": {
-                    async hasVerifiedBenefit() {
+                    async hasSocialCommissionBenefit() {
                         return false;
                     },
                 },

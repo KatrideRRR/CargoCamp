@@ -71,6 +71,12 @@ module.exports = (sequelize) => {
                 field: "commission_accrued_at",
             },
             creatorId: { type: DataTypes.INTEGER, allowNull: false },
+            creatorSocialBenefitAtCreation: {
+                type: DataTypes.BOOLEAN,
+                allowNull: true,
+                defaultValue: null,
+                field: "creator_social_benefit_at_creation",
+            },
             completedBy: { type: DataTypes.JSON, allowNull: false, defaultValue: [] },
             images: {
                 type: DataTypes.TEXT,

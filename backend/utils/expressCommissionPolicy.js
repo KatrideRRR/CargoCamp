@@ -2,6 +2,7 @@ function calculateExpressCommission({
                                         totalPriceRub,
                                         subscriptionType,
                                         subscriptionExpiresAt,
+                                        hasSocialBenefit = false,
                                         now = new Date(),
                                     }) {
     const price = Number(totalPriceRub);
@@ -37,9 +38,14 @@ function calculateExpressCommission({
         Number.isFinite(expiration.getTime()) &&
         expiration.getTime() > now.getTime();
 
+    const baseFeeKopecks =
+        Math.round(totalKopecks * 0.10);
+
     const feeKopecks = premiumActive
         ? 0
-        : Math.round(totalKopecks * 0.10);
+        : hasSocialBenefit
+            ? Math.round(baseFeeKopecks / 2)
+            : baseFeeKopecks;
 
     return {
         premiumActive,
