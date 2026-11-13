@@ -38,6 +38,20 @@ function makeUser(changes = {}) {
     };
 }
 
+
+function getVehicleReviewSnapshot(user) {
+    return {
+        vehicleBrand: user.vehicleBrand ?? null,
+        vehicleModel: user.vehicleModel ?? null,
+        vehicleColor: user.vehicleColor ?? null,
+        vehiclePlate: user.vehiclePlate ?? null,
+        vehicleYear: user.vehicleYear ?? null,
+        vehiclePhoto: user.vehiclePhoto ?? null,
+        vehicleVerificationStatus:
+            user.vehicleVerificationStatus ?? null,
+    };
+}
+
 async function setupMocks(page, options = {}) {
     const {
         user = makeUser(),
@@ -426,6 +440,8 @@ test.describe("UsersPage — автомобили", () => {
             method: "PUT",
             body: {
                 status: "verified",
+                expectedVehicle:
+                    getVehicleReviewSnapshot(USER),
             },
             authorization:
                 `Bearer ${ADMIN_TEST_TOKEN}`,
@@ -607,6 +623,8 @@ test.describe("UsersPage — автомобили", () => {
             body: {
                 status: "rejected",
                 note: reason,
+                expectedVehicle:
+                    getVehicleReviewSnapshot(USER),
             },
             authorization:
                 `Bearer ${ADMIN_TEST_TOKEN}`,

@@ -34,6 +34,9 @@ const {
 const {
     getPublicUserBadges,
 } = require("../services/publicUserBadgesService");
+const {
+    mutateVehicleWithLock,
+} = require("../services/vehicleVerificationService");
 const crypto = require("crypto");
 const {uploadsRoot: publicUploadsRoot,} = require("../config/storagePaths");
 const avatarsDir = path.join(__dirname, "..", "uploads", "avatars");
@@ -1666,29 +1669,21 @@ router.post("/vehicle/me", authenticateToken, async (req, res) => {
             }
         }
 
-        const user = await User.findByPk(userId);
 
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: "Пользователь не найден",
-            });
-        }
+        const user = await mutateVehicleWithLock(
+            userId,
+            (user) => {
+                user.vehicleBrand = brand;
+                user.vehicleModel = model;
+                user.vehicleColor = color;
+                user.vehiclePlate = plate;
+                user.vehicleYear = normalizedYear;
 
-        user.vehicleBrand = brand;
-        user.vehicleModel = model;
-        user.vehicleColor = color;
-        user.vehiclePlate = plate;
-        user.vehicleYear = normalizedYear;
+                user.vehicleVerificationStatus = "pending";
+                user.vehicleVerificationNote = null;
+            }
+        );
 
-        /*
-         * Любое изменение данных автомобиля
-         * требует новой проверки администратором.
-         */
-        user.vehicleVerificationStatus = "pending";
-        user.vehicleVerificationNote = null;
-
-        await user.save();
 
         void sendAdminNotification({
             topic: "vehicles",
@@ -1738,6 +1733,12 @@ router.post("/vehicle/me", authenticateToken, async (req, res) => {
             },
         });
     } catch (error) {
+        if (error.httpStatus) {
+            return res.status(error.httpStatus).json({
+                success: false,
+                message: error.message,
+            });
+        }
         console.error(
             "Ошибка сохранения автомобиля:",
             error
@@ -1822,21 +1823,22 @@ router.post("/vehicle/photo", authenticateToken, (req, res, next) => {vehiclePho
         const publicPath =
             `/uploads/vehicles/${fileName}`;
 
-        user.vehiclePhoto = publicPath;
-
-        // Новое фото требует повторной проверки.
-        user.vehicleVerificationStatus = "pending";
-        user.vehicleVerificationNote = null;
-
-        await user.save();
+    const updatedUser = await mutateVehicleWithLock(
+        userId,
+        (currentUser) => {
+            currentUser.vehiclePhoto = publicPath;
+            currentUser.vehicleVerificationStatus = "pending";
+            currentUser.vehicleVerificationNote = null;
+        }
+    );
 
         return res.json({
             success: true,
             message:
                 "Фото автомобиля загружено и отправлено на проверку",
-            vehiclePhoto: user.vehiclePhoto,
+            vehiclePhoto: updatedUser.vehiclePhoto,
             vehicleVerificationStatus:
-            user.vehicleVerificationStatus,
+            updatedUser.vehicleVerificationStatus,
         });
 
     } catch (error) {if (newFilePath) {
@@ -1851,7 +1853,14 @@ router.post("/vehicle/photo", authenticateToken, (req, res, next) => {vehiclePho
                     cleanupError
                 );
             }
-        }console.error("Ошибка загрузки фото автомобиля:", error);return res.status(500).json({
+        }console.error("Ошибка загрузки фото автомобиля:", error);
+    if (error.httpStatus) {
+        return res.status(error.httpStatus).json({
+            success: false,
+            message: error.message,
+        });
+    }
+        return res.status(500).json({
             success: false,
             message:
                 "Не удалось сохранить фотографию автомобиля",

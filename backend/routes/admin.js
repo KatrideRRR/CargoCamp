@@ -12,6 +12,10 @@ const {validateAdminSessionOrigin, getAdminRefreshToken, setAdminRefreshCookie, 
 const {
     getAdminSelfActionError,
 } = require("../utils/adminRoleSafety");
+const {
+    mutateVehicleWithLock,
+    assertVehicleSnapshot,
+} = require("../services/vehicleVerificationService");
 
 const geocoder = NodeGeocoder({provider: "openstreetmap",});
 
@@ -2668,69 +2672,67 @@ router.put("/users/:id/vehicle-verification", authMiddleware, adminMiddleware, a
                 });
             }
 
-            const user = await User.findByPk(userId);
 
-            if (!user) {
-                return res.status(404).json({
-                    success: false,
-                    message: "Пользователь не найден",
-                });
-            }
+            const user = await mutateVehicleWithLock(
+                userId,
+                (user) => {
+                    // Администратор должен проверять именно
+                    // те данные, которые видел на экране.
+                    assertVehicleSnapshot(
+                        user,
+                        req.body.expectedVehicle
+                    );
 
-            /*
-             * Одобрить машину можно только если
-             * основные обязательные данные заполнены.
-             */
-            const requiredVehicleFields = [
-                user.vehicleBrand,
-                user.vehicleModel,
-                user.vehicleColor,
-                user.vehiclePlate,
-            ];
+                    const requiredVehicleFields = [
+                        user.vehicleBrand,
+                        user.vehicleModel,
+                        user.vehicleColor,
+                        user.vehiclePlate,
+                    ];
 
-            const hasAllRequiredVehicleData =
-                requiredVehicleFields.every(
-                    (value) =>
-                        String(value || "").trim().length > 0
-                );
+                    const hasAllRequiredVehicleData =
+                        requiredVehicleFields.every(
+                            (value) =>
+                                String(value || "").trim().length > 0
+                        );
 
-            if (
-                status === "verified" &&
-                !hasAllRequiredVehicleData
-            ) {
-                return res.status(400).json({
-                    success: false,
-                    message:
-                        "Нельзя подтвердить автомобиль: не заполнены обязательные данные",
-                });
-            }
+                    if (
+                        status === "verified" &&
+                        !hasAllRequiredVehicleData
+                    ) {
+                        const error = new Error(
+                            "Нельзя подтвердить автомобиль: не заполнены обязательные данные"
+                        );
+                        error.httpStatus = 400;
+                        throw error;
+                    }
 
-            if (status === "rejected") {
-                const cleanNote =
-                    String(note || "").trim();
+                    if (status === "rejected") {
+                        const cleanNote =
+                            String(note || "").trim();
 
-                if (cleanNote.length < 3) {
-                    return res.status(400).json({
-                        success: false,
-                        message:
-                            "Укажите причину отклонения автомобиля",
-                    });
+                        if (cleanNote.length < 3) {
+                            const error = new Error(
+                                "Укажите причину отклонения автомобиля"
+                            );
+                            error.httpStatus = 400;
+                            throw error;
+                        }
+
+                        user.vehicleVerificationStatus =
+                            "rejected";
+
+                        user.vehicleVerificationNote =
+                            cleanNote;
+                    } else {
+                        user.vehicleVerificationStatus =
+                            "verified";
+
+                        user.vehicleVerificationNote =
+                            null;
+                    }
                 }
-
-                user.vehicleVerificationStatus =
-                    "rejected";
-
-                user.vehicleVerificationNote =
-                    cleanNote;
-            } else {
-                user.vehicleVerificationStatus =
-                    "verified";
-
-                user.vehicleVerificationNote =
-                    null;
-            }
-
-            await user.save();
+            );
 
             try {
                 if (status === "verified") {
@@ -2845,51 +2847,47 @@ router.put("/users/:id/vehicle-verification", authMiddleware, adminMiddleware, a
                     user.vehicleVerificationNote,
                 },
             });
+
+
         } catch (error) {
+            if (error?.httpStatus) {
+                return res.status(error.httpStatus).json({
+                    success: false,
+                    message: error.message,
+                });
+            }
+
             console.error(
-                "Ошибка проверки автомобиля:",
+                "admin remove vehicle error:",
                 error
             );
 
             return res.status(500).json({
                 success: false,
-                message:
-                    "Не удалось изменить статус проверки автомобиля",
+                message: "Не удалось удалить автомобиль",
             });
         }
-    });
+
+
+});
 
 router.delete("/users/:id/vehicle", authMiddleware, adminMiddleware, async (req, res) => {
         try {
-            const user =
-                await User.findByPk(
-                    req.params.id
-                );
 
-            if (!user) {
-                return res
-                    .status(404)
-                    .json({
-                        success: false,
-                        message:
-                            "Пользователь не найден",
-                    });
-            }
+            const user = await mutateVehicleWithLock(
+                req.params.id,
+                (user) => {
+                    user.vehicleBrand = null;
+                    user.vehicleModel = null;
+                    user.vehicleColor = null;
+                    user.vehiclePlate = null;
+                    user.vehicleYear = null;
+                    user.vehiclePhoto = null;
 
-            user.vehicleBrand = null;
-            user.vehicleModel = null;
-            user.vehicleColor = null;
-            user.vehiclePlate = null;
-            user.vehicleYear = null;
-            user.vehiclePhoto = null;
-
-            user.vehicleVerificationStatus =
-                "none";
-
-            user.vehicleVerificationNote =
-                null;
-
-            await user.save();
+                    user.vehicleVerificationStatus = "none";
+                    user.vehicleVerificationNote = null;
+                }
+            );
 
             return res.json({
                 success: true,
@@ -2925,20 +2923,26 @@ router.delete("/users/:id/vehicle", authMiddleware, adminMiddleware, async (req,
                     user.vehicleVerificationNote,
                 },
             });
+
         } catch (error) {
+            if (error?.httpStatus) {
+                return res.status(error.httpStatus).json({
+                    success: false,
+                    message: error.message,
+                });
+            }
+
             console.error(
                 "admin remove vehicle error:",
                 error
             );
 
-            return res
-                .status(500)
-                .json({
-                    success: false,
-                    message:
-                        "Не удалось удалить автомобиль",
-                });
+            return res.status(500).json({
+                success: false,
+                message: "Не удалось удалить автомобиль",
+            });
         }
-    });
+
+});
 
 module.exports = router;

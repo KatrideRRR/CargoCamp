@@ -1,6 +1,9 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const express = require("express");
+const {
+    loadIsolatedService,
+} = require("./helpers/loadIsolatedService");
 
 const {
     loadIsolatedRouter,
@@ -140,9 +143,23 @@ async function createTestServer({
         Dispute: {},
         ActionLog: {},
         Service: {},
-        sequelize: {},
+        sequelize: {
+            async transaction(callback) {
+                return callback({
+                    LOCK: {
+                        UPDATE: "UPDATE",
+                    },
+                });
+            },
+        },
     };
 
+    const vehicleService = loadIsolatedService(
+        "vehicleVerificationService.js",
+        {
+            "../models": models,
+        }
+    );
     // Загружаем реальный backend/routes/admin.js,
     // но полностью заменяем внешние зависимости.
     const router = loadIsolatedRouter(
@@ -164,6 +181,9 @@ async function createTestServer({
             sequelize: {
                 Op: {},
             },
+
+            "../services/vehicleVerificationService":
+            vehicleService,
 
             "../services/notificationService": {
                 notifyUser,
@@ -221,6 +241,39 @@ async function createTestServer({
         body,
         token = "admin-test"
     ) {
+
+
+        let requestBody = body;
+
+        if (
+            method === "PUT" &&
+            /\/vehicle-verification$/.test(endpoint) &&
+            body &&
+            !Object.prototype.hasOwnProperty.call(
+                body,
+                "expectedVehicle"
+            )
+        ) {
+            const match = endpoint.match(
+                /\/users\/(\d+)\/vehicle-verification$/
+            );
+
+            const current = match
+                ? users.get(Number(match[1]))
+                : null;
+
+            if (current) {
+                requestBody = {
+                    ...body,
+                    expectedVehicle:
+                        vehicleService.getVehicleSnapshot(
+                            current
+                        ),
+                };
+            }
+        }
+
+
         const response = await fetch(
             `${baseURL}${endpoint}`,
             {
@@ -240,7 +293,7 @@ async function createTestServer({
                 ...(body === undefined
                     ? {}
                     : {
-                        body: JSON.stringify(body),
+                        body: JSON.stringify(requestBody),
                     }),
             }
         );
@@ -620,4 +673,59 @@ test("HTTP: ошибка сохранения не удаляет автомоб
             saveFails: true,
         }
     );
+});
+
+
+test("HTTP: отсутствующий снимок автомобиля запрещает подтверждение", async () => {
+    await withServer(async (api) => {
+        const response = await api.request(
+            "PUT",
+            VERIFY,
+            {
+                status: "verified",
+                expectedVehicle: null,
+            }
+        );
+
+        assert.equal(response.status, 409);
+        assert.equal(api.writes.length, 0);
+        assert.equal(
+            api.getUser(101).vehicleVerificationStatus,
+            "pending"
+        );
+    });
+});
+
+test("HTTP: устаревший снимок автомобиля запрещает подтверждение", async () => {
+    await withServer(async (api) => {
+        const expectedVehicle = {
+            vehicleBrand: "Toyota",
+            vehicleModel: "Camry",
+            vehicleColor: "Чёрный",
+            vehiclePlate: "А123АА82",
+            vehicleYear: 2020,
+            vehiclePhoto: "/uploads/test-car.jpg",
+            vehicleVerificationStatus: "pending",
+        };
+
+        api.setUser(101, {
+            vehiclePlate: "В456ВВ82",
+        });
+
+        const response = await api.request(
+            "PUT",
+            VERIFY,
+            {
+                status: "verified",
+                expectedVehicle,
+            }
+        );
+
+        assert.equal(response.status, 409);
+        assert.equal(api.writes.length, 0);
+        assert.equal(
+            api.getUser(101).vehicleVerificationStatus,
+            "pending"
+        );
+    });
 });

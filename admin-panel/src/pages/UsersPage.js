@@ -63,6 +63,8 @@ function UsersPage() {
                 `${apiUrl}/api/admin/users/${user.id}/vehicle-verification`,
                 {
                     status: "verified",
+                    expectedVehicle:
+                        getVehicleReviewSnapshot(user),
                 },
                 {
                     headers: {
@@ -144,6 +146,8 @@ function UsersPage() {
                 {
                     status: "rejected",
                     note: reason,
+                    expectedVehicle:
+                        getVehicleReviewSnapshot(user),
                 },
                 {
                     headers: {
