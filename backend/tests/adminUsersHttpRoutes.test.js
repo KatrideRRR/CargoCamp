@@ -201,6 +201,8 @@ async function createTestServer({
                 notifyUser: async () => {},
             },
 
+            "../services/vehicleVerificationService": {},
+
             "../models": {
                 User,
                 Message: {},

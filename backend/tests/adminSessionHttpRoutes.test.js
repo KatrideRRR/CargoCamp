@@ -190,6 +190,8 @@ async function createHarness() {
                 notifyUser: async () => {},
             },
 
+            "../services/vehicleVerificationService": {},
+
             "../models": {
                 User: {
                     async findOne({ where }) {

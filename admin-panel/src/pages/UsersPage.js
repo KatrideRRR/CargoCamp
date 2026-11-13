@@ -5,6 +5,20 @@ import { useNavigate } from "react-router-dom";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
+
+function getVehicleReviewSnapshot(user) {
+    return {
+        vehicleBrand: user.vehicleBrand ?? null,
+        vehicleModel: user.vehicleModel ?? null,
+        vehicleColor: user.vehicleColor ?? null,
+        vehiclePlate: user.vehiclePlate ?? null,
+        vehicleYear: user.vehicleYear ?? null,
+        vehiclePhoto: user.vehiclePhoto ?? null,
+        vehicleVerificationStatus:
+            user.vehicleVerificationStatus ?? null,
+    };
+}
+
 function UsersPage() {
     const [users, setUsers] = useState([]);
     const [pepRecords, setPepRecords] = useState({});

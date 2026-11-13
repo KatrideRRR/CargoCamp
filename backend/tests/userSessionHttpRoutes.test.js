@@ -251,6 +251,8 @@ async function createTestServer() {
                 },
             },
 
+            "../services/vehicleVerificationService": {},
+
             "../services/publicUserBadgesService": {
                 async getPublicUserBadges() {
                     return {

@@ -716,11 +716,17 @@ test.describe("UsersPage — автомобили", () => {
             () => state.verifications.length
         ).toBe(1);
 
+
         expect(
             state.verifications[0].body
         ).toEqual({
             status: "verified",
+            expectedVehicle: getVehicleReviewSnapshot({
+                ...USER,
+                vehicleVerificationStatus: "rejected",
+            }),
         });
+
 
         await expect(
             vehicleCell(page).locator(

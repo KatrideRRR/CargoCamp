@@ -327,6 +327,8 @@ async function createHarness() {
                 },
             },
 
+            "../services/vehicleVerificationService": {},
+
             "../services/publicOfferConsentService": {
                 CURRENT_OFFER: {
                     version: "2026-11-09",
