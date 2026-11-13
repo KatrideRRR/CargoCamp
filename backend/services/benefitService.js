@@ -1,4 +1,3 @@
-const { Op } = require("sequelize");
 
 const {
     UserBenefitVerification,
@@ -10,44 +9,56 @@ const {
 } = require("../config/benefitPrograms");
 
 function isActiveVerification(record, now = new Date()) {
-    if (!record) return false;
-
-    if (record.status !== "verified") {
-        return false;
-    }
-
-    if (!record.verifiedAt) {
-        return false;
-    }
-
-    if (new Date(record.verifiedAt) > now) {
-        return false;
-    }
-
-    if (record.revokedAt) {
-        return false;
-    }
-
     if (
-        record.expiresAt &&
-        new Date(record.expiresAt) <= now
+        !record ||
+        record.status !== "verified" ||
+        !record.verifiedAt ||
+        record.revokedAt
     ) {
         return false;
+    }
+
+    const nowTime = now.getTime();
+    const verifiedTime = new Date(
+        record.verifiedAt
+    ).getTime();
+
+    if (
+        !Number.isFinite(verifiedTime) ||
+        verifiedTime > nowTime
+    ) {
+        return false;
+    }
+
+    if (record.expiresAt != null) {
+        const expiresTime = new Date(
+            record.expiresAt
+        ).getTime();
+
+        if (
+            !Number.isFinite(expiresTime) ||
+            expiresTime <= nowTime
+        ) {
+            return false;
+        }
     }
 
     return true;
 }
 
-async function hasVerifiedBenefit({
-                                      userId,
-                                      benefitCode,
-                                      countryCode = "RU",
-                                      transaction = null,
-                                  }) {
+async function getCurrentBenefitVerification({
+                                                 userId,
+                                                 benefitCode,
+                                                 countryCode = "RU",
+                                                 transaction = null,
+                                             }) {
     const id = Number(userId);
 
-    if (!Number.isSafeInteger(id) || id <= 0) {
-        return false;
+    if (
+        !Number.isSafeInteger(id) ||
+        id <= 0
+    ) {
+        return null;
     }
 
     const program = getBenefitProgram(benefitCode);
@@ -56,49 +67,39 @@ async function hasVerifiedBenefit({
         !program ||
         program.countryCode !== countryCode
     ) {
-        return false;
+        return null;
     }
 
-    const now = new Date();
+    // Последняя заявка является источником
+    // текущего статуса, как и для Identity.
+    return UserBenefitVerification.findOne({
+        where: {
+            userId: id,
+            benefitCode,
+            countryCode,
+        },
+        order: [
+            ["createdAt", "DESC"],
+            ["id", "DESC"],
+        ],
+        transaction,
+    });
+}
 
-    const verification =
-        await UserBenefitVerification.findOne({
-            where: {
-                userId: id,
-                benefitCode,
-                countryCode,
-                status: "verified",
+async function hasVerifiedBenefit(options) {
+    const record =
+        await getCurrentBenefitVerification(options);
 
-                verifiedAt: {
-                    [Op.lte]: now,
-                },
-
-                revokedAt: null,
-
-                [Op.or]: [
-                    { expiresAt: null },
-                    {
-                        expiresAt: {
-                            [Op.gt]: now,
-                        },
-                    },
-                ],
-            },
-
-            order: [
-                ["verifiedAt", "DESC"],
-                ["id", "DESC"],
-            ],
-            transaction,
-        });
-
-    return Boolean(verification);
+    return isActiveVerification(record);
 }
 
 async function getMyBenefitOverview(userId) {
     const id = Number(userId);
 
-    if (!Number.isSafeInteger(id) || id <= 0) {
+    if (
+        !Number.isSafeInteger(id) ||
+        id <= 0
+    ) {
         throw new Error("Некорректный пользователь");
     }
 
@@ -108,7 +109,6 @@ async function getMyBenefitOverview(userId) {
                 userId: id,
                 countryCode: "RU",
             },
-
             attributes: [
                 "id",
                 "benefitCode",
@@ -118,7 +118,6 @@ async function getMyBenefitOverview(userId) {
                 "revokedAt",
                 "createdAt",
             ],
-
             order: [
                 ["createdAt", "DESC"],
                 ["id", "DESC"],
@@ -128,38 +127,28 @@ async function getMyBenefitOverview(userId) {
     const now = new Date();
 
     return BENEFIT_PROGRAMS.map((program) => {
-        const records = verifications.filter(
-            (record) =>
-                record.benefitCode === program.code
-        );
-
-        const activeRecord = records.find(
-            (record) =>
-                isActiveVerification(record, now)
-        );
-
-        const latestRecord = records[0] || null;
+        const latestRecord =
+            verifications.find(
+                (record) =>
+                    record.benefitCode === program.code
+            ) || null;
 
         let status = "not_requested";
 
-        if (activeRecord) {
-            status = "verified";
-        } else if (latestRecord) {
-            status = latestRecord.status;
-
-            if (latestRecord.revokedAt) {
-                status = "revoked";
-            } else if (
-                latestRecord.status === "verified" &&
-                latestRecord.expiresAt &&
-                new Date(latestRecord.expiresAt) <= now
-            ) {
-                status = "expired";
+        if (latestRecord) {
+            if (latestRecord.status === "verified") {
+                status = isActiveVerification(
+                    latestRecord,
+                    now
+                )
+                    ? "verified"
+                    : latestRecord.revokedAt
+                        ? "revoked"
+                        : "expired";
+            } else {
+                status = latestRecord.status;
             }
         }
-
-        const effectiveRecord =
-            activeRecord || latestRecord;
 
         return {
             code: program.code,
@@ -167,17 +156,17 @@ async function getMyBenefitOverview(userId) {
             description: program.description,
             countryCode: program.countryCode,
             status,
-
             verifiedAt:
-                effectiveRecord?.verifiedAt || null,
-
+                latestRecord?.verifiedAt || null,
             expiresAt:
-                effectiveRecord?.expiresAt || null,
+                latestRecord?.expiresAt || null,
         };
     });
 }
 
 module.exports = {
+    isActiveVerification,
+    getCurrentBenefitVerification,
     hasVerifiedBenefit,
     getMyBenefitOverview,
 };

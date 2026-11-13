@@ -5,6 +5,8 @@ const authenticateToken =
 
 const {
     getMyBenefitOverview,
+    getCurrentBenefitVerification,
+    isActiveVerification,
 } = require("../services/benefitService");
 
 const multer = require("multer");
@@ -152,18 +154,16 @@ router.post(
                         );
                     }
 
-                    const pending =
-                        await UserBenefitVerification.findOne({
-                            where: {
-                                userId,
-                                benefitCode,
-                                countryCode: "RU",
-                                status: "pending",
-                            },
+
+                    const current =
+                        await getCurrentBenefitVerification({
+                            userId,
+                            benefitCode,
+                            countryCode: "RU",
                             transaction,
                         });
 
-                    if (pending) {
+                    if (current?.status === "pending") {
                         throw benefitHttpError(
                             409,
                             "Заявка уже находится на проверке"
@@ -172,35 +172,13 @@ router.post(
 
                     const now = new Date();
 
-                    const active =
-                        await UserBenefitVerification.findOne({
-                            where: {
-                                userId,
-                                benefitCode,
-                                countryCode: "RU",
-                                status: "verified",
-                                revokedAt: null,
-                                verifiedAt: {
-                                    [Op.lte]: now,
-                                },
-                                [Op.or]: [
-                                    { expiresAt: null },
-                                    {
-                                        expiresAt: {
-                                            [Op.gt]: now,
-                                        },
-                                    },
-                                ],
-                            },
-                            transaction,
-                        });
-
-                    if (active) {
+                    if (isActiveVerification(current, now)) {
                         throw benefitHttpError(
                             409,
                             "Льгота уже подтверждена"
                         );
                     }
+
 
                     /*
                      * Ограничиваем количество повторных
