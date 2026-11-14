@@ -314,7 +314,59 @@ async function applyConfirmedPayment({
             }
         );
 
+
         await markCommissionAttemptPaid();
+
+        // Только впервые применённый платёж.
+        // Повторный webhook не создаёт
+        // второе бизнес-событие.
+        if (!previouslyProcessed) {
+            await ActionLog.create(
+                {
+                    actorUserId: null,
+                    actorRole: "system",
+
+                    actionType:
+                        "payment_receipt_applied",
+
+                    entityType: "payment",
+                    entityId: null,
+
+                    orderId: null,
+                    expressOrderId: null,
+
+                    // Поле модели ограничено 64 символами.
+                    paymentId:
+                        id.length <= 64
+                            ? id
+                            : null,
+
+                    severity: "info",
+                    success: true,
+
+                    meta: {
+                        provider,
+                        purpose,
+                        userId: uid,
+                        amountKopecks: amount,
+                        appliedKopecks,
+
+                        commissionAttemptId:
+                            commissionAttemptId
+                                ? Number(
+                                    commissionAttemptId
+                                )
+                                : null,
+
+                        source:
+                            "payment_receipt_service",
+                    },
+                },
+                {
+                    transaction,
+                }
+            );
+        }
 
         return {
             duplicate: previouslyProcessed,
@@ -322,6 +374,7 @@ async function applyConfirmedPayment({
             subscriptionExpiresAt,
             debtKopecks: Number(user.debt || 0),
         };
+
     });
 }
 

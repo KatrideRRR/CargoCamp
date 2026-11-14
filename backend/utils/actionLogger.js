@@ -1,16 +1,34 @@
-module.exports = function makeActionLogger({ db }) {
+
+"use strict";
+
+const {
+    notifySystemError,
+} = require("../services/adminNotificationService");
+
+module.exports = function makeActionLogger({
+                                               db,
+                                           }) {
     const ActionLog = db.ActionLog;
 
     function getIp(req) {
-        const xf = req.headers["x-forwarded-for"];
-        if (xf) return String(xf).split(",")[0].trim();
-        return req.ip || null;
+        if (!req) {
+            return null;
+        }
+
+        // Используем обработанное Express значение.
+        // Не доверяем напрямую произвольному
+        // X-Forwarded-For из запроса.
+        const ip = req.ip;
+
+        return typeof ip === "string"
+            ? ip.slice(0, 64)
+            : null;
     }
 
     async function logAction({
                                  req = null,
                                  actorUserId = null,
-                                 actorRole = "user", // user|admin|system|webhook
+                                 actorRole = "user",
                                  actionType,
                                  entityType,
                                  entityId = null,
@@ -23,31 +41,66 @@ module.exports = function makeActionLogger({ db }) {
                                  meta = null,
                              }) {
         try {
-            const ip = req ? getIp(req) : null;
-            const ua = req ? (req.headers["user-agent"] || null) : null;
+            const ip = getIp(req);
+
+            const userAgent =
+                req?.headers?.["user-agent"];
+
+            const ua =
+                typeof userAgent === "string"
+                    ? userAgent.slice(0, 512)
+                    : null;
 
             await ActionLog.create({
                 ts: new Date(),
+
                 actorUserId,
                 actorRole,
                 actionType,
                 entityType,
                 entityId,
+
                 orderId,
                 expressOrderId,
                 paymentId,
+
                 severity,
                 success,
                 reason,
+
                 ip,
                 ua,
                 meta,
             });
-        } catch (e) {
-            // Логирование не должно ломать бизнес-процесс
-            console.error("ActionLog write error:", e?.message || e);
+
+            return true;
+        } catch (error) {
+            // Не выводим SQL, параметры запроса
+            // или конфиденциальные данные.
+            console.error(
+                "ActionLog write failed:",
+                error?.code ||
+                error?.name ||
+                "Error"
+            );
+
+            // Telegram-монитор сгруппирует
+            // повторяющиеся сбои записи.
+            void notifySystemError({
+                module: "mysql",
+                phase: "action_log_write",
+                severity: "high",
+                error,
+            });
+
+            // Сохраняем совместимость:
+            // прежние обработчики не падают,
+            // но теперь могут проверить результат.
+            return false;
         }
     }
 
-    return { logAction };
+    return {
+        logAction,
+    };
 };

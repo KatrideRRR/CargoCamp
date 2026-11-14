@@ -29,6 +29,11 @@ const {
 } = require("./services/operationalErrorMonitor");
 
 
+const {
+    createMutationAuditObserver,
+} = require("./middlewares/mutationAuditObserver");
+
+
 process.on("unhandledRejection", (reason) => {
     console.error("Unhandled Promise Rejection");
 
@@ -185,8 +190,23 @@ const { logAction } = makeActionLogger({ db });
 app.locals.logAction = logAction;
 app.set("logAction", logAction);
 
-app.use(logActionMiddleware);
 
+app.use(
+    createMutationAuditObserver({
+        write: (entry) =>
+            db.ActionLog.create(entry),
+
+        report: (error) =>
+            notifySystemError({
+                module: "mysql",
+                phase: "mutation_action_log",
+                severity: "high",
+                error,
+            }),
+    })
+);
+
+app.use(logActionMiddleware);
 app.use((req, res, next) => {
     req.logAction = typeof logAction === "function" ? logAction : async () => {};
     next();
