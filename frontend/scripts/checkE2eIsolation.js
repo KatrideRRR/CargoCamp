@@ -1,10 +1,21 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
+
+const suite = process.argv[2] || "frontend";
+
+if (!["frontend", "admin-panel"].includes(suite)) {
+    console.error("Unknown Playwright suite:", suite);
+    process.exit(1);
+}
+
 const testsDir = path.resolve(
     __dirname,
-    "../tests"
+    "../..",
+    suite,
+    "tests"
 );
+
 
 const files = fs.readdirSync(testsDir)
     .filter((name) => name.endsWith(".spec.js"))
@@ -56,6 +67,17 @@ for (const file of files) {
             `${file}: обнаружен route.continue()`
         );
     }
+
+
+    if (
+        /\b(?:page|context)\.request\b/.test(source) ||
+        /\brequest\.(?:get|post|put|patch|delete|fetch)\s*\(/.test(source)
+    ) {
+        errors.push(
+            `${file}: прямой APIRequestContext требует отдельной сетевой изоляции`
+        );
+    }
+
 }
 
 console.log(

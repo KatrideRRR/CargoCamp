@@ -8,7 +8,7 @@
     "migrate": "node scripts/migrate.js",
     "migrate:status": "node scripts/migrate.js --status",
     "test": "node --test tests/*.test.js",
-    "test:integration:mysql": "node --test tests/integration/chatMysqlConstraints.test.js"
+    "test:integration:mysql": "node --test --test-concurrency=1 tests/integration/*.test.js"
   },
   "repository": {
     "type": "git",
