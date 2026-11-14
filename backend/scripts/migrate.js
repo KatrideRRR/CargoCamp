@@ -16,6 +16,12 @@ dotenv.config({
     path: path.join(backendRoot, envFile),
 });
 
+
+const {
+    notifySystemError,
+} = require("../services/adminNotificationService");
+
+
 const migrationsDir = path.join(
     backendRoot,
     "migrations"
@@ -272,26 +278,50 @@ async function main() {
                         'cargocamp_schema_migrations'
                     )
                 `);
+
             } catch (error) {
                 console.error(
-                    "⚠️ Не удалось освободить migration lock:",
-                    error.message
+                    "Не удалось освободить migration lock:",
+                    error?.code ||
+                    error?.name ||
+                    "Error"
                 );
+
+                void notifySystemError({
+                    module: "migration",
+                    phase: "release_lock",
+                    severity: "high",
+                    error,
+                });
             }
+
         }
 
         await connection.end();
     }
 }
 
-main().catch((error) => {
-    console.error(
-        "❌ Ошибка миграции:"
-    );
 
-    console.error(
-        error
-    );
-
+main().catch(async (error) => {
     process.exitCode = 1;
+
+    console.error(
+        "Migration failed:",
+        error?.code ||
+        error?.name ||
+        "Error"
+    );
+
+    // Режим --status — ручная проверка.
+    // Не отправляем Telegram при её ошибке.
+    if (isStatusMode) {
+        return;
+    }
+
+    await notifySystemError({
+        module: "migration",
+        phase: "execution_failed",
+        severity: "critical",
+        error,
+    });
 });

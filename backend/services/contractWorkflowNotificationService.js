@@ -3,6 +3,11 @@ const {
     notifyUser,
 } = require("./notificationService");
 
+
+const {
+    notifySystemError,
+} = require("./adminNotificationService");
+
 const EVENTS = {
     act_remarks_received: {
         type: "act_remarks_received",
@@ -80,24 +85,35 @@ async function notifyContractWorkflow({
             },
         });
 
+
     } catch (error) {
-        /*
-         * Решение по акту уже сохранено в БД.
-         * Сбой уведомления не должен приводить
-         * к повторному сохранению решения.
-         */
+        // Сохранение решения по акту
+        // не откатываем из-за уведомления.
         console.error(
             "Contract workflow notification failed:",
             {
                 event,
                 userId: numericUserId,
                 orderId: numericOrderId,
-                message: error.message,
+                errorCode:
+                    error?.code ||
+                    error?.name ||
+                    "Error",
             }
         );
 
+        void notifySystemError({
+            module: "notifications",
+            phase: "contract_workflow",
+            severity: "normal",
+            error,
+            userId: numericUserId,
+            orderId: numericOrderId,
+        });
+
         return null;
     }
+
 }
 
 module.exports = {

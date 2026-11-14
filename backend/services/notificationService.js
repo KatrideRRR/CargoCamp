@@ -2,6 +2,11 @@ const { Notification } = require("../models");
 const { sendPushToUser } = require("./pushService");
 const { sendToUser } = require("../socket");
 
+
+const {
+    notifySystemError,
+} = require("./adminNotificationService");
+
 function normalizeOrderType(orderType) {
     return ["regular", "express"].includes(orderType)
         ? orderType
@@ -148,12 +153,25 @@ async function notifyUser({
             createdAt: notification.createdAt,
             ...payloadData,
         }),
+
     }).catch((error) => {
         console.error(
-            "push send failed:",
-            error
+            "Push preparation failed:",
+            error?.code ||
+            error?.name ||
+            "Error"
         );
+
+        void notifySystemError({
+            module: "push",
+            phase: "preparation",
+            severity: "high",
+            error,
+            userId,
+            orderId,
+        });
     });
+
 
     return notification;
 }

@@ -1,11 +1,23 @@
+
 const path = require("path");
 const fs = require("fs");
 const dotenv = require("dotenv");
 
-const envFile = fs.existsSync(path.resolve(__dirname, ".env.local"))
+const envFile = fs.existsSync(
+    path.resolve(__dirname, ".env.local")
+)
     ? ".env.local"
     : ".env";
 
+// Сначала загружаем настройки.
+// Только потом подключаем сервисы.
+dotenv.config({
+    path: path.resolve(__dirname, envFile),
+});
+
+console.log(
+    `✅ Загружен файл окружения: ${envFile}`
+);
 
 const {
     notifySystemError,
@@ -15,6 +27,7 @@ const {
 const {
     createHttpErrorObserver,
 } = require("./services/operationalErrorMonitor");
+
 
 process.on("unhandledRejection", (reason) => {
     console.error("Unhandled Promise Rejection");
@@ -61,9 +74,6 @@ process.on("uncaughtException", (error) => {
         process.exit(1);
     });
 });
-
-dotenv.config({ path: path.resolve(__dirname, envFile) });
-console.log(`✅ Загружен файл окружения: ${envFile}`);
 
 const express = require("express");
 const bodyParser = require("body-parser");

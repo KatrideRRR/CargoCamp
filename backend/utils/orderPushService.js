@@ -3,6 +3,10 @@ const { Notification } = require("../models");
 const { sendPushToUser } = require("../services/pushService");
 const { sendNotifications, sendToUser } = require("../socket");
 
+const {
+    notifySystemError,
+} = require("../services/adminNotificationService");
+
 function toNum(x) {
     const n = Number(x);
     return Number.isFinite(n) ? n : null;
@@ -174,9 +178,25 @@ async function sendOrderPush({
                     distanceKm: String(Number(t.distanceKm.toFixed(2))),
                 },
             });
-        } catch (e) {
-            console.error("sendPushToUser order_push error:", e);
+
+        } catch (error) {
+            console.error(
+                "Order push delivery error:",
+                error?.code ||
+                error?.name ||
+                "Error"
+            );
+
+            void notifySystemError({
+                module: "push",
+                phase: "order_promotion",
+                severity: "normal",
+                error,
+                userId: t.userId,
+                orderId: order.id,
+            });
         }
+
 
         if (logAction) {
             await logAction({

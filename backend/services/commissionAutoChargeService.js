@@ -20,6 +20,12 @@ const {
     customerKey,
 } = require("./tbankCardBindingService");
 
+
+const {
+    notifySystemError,
+} = require("./adminNotificationService");
+
+
 const EMPTY_RESULT = {
     autoPaymentTried: false,
     autoPaymentPaid: false,
@@ -528,19 +534,36 @@ async function startCommissionAutoCharge(attemptId) {
         throw new Error(
             "Неизвестный платёжный провайдер"
         );
+
     } catch (error) {
         console.error(
             "Commission auto charge error:",
             {
                 attemptId: id,
                 provider: attempt.provider,
-                paymentId,
-                error: error.message,
+                errorCode:
+                    error?.code ||
+                    error?.name ||
+                    "Error",
             }
         );
 
-        // Неизвестный результат — НЕ повторяем
-        // списание автоматически.
+        // Сообщаем администратору о проблеме
+        // с автоматическим списанием комиссии.
+        // Номер карты, RebillId и токены
+        // никуда не передаются.
+        void notifySystemError({
+            module: "payments.auto_charge",
+            phase: "charge_or_settlement",
+            severity: "high",
+            error,
+            userId: attempt.user_id,
+        });
+
+        // ВАЖНО: сохраняем существующее
+        // безопасное поведение.
+        // Не повторяем платёж автоматически,
+        // если результат неизвестен.
         await updateAttempt({
             id,
             status: "unknown",
@@ -552,6 +575,7 @@ async function startCommissionAutoCharge(attemptId) {
             paymentId,
         });
     }
+
 }
 
 module.exports = {

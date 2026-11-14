@@ -72,21 +72,41 @@ function fail(status, message) {
     });
 }
 
+
 function respondError(res, error) {
     if (error.httpStatus) {
+        // Функция сознательно отключена.
+        // Это не технический сбой сервера.
+        const signingDisabled =
+            error.httpStatus === 503 &&
+            [
+                "Электронное подписание пока не включено",
+                "Электронное подписание не включено",
+            ].includes(error.message);
+
+        if (signingDisabled) {
+            res.locals.cargoCampErrorReported = true;
+        }
+
         return res.status(error.httpStatus).json({
             success: false,
             message: error.message,
         });
     }
 
-    console.error("Contract signing error:", error);
+    console.error(
+        "Contract signing error:",
+        error?.code ||
+        error?.name ||
+        "Error"
+    );
 
     return res.status(500).json({
         success: false,
         message: "Ошибка обработки подписи",
     });
 }
+
 
 function getSecret() {
     const value = process.env.SIGNATURE_OTP_SECRET_HEX;

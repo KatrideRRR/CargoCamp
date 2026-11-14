@@ -4,13 +4,6 @@ const {
     createErrorMonitor,
 } = require("./operationalErrorMonitor");
 
-const NOTIFY_URL =
-    process.env.CARGOCAMP_NOTIFY_URL ||
-    "https://notify.cargocamp.ru/notify";
-
-const NOTIFY_SECRET =
-    process.env.CARGOCAMP_NOTIFY_SECRET;
-
 const ADMIN_PANEL_URL =
     process.env.ADMIN_PANEL_URL ||
     "https://admin.cargocamp.ru";
@@ -64,6 +57,7 @@ function sanitizeMessage(value) {
     return text;
 }
 
+
 async function sendAdminNotification({
                                          topic,
                                          title,
@@ -72,7 +66,16 @@ async function sendAdminNotification({
                                          buttonUrl,
                                      }) {
     try {
-        if (!NOTIFY_SECRET) {
+        // Читаем настройки в момент отправки.
+        // Это исключает проблему раннего импорта.
+        const notifyUrl =
+            process.env.CARGOCAMP_NOTIFY_URL ||
+            "https://notify.cargocamp.ru/notify";
+
+        const notifySecret =
+            process.env.CARGOCAMP_NOTIFY_SECRET;
+
+        if (!notifySecret) {
             console.error(
                 "[adminNotification] CARGOCAMP_NOTIFY_SECRET is not configured"
             );
@@ -85,7 +88,7 @@ async function sendAdminNotification({
 
         if (!ALLOWED_TOPICS.has(topic)) {
             console.error(
-                `[adminNotification] Unknown topic: ${topic}`
+                "[adminNotification] Unknown topic"
             );
 
             return {
@@ -95,7 +98,7 @@ async function sendAdminNotification({
         }
 
         const response = await axios.post(
-            NOTIFY_URL,
+            notifyUrl,
             {
                 topic,
                 title: cleanValue(title),
@@ -114,7 +117,7 @@ async function sendAdminNotification({
             {
                 headers: {
                     Authorization:
-                        `Bearer ${NOTIFY_SECRET}`,
+                        `Bearer ${notifySecret}`,
 
                     "Content-Type":
                         "application/json",
@@ -130,6 +133,8 @@ async function sendAdminNotification({
         };
 
     } catch (error) {
+        // Не выводим Axios config, headers
+        // и тело запроса с секретами.
         console.error(
             "[adminNotification] send failed:",
             error?.code ||
@@ -142,7 +147,6 @@ async function sendAdminNotification({
             errorCode: "NOTIFY_UNAVAILABLE",
         };
     }
-
 }
 
 function adminUserUrl(userId) {

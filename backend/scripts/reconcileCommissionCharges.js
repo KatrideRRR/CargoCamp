@@ -32,6 +32,12 @@ const {
     startCommissionAutoCharge,
 } = require("../services/commissionAutoChargeService");
 
+
+const {
+    notifySystemError,
+} = require("../services/adminNotificationService");
+
+
 async function main() {
     const attempts = await sequelize.query(
         `
@@ -70,6 +76,7 @@ async function main() {
                 continue;
             }
 
+
             if (!attempt.provider_payment_id) {
                 console.warn(
                     "Требуется ручная сверка:",
@@ -77,8 +84,22 @@ async function main() {
                     "PaymentId неизвестен"
                 );
 
+                // Не создаём повторный платёж.
+                // Сообщаем о необходимости проверки.
+                await notifySystemError({
+                    module: "reconciliation",
+                    phase: "missing_payment_id",
+                    severity: "high",
+                    error: {
+                        name: "ManualReviewRequired",
+                        code: "PAYMENT_ID_MISSING",
+                    },
+                    userId: attempt.user_id,
+                });
+
                 continue;
             }
+
 
             const paymentId =
                 String(attempt.provider_payment_id);
@@ -182,18 +203,67 @@ async function main() {
                     attempt.id
                 );
             }
+
         } catch (error) {
             console.error(
                 "Ошибка сверки:",
                 attempt.id,
-                error.message
+                error?.code ||
+                error?.name ||
+                "Error"
             );
+
+            process.exitCode = 1;
+
+            await notifySystemError({
+                module: "reconciliation",
+                phase: "commission_attempt",
+                severity: "high",
+                error,
+                userId: attempt.user_id,
+            });
         }
+
     }
 }
 
+
 main()
-    .catch(console.error)
+    .catch(async (error) => {
+        process.exitCode = 1;
+
+        console.error(
+            "Commission reconciliation failed:",
+            error?.code ||
+            error?.name ||
+            "Error"
+        );
+
+        await notifySystemError({
+            module: "reconciliation",
+            phase: "script_failed",
+            severity: "critical",
+            error,
+        });
+    })
     .finally(async () => {
-        await sequelize.close();
+        try {
+            await sequelize.close();
+        } catch (error) {
+            process.exitCode = 1;
+
+            console.error(
+                "Reconciliation DB close failed:",
+                error?.code ||
+                error?.name ||
+                "Error"
+            );
+
+            await notifySystemError({
+                module: "reconciliation",
+                phase: "database_close",
+                severity: "high",
+                error,
+            });
+        }
     });

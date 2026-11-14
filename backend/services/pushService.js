@@ -2,6 +2,12 @@ const { PushToken } = require("../models");
 const { initFirebaseAdmin } = require("../config/firebaseAdmin");
 const crypto = require("crypto");
 
+
+const {
+    notifySystemError,
+} = require("./adminNotificationService");
+
+
 function stringifyData(data = {}) {
     const out = {};
 
@@ -105,28 +111,61 @@ async function sendPushToUser({
     try {
         const response = await admin.messaging().sendEach(messages);
 
+
         response.responses.forEach((r, idx) => {
-            if (!r.success) {
-                const code = r.error?.code || "";
+            if (r.success) {
+                return;
+            }
 
-                if (
-                    code.includes("registration-token-not-registered") ||
-                    code.includes("invalid-registration-token") ||
-                    code.includes("invalid-argument")
-                ) {
-                    badTokens.push(tokens[idx]);
-                }
+            const code = String(
+                r.error?.code ||
+                "PUSH_SEND_FAILED"
+            );
 
-                console.error("push send error:", {
+            const invalidToken =
+                code.includes(
+                    "registration-token-not-registered"
+                ) ||
+                code.includes(
+                    "invalid-registration-token"
+                ) ||
+                code.includes(
+                    "invalid-argument"
+                );
+
+            if (invalidToken) {
+                badTokens.push(tokens[idx]);
+                return;
+            }
+
+            console.error(
+                "Firebase push delivery failed:",
+                {
                     userId,
                     tokenId: rows[idx]?.id,
-                    platform: rows[idx]?.platform,
-                    deviceId: rows[idx]?.deviceId,
-                    tokenStart: tokens[idx]?.slice(0, 20),
                     code,
-                    message: r.error?.message,
-                });            }
+                }
+            );
+
+            // Не отправляем токен устройства
+            // или текст сообщения в Telegram.
+            void notifySystemError({
+                module: "push",
+                phase: "firebase_delivery",
+                severity: "normal",
+                error: {
+                    name: "PushProviderError",
+                    code: code
+                        .replace(
+                            /[^A-Za-z0-9_.-]/g,
+                            "_"
+                        )
+                        .slice(0, 64),
+                },
+                userId,
+            });
         });
+
 
         await deactivateBadTokens(badTokens);
 
@@ -134,10 +173,26 @@ async function sendPushToUser({
             successCount: response.successCount,
             failureCount: response.failureCount,
         };
-    } catch (e) {
-        console.error("sendPushToUser error:", e);
+
+    } catch (error) {
+        console.error(
+            "sendPushToUser error:",
+            error?.code ||
+            error?.name ||
+            "Error"
+        );
+
+        void notifySystemError({
+            module: "push",
+            phase: "firebase_batch",
+            severity: "high",
+            error,
+            userId,
+        });
+
         return null;
     }
+
 }
 
 module.exports = {

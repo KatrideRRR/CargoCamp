@@ -1,6 +1,11 @@
 const axios =
     require("axios");
 
+
+const {
+    notifySystemError,
+} = require("./adminNotificationService");
+
 function sleep(ms) {
     return new Promise(
         (resolve) =>
@@ -204,34 +209,48 @@ async function sendBusinessCashPayment({
                             ?.duplicate
                     ),
             };
+
         } catch (error) {
-            lastError =
-                error;
+            lastError = error;
 
             console.error(
-                `⚠️ BusinessCash attempt ${attempt + 1}/${delays.length}:`,
-                error
-                    ?.response
-                    ?.data ||
-                error.message
+                `BusinessCash payment attempt ${attempt + 1}/${delays.length}:`,
+                error?.code ||
+                error?.response?.status ||
+                "REQUEST_FAILED"
             );
         }
+
     }
 
+
     console.error(
-        "❌ BusinessCash: платёж не передан:",
+        "BusinessCash payment export failed:",
         {
             provider,
-            paymentId,
-            kind:
-            normalizedKind,
-
-            error:
-                lastError
-                    ?.message ||
-                "unknown",
+            kind: normalizedKind,
+            errorCode:
+                lastError?.code ||
+                lastError?.name ||
+                "REQUEST_FAILED",
         }
     );
+
+    // Все попытки исчерпаны.
+    // Не повторяем платёж и не меняем
+    // финансовые записи самостоятельно.
+    void notifySystemError({
+        module: "business_cash",
+        phase: "payment_export",
+        severity: "high",
+        error: lastError || {
+            name: "IntegrationError",
+            code: "EXPORT_FAILED",
+        },
+        userId,
+        orderId,
+    });
+
 
     return {
         ok: false,
@@ -352,6 +371,10 @@ async function sendBusinessCashRefund({
         7000,
     ];
 
+
+    let lastRefundError = null;
+
+
     for (
         let attempt = 0;
         attempt < delays.length;
@@ -402,16 +425,41 @@ async function sendBusinessCashRefund({
             return {
                 ok: true,
             };
+
         } catch (error) {
+            lastRefundError = error;
+
             console.error(
-                `⚠️ BusinessCash refund attempt ${attempt + 1}/${delays.length}:`,
-                error
-                    ?.response
-                    ?.data ||
-                error.message
+                `BusinessCash refund attempt ${attempt + 1}/${delays.length}:`,
+                error?.code ||
+                error?.response?.status ||
+                "REQUEST_FAILED"
             );
         }
+
     }
+
+
+    console.error(
+        "BusinessCash refund export failed:",
+        {
+            provider,
+            errorCode:
+                lastRefundError?.code ||
+                lastRefundError?.name ||
+                "REQUEST_FAILED",
+        }
+    );
+
+    void notifySystemError({
+        module: "business_cash",
+        phase: "refund_export",
+        severity: "high",
+        error: lastRefundError || {
+            name: "IntegrationError",
+            code: "REFUND_EXPORT_FAILED",
+        },
+    });
 
     return {
         ok: false,
