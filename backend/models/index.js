@@ -1,5 +1,9 @@
 require("dotenv").config(); // Загружаем переменные окружения
 
+const {
+    notifySystemError,
+} = require("../services/adminNotificationService");
+
 const { DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
 
@@ -65,12 +69,28 @@ Object.values(db).forEach((model) => {
 });
 
 // Проверяем подключение к БД
+
 sequelize
     .authenticate()
-    .then(() => console.log("✅ База данных подключена!"))
-    .catch((err) => {
-        console.error("❌ Ошибка подключения к БД:", err);
-        process.exit(1);
+    .then(() => {
+        console.log("✅ База данных подключена!");
+    })
+    .catch(async (error) => {
+        console.error(
+            "Database connection failed:",
+            error?.code || error?.name || "Error"
+        );
+
+        try {
+            await notifySystemError({
+                module: "mysql",
+                phase: "initial_connection",
+                severity: "critical",
+                error,
+            });
+        } finally {
+            process.exit(1);
+        }
     });
 
 module.exports = db;

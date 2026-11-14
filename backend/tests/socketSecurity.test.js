@@ -155,6 +155,16 @@ async function createSocketHarness() {
         },
     };
 
+
+    // Изолированная заглушка мониторинга.
+    // Telegram и реальные внешние сервисы
+    // во время тестов не вызываются.
+    const monitoringStub = {
+        notifySystemError: async () => ({
+            success: true,
+        }),
+    };
+
     const accessService = loadModule(
         "services/chatOrderAccess.js",
         {
@@ -162,7 +172,8 @@ async function createSocketHarness() {
         }
     );
 
-    // Настоящая JWT-проверка, но с тестовым ключом.
+    // Настоящая JWT-проверка,
+    // но с тестовым ключом.
     const authService = loadModule(
         "middlewares/socketAuth.js",
         {
@@ -177,15 +188,26 @@ async function createSocketHarness() {
             },
 
             "../models": models,
+
+            "../services/adminNotificationService":
+            monitoringStub,
         }
     );
+
 
     const typingService = loadModule(
         "services/chatTypingEvents.js",
         {
             "./chatOrderAccess": accessService,
+
+            "./adminNotificationService":
+            monitoringStub,
+
+            "../services/adminNotificationService":
+            monitoringStub,
         }
     );
+
 
     const socketModule = loadModule(
         "socket.js",
@@ -206,8 +228,12 @@ async function createSocketHarness() {
 
             "./services/chatTypingEvents":
             typingService,
+
+            "./services/adminNotificationService":
+            monitoringStub,
         }
     );
+
 
     const httpServer = http.createServer(
         (req, res) => {

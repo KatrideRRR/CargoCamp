@@ -2,6 +2,9 @@ const {
     requireChatOrderAccess,
 } = require("./chatOrderAccess");
 
+const {notifySystemError} = require("../services/adminNotificationService");
+
+
 const TYPING_TIMEOUT_MS = 5500;
 const MIN_EVENT_INTERVAL_MS = 1200;
 
@@ -177,6 +180,15 @@ function registerChatTypingEvents({
                     "Ошибка индикатора набора:",
                     error
                 );
+
+                void notifySystemError({
+                    module: "socket",
+                    phase: "typing_access",
+                    severity: "normal",
+                    error,
+                    userId,
+                });
+
             }
         }
     });

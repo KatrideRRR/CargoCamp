@@ -10,7 +10,13 @@ const authenticateToken = require('../middlewares/userAuth'); // если нуж
 const { randomUUID } = require('crypto');
 const yooKassa = require('../config/yookassaClient');
 const { sendOrderPush } = require("../utils/orderPushService");
-const {sendAdminNotification, adminUsersUrl, adminOrderUrl} = require("../services/adminNotificationService");
+
+const {
+    sendAdminNotification,
+    adminUsersUrl,
+    adminOrderUrl,
+    notifySystemError,
+} = require("../services/adminNotificationService");
 const {sendBusinessCashPayment, sendBusinessCashRefund,} = require("../services/businessCashService");
 const {getGuaranteeEligibility,} = require("../services/guaranteeEligibilityService");
 const {OrderSafeDeal,} = require("../models");
@@ -1852,28 +1858,28 @@ router.post("/yookassa/webhook", async (req, res) => {
         }
 
         return res.sendStatus(200);
+
     } catch (e) {
-        console.error("yookassa webhook error:", e);
+        console.error(
+            "YooKassa webhook error:",
+            e?.code || e?.name || "Error"
+        );
 
-        notifyPaymentProblem({
-            provider: "YooKassa",
-            type: "webhook",
+        // Ошибка уже зарегистрирована.
+        // HTTP-монитор не должен отправлять
+        // второе уведомление о том же сбое.
+        res.locals.cargoCampErrorReported = true;
 
-            title: "🚨 Ошибка обработки YooKassa webhook",
-
-            message: [
-                `Ошибка: ${e?.message || "Unknown error"}`,
-                req.body?.event
-                    ? `Event: ${req.body.event}`
-                    : null,
-                req.body?.object?.id
-                    ? `Payment ID: ${req.body.object.id}`
-                    : null,
-            ]
-                .filter(Boolean)
-                .join("\n"),
+        void notifySystemError({
+            module: "payments.yookassa",
+            phase: "webhook",
+            severity: "high",
+            error: e,
+            req,
         });
 
+        // Сохраняем существующую логику
+        // повторной доставки вебхуков ЮKassa.
         const paymentType =
             req.body?.object?.metadata?.type;
 
@@ -1888,8 +1894,10 @@ router.post("/yookassa/webhook", async (req, res) => {
             return res.sendStatus(500);
         }
 
-        return res.sendStatus(200);    }
+        return res.sendStatus(200);
+    }
 });
+
 
 router.get("/card/bind/status", authenticateToken, async (req, res) => {
     try {

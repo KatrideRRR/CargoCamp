@@ -6,6 +6,62 @@ const envFile = fs.existsSync(path.resolve(__dirname, ".env.local"))
     ? ".env.local"
     : ".env";
 
+
+const {
+    notifySystemError,
+    flushSystemErrorSummaries,
+} = require("./services/adminNotificationService");
+
+const {
+    createHttpErrorObserver,
+} = require("./services/operationalErrorMonitor");
+
+process.on("unhandledRejection", (reason) => {
+    console.error("Unhandled Promise Rejection");
+
+    void notifySystemError({
+        module: "node",
+        phase: "unhandled_rejection",
+        severity: "high",
+        error:
+            reason instanceof Error
+                ? reason
+                : {
+                    name: "UnhandledRejection",
+                    code: "UNHANDLED_REJECTION",
+                },
+    });
+});
+
+let fatalErrorInProgress = false;
+
+process.on("uncaughtException", (error) => {
+    if (fatalErrorInProgress) return;
+
+    fatalErrorInProgress = true;
+
+    console.error(
+        "Uncaught Exception:",
+        error?.code || error?.name || "Error"
+    );
+
+    // При необратимом сбое процесс должен
+    // завершиться и быть перезапущен supervisor.
+    const exitTimer = setTimeout(() => {
+        process.exit(1);
+    }, 3000);
+
+    void notifySystemError({
+        module: "node",
+        phase: "uncaught_exception",
+        severity: "critical",
+        error,
+    }).finally(() => {
+        clearTimeout(exitTimer);
+        process.exit(1);
+    });
+});
+
 dotenv.config({ path: path.resolve(__dirname, envFile) });
 console.log(`✅ Загружен файл окружения: ${envFile}`);
 
@@ -57,7 +113,6 @@ const pushTokensRoutes = require("./routes/pushTokens");
 const supportRoutes = require("./routes/support");
 const benefitsRoutes = require("./routes/benefits");
 const adminSupportRoutes = require("./routes/adminSupport");
-const {notifySystemError} = require("./services/adminNotificationService");
 const adminBenefitsRoutes = require("./routes/adminBenefits");
 const identityRoutes = require("./routes/identity");
 const adminIdentityRoutes = require("./routes/adminIdentity");
@@ -87,6 +142,21 @@ db.Sequelize = sequelize.constructor;
 db.sequelize = sequelize;
 
 const app = express();
+
+
+app.use(
+    createHttpErrorObserver({
+        notifySystemError,
+    })
+);
+
+// Минимальный публичный endpoint для
+// независимого контроля доступности Node.js.
+app.get("/healthz", (req, res) => {
+    return res.status(200).json({
+        status: "ok",
+    });
+});
 
 app.use(
     express.json({
@@ -319,17 +389,20 @@ app.post("/api/token", (req, res) => {
 });
 
 app.use((error, req, res, next) => {
-    console.error("Unhandled Express error:", error);
 
-    notifySystemError({
-        title: "🚨 Необработанная ошибка API",
+    console.error(
+        "Unhandled Express error:",
+        error?.code || error?.name || "Error"
+    );
+
+    res.locals.cargoCampErrorReported = true;
+
+    void notifySystemError({
         error,
         req,
+        phase: "express_unhandled",
     });
 
-    if (res.headersSent) {
-        return next(error);
-    }
 
     return res.status(
         Number(error?.status) || 500
@@ -343,58 +416,13 @@ app.use((error, req, res, next) => {
     });
 });
 
-process.on(
-    "unhandledRejection",
-    (reason) => {
-        console.error(
-            "Unhandled Promise Rejection:",
-            reason
-        );
 
-        void notifySystemError({
-            title: "🚨 Unhandled Promise Rejection",
+const monitoringSummaryTimer = setInterval(() => {
+    void flushSystemErrorSummaries();
+}, 60_000);
 
-            error:
-                reason instanceof Error
-                    ? reason
-                    : new Error(String(reason)),
-        });
-    }
-);
+monitoringSummaryTimer.unref?.();
 
-process.on(
-    "uncaughtException",
-    async (error) => {
-        console.error(
-            "Uncaught Exception:",
-            error
-        );
-
-        try {
-            await notifySystemError({
-                title: "💥 Uncaught Exception",
-                error,
-            });
-        } catch (notifyError) {
-            console.error(
-                "Не удалось отправить системное уведомление:",
-                notifyError
-            );
-        }
-
-        process.exit(1);
-    }
-);
-
-sequelize.authenticate().catch((err) => {
-    console.error("Database connection error:", err);
-
-    notifySystemError({
-        title: "🚨 Ошибка подключения к базе данных",
-        error: err,
-        extra: "sequelize.authenticate()",
-    });
-});
 
 const PORT = process.env.PORT;
 server.listen(PORT, "0.0.0.0", () => {

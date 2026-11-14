@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-
+const {notifySystemError} = require("../services/adminNotificationService");
 const {
     User,
     AuthSession,
@@ -101,6 +101,23 @@ async function authenticateSocket(socket, next) {
 
         return next();
     } catch (error) {
+
+
+        if (
+            ![
+                "JsonWebTokenError",
+                "TokenExpiredError",
+                "NotBeforeError",
+            ].includes(error?.name)
+        ) {
+            void notifySystemError({
+                module: "socket",
+                phase: "authentication",
+                severity: "high",
+                error,
+            });
+        }
+
         return next(
             new Error("SOCKET_UNAUTHORIZED")
         );

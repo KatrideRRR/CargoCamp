@@ -11,7 +11,13 @@ const {
     processTBankCardNotification,
 } = require("../services/tbankCardBindingService");
 const { sendOrderPush } = require("../utils/orderPushService");
-const {sendAdminNotification, adminUsersUrl, adminOrderUrl} = require("../services/adminNotificationService");
+
+const {
+    sendAdminNotification,
+    adminUsersUrl,
+    adminOrderUrl,
+    notifySystemError,
+} = require("../services/adminNotificationService");
 const {sendBusinessCashPayment, sendBusinessCashRefund,} = require("../services/businessCashService");
 const {
     verifyTBankPromotion,
@@ -474,40 +480,32 @@ router.post("/webhook", async (req, res) => {
 
         const isValid = verifyNotificationToken(body);
 
+
         if (!isValid) {
+            // Не выводим недоверенные данные
+            // входящего webhook в технические логи.
             console.warn(
-                "Invalid TBank webhook token",
-                {
-                    paymentId: body?.PaymentId || null,
-                    orderId: body?.OrderId || null,
-                }
+                "TBank webhook signature verification failed"
             );
 
-            void sendAdminNotification({
-                topic: "system",
-
-                title: "🚨 Некорректный T-Bank webhook",
-
-                message: [
-                    "Получен webhook с неправильной подписью/token.",
-                    body?.PaymentId
-                        ? `Payment ID: ${body.PaymentId}`
-                        : null,
-                    body?.OrderId
-                        ? `Order ID: ${body.OrderId}`
-                        : null,
-                ]
-                    .filter(Boolean)
-                    .join("\n"),
+            // Единый мониторинг ошибок.
+            // Повторы автоматически группируются.
+            void notifySystemError({
+                module: "payments.tbank",
+                phase: "invalid_webhook_signature",
+                severity: "high",
+                error: {
+                    name: "WebhookSecurityError",
+                    code: "INVALID_SIGNATURE",
+                },
             });
 
-            /**
-             * Важно:
-             * Возвращаем 200, чтобы Т-Банк не долбил webhook бесконечно.
-             * Но в логах видим проблему.
-             */
+            // Сохраняем существующее поведение:
+            // неправильная подпись не должна
+            // вызывать бесконечные повторы банка.
             return res.status(200).send("OK");
         }
+
 
         // Уведомление о привязке карты.
 // Подпись Т-Банка уже проверена выше.
@@ -932,38 +930,39 @@ router.post("/webhook", async (req, res) => {
         }
 
         return res.status(200).send("OK");
+
     } catch (e) {
-        console.error("tbank webhook error:", e);
+        console.error(
+            "TBank webhook error:",
+            e?.code || e?.name || "Error"
+        );
 
-        notifyPaymentProblem({
-            provider: "T-Bank",
-            type: "webhook",
+        // Исключаем повторное уведомление
+        // от общего HTTP-монитора.
+        res.locals.cargoCampErrorReported = true;
 
-            title: "🚨 Ошибка обработки T-Bank webhook",
-
-            message: [
-                `Ошибка: ${e?.message || "Unknown error"}`,
-                req.body?.PaymentId
-                    ? `Payment ID: ${req.body.PaymentId}`
-                    : null,
-                req.body?.OrderId
-                    ? `Order ID: ${req.body.OrderId}`
-                    : null,
-                req.body?.Status
-                    ? `Статус: ${req.body.Status}`
-                    : null,
-            ]
-                .filter(Boolean)
-                .join("\n"),
+        void notifySystemError({
+            module: "payments.tbank",
+            phase: "webhook",
+            severity: "high",
+            error: e,
+            req,
         });
 
+        // Сохраняем существующие правила
+        // ответа Т-Банку при ошибке.
         const paymentType = parseTBankOrderId(
             req.body?.OrderId
         ).type;
 
         if (
-            ["premium", "debt", "promo", "promotion", "order_promotion"]
-                .includes(paymentType)
+            [
+                "premium",
+                "debt",
+                "promo",
+                "promotion",
+                "order_promotion",
+            ].includes(paymentType)
         ) {
             return res.status(500).send("ERROR");
         }
@@ -971,13 +970,16 @@ router.post("/webhook", async (req, res) => {
         if (
             req.body?.NotificationType === "LINKCARD" ||
             ["premium", "debt"].includes(
-                parseTBankOrderId(req.body?.OrderId).type
+                parseTBankOrderId(
+                    req.body?.OrderId
+                ).type
             )
         ) {
             return res.status(500).send("ERROR");
         }
 
-        return res.status(200).send("OK");}}
-);
+        return res.status(200).send("OK");
+    }
+});
 
 module.exports = router;

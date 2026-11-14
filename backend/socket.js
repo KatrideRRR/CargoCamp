@@ -1,5 +1,7 @@
 const socketIo = require("socket.io");
-
+const {
+    notifySystemError,
+} = require("./services/adminNotificationService");
 const {
     Notification,
 } = require("./models");
@@ -59,6 +61,15 @@ async function sendNotifications(userId) {
             unreadNotifications
         );
     } catch (error) {
+
+        void notifySystemError({
+            module: "socket",
+            phase: "load_notifications",
+            severity: "high",
+            error,
+            userId,
+        });
+
         console.error(
             "Ошибка отправки уведомлений:",
             error
@@ -160,6 +171,15 @@ function initializeSocket(server) {
                         socket.disconnect(true);
                     }
                 } catch (error) {
+
+                    void notifySystemError({
+                        module: "socket",
+                        phase: "session_validation",
+                        severity: "high",
+                        error,
+                        userId,
+                    });
+
                     console.error(
                         "Socket session validation error:",
                         error
@@ -342,6 +362,17 @@ function initializeSocket(server) {
                         orderType: access.orderType,
                     });
                 } catch (error) {
+
+                    if (!error?.status || error.status >= 500) {
+                        void notifySystemError({
+                            module: "socket",
+                            phase: "join_chat",
+                            severity: "high",
+                            error,
+                            userId,
+                        });
+                    }
+
                     reply({
                         ok: false,
                         message:
@@ -421,12 +452,20 @@ function initializeSocket(server) {
                         access.userId
                     );
                 } catch (error) {
-                    if (error.status) return;
-
+                    if (error.status && error.status < 500) return;
                     console.error(
                         "Ошибка обновления уведомлений:",
                         error
                     );
+
+                    void notifySystemError({
+                        module: "socket",
+                        phase: "mark_notifications_read",
+                        severity: "normal",
+                        error,
+                        userId,
+                    });
+
                 }
             }
         );

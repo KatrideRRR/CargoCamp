@@ -1,5 +1,9 @@
 const axios = require("axios");
 
+const {
+    createErrorMonitor,
+} = require("./operationalErrorMonitor");
+
 const NOTIFY_URL =
     process.env.CARGOCAMP_NOTIFY_URL ||
     "https://notify.cargocamp.ru/notify";
@@ -124,22 +128,21 @@ async function sendAdminNotification({
             success: true,
             data: response.data,
         };
+
     } catch (error) {
         console.error(
             "[adminNotification] send failed:",
-            error.response?.data ||
-            error.message
+            error?.code ||
+            error?.response?.status ||
+            "NOTIFY_UNAVAILABLE"
         );
 
-        // Критично:
-        // Telegram никогда не должен ломать основной запрос пользователя.
         return {
             success: false,
-            error:
-                error.response?.data ||
-                error.message,
+            errorCode: "NOTIFY_UNAVAILABLE",
         };
     }
+
 }
 
 function adminUserUrl(userId) {
@@ -162,73 +165,17 @@ function adminExpressOrderUrl(orderId) {
     return `${ADMIN_PANEL_URL}/express-orders/${orderId}`;
 }
 
-function sanitizeSystemError(error) {
-    const message =
-        error?.message ||
-        String(error || "Unknown error");
 
-    const stack =
-        typeof error?.stack === "string"
-            ? error.stack
-                .split("\n")
-                .slice(0, 8)
-                .join("\n")
-            : null;
+const operationalMonitor = createErrorMonitor({
+    send: sendAdminNotification,
+});
 
-    return {
-        message: sanitizeMessage(message),
-        stack: stack
-            ? sanitizeMessage(stack)
-            : null,
-    };
+function notifySystemError(options = {}) {
+    return operationalMonitor.record(options);
 }
 
-function notifySystemError({title = "🚨 Ошибка backend", error, req = null, extra = null,}) {
-    const safeError =
-        sanitizeSystemError(error);
-
-    const message = [
-        `Environment: ${process.env.NODE_ENV || "unknown"}`,
-
-        req?.method
-            ? `Метод: ${req.method}`
-            : null,
-
-        req?.originalUrl
-            ? `URL: ${req.originalUrl}`
-            : null,
-
-        req?.user?.id
-            ? `User ID: ${req.user.id}`
-            : null,
-
-        error?.status
-            ? `HTTP status: ${error.status}`
-            : null,
-
-        error?.code
-            ? `Код ошибки: ${error.code}`
-            : null,
-
-        "",
-        `Ошибка: ${safeError.message}`,
-
-        extra
-            ? `Контекст: ${sanitizeMessage(extra)}`
-            : null,
-
-        safeError.stack
-            ? `\nStack:\n${safeError.stack}`
-            : null,
-    ]
-        .filter(Boolean)
-        .join("\n");
-
-    return sendAdminNotification({
-        topic: "system",
-        title,
-        message,
-    });
+function flushSystemErrorSummaries() {
+    return operationalMonitor.flush();
 }
 
 module.exports = {
@@ -239,4 +186,5 @@ module.exports = {
     adminOrderUrl,
     adminExpressOrderUrl,
     notifySystemError,
+    flushSystemErrorSummaries
 };
