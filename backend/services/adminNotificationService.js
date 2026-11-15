@@ -101,13 +101,17 @@ async function sendAdminNotification({
             notifyUrl,
             {
                 topic,
-                title: cleanValue(title),
+
+                title: sanitizeMessage(title),
                 message: sanitizeMessage(message),
+
 
                 ...(buttonText && buttonUrl
                     ? {
+
                         buttonText:
-                            cleanValue(buttonText),
+                            sanitizeMessage(buttonText),
+
 
                         buttonUrl:
                             cleanValue(buttonUrl),

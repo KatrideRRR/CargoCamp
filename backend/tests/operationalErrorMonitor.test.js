@@ -93,3 +93,59 @@ test("handled HTTP 5xx is reported once; 4xx and already reported are ignored", 
     assert.equal(observed.length, 1);
     assert.equal(observed[0].error.code, "HTTP_500");
 });
+
+
+test(
+    "Telegram rate limit preserves pending incidents",
+    async () => {
+        let time = 10000;
+
+        const sent = [];
+
+        const monitor = createErrorMonitor({
+            now: () => time,
+            maxPerMinute: 1,
+            windowMs: 300000,
+
+            send: async (payload) => {
+                sent.push(payload);
+
+                return {
+                    success: true,
+                };
+            },
+        });
+
+        await monitor.record({
+            error: {
+                name: "DatabaseError",
+                code: "ER_TEST_FIRST",
+            },
+            module: "mysql",
+            phase: "first",
+        });
+
+        const limited = await monitor.record({
+            error: {
+                name: "DatabaseError",
+                code: "ER_TEST_SECOND",
+            },
+            module: "mysql",
+            phase: "second",
+        });
+
+        assert.equal(sent.length, 1);
+        assert.equal(limited.rateLimited, true);
+
+        time += 60001;
+
+        await monitor.flush();
+
+        assert.equal(sent.length, 2);
+
+        assert.match(
+            sent[1].message,
+            /ER_TEST_SECOND/
+        );
+    }
+);
