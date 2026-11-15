@@ -6,6 +6,11 @@ const { Op } = require("sequelize");
 const authenticateToken =
     require("../middlewares/userAuth");
 
+
+const {
+    isFutureTimestamp,
+} = require("../utils/expiryGuard");
+
 const {
     getCurrentVerifiedIdentity,
 } = require("../services/identityStatusService");
@@ -596,7 +601,7 @@ async function getActivePepEnrollment({
     if (
         !enrollment ||
         enrollment.revokedAt ||
-        new Date(enrollment.expiresAt).getTime() <= Date.now() ||
+        !isFutureTimestamp(enrollment.expiresAt) ||
         enrollment.policyCode !== policy.code ||
         enrollment.policyVersion !== policy.version ||
         !safeHashEqual(enrollment.policySha256, policy.sha256) ||
@@ -656,8 +661,10 @@ async function hasRecentSigningSession(
         session.scope !== "user" ||
         Number(session.userId) !== Number(req.user.id) ||
         session.revokedAt ||
-        new Date(session.expiresAt).getTime() <= Date.now() ||
-        new Date(session.absoluteExpiresAt).getTime() <= Date.now()
+
+        !isFutureTimestamp(session.expiresAt) ||
+        !isFutureTimestamp(session.absoluteExpiresAt)
+
     ) {
         return false;
     }

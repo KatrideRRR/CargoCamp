@@ -1,5 +1,11 @@
 const jwt = require("jsonwebtoken");
 
+
+const {
+    isFutureTimestamp,
+} = require("../utils/expiryGuard");
+
+
 const {
     User,
     AuthSession,
@@ -72,8 +78,10 @@ module.exports = async function authenticateToken(
                 session.scope !== "user" ||
                 Number(session.userId) !== Number(user.id) ||
                 session.revokedAt ||
-                new Date(session.expiresAt).getTime() <= now ||
-                new Date(session.absoluteExpiresAt).getTime() <= now
+
+                !isFutureTimestamp(session.expiresAt, now) ||
+                !isFutureTimestamp(session.absoluteExpiresAt, now)
+
             ) {
                 return res.status(401).json({
                     message: "Сессия завершена или истекла",
