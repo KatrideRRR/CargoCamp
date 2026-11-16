@@ -1,0 +1,95 @@
+
+name: CargoCamp Release Gate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cargocamp-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-check:
+    name: release-check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+
+    env:
+      CI: "true"
+
+      # Только фиктивные адреса для CI-сборок.
+      # Эти сборки не предназначены для публикации.
+      REACT_APP_API_URL: "http://127.0.0.1:59999"
+      REACT_APP_SOCKET_URL: "http://127.0.0.1:59999"
+      REACT_APP_YANDEX_API_KEY: "playwright-test-only-key"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+            frontend/package-lock.json
+            admin-panel/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install backend dependencies
+        run: npm ci --prefix backend
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Install admin dependencies
+        run: npm ci --prefix admin-panel
+
+      - name: Install Playwright browsers
+        run: |
+          npx playwright install --with-deps chromium firefox webkit
+
+          # У фронтенда своя версия Playwright.
+          cd frontend
+          npx playwright install chromium firefox webkit
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check backend/server.js
+          node --check backend/scripts/migrate.js
+          node --check frontend/playwright.config.js
+          node --check admin-panel/playwright.config.js
+
+      - name: Run full CargoCamp release checks
+        run: npm run test:release
+
+      - name: Upload failed test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargocamp-test-failure-${{ github.run_id }}
+          if-no-files-found: ignore
+          retention-days: 7
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+            admin-panel/test-results/
+            admin-panel/playwright-report/
+
+      - name: Stop isolated test MySQL
+        if: always()
+        run: npm run test:mysql:stop
