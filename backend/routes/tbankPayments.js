@@ -675,66 +675,6 @@ router.post("/webhook", async (req, res) => {
             return res.status(200).send("OK");
         }
 
-        /*
- * CONFIRMED — деньги реально
- * подтверждены Т-Банком.
- *
- * Передаём только собственную
- * выручку CargoCamp.
- */
-        let businessCashKind =
-            null;
-
-        if (
-            type ===
-            "premium"
-        ) {
-            businessCashKind =
-                "premium";
-        }
-
-        if (
-            type ===
-            "debt"
-        ) {
-            businessCashKind =
-                "debt";
-        }
-
-        if (businessCashKind) {
-            void sendBusinessCashPayment({
-                provider:
-                    "tbank",
-
-                paymentId,
-
-                kind:
-                businessCashKind,
-
-                amountKopecks,
-
-                userId:
-                    (
-                        businessCashKind ===
-                        "premium" ||
-                        businessCashKind ===
-                        "debt"
-                    )
-                        ? userId
-                        : null,
-
-                orderId:
-                    businessCashKind ===
-                    "promotion"
-                        ? orderId
-                        : null,
-
-                occurredAt:
-                    new Date()
-                        .toISOString(),
-            });
-        }
-
 // ====== Premium / Debt ======
         if (type === "premium" || type === "debt") {
             if (
@@ -784,6 +724,28 @@ router.post("/webhook", async (req, res) => {
                         ? commissionAttemptId
                         : null,
             });
+
+
+            /*
+             * Выручку передаём только после:
+             * 1. проверки подписи уведомления;
+             * 2. подтверждения GetState;
+             * 3. успешной транзакции учёта платежа.
+             *
+             * Повторную доставку разрешаем —
+             * идемпотентность BusinessCash должна
+             * обеспечиваться по provider + paymentId.
+             */
+            void sendBusinessCashPayment({
+                provider: "tbank",
+                paymentId,
+                kind: type,
+                amountKopecks,
+                userId,
+                orderId: null,
+                occurredAt: new Date().toISOString(),
+            });
+
 
             if (!result.duplicate) {
                 await req.logAction?.({

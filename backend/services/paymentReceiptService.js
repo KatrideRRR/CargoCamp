@@ -178,9 +178,6 @@ async function applyConfirmedPayment({
                     "Конфликт данных ранее обработанного платежа"
                 );
             }
-
-            await markCommissionAttemptPaid();
-
             return { duplicate: true };
         }
 
