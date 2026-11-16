@@ -948,3 +948,157 @@ test("HTTP chat: проверяет формат входных данных", a
         assert.equal(api.rows.length, 0);
     });
 });
+
+
+test(
+    "HTTP chat: restores 205 missed messages in pages without leaking other chats",
+    async () => {
+        await withServer(async (api) => {
+            const createdAt =
+                "2026-11-16T10:00:00.000Z";
+
+            // Имитируем переписку, которая
+            // продолжалась, пока пользователь
+            // находился без интернета.
+            for (let id = 1; id <= 205; id++) {
+                const fromCreator = id % 2 === 1;
+
+                api.rows.push({
+                    id,
+                    orderId: 11,
+                    orderType: "regular",
+
+                    senderId:
+                        fromCreator ? 101 : 202,
+
+                    receiverId:
+                        fromCreator ? 202 : 101,
+
+                    content: `Сообщение ${id}`,
+
+                    clientMessageId: null,
+                    replyToMessageId: null,
+                    readAt: null,
+                    createdAt,
+                });
+            }
+
+            // Другие заказы не должны попадать
+            // в результат восстановления.
+            api.rows.push({
+                id: 300,
+                orderId: 11,
+                orderType: "express",
+                senderId: 101,
+                receiverId: 303,
+                content: "Чужой тип заказа",
+                readAt: null,
+                createdAt,
+            });
+
+            api.rows.push({
+                id: 301,
+                orderId: 22,
+                orderType: "regular",
+                senderId: 303,
+                receiverId: 404,
+                content: "Чужой заказ",
+                readAt: null,
+                createdAt,
+            });
+
+            // Даже при совпадении номера заказа
+            // сообщения других пользователей
+            // не должны попадать в историю.
+            api.rows.push({
+                id: 302,
+                orderId: 11,
+                orderType: "regular",
+                senderId: 303,
+                receiverId: 404,
+                content: "Не участники чата",
+                readAt: null,
+                createdAt,
+            });
+
+            const collected = [];
+            let cursor = 0;
+
+            const pageSizes = [];
+
+            for (let page = 0; page < 4; page++) {
+                const response = await api.request(
+                    "GET",
+                    "/api/messages/sync/regular/11" +
+                    `?afterId=${cursor}`,
+                    101
+                );
+
+                assert.equal(response.status, 200);
+
+                const messages = response.body.messages;
+
+                pageSizes.push(messages.length);
+
+                collected.push(
+                    ...messages.map(
+                        (message) => message.id
+                    )
+                );
+
+                const nextCursor =
+                    response.body.nextCursor;
+
+                if (!response.body.hasMore) {
+                    break;
+                }
+
+                assert.ok(
+                    nextCursor > cursor,
+                    "Cursor must move forward"
+                );
+
+                cursor = nextCursor;
+            }
+
+            assert.deepEqual(
+                pageSizes,
+                [100, 100, 5]
+            );
+
+            assert.deepEqual(
+                collected,
+                Array.from(
+                    { length: 205 },
+                    (_, index) => index + 1
+                )
+            );
+
+            assert.equal(
+                new Set(collected).size,
+                205
+            );
+
+            const outsider = await api.request(
+                "GET",
+                "/api/messages/sync/regular/11" +
+                "?afterId=0",
+                999
+            );
+
+            assert.equal(outsider.status, 404);
+
+            const invalidCursor = await api.request(
+                "GET",
+                "/api/messages/sync/regular/11" +
+                "?afterId=9007199254740992",
+                101
+            );
+
+            assert.equal(
+                invalidCursor.status,
+                400
+            );
+        });
+    }
+);

@@ -44,10 +44,11 @@ async function deactivateBadTokens(badTokens = []) {
         }
     );
 
+
     console.warn("PUSH BAD TOKENS DEACTIVATED:", {
         count: badTokens.length,
-        tokenStarts: badTokens.map((t) => String(t).slice(0, 20)),
     });
+
 }
 
 async function sendPushToUser({
@@ -122,16 +123,15 @@ async function sendPushToUser({
                 "PUSH_SEND_FAILED"
             );
 
+
             const invalidToken =
                 code.includes(
                     "registration-token-not-registered"
                 ) ||
                 code.includes(
                     "invalid-registration-token"
-                ) ||
-                code.includes(
-                    "invalid-argument"
                 );
+
 
             if (invalidToken) {
                 badTokens.push(tokens[idx]);
