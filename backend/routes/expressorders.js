@@ -2293,9 +2293,16 @@ try{
                     paidBySavedCard =
                         chargeResult.autoPaymentPaid === true;
 
+
                     if (paidBySavedCard) {
                         commissionStatus = "paid";
+
+                        // База уже обновлена сервисом
+                        // применения подтверждённого платежа.
+                        // Синхронизируем объект HTTP-ответа.
+                        order.commissionStatus = "paid";
                     }
+
                 } catch (error) {
                     console.error(
                         "Express commission charge error:",
