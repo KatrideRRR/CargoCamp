@@ -157,6 +157,49 @@ test.describe("StartPage", () => {
         await openStartPage(page);
     });
 
+
+    test(
+        "@release-smoke главная: действия доступны без горизонтальной прокрутки",
+        async ({ page }) => {
+            const buttons = page.locator(
+                ".start-page-role-button"
+            );
+
+            await expect(buttons).toHaveCount(3);
+
+            for (let i = 0; i < 3; i++) {
+                await expect(
+                    buttons.nth(i)
+                ).toBeVisible();
+            }
+
+            const layout = await page.evaluate(() => ({
+                viewport:
+                document.documentElement.clientWidth,
+
+                content:
+                document.documentElement.scrollWidth,
+            }));
+
+            expect(
+                layout.content,
+                "Главная страница шире экрана"
+            ).toBeLessThanOrEqual(
+                layout.viewport + 2
+            );
+
+            // Проверяем именно возможность нажать,
+            // а не только наличие кнопки в DOM.
+            await page.getByRole("button", {
+                name: /Такси \/ Курьер/i,
+            }).click();
+
+            await expect(page).toHaveURL(
+                /\/express(?:\?|$)/
+            );
+        }
+    );
+
     test("отображает стартовую страницу", async ({ page }) => {
         await expect(page.locator(".start-page-container")).toBeVisible();
         await expect(page.locator(".start-page-content")).toBeVisible();

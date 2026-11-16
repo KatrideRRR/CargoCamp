@@ -297,6 +297,66 @@ test.describe("CreateExpressOrder", () => {
         await openExpressPage(page);
     });
 
+    test(
+        "@release-smoke экспресс: такси и курьер доступны на мобильном экране",
+        async ({ page }) => {
+            await expect(
+                page.locator(".exo-page")
+            ).toBeVisible();
+
+            const taxi = page.locator(
+                ".exo-typeBtn"
+            ).filter({
+                hasText: "Такси",
+            });
+
+            const courier = page.locator(
+                ".exo-typeBtn"
+            ).filter({
+                hasText: "Курьер",
+            });
+
+            await expect(taxi).toBeVisible();
+            await expect(courier).toBeVisible();
+
+            await courier.click();
+
+            await expect(
+                page.locator(".exo-typeBtn.isActive")
+            ).toContainText("Курьер");
+
+            await expect(
+                page.getByPlaceholder(
+                    "Откуда — адрес точки A"
+                )
+            ).toBeVisible();
+
+            await expect(
+                page.getByPlaceholder(
+                    "Куда — адрес точки B"
+                )
+            ).toBeVisible();
+
+            const price = page.locator(
+                "#express-price"
+            );
+
+            await price.fill("700");
+
+            await expect(price).toHaveValue("700");
+
+            const overflow = await page.evaluate(() =>
+                document.documentElement.scrollWidth -
+                document.documentElement.clientWidth
+            );
+
+            expect(
+                overflow,
+                "Экспресс-форма выходит за ширину экрана"
+            ).toBeLessThanOrEqual(2);
+        }
+    );
+
     test("отображает страницу экспресс-заказа", async ({ page }) => {
         await expect(page.locator(".exo-page")).toBeVisible();
 

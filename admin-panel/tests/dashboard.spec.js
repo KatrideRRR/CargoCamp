@@ -45,6 +45,72 @@ async function openDashboard(page) {
 }
 
 test.describe("Dashboard", () => {
+
+    test(
+        "@release-smoke Dashboard: мобильная навигация и переход в проверку льгот",
+        async ({ page }) => {
+            await page.setViewportSize({
+                width: 390,
+                height: 844,
+            });
+
+            await openDashboard(page);
+
+            await expect(
+                page.locator(".dashboard-nav")
+            ).toBeVisible();
+
+            const links = [
+                "Пользователи",
+                "Проверка личности",
+                "Проверка льгот",
+                "Заказы",
+                "Поддержка",
+            ];
+
+            for (const name of links) {
+                await expect(
+                    page.getByRole("link", { name })
+                ).toBeVisible();
+            }
+
+            const overflow = await page.evaluate(() =>
+                document.documentElement.scrollWidth -
+                document.documentElement.clientWidth
+            );
+
+            expect(
+                overflow,
+                "Dashboard шире мобильного экрана"
+            ).toBeLessThanOrEqual(2);
+
+            await page.route(
+                "**/api/admin/benefits/pending",
+                async (route) => {
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                            applications: [],
+                        },
+                    });
+                }
+            );
+
+            await page.getByRole("link", {
+                name: "Проверка льгот",
+            }).click();
+
+            await expect(page).toHaveURL(
+                /\/benefits$/
+            );
+
+            await expect(
+                page.locator(".admin-benefits-page")
+            ).toBeVisible();
+        }
+    );
+
     test("отображает панель администратора", async ({ page }) => {
         await openDashboard(page);
 

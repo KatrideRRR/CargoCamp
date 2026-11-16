@@ -515,6 +515,52 @@ test.describe("ChatPage", () => {
         await openChatPage(page);
     });
 
+    test(
+        "@release-smoke чат: поле сообщения и отправка доступны на мобильном экране",
+        async ({ page }) => {
+            await expect(
+                page.locator(".chat-page")
+            ).toBeVisible();
+
+            await expect(
+                page.locator(".chat-header")
+            ).toBeVisible();
+
+            const input = page.locator(".chat-input");
+
+            await expect(input).toBeVisible();
+
+            const sendButton = page.getByRole(
+                "button",
+                {
+                    name: /Отправить сообщение/i,
+                }
+            );
+
+            await expect(sendButton).toBeDisabled();
+
+            await input.fill(
+                "Сообщение для мобильной проверки"
+            );
+
+            await expect(input).toHaveValue(
+                "Сообщение для мобильной проверки"
+            );
+
+            await expect(sendButton).toBeEnabled();
+
+            const overflow = await page.evaluate(() =>
+                document.documentElement.scrollWidth -
+                document.documentElement.clientWidth
+            );
+
+            expect(
+                overflow,
+                "Чат выходит за ширину экрана"
+            ).toBeLessThanOrEqual(2);
+        }
+    );
+
     test("отображает страницу чата", async ({ page }) => {
         await expect(page.locator(".chat-page")).toBeVisible();
 

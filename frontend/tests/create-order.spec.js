@@ -482,6 +482,50 @@ test.describe("CreateOrderPage", () => {
         await openCreateOrderPage(page);
     });
 
+    test(
+        "@release-smoke обычный заказ: поля доступны на узком экране",
+        async ({ page }) => {
+            await expect(
+                page.locator(".create-page")
+            ).toBeVisible();
+
+            const description = page.locator(
+                "textarea.textarea"
+            );
+
+            const amount = page.locator(
+                'input[type="number"]'
+            ).first();
+
+            await expect(description).toBeVisible();
+            await expect(amount).toBeVisible();
+
+            await description.fill(
+                "Проверка формы на мобильном экране"
+            );
+
+            await amount.fill("1500");
+
+            await expect(description).toHaveValue(
+                "Проверка формы на мобильном экране"
+            );
+
+            await expect(amount).toHaveValue(
+                "1500"
+            );
+
+            const overflow = await page.evaluate(() =>
+                document.documentElement.scrollWidth -
+                document.documentElement.clientWidth
+            );
+
+            expect(
+                overflow,
+                "Форма обычного заказа выходит за ширину экрана"
+            ).toBeLessThanOrEqual(2);
+        }
+    );
+
     test("отображает страницу создания заказа", async ({ page }) => {
         await expect(page.locator(".create-page")).toBeVisible();
 
