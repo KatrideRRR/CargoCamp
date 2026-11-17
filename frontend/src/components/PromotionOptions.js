@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { Star, Bell, Paintbrush } from "lucide-react";
 
 export const PROMOTION_PRICES = {
@@ -32,11 +32,15 @@ export default function PromotionOptions({ value, onChange }) {
         },
     ];
 
-    const total = useMemo(() => {
-        return Object.entries(safeValue).reduce((sum, [key, enabled]) => {
-            return enabled ? sum + PROMOTION_PRICES[key] : sum;
-        }, 0);
-    }, [safeValue.highlight, safeValue.recommended, safeValue.push]);
+
+    const total = Object.entries(safeValue).reduce(
+        (sum, [key, enabled]) =>
+            enabled
+                ? sum + PROMOTION_PRICES[key]
+                : sum,
+        0
+    );
+
 
     const handleToggle = (id) => {
         onChange((prev) => {

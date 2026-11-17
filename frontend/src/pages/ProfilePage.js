@@ -355,10 +355,6 @@ const ProfilePage = () => {
         );
 
         return normalizedProfile;
-
-        setPaymentMethodId(response.data.yookassaPaymentMethodId || null);
-
-        return response.data;
     };
 
     const loadDebtStatus = async () => {
@@ -628,7 +624,7 @@ const ProfilePage = () => {
     };
 
     useEffect(() => {
-        if (!profile) return;
+        if (!profile?.id) return;
 
         setVehicleForm({
             vehicleBrand:
@@ -1212,8 +1208,13 @@ const ProfilePage = () => {
         }
     };
 
+
+    const loadedProfileId = profile?.id;
+
+
+
     useEffect(() => {
-        if (!profile) {
+        if (!loadedProfileId) {
             return;
         }
 
@@ -1280,7 +1281,7 @@ const ProfilePage = () => {
             left: 0,
             behavior: "auto",
         });
-    }, [profile?.id]);
+    }, [loadedProfileId]);
 
     const handleBindTBankCard = async () => {
         try {

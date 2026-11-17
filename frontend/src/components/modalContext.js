@@ -1,5 +1,5 @@
 import { toast } from "react-toastify";
-import React, { createContext, useState, useEffect } from "react";
+import React, { createContext, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { socket } from "../socketClient";
 import axiosInstance from "../utils/axiosInstance";
@@ -188,9 +188,22 @@ const isNotificationFresh = (
     return age >= 0 && age <= maxAgeMs;
 };
 
+
+const getExpressAcceptedModalKey = (orderId) =>
+    `express_accepted_modal_shown_${orderId}`;
+
+const getExpressCancelledModalKey = (
+    orderId,
+    cancelledBy
+) =>
+    `express_cancelled_modal_shown_${orderId}_${
+        cancelledBy || "unknown"
+    }`;
+
+
 export const ModalProvider = ({ children }) => {
     const navigate = useNavigate();
-    const [modalData, setModalData] = useState(null);
+    const [setModalData] = useState(null);
     const [userId, setUserId] = useState(null);
     const [notificationData, setNotificationData] = useState(null);
     const [completionNotificationData, setCompletionNotificationData] = useState(null);
@@ -242,11 +255,8 @@ export const ModalProvider = ({ children }) => {
         fetchUserData();
     }, []);
 
-    const getExpressAcceptedModalKey = (orderId) => {
-        return `express_accepted_modal_shown_${orderId}`;
-    };
+    const openExpressAcceptedModal = useCallback((data) => {
 
-    const openExpressAcceptedModal = (data) => {
         if (!data?.orderId) return;
 
         const orderId = data.orderId || data?.data?.orderId;
@@ -285,9 +295,9 @@ export const ModalProvider = ({ children }) => {
             expressType,
             status: "accepted",
         });
-    };
+    }, [userId]);
 
-    const handleExpressOrderAccepted = (data) => {
+    const handleExpressOrderAccepted = useCallback((data)  => {
 
         if (!data?.orderId) return;
 
@@ -296,13 +306,13 @@ export const ModalProvider = ({ children }) => {
         if (Number(creatorId) === Number(userId)) {
             openExpressAcceptedModal(data);
         }
-    };
+    }, [userId, openExpressAcceptedModal]);
 
     const handleExpressOrderStatusChanged = (data) => {
         if (!data?.status) return;
     };
 
-    const openReviewFromCompletion = (
+    const openReviewFromCompletion = useCallback((
         orderId,
         creatorId,
         executorId,
@@ -329,9 +339,9 @@ export const ModalProvider = ({ children }) => {
 
         setRating(0);
         setShowRatingModal(true);
-    };
+    }, []);
 
-    const openReviewFromPushPayload = (payload) => {
+    const openReviewFromPushPayload = useCallback( (payload) => {
         if (!payload?.orderId) return false;
 
         const orderId = payload.orderId;
@@ -365,7 +375,7 @@ export const ModalProvider = ({ children }) => {
         markReminded(orderId, orderType);
 
         return true;
-    };
+    }, [openReviewFromCompletion]);
 
     useEffect(() => {
         if (!userId) return;
@@ -399,7 +409,9 @@ export const ModalProvider = ({ children }) => {
         return () => {
             window.removeEventListener("openReviewFromPush", openPendingReview);
         };
-    }, [userId]);
+
+    }, [userId, openReviewFromPushPayload]);
+
 
     const openCompletionSuccessModal = (payload) => {
         setCompletionSuccessData(payload);
@@ -413,11 +425,7 @@ export const ModalProvider = ({ children }) => {
         setExpressAcceptedData(null);
     };
 
-    const getExpressCancelledModalKey = (orderId, cancelledBy) => {
-        return `express_cancelled_modal_shown_${orderId}_${cancelledBy || "unknown"}`;
-    };
-
-    const openExpressCancelledModal = (data) => {
+    const openExpressCancelledModal = useCallback((data) => {
         const orderId = data?.orderId || data?.id || data?.data?.orderId;
         if (!orderId) return;
 
@@ -481,7 +489,7 @@ export const ModalProvider = ({ children }) => {
             cancelledByMe,
             orderType: "express",
         });
-    };
+    },[userId]);
 
     const handleExpressCancelledClose = () => {
         setExpressCancelledData(null);
@@ -546,8 +554,7 @@ export const ModalProvider = ({ children }) => {
                 selectedOrder.orderType ||
                 (selectedOrder.isExpress ? "express" : "regular");
 
-            const response =
-                await axiosInstance.post(
+            await axiosInstance.post(
                     "/auth/review",
                     {
                         orderId: selectedOrder.id,
@@ -1036,7 +1043,15 @@ export const ModalProvider = ({ children }) => {
             socket.off("new_notification", handleNewNotification);
             socket.off("expressOrderCancelled", handleExpressOrderCancelled);
         };
-    }, [userId, navigate]);
+
+    }, [
+        userId,
+        navigate,
+        handleExpressOrderAccepted,
+        openExpressCancelledModal,
+        openReviewFromCompletion,
+    ]);
+
 
     const openDebtModal = ({ title, description, amount, returnPath }) => {
         setDebtModalData({

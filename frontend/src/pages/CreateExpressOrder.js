@@ -82,10 +82,6 @@ function parseYandexGeocoderSuggestions(data) {
         .filter(Boolean);
 }
 
-function buildYandexNaviUrl(fromLat, fromLng, toLat, toLng) {
-    return `https://yandex.ru/navi/?rtext=${Number(fromLat)},${Number(fromLng)}~${Number(toLat)},${Number(toLng)}&rtt=auto`;
-}
-
 function loadYMaps(apiKey) {
     if (window.ymaps) return Promise.resolve(window.ymaps);
 
@@ -269,11 +265,6 @@ const CreateExpressOrder = () => {
         const tLng = toNum(form.toLng);
         return [fLat, fLng, tLat, tLng].every(Number.isFinite);
     }, [form.fromLat, form.fromLng, form.toLat, form.toLng]);
-
-    const routeUrl = useMemo(() => {
-        if (!coordsOk) return "";
-        return buildYandexNaviUrl(form.fromLat, form.fromLng, form.toLat, form.toLng);
-    }, [coordsOk, form.fromLat, form.fromLng, form.toLat, form.toLng]);
 
     const clearSuggest = (kind) => {
         setAddrSug((p) => ({ ...p, [kind]: [] }));
@@ -706,24 +697,6 @@ const CreateExpressOrder = () => {
             console.error(e);
             setError(e.response?.data?.message || "Ошибка при создании заказа");
             setIsSubmitting(false);
-        }
-    };
-
-    const saveAddress = async ({ label, title, address, lat, lng }) => {
-        try {
-            const r = await axiosInstance.post("/express/express-addresses/me", {
-                label,
-                title: title?.trim() || null,
-                address,
-                lat: Number(lat),
-                lng: Number(lng),
-            });
-            if (r.data?.success) {
-                const rr = await axiosInstance.get("/express/express-addresses/me");
-                if (rr.data?.success) setSaved(Array.isArray(rr.data.items) ? rr.data.items : []);
-            }
-        } catch (e) {
-            console.error(e);
         }
     };
 

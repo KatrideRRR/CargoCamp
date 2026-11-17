@@ -44,6 +44,30 @@ const ServiceInfoPage = lazy(() => import('./pages/ServiceInfoPage'));
 const InfoPage = lazy(() => import('./pages/InfoPage'));
 const SupportChatPage = React.lazy(() => import("./pages/SupportChatPage"));
 
+const getNotificationCreatedAtMs = (n) => {
+    const raw =
+        n?.createdAt ||
+        n?.created_at ||
+        n?.data?.createdAt ||
+        n?.data?.created_at;
+
+    if (!raw) return null;
+
+    const ts = new Date(raw).getTime();
+
+    return Number.isFinite(ts) ? ts : null;
+};
+
+const isFreshNotification = (n, maxAgeMs = 2 * 60 * 1000) => {
+    const createdAtMs = getNotificationCreatedAtMs(n);
+
+    // Если даты нет, лучше не показывать toast как "новый",
+    // иначе старые события без createdAt будут всплывать бесконечно.
+    if (!createdAtMs) return false;
+
+    return Date.now() - createdAtMs <= maxAgeMs;
+};
+
 function AuthBootGate({ children }) {
     const {
         loading,
@@ -322,30 +346,6 @@ function App() {
 
     const getNotificationId = (n) => {
         return n?.id || n?.data?.notificationId || null;
-    };
-
-    const getNotificationCreatedAtMs = (n) => {
-        const raw =
-            n?.createdAt ||
-            n?.created_at ||
-            n?.data?.createdAt ||
-            n?.data?.created_at;
-
-        if (!raw) return null;
-
-        const ts = new Date(raw).getTime();
-
-        return Number.isFinite(ts) ? ts : null;
-    };
-
-    const isFreshNotification = (n, maxAgeMs = 2 * 60 * 1000) => {
-        const createdAtMs = getNotificationCreatedAtMs(n);
-
-        // Если даты нет, лучше не показывать toast как "новый",
-        // иначе старые события без createdAt будут всплывать бесконечно.
-        if (!createdAtMs) return false;
-
-        return Date.now() - createdAtMs <= maxAgeMs;
     };
 
     const wasToastShown = (notificationId) => {

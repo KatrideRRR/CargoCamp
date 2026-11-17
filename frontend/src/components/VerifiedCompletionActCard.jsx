@@ -1,7 +1,7 @@
 import React, {useState} from "react";
 import {downloadVerifiedContract,} from "../utils/downloadVerifiedContract";
 import "../styles/VerifiedAssignmentCard.css";
-import { ClipboardCheck, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 
 import SignatureAgreementPanel
     from "./SignatureAgreementPanel";

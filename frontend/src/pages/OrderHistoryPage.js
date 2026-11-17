@@ -5,16 +5,13 @@ import axiosInstance from "../utils/axiosInstance";
 import OrderServiceDetails from "../components/OrderServiceDetails";
 import "../styles/OrderHistotyPage.css";
 import "../styles/OrderHistoryPageDark.css";
-import {FiCheckCircle, FiFileText, FiMapPin, FiNavigation, FiPackage, FiStar,} from "react-icons/fi";
+import {FiCheckCircle, FiFileText, FiNavigation, FiPackage, FiStar,} from "react-icons/fi";
 import {FaCarSide, FaRegMoneyBillAlt,} from "react-icons/fa";
 import {downloadLegacyContract,} from "../utils/downloadLegacyContract";
 import useVerifiedAssignments from "../hooks/useVerifiedAssignments";
 import VerifiedAssignmentCard from "../components/VerifiedAssignmentCard";
 import VerifiedCompletionActCard from "../components/VerifiedCompletionActCard";
 
-const apiUrl =
-    process.env.REACT_APP_API_URL ||
-    "http://localhost:5001";
 
 function formatCompletedDate(value) {
     if (!value) {
