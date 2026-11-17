@@ -115,9 +115,15 @@ function DynamicServiceFields({
                                   onChange,
                                   yandexApiKey,
                               }) {
-    const fields = Array.isArray(config?.fields)
-        ? config.fields
-        : [];
+
+    const fields = useMemo(
+        () =>
+            Array.isArray(config?.fields)
+                ? config.fields
+                : [],
+        [config?.fields]
+    );
+
 
     const visibleFields = useMemo(
         () =>

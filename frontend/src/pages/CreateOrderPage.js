@@ -388,37 +388,29 @@ function CreateOrderPage() {
                 recommendedPrice.helperHourlyRate,
             };
         });
-    }, [
-        recommendedPrice?.recommendedPrice,
-        recommendedPrice?.minPrice,
-        recommendedPrice?.maxPrice,
-        recommendedPrice?.calculator,
 
-        recommendedPrice?.pricingModel,
-        recommendedPrice?.billedHours,
-        recommendedPrice?.minimumHours,
+    }, [recommendedPrice]);
 
-        recommendedPrice?.firstHourPrice,
-        recommendedPrice?.nextHourPrice,
 
-        recommendedPrice?.calloutPrice,
-        recommendedPrice?.vehicleHourlyRate,
-        recommendedPrice?.helperHourlyRate,
-    ]);
+    const startLatitude = markerPosition?.[0];
+    const startLongitude = markerPosition?.[1];
+
+    const destinationLatitude =
+        serviceDetails?.destinationCoordinates?.lat;
+
+    const destinationLongitude =
+        serviceDetails?.destinationCoordinates?.lng;
+
 
     useEffect(() => {
-        const destination =
-            serviceDetails
-                ?.destinationCoordinates;
 
-        const hasStart =
-            isValidOrderCoords(markerPosition);
+        const hasStart = isValidOrderCoords(
+            [startLatitude, startLongitude]
+        );
 
-        const destinationLat =
-            Number(destination?.lat);
+        const destinationLat = Number(destinationLatitude);
+        const destinationLng = Number(destinationLongitude);
 
-        const destinationLng =
-            Number(destination?.lng);
 
         const hasDestination =
             Number.isFinite(destinationLat) &&
@@ -474,8 +466,8 @@ function CreateOrderPage() {
 
         const straightDistanceKm =
             calculateStraightDistanceKm(
-                markerPosition[0],
-                markerPosition[1],
+                startLatitude,
+                startLongitude,
                 destinationLat,
                 destinationLng
             );
@@ -535,14 +527,14 @@ function CreateOrderPage() {
 
             return next;
         });
+
     }, [
-        markerPosition?.[0],
-        markerPosition?.[1],
-        serviceDetails
-            ?.destinationCoordinates?.lat,
-        serviceDetails
-            ?.destinationCoordinates?.lng,
+        startLatitude,
+        startLongitude,
+        destinationLatitude,
+        destinationLongitude,
     ]);
+
 
     const validateServiceDetails = () => {
         const fields = Array.isArray(
@@ -1654,7 +1646,6 @@ function CreateOrderPage() {
                                     autoComplete="off"
                                     spellCheck="true"
                                     aria-label="Поиск услуги"
-                                    aria-expanded={serviceSearchOpen}
                                 />
 
                                 {serviceSearching && (

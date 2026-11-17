@@ -868,8 +868,6 @@ const OrderPage = () => {
         !order.executorId &&
         ["pending", "created"].includes(String(order.status || "pending"));
 
-    const canTakeOrder = canRequestRegular || canAcceptExpress;
-
     return (
         <div className={`orders-page orders-page--${platform} order-detail-page`}>
             <div className="orders-shell">

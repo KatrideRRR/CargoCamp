@@ -188,6 +188,21 @@ test.describe("StartPage", () => {
                 layout.viewport + 2
             );
 
+
+            await page.route(
+                "**/api/express/express-addresses/me",
+                async (route) => {
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                            items: [],
+                        },
+                    });
+                }
+            );
+
+
             // Проверяем именно возможность нажать,
             // а не только наличие кнопки в DOM.
             await page.getByRole("button", {

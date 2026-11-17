@@ -313,12 +313,9 @@ function AdminCreateOrderPage() {
                 recommendedRegularPrice.calculator,
             };
         });
-    }, [
-        recommendedRegularPrice?.recommendedPrice,
-        recommendedRegularPrice?.minPrice,
-        recommendedRegularPrice?.maxPrice,
-        recommendedRegularPrice?.calculator,
-    ]);
+
+    }, [recommendedRegularPrice]);
+
 
     useEffect(() => {
         const destination =
@@ -412,12 +409,12 @@ function AdminCreateOrderPage() {
                     "estimated_from_coordinates",
             };
         });
+
     }, [
-        markerPosition?.[0],
-        markerPosition?.[1],
-        serviceDetails?.destinationCoordinates?.lat,
-        serviceDetails?.destinationCoordinates?.lng,
+        markerPosition,
+        serviceDetails?.destinationCoordinates,
     ]);
+
 
     const clearSelectedService = () => {
         setSelectedService(null);

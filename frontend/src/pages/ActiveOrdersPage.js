@@ -43,13 +43,6 @@ const apiUrl = process.env.REACT_APP_API_URL;
 const hasDescription = (value) =>
     typeof value === "string" && value.trim().length > 0;
 
-const makeDisputeKey = (
-    orderType,
-    orderId
-) => {
-    return `${orderType}:${orderId}`;
-};
-
 const parseServiceDetails = (value) => {
     if (!value) {
         return {};
@@ -138,30 +131,6 @@ const getWorkDurationMs = (
     }
 
     return endTime - startTime;
-};
-
-const formatWorkTimer = (durationMs) => {
-    const totalSeconds = Math.max(
-        0,
-        Math.floor(durationMs / 1000)
-    );
-
-    const hours = Math.floor(
-        totalSeconds / 3600
-    );
-
-    const minutes = Math.floor(
-        (totalSeconds % 3600) / 60
-    );
-
-    const seconds =
-        totalSeconds % 60;
-
-    return [
-        String(hours).padStart(2, "0"),
-        String(minutes).padStart(2, "0"),
-        String(seconds).padStart(2, "0"),
-    ].join(":");
 };
 
 const formatWorkDurationText = (
@@ -422,7 +391,6 @@ const ActiveOrdersPage = () => {
 
     const {
         openCompletionSuccessModal,
-        openReviewFromCompletion,
     } = useContext(ModalContext);
     const isMobile = useMediaQuery({ maxWidth: 768 });
 
@@ -479,7 +447,7 @@ const ActiveOrdersPage = () => {
         useState("regular");
 
     // “удаленные” обычные заказы
-    const [removedOrders, setRemovedOrders] = useState(() => {
+    const [removedOrders] = useState(() => {
         const saved = localStorage.getItem("removedOrders");
         return saved ? JSON.parse(saved) : [];
     });
@@ -888,24 +856,6 @@ const ActiveOrdersPage = () => {
         setCurrentImageIndex((prev) => (prev - 1 + currentImages.length) % currentImages.length);
     };
 
-    const makeRemovedOrderKey = (orderId, view = activeView) => {
-        return `${user.id}_${view}_${orderId}`;
-    };
-
-    const handleRemoveOrder = (orderId) => {
-        const key = makeRemovedOrderKey(orderId);
-
-        setRemovedOrders((prev) => {
-            const updated = prev.includes(key) ? prev : [...prev, key];
-            localStorage.setItem("removedOrders", JSON.stringify(updated));
-            return updated;
-        });
-
-        setOrders((prev) =>
-            prev.filter((o) => makeRemovedOrderKey(o.id) !== key)
-        );
-    };
-
     const handleRouteClick = async (order) => {
         try {
             await openOrderRoute(order, {
@@ -1208,14 +1158,6 @@ const ActiveOrdersPage = () => {
                 );
 
                 await fetchActiveOrders();
-
-                const creatorId =
-                    updatedOrder?.creatorId;
-
-                const executorId =
-                    updatedOrder?.executorId;
-
-
 
                 if (updatedOrder?.status === "completed") {
                     if (updatedOrder.completionAct) {

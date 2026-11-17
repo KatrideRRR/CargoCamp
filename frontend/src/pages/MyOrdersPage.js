@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useMemo } from "react";
+import React, { useState, useEffect, useContext, useMemo, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import axiosInstance from "../utils/axiosInstance";
 import { socket } from "../socketClient";
@@ -233,7 +233,7 @@ const MyOrdersPage = () => {
         }
     };
 
-    const fetchOrders = async () => {
+    const fetchOrders = useCallback(async () => {
         try {
             setLoading(true);
             setError("");
@@ -330,7 +330,12 @@ const MyOrdersPage = () => {
         } finally {
             setLoading(false);
         }
-    };
+
+    }, [
+        userId,
+        targetOrderId,
+        shouldExpandTarget,
+    ]);
 
     useEffect(() => {
         const params = new URLSearchParams(location.search);
@@ -617,7 +622,7 @@ const MyOrdersPage = () => {
             socket.off("expressOrderStatusChanged", removeAcceptedExpressFromMyOrders);
             socket.off("expressStatusChanged", removeAcceptedExpressFromMyOrders);
         };
-    }, [userId, navigate, setHasNewRequests, targetOrderId, shouldExpandTarget]);
+    }, [userId, navigate, setHasNewRequests, targetOrderId, shouldExpandTarget, fetchOrders]);
 
     const getPaymentIcon = (type) => {
         switch (type) {

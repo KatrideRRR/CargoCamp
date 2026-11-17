@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import "../styles/UserOrdersPage.css";
-import OrderServiceDetails from "../components/OrderServiceDetails";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 

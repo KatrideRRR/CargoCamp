@@ -1,4 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+
+import React, {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useCallback,
+} from "react";
 import axiosInstance from "../utils/axiosInstance";
 import { socket } from "../socketClient";
 import "../styles/AdminSupportPage.css";
@@ -60,11 +67,19 @@ const AdminSupportPage = () => {
         }
     }, []);
 
-    const draftKeyFor = (userId) =>
-        `cc:support:admin:${adminId}:${userId}:draft`;
 
-    const pendingKeyFor = (userId) =>
-        `cc:support:admin:${adminId}:${userId}:pending`;
+    const draftKeyFor = useCallback(
+        (userId) =>
+            `cc:support:admin:${adminId}:${userId}:draft`,
+        [adminId]
+    );
+
+    const pendingKeyFor = useCallback(
+        (userId) =>
+            `cc:support:admin:${adminId}:${userId}:pending`,
+        [adminId]
+    );
+
 
     selectedUserRef.current = selectedUserId;
 
@@ -72,16 +87,21 @@ const AdminSupportPage = () => {
         return chats.find((chat) => Number(chat.userId) === Number(selectedUserId));
     }, [chats, selectedUserId]);
 
-    const scrollToBottom = (smooth = true) => {
-        setTimeout(() => {
-            bottomRef.current?.scrollIntoView({
-                behavior: smooth ? "smooth" : "auto",
-                block: "end",
-            });
-        }, 50);
-    };
 
-    const fetchChats = async () => {
+    const scrollToBottom = useCallback(
+        (smooth = true) => {
+            setTimeout(() => {
+                bottomRef.current?.scrollIntoView({
+                    behavior: smooth ? "smooth" : "auto",
+                    block: "end",
+                });
+            }, 50);
+        },
+        []
+    );
+
+
+    const fetchChats = useCallback(async () => {
         try {
             setLoadingChats(true);
             setError("");
@@ -100,9 +120,9 @@ const AdminSupportPage = () => {
         } finally {
             setLoadingChats(false);
         }
-    };
+    }, []);
 
-    const fetchMessages = async (
+    const fetchMessages = useCallback(async (
         userId,
         { silent = false } = {}
     ) => {
@@ -215,11 +235,13 @@ const AdminSupportPage = () => {
                 setLoadingMessages(false);
             }
         }
-    };
+    }, [scrollToBottom]);
+
 
     useEffect(() => {
         fetchChats();
-    }, []);
+    }, [fetchChats]);
+
 
     useEffect(() => {
         setMessages([]);
@@ -251,7 +273,14 @@ const AdminSupportPage = () => {
         }
 
         fetchMessages(selectedUserId);
-    }, [selectedUserId]);
+
+    }, [
+        selectedUserId,
+        draftKeyFor,
+        pendingKeyFor,
+        fetchMessages,
+    ]);
+
 
     useEffect(() => {
         const subscribeAdminSupport = () => {
@@ -465,11 +494,15 @@ const AdminSupportPage = () => {
 
             socket.disconnect();
         };
-    }, []);
+
+    }, [fetchChats, fetchMessages]);
+
+
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages.length]);
+    }, [messages.length, scrollToBottom]);
+
 
     const sendMessage = async () => {
         const text = newMessage.trim();

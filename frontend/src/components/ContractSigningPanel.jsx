@@ -26,10 +26,6 @@ export default function ContractSigningPanel({
         assignment.type ===
         "verified_completion_act";
 
-    const documentTitle = isAct
-        ? "акта"
-        : "договора";
-
     const base =
         `/contracts/signing/${assignment.id}`;
 
