@@ -379,6 +379,30 @@ async function fillExpressOrder(page) {
     await page.getByPlaceholder("Комментарий к экспресс-заказу").fill("Подъехать аккуратно");
 }
 
+
+async function submitOrderAndAcceptDialog(
+    page,
+    expectedMessage
+) {
+    const [actualMessage] = await Promise.all([
+        page.waitForEvent("dialog").then(async (dialog) => {
+            const message = dialog.message();
+
+            // Подтверждаем alert сразу после появления,
+            // не дожидаясь завершения click().
+            await dialog.accept();
+
+            return message;
+        }),
+
+        page.getByRole("button", {
+            name: "Создать заказ",
+        }).click(),
+    ]);
+
+    expect(actualMessage).toBe(expectedMessage);
+}
+
 test.describe("AdminCreateOrderPage", () => {
     test("отображает страницу создания заказа для пользователя", async ({ page }) => {
         await openAdminCreateOrderPage(page);
@@ -525,17 +549,12 @@ test.describe("AdminCreateOrderPage", () => {
 
         await fillRegularOrder(page);
 
-        const dialogPromise = page.waitForEvent("dialog");
 
-        await page.getByRole("button", {
-            name: "Создать заказ",
-        }).click();
+        await submitOrderAndAcceptDialog(
+            page,
+            "Обычный заказ успешно создан"
+        );
 
-        const dialog = await dialogPromise;
-
-        expect(dialog.message()).toBe("Обычный заказ успешно создан");
-
-        await dialog.accept();
 
         await expect
             .poll(() => createdPayload, {
@@ -709,17 +728,12 @@ test.describe("AdminCreateOrderPage", () => {
 
         await fillExpressOrder(page);
 
-        const dialogPromise = page.waitForEvent("dialog");
 
-        await page.getByRole("button", {
-            name: "Создать заказ",
-        }).click();
+        await submitOrderAndAcceptDialog(
+            page,
+            "Экспресс-заказ успешно создан"
+        );
 
-        const dialog = await dialogPromise;
-
-        expect(dialog.message()).toBe("Экспресс-заказ успешно создан");
-
-        await dialog.accept();
 
         await expect
             .poll(() => createdPayload, {
@@ -772,17 +786,12 @@ test.describe("AdminCreateOrderPage", () => {
 
         await page.getByPlaceholder("Например 500").fill("900");
 
-        const dialogPromise = page.waitForEvent("dialog");
 
-        await page.getByRole("button", {
-            name: "Создать заказ",
-        }).click();
+        await submitOrderAndAcceptDialog(
+            page,
+            "Экспресс-заказ успешно создан"
+        );
 
-        const dialog = await dialogPromise;
-
-        expect(dialog.message()).toBe("Экспресс-заказ успешно создан");
-
-        await dialog.accept();
 
         await expect
             .poll(() => createdPayload, {
