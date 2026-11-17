@@ -903,15 +903,25 @@ test.describe("ActiveOrdersPage", () => {
 
         await expect(page.getByText("Вы подтвердили завершение.")).toBeVisible();
 
-        const dialogPromise = page.waitForEvent("dialog");
 
-        await page.getByRole("button", { name: /Напомнить/i }).click();
+        const [dialogMessage] = await Promise.all([
+            page.waitForEvent("dialog").then(async (dialog) => {
+                const message = dialog.message();
 
-        const dialog = await dialogPromise;
+                await dialog.accept();
 
-        expect(dialog.message()).toContain("Напоминание отправлено");
+                return message;
+            }),
 
-        await dialog.accept();
+            page.getByRole("button", {
+                name: /Напомнить/i,
+            }).click(),
+        ]);
+
+        expect(dialogMessage).toContain(
+            "Напоминание отправлено"
+        );
+
     });
 
     test(

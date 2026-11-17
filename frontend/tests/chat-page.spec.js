@@ -1875,19 +1875,23 @@ test.describe("ChatPage", () => {
             modal.getByAltText("Доказательство 1")
         ).toBeVisible();
 
-        const dialogPromise = page.waitForEvent("dialog");
 
-        await modal.locator(
-            ".chat-dispute-submit"
-        ).click();
+        const [dialogMessage] = await Promise.all([
+            page.waitForEvent("dialog").then(async (dialog) => {
+                const message = dialog.message();
 
-        const dialog = await dialogPromise;
+                await dialog.accept();
 
-        expect(dialog.message()).toContain(
+                return message;
+            }),
+
+            modal.locator(".chat-dispute-submit").click(),
+        ]);
+
+        expect(dialogMessage).toContain(
             "Спор успешно открыт"
         );
 
-        await dialog.accept();
 
         await expect.poll(
             () => submittedRequest
@@ -2294,17 +2298,23 @@ test.describe("ChatPage", () => {
             )
             .fill("Исполнитель повредил груз");
 
-        const dialogPromise = page.waitForEvent("dialog");
 
-        await modal.locator(".chat-dispute-submit").click();
+        const [dialogMessage] = await Promise.all([
+            page.waitForEvent("dialog").then(async (dialog) => {
+                const message = dialog.message();
 
-        const dialog = await dialogPromise;
+                await dialog.accept();
 
-        expect(dialog.message()).toContain(
+                return message;
+            }),
+
+            modal.locator(".chat-dispute-submit").click(),
+        ]);
+
+        expect(dialogMessage).toContain(
             "Спор успешно открыт"
         );
 
-        await dialog.accept();
 
         await expect.poll(
             () => submittedRequest
