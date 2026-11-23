@@ -1685,7 +1685,7 @@ test.describe(
         });
 
         test(
-            "гарантийная оплата недоступна до подключения",
+            "гарантия доступна для предпросмотра, но не для оплаты",
             async ({ page }) => {
                 const cash = page.locator(
                     'input[name="paymentType"][value="cash"]'
@@ -1696,14 +1696,104 @@ test.describe(
                 );
 
                 await expect(cash).toBeChecked();
-
-                await expect(guarantee).toBeDisabled();
+                await expect(guarantee).toBeEnabled();
 
                 await expect(
-                    page.getByText(
-                        "Гарантийные расчёты находятся на этапе подключения."
-                    )
+                    page.getByText("Предварительный расчёт гарантии")
+                ).toHaveCount(0);
+
+                await guarantee.check();
+
+                await expect(
+                    page.getByRole("button", {
+                        name: "Гарантийная оплата пока недоступна",
+                    })
+                ).toBeDisabled();
+
+                await cash.check();
+
+                await expect(
+                    page.getByRole("button", {
+                        name: /^Создать заказ$/,
+                    })
+                ).toBeEnabled();
+            }
+        );
+
+        test(
+            "гарантия считает общую сумму с продвижением",
+            async ({ page }) => {
+                await page.route(
+                    "**/api/payments/guarantee/quote?**",
+                    async (route) => {
+                        const url = new URL(route.request().url());
+
+                        expect(
+                            url.searchParams.get("workPriceKopecks")
+                        ).toBe("1000000");
+
+                        await route.fulfill({
+                            status: 200,
+                            json: {
+                                success: true,
+                                previewOnly: true,
+                                availableForPayment: false,
+                                quote: {
+                                    workPriceKopecks: 1000000,
+                                    feeKopecks: 72000,
+                                    buyerFeeKopecks: 21600,
+                                    executorFeeKopecks: 50400,
+                                    customerTotalKopecks: 1021600,
+                                    executorPayoutKopecks: 949600,
+                                },
+                            },
+                        });
+                    }
+                );
+
+                await page
+                    .locator('input[type="number"]')
+                    .fill("10000");
+
+                await expect(
+                    page.getByText("Предварительный расчёт гарантии")
+                ).toHaveCount(0);
+
+                await page.locator(
+                    'input[name="paymentType"][value="guarantee"]'
+                ).check();
+
+                await expect(
+                    page.getByText("Предварительный расчёт гарантии")
                 ).toBeVisible();
+
+                await expect(
+                    page.locator(".totalAmount")
+                ).toHaveText(/10\s*216\s*₽/);
+
+                const push = page
+                    .locator(".promoBox .promoOption")
+                    .filter({
+                        hasText: "Push-уведомление исполнителям",
+                    });
+
+                await push.click();
+
+                await expect(
+                    page.locator(".totalAmount")
+                ).toHaveText(/10\s*366\s*₽/);
+
+                await page.locator(
+                    'input[name="paymentType"][value="cash"]'
+                ).check();
+
+                await expect(
+                    page.getByText("Предварительный расчёт гарантии")
+                ).toHaveCount(0);
+
+                await expect(
+                    page.locator(".totalAmount")
+                ).toHaveText("150 ₽");
             }
         );
 
