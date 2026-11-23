@@ -16,6 +16,12 @@ import { Check, Paperclip, Timer, X, ChevronUp, ChevronDown } from "lucide-react
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
+function formatGuaranteeRub(kopecks) {
+    return new Intl.NumberFormat("ru-RU", {
+        maximumFractionDigits: 2,
+    }).format(kopecks / 100) + " ₽";
+}
+
 function isCoordsString(v) {
     if (!v) return false;
     return String(v).trim().startsWith("Координаты:");
@@ -233,6 +239,30 @@ function CreateOrderPage() {
         available: false,
         operational: false,
     });
+
+    const [
+        guaranteePreview,
+        setGuaranteePreview,
+    ] = useState(null);
+
+    const [
+        guaranteePreviewLoading,
+        setGuaranteePreviewLoading,
+    ] = useState(false);
+
+    const guaranteePreviewKopecks = useMemo(() => {
+        const amount = Number(formData.proposedSum);
+
+        if (
+            !Number.isFinite(amount) ||
+            amount <= 0 ||
+            amount > 300000
+        ) {
+            return null;
+        }
+
+        return Math.round(amount * 100);
+    }, [formData.proposedSum]);
 
     // address
     const [profile, setProfile] = useState(null);
@@ -700,6 +730,65 @@ function CreateOrderPage() {
         };
     }, []);
 
+    useEffect(() => {
+        if (
+            process.env.NODE_ENV !== "development" ||
+            guaranteePreviewKopecks === null
+        ) {
+            setGuaranteePreview(null);
+            setGuaranteePreviewLoading(false);
+            return;
+        }
+
+        const token = localStorage.getItem("authToken");
+
+        if (!token) {
+            setGuaranteePreview(null);
+            setGuaranteePreviewLoading(false);
+            return;
+        }
+
+        let active = true;
+
+        setGuaranteePreview(null);
+        setGuaranteePreviewLoading(true);
+
+        const timer = setTimeout(async () => {
+            try {
+                const { data } = await axios.get(
+                    `${apiUrl}/api/payments/guarantee/quote`,
+                    {
+                        params: {
+                            workPriceKopecks:
+                            guaranteePreviewKopecks,
+                        },
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
+                );
+
+                if (active && data.previewOnly === true) {
+                    setGuaranteePreview(data);
+                }
+
+            } catch {
+                if (active) {
+                    setGuaranteePreview(null);
+                }
+
+            } finally {
+                if (active) {
+                    setGuaranteePreviewLoading(false);
+                }
+            }
+        }, 350);
+
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [guaranteePreviewKopecks]);
 
     // preload location
     useEffect(() => {
@@ -2266,6 +2355,98 @@ function CreateOrderPage() {
                             )}
                         </div>
 
+                        {process.env.NODE_ENV === "development" &&
+                            guaranteePreviewKopecks !== null && (
+                                <div
+                                    className="glass field"
+                                    style={{ marginTop: 12 }}
+                                >
+                                    <strong>
+                                        Предварительный расчёт гарантии
+                                    </strong>
+
+                                    <small
+                                        style={{
+                                            display: "block",
+                                            marginTop: 8,
+                                        }}
+                                    >
+                                        Демонстрация. Банковские тарифы
+                                        пока не подтверждены.
+                                        Оплата гарантией отключена.
+                                    </small>
+
+                                    {guaranteePreviewLoading ? (
+                                        <div style={{ marginTop: 12 }}>
+                                            Рассчитываем…
+                                        </div>
+                                    ) : guaranteePreview?.quote ? (
+                                        <div
+                                            style={{
+                                                display: "grid",
+                                                gap: 8,
+                                                marginTop: 12,
+                                            }}
+                                        >
+                                            <div>
+                                                Стоимость работы:{" "}
+                                                <b>
+                                                    {formatGuaranteeRub(
+                                                        guaranteePreview.quote
+                                                            .workPriceKopecks
+                                                    )}
+                                                </b>
+                                            </div>
+
+                                            <div>
+                                                Сбор с заказчика:{" "}
+                                                <b>
+                                                    {formatGuaranteeRub(
+                                                        guaranteePreview.quote
+                                                            .buyerFeeKopecks
+                                                    )}
+                                                </b>
+                                            </div>
+
+                                            <div>
+                                                Итого заказчик оплатит:{" "}
+                                                <b>
+                                                    {formatGuaranteeRub(
+                                                        guaranteePreview.quote
+                                                            .customerTotalKopecks
+                                                    )}
+                                                </b>
+                                            </div>
+
+                                            <div>
+                                                Сбор с исполнителя:{" "}
+                                                <b>
+                                                    {formatGuaranteeRub(
+                                                        guaranteePreview.quote
+                                                            .executorFeeKopecks
+                                                    )}
+                                                </b>
+                                            </div>
+
+                                            <div>
+                                                Исполнителю к выплате:{" "}
+                                                <b>
+                                                    {formatGuaranteeRub(
+                                                        guaranteePreview.quote
+                                                            .executorPayoutKopecks
+                                                    )}
+                                                </b>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <small>
+                                            Для указанной суммы
+                                            предварительный расчёт
+                                            недоступен.
+                                        </small>
+                                    )}
+                                </div>
+                            )}
 
                         <div className="glass promoBox">
                             <PromotionOptions value={promotion} onChange={setPromotion}/>
