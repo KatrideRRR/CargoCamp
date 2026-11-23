@@ -264,6 +264,22 @@ function CreateOrderPage() {
         return Math.round(amount * 100);
     }, [formData.proposedSum]);
 
+    // Пока банк не подключён, гарантию можно
+// выбирать только для предпросмотра в разработке.
+    const guaranteeChoiceEnabled =
+        process.env.NODE_ENV === "development" ||
+        guaranteeEligibility.available === true;
+
+// Защита от отображения устаревшего расчёта,
+// если пользователь изменил сумму заказа.
+    const selectedGuaranteeQuote =
+        paymentType === "guarantee" &&
+        guaranteePreview?.previewOnly === true &&
+        guaranteePreview?.quote?.workPriceKopecks ===
+        guaranteePreviewKopecks
+            ? guaranteePreview.quote
+            : null;
+
     // address
     const [profile, setProfile] = useState(null);
     const [addressMode, setAddressMode] = useState("profile"); // profile | custom
@@ -733,6 +749,7 @@ function CreateOrderPage() {
     useEffect(() => {
         if (
             process.env.NODE_ENV !== "development" ||
+            paymentType !== "guarantee" ||
             guaranteePreviewKopecks === null
         ) {
             setGuaranteePreview(null);
@@ -788,7 +805,7 @@ function CreateOrderPage() {
             active = false;
             clearTimeout(timer);
         };
-    }, [guaranteePreviewKopecks]);
+    }, [guaranteePreviewKopecks, paymentType]);
 
     // preload location
     useEffect(() => {
@@ -1220,6 +1237,14 @@ function CreateOrderPage() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
+
+        if (paymentType === "guarantee") {
+            setError(
+                "Гарантийная оплата пока не подключена. " +
+                "Выберите обычную оплату или дождитесь подключения."
+            );
+            return;
+        }
 
         if (!formData.address?.trim()) {
             setError("Адрес обязателен");
@@ -2311,10 +2336,7 @@ function CreateOrderPage() {
                                     alignItems: "flex-start",
                                     gap: 10,
                                     marginTop: 12,
-                                    opacity:
-                                        guaranteeEligibility.available
-                                            ? 1
-                                            : 0.6,
+                                    opacity: guaranteeChoiceEnabled ? 1 : 0.6,
                                 }}
                             >
                                 <input
@@ -2322,9 +2344,7 @@ function CreateOrderPage() {
                                     name="paymentType"
                                     value="guarantee"
                                     checked={paymentType === "guarantee"}
-                                    disabled={
-                                        !guaranteeEligibility.available
-                                    }
+                                    disabled={!guaranteeChoiceEnabled}
                                     onChange={() =>
                                         setPaymentType("guarantee")
                                     }
@@ -2340,22 +2360,25 @@ function CreateOrderPage() {
         </span>
                             </label>
 
-                            {!guaranteeEligibility.verified && (
-                                <small>
-                                    Для гарантии потребуется подтверждение
-                                    личности заказчика.
-                                </small>
-                            )}
+                            {paymentType === "guarantee" &&
+                                !guaranteeEligibility.verified && (
+                                    <small>
+                                        Для гарантии потребуется подтверждение
+                                        личности заказчика.
+                                    </small>
+                                )}
 
-                            {!guaranteeEligibility.operational && (
-                                <small>
-                                    Гарантийные расчёты находятся
-                                    на этапе подключения.
-                                </small>
-                            )}
+                            {paymentType === "guarantee" &&
+                                !guaranteeEligibility.operational && (
+                                    <small>
+                                        Гарантийные расчёты находятся
+                                        на этапе подключения.
+                                    </small>
+                                )}
                         </div>
 
                         {process.env.NODE_ENV === "development" &&
+                            paymentType === "guarantee" &&
                             guaranteePreviewKopecks !== null && (
                                 <div
                                     className="glass field"
@@ -2380,7 +2403,7 @@ function CreateOrderPage() {
                                         <div style={{ marginTop: 12 }}>
                                             Рассчитываем…
                                         </div>
-                                    ) : guaranteePreview?.quote ? (
+                                    ) : selectedGuaranteeQuote ? (
                                         <div
                                             style={{
                                                 display: "grid",
@@ -2392,7 +2415,7 @@ function CreateOrderPage() {
                                                 Стоимость работы:{" "}
                                                 <b>
                                                     {formatGuaranteeRub(
-                                                        guaranteePreview.quote
+                                                        selectedGuaranteeQuote
                                                             .workPriceKopecks
                                                     )}
                                                 </b>
@@ -2402,7 +2425,7 @@ function CreateOrderPage() {
                                                 Сбор с заказчика:{" "}
                                                 <b>
                                                     {formatGuaranteeRub(
-                                                        guaranteePreview.quote
+                                                        selectedGuaranteeQuote
                                                             .buyerFeeKopecks
                                                     )}
                                                 </b>
@@ -2412,7 +2435,7 @@ function CreateOrderPage() {
                                                 Итого заказчик оплатит:{" "}
                                                 <b>
                                                     {formatGuaranteeRub(
-                                                        guaranteePreview.quote
+                                                        selectedGuaranteeQuote
                                                             .customerTotalKopecks
                                                     )}
                                                 </b>
@@ -2422,7 +2445,7 @@ function CreateOrderPage() {
                                                 Сбор с исполнителя:{" "}
                                                 <b>
                                                     {formatGuaranteeRub(
-                                                        guaranteePreview.quote
+                                                        selectedGuaranteeQuote
                                                             .executorFeeKopecks
                                                     )}
                                                 </b>
@@ -2432,7 +2455,7 @@ function CreateOrderPage() {
                                                 Исполнителю к выплате:{" "}
                                                 <b>
                                                     {formatGuaranteeRub(
-                                                        guaranteePreview.quote
+                                                        selectedGuaranteeQuote
                                                             .executorPayoutKopecks
                                                     )}
                                                 </b>
@@ -2452,25 +2475,55 @@ function CreateOrderPage() {
                             <PromotionOptions value={promotion} onChange={setPromotion}/>
                         </div>
 
-                        {promotionTotal > 0 && (
+                        {(promotionTotal > 0 || paymentType === "guarantee") && (
                             <div className="glass field" style={{marginTop: 10}}>
                                 <PaymentProviderSelect
                                     selectedProvider={selectedProvider}
                                     onSelect={setSelectedProvider}
                                     disabled={isSubmitting}
+                                    title={
+                                        paymentType === "guarantee"
+                                            ? "Провайдер гарантийной оплаты (предпросмотр)"
+                                            : "Способ оплаты продвижения"
+                                    }
                                 />
                             </div>
                         )}
 
                         <div className="glass total">
                             <div>
-                                <div className="totalTitle">К оплате сейчас</div>
-                                <div className="totalSub">Оплачивается только продвижение</div>
+                                <div className="totalTitle">
+                                    {paymentType === "guarantee"
+                                        ? "К оплате по гарантии"
+                                        : "К оплате сейчас"}
+                                </div>
+
+                                <div className="totalSub">
+                                    {paymentType === "guarantee"
+                                        ? "Работа + доля сбора заказчика + продвижение"
+                                        : "Только продвижение. За работу — напрямую исполнителю."}
+                                </div>
                             </div>
-                            <div className="totalAmount">{promotionTotal} ₽</div>
+
+                            <div className="totalAmount">
+                                {paymentType === "guarantee"
+                                    ? selectedGuaranteeQuote
+                                        ? formatGuaranteeRub(
+                                            selectedGuaranteeQuote.customerTotalKopecks +
+                                            promotionTotal * 100
+                                        )
+                                        : "—"
+                                    : `${promotionTotal} ₽`}
+                            </div>
                         </div>
 
-                        <div className="muted"> Если продвижение не выбрано — оплата сейчас = 0 ₽.</div>
+                        <div className="muted">
+                            {paymentType === "guarantee"
+                                ? "Предварительный расчёт. Гарантийная оплата пока не подключена — списания не выполняются."
+                                : promotionTotal > 0
+                                    ? "Сейчас оплачивается только выбранное продвижение."
+                                    : "При создании заказа ничего оплачивать не нужно."}
+                        </div>
                     </div>
 
                     {/* actions */}
@@ -2479,9 +2532,20 @@ function CreateOrderPage() {
                             Назад
                         </button>
 
-                        <button type="submit" disabled={isSubmitting} className="action-btn primary"
-                                onClick={handleSubmit}>
-                            {isSubmitting ? "Создание…" : "Создать заказ"}
+                        <button
+                            type="submit"
+                            disabled={
+                                isSubmitting ||
+                                paymentType === "guarantee"
+                            }
+                            className="action-btn primary"
+                            onClick={handleSubmit}
+                        >
+                            {paymentType === "guarantee"
+                                ? "Гарантийная оплата пока недоступна"
+                                : isSubmitting
+                                    ? "Создание…"
+                                    : "Создать заказ"}
                         </button>
                     </div>
                 </div>
