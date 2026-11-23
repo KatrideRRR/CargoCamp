@@ -587,15 +587,49 @@ test.describe("OrderPage — обычный заказ", () => {
         });
     });
 
-    test("если нет токена, при запросе выполнения уводит на login", async ({ page }) => {
-        await page.evaluate(() => {
-            localStorage.removeItem("authToken");
-        });
+    test(
+        "если нет токена, при запросе выполнения уводит на login",
+        async ({ page }) => {
+            // В тестах не обращаемся к настоящему
+            // backend для обновления сессии.
+            await page.route(
+                "**/api/auth/session/refresh",
+                async (route) => {
+                    await route.fulfill({
+                        status: 401,
+                        contentType: "application/json",
+                        body: JSON.stringify({
+                            message: "Тест: сессия отсутствует",
+                        }),
+                    });
+                }
+            );
 
-        await page.getByRole("button", { name: "Запросить выполнение" }).click();
+            const requestButton = page.getByRole(
+                "button",
+                {
+                    name: "Запросить выполнение",
+                    exact: true,
+                }
+            );
 
-        await expect(page).toHaveURL(/\/login/);
-    });
+            // Сначала убеждаемся, что кнопка существует.
+            await expect(requestButton).toBeVisible();
+
+            // Удаляем JWT и нажимаем кнопку синхронно,
+            // чтобы фоновое обновление авторизации
+            // не убрало кнопку между действиями.
+            await requestButton.evaluate((button) => {
+                localStorage.removeItem("authToken");
+                button.click();
+            });
+
+            // Без токена должен открыться вход.
+            await expect(page).toHaveURL(
+                /\/login(?:[/?#]|$)/
+            );
+        }
+    );
 
     test("открывает модалку изображения и переключает фото", async ({ page }) => {
         await page.locator(".thumbs img").first().click();
@@ -812,15 +846,49 @@ test.describe("OrderPage — экспресс-заказ", () => {
         await expect(page).not.toHaveURL(/\/active-orders/);
     });
 
-    test("если нет токена, при принятии экспресс-заказа уводит на login", async ({ page }) => {
-        await page.evaluate(() => {
-            localStorage.removeItem("authToken");
-        });
+    test(
+        "если нет токена, при принятии экспресс-заказа уводит на login",
+        async ({ page }) => {
+            // Изолируем возможное обновление сессии.
+            // Никаких запросов к реальному backend.
+            await page.route(
+                "**/api/auth/session/refresh",
+                async (route) => {
+                    await route.fulfill({
+                        status: 401,
+                        contentType: "application/json",
+                        body: JSON.stringify({
+                            message: "Тест: сессия отсутствует",
+                        }),
+                    });
+                }
+            );
 
-        await page.getByRole("button", { name: "Принять" }).click();
+            const acceptButton = page.getByRole(
+                "button",
+                {
+                    name: "Принять",
+                    exact: true,
+                }
+            );
 
-        await expect(page).toHaveURL(/\/login/);
-    });
+            // Сначала убеждаемся, что кнопка есть.
+            await expect(acceptButton).toBeVisible();
+
+            // Удаление токена и нажатие выполняем
+            // в одном синхронном действии браузера.
+            // Фоновые запросы не успеют вмешаться
+            // между двумя операциями.
+            await acceptButton.evaluate((button) => {
+                localStorage.removeItem("authToken");
+                button.click();
+            });
+
+            await expect(page).toHaveURL(
+                /\/login(?:[/?#]|$)/
+            );
+        }
+    );
 
     test("для своего экспресс-заказа показывает кнопку Мои активные", async ({ page }) => {
         await openExpressOrderPage(page, {
