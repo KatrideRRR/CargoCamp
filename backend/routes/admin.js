@@ -3,6 +3,7 @@ const { authMiddleware, adminMiddleware } = require('../middlewares/adminAuth');
 const jwt = require('jsonwebtoken');
 const NodeGeocoder = require("node-geocoder");
 const { Op } = require("sequelize");
+const { isLaunchPaymentTypeAllowed } = require("../utils/launchPaymentPolicy");
 const { notifyUser } = require("../services/notificationService");
 const { User, Message, Order, ExpressOrder, Category, Subcategory, Dispute, ActionLog, sequelize, Service,} = require("../models");
 const bcrypt = require("bcrypt");
@@ -405,6 +406,15 @@ router.post("/create-order", authMiddleware, adminMiddleware, async (req, res) =
                     success: false,
                     message:
                         "Некорректный paymentType",
+                });
+            }
+
+            if (!isLaunchPaymentTypeAllowed(paymentType)) {
+                await transaction.rollback();
+                return res.status(503).json({
+                    success: false,
+                    code: "PAYMENT_METHOD_UNAVAILABLE",
+                    message: "Сейчас доступна только прямая оплата исполнителю.",
                 });
             }
 
@@ -899,6 +909,15 @@ router.post("/create-express-order", authMiddleware, adminMiddleware, async (req
             return res.status(400).json({
                 success: false,
                 message: "paymentType должен быть cash|guarantee",
+            });
+        }
+
+        if (!isLaunchPaymentTypeAllowed(normalizedPaymentType)) {
+            await t.rollback();
+            return res.status(503).json({
+                success: false,
+                code: "PAYMENT_METHOD_UNAVAILABLE",
+                message: "Экспресс-заказы доступны только с прямой оплатой.",
             });
         }
 
