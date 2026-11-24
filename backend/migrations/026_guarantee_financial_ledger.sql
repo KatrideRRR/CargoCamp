@@ -56,8 +56,10 @@ CREATE TABLE guarantee_financial_snapshots (
 
                                                CONSTRAINT chk_guarantee_executor_payout
                                                    CHECK (
-                                                       executor_payout_kopecks =
-                                                       work_price_kopecks - executor_fee_kopecks
+                                                       executor_payout_kopecks +
+                                                       executor_fee_kopecks =
+                                                       work_price_kopecks
+                                                           AND executor_payout_kopecks > 0
                                                        )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
