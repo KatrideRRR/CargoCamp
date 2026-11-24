@@ -86,7 +86,7 @@ test.describe("ServiceInfoPage", () => {
         await expect(
             page.locator(".info-subtitle")
         ).toContainText(
-            "Для конкретного заказа доступны способы оплаты"
+            "На старте оплата работ по заказам"
         );
     });
 
@@ -116,11 +116,11 @@ test.describe("ServiceInfoPage", () => {
         });
 
         await expect(section).toContainText(
-            "При прямом расчёте заказчик оплачивает работу исполнителю"
+            "Оплата самой работы производится напрямую исполнителю"
         );
 
         await expect(section).toContainText(
-            "После подключения соответствующей платёжной схемы"
+            "только отдельные собственные услуги CargoCamp"
         );
 
         await expect(section).toContainText(
@@ -136,15 +136,15 @@ test.describe("ServiceInfoPage", () => {
         await expect(section.locator("li")).toHaveCount(4);
 
         await expect(section).toContainText(
-            "Пользователь выбирает способ расчёта"
+            "Оплата работы производится заказчиком"
         );
 
         await expect(section).toContainText(
-            "До подтверждения платежа отображаются стоимость"
+            "Стоимость работы согласовывается участниками"
         );
 
         await expect(section).toContainText(
-            "средства могут резервироваться или списываться"
+            "Онлайн-платежи в CargoCamp предназначены"
         );
 
         await expect(section).toContainText(
@@ -158,11 +158,11 @@ test.describe("ServiceInfoPage", () => {
         });
 
         await expect(section).toContainText(
-            "При подключении мультирасчётов будет доступна также оплата услуг исполнителей"
+            "По заказам оплата работы производится напрямую исполнителю"
         );
 
         await expect(section).toContainText(
-            "Способ расчёта, стоимость заказа, комиссия и итоговая сумма"
+            "Стоимость платной услуги платформы и итоговая сумма"
         );
     });
 
@@ -233,16 +233,12 @@ test.describe("ServiceInfoPage", () => {
         await expect(tariff).toContainText("задолженность в 200 ₽");
     });
 
-    test("показывает сервисный сбор безопасной сделки", async ({ page }) => {
+    test("не показывает тариф отключённой гарантии", async ({ page }) => {
         const tariff = page.locator(".tariff-item").filter({
             hasText: "Сервисный сбор при безопасной сделке",
         });
 
-        await expect(tariff.locator(".tariff-price")).toHaveText("10% от суммы заказа");
-
-        await expect(tariff).toContainText(
-            "организацию безопасного удержания и перевода"
-        );
+        await expect(tariff).toHaveCount(0);
     });
 
     test("показывает погашение задолженности", async ({ page }) => {

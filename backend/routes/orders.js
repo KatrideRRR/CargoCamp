@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require("uuid");
 const express = require('express');
 const router = express.Router();
+const { isLaunchPaymentTypeAllowed } = require("../utils/launchPaymentPolicy");
 const NodeGeocoder = require('node-geocoder');
 const db = require('../models');
 const { notifyUser, notifyMany } = require("../services/notificationService");
@@ -1269,6 +1270,15 @@ module.exports = (io) => {
             const allowedPaymentTypes = new Set(["cash", "guarantee", "installment"]);
             if (!allowedPaymentTypes.has(paymentType)) {
                 return res.status(400).json({ message: "Некорректный paymentType" });
+            }
+
+
+            if (!isLaunchPaymentTypeAllowed(paymentType)) {
+                return res.status(503).json({
+                    success: false,
+                    code: "PAYMENT_METHOD_UNAVAILABLE",
+                    message: "Сейчас доступна только оплата работы напрямую исполнителю.",
+                });
             }
 
             if (paymentType === "guarantee") {

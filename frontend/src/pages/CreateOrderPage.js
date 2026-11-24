@@ -14,6 +14,7 @@ import DynamicServiceFields, {isDynamicFieldVisible} from "../components/Dynamic
 import {calculateRecommendedPrice} from "../utils/calculateRecommendedPrice";
 import { Check, Paperclip, Timer, X, ChevronUp, ChevronDown } from "lucide-react";
 
+const CASH_ONLY_RELEASE = true;
 const apiUrl = process.env.REACT_APP_API_URL;
 
 function formatGuaranteeRub(kopecks) {
@@ -739,7 +740,7 @@ function CreateOrderPage() {
             }
         };
 
-        checkGuarantee();
+        if (!CASH_ONLY_RELEASE) checkGuarantee();
 
         return () => {
             cancelled = true;
@@ -2330,6 +2331,8 @@ function CreateOrderPage() {
         </span>
                             </label>
 
+                            {!CASH_ONLY_RELEASE && (
+                                <>
                             <label
                                 style={{
                                     display: "flex",
@@ -2375,9 +2378,12 @@ function CreateOrderPage() {
                                         на этапе подключения.
                                     </small>
                                 )}
+                                </>
+                            )}
                         </div>
 
-                        {process.env.NODE_ENV === "development" &&
+                        {!CASH_ONLY_RELEASE &&
+                            process.env.NODE_ENV === "development" &&
                             paymentType === "guarantee" &&
                             guaranteePreviewKopecks !== null && (
                                 <div

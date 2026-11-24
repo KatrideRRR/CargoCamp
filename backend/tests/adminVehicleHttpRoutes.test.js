@@ -167,6 +167,9 @@ async function createTestServer({
         {
             express,
 
+            "../utils/launchPaymentPolicy":
+                require("../utils/launchPaymentPolicy"),
+
             "../middlewares/adminAuth": {
                 authMiddleware,
                 adminMiddleware,

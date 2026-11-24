@@ -168,6 +168,9 @@ async function createHarness() {
         {
             express,
 
+            "../utils/launchPaymentPolicy":
+                require("../utils/launchPaymentPolicy"),
+
             "../middlewares/adminAuth": {
                 authMiddleware: (req, res, next) =>
                     res.sendStatus(401),
