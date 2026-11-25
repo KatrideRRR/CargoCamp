@@ -151,6 +151,7 @@ async function markChatMessagesRead({
         attributes: [
             "id",
             "readAt",
+            "createdAt",
         ],
     });
 
@@ -240,9 +241,25 @@ async function markChatMessagesRead({
 
                     type: "new_message",
 
-                    messageId: {
-                        [Op.lte]: messageId,
-                    },
+                    [Op.or]: [
+                        {
+                            messageId: {
+                                [Op.lte]: messageId,
+                            },
+                        },
+                        ...(target.createdAt
+                            ? [
+                                {
+                                    messageId: {
+                                        [Op.is]: null,
+                                    },
+                                    createdAt: {
+                                        [Op.lte]: target.createdAt,
+                                    },
+                                },
+                            ]
+                            : []),
+                    ],
 
                     isRead: false,
                 },
@@ -257,6 +274,8 @@ async function markChatMessagesRead({
             "Не удалось обновить уведомления чата:",
             error
         );
+
+        throw error;
     }
 
     return result;

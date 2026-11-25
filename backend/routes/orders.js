@@ -1796,6 +1796,48 @@ module.exports = (io) => {
         }
     });
 
+    router.post(
+        "/notifications/read-requests",
+        authenticateToken,
+        async (req, res) => {
+            try {
+                const userId = Number(req.user.id);
+
+                const [updatedCount] =
+                    await db.Notification.update(
+                        {
+                            isRead: true,
+                        },
+                        {
+                            where: {
+                                userId,
+                                type: "order_request",
+                                isRead: false,
+                            },
+                        }
+                    );
+
+                await sendNotifications(userId);
+
+                return res.json({
+                    success: true,
+                    updatedCount,
+                });
+            } catch (error) {
+                console.error(
+                    "Ошибка отметки просмотра откликов:",
+                    error
+                );
+
+                return res.status(500).json({
+                    success: false,
+                    message:
+                        "Не удалось обновить уведомления",
+                });
+            }
+        }
+    );
+
     router.get("/all", async (req, res) => {
         try {
             const {
@@ -2362,7 +2404,7 @@ module.exports = (io) => {
 
                     await notifyUser({
                         userId: otherUserId,
-                        type: "order_request",
+                        type: "reservation_cancelled",
                         title: "Бронирование отменено",
                         body: `Предварительное бронирование заказа №${result.id} отменено.`,
                         orderId: result.id,
