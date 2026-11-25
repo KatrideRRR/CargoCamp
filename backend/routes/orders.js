@@ -4,7 +4,7 @@ const router = express.Router();
 const { isLaunchPaymentTypeAllowed } = require("../utils/launchPaymentPolicy");
 const NodeGeocoder = require('node-geocoder');
 const db = require('../models');
-const { notifyUser, notifyMany } = require("../services/notificationService");
+const { notifyUser } = require("../services/notificationService");
 const {
     reserveRegularOrder,
     cancelRegularReservation,
@@ -15,6 +15,10 @@ const { Op } = require('sequelize');
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
+const {
+    canPublishOrder,
+    notifyAdminsAboutNewOrder,
+} = require("../services/orderPublicationService");
 const {
     Order,
     User,
@@ -407,207 +411,6 @@ function calculateStraightDistanceKm(startLat, startLng, endLat, endLng) {
     );
 }
 
-const notifyAdminsAboutNewOrder = async ({order, category, subcategory, creatorId,}) => {
-    try {
-        if (!order?.id) {
-            return;
-        }
-
-        /*
-         * Никаких фильтров по:
-         * - координатам;
-         * - радиусу;
-         * - категории администратора;
-         * - подкатегории;
-         * - выбранному платному продвижению.
-         */
-        const admins = await User.findAll({
-            where: {
-                role: "admin",
-            },
-            attributes: [
-                "id",
-            ],
-        });
-
-        const adminIds = admins
-            .map((admin) => Number(admin.id))
-            .filter(
-                (id) =>
-                    Number.isInteger(id) &&
-                    id > 0
-            );
-
-        if (adminIds.length === 0) {
-            console.warn(
-                `Администраторы не найдены. Push по заказу №${order.id} не отправлен.`
-            );
-
-            return;
-        }
-
-        const categoryName =
-            category?.name ||
-            "Без категории";
-
-        const subcategoryName =
-            subcategory?.name ||
-            null;
-
-        const serviceName =
-            subcategoryName
-                ? `${categoryName} • ${subcategoryName}`
-                : categoryName;
-
-        const amount =
-            Number(order.proposedSum || 0);
-
-        const formattedAmount =
-            amount.toLocaleString(
-                "ru-RU"
-            );
-
-        const title =
-            `Новый заказ №${order.id}`;
-
-        const bodyParts = [
-            serviceName,
-            formattedAmount
-                ? `${formattedAmount} ₽`
-                : null,
-            order.address || null,
-        ].filter(Boolean);
-
-        const body =
-            bodyParts.join(" • ");
-
-        /*
-         * Если notifyMany у тебя умеет принимать
-         * массив userId, это наиболее удобный вариант.
-         */
-        await notifyMany(adminIds, {
-            type: "admin_new_order",
-
-            title,
-
-            body,
-
-            orderId: order.id,
-
-            orderType: "regular",
-
-            data: {
-                orderId:
-                order.id,
-
-                orderType:
-                    "regular",
-
-                creatorId:
-                    creatorId ||
-                    order.creatorId,
-
-                categoryId:
-                order.categoryId,
-
-                categoryName,
-
-                subcategoryId:
-                    order.subcategoryId ||
-                    null,
-
-                subcategoryName,
-
-                proposedSum:
-                amount,
-
-                address:
-                order.address,
-
-                coordinates:
-                order.coordinates,
-
-                status:
-                order.status,
-
-                isAsap:
-                    !!order.isAsap,
-
-                workTime:
-                    order.workTime ||
-                    null,
-
-                /*
-                 * Администратор получает уведомление
-                 * независимо от покупки push.
-                 */
-                adminUnfiltered:
-                    true,
-
-                paidPromotionPush:
-                    Boolean(
-                        order
-                            ?.promotionRequested
-                            ?.push
-                    ),
-            },
-
-            socketEvent:
-                "adminNewOrder",
-
-            socketPayload: {
-                orderId:
-                order.id,
-
-                orderType:
-                    "regular",
-
-                creatorId:
-                    creatorId ||
-                    order.creatorId,
-
-                categoryId:
-                order.categoryId,
-
-                categoryName,
-
-                subcategoryId:
-                    order.subcategoryId ||
-                    null,
-
-                subcategoryName,
-
-                proposedSum:
-                amount,
-
-                address:
-                order.address,
-
-                coordinates:
-                order.coordinates,
-
-                status:
-                order.status,
-
-                adminUnfiltered:
-                    true,
-
-                message:
-                    `Создан новый заказ №${order.id}`,
-            },
-        });
-    } catch (error) {
-        /*
-         * Ошибка административного push не должна
-         * отменять уже успешно созданный заказ.
-         */
-        console.error(
-            "Ошибка уведомления администраторов о новом заказе:",
-            error
-        );
-    }
-};
-
 module.exports = (io) => {
 
     router.get("/admin/:id", authenticateToken, async (req, res) => {
@@ -749,41 +552,139 @@ module.exports = (io) => {
             }
         });
 
-    router.post('/:id/restore', authenticateToken, async (req, res) => {
-        const { id } = req.params;
+    router.post(
+        "/:id/restore",
+        authenticateToken,
+        async (req, res) => {
+            const orderId = Number(req.params.id);
+            const userId = Number(req.user.id);
 
-        try {
-            const order = await Order.findByPk(id);
-            if (!order || order.status !== 'expired') {
-                return res.status(404).json({ success: false, error: 'Заказ не найден или не может быть восстановлен' });
+            if (
+                !Number.isSafeInteger(orderId) ||
+                orderId <= 0
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Некорректный ID заказа",
+                });
             }
 
-            order.status = 'pending';
-            order.createdAt = new Date();
+            try {
+                const order = await Order.findByPk(
+                    orderId
+                );
 
-            await Order.update(
-                { status: 'pending', createdAt: new Date(), updatedAt: new Date() },
-                { where: { id } }
-            );
+                if (!order) {
+                    return res.status(404).json({
+                        success: false,
+                        error: "Заказ не найден",
+                    });
+                }
 
-            await logAction({
-                req,
-                actorUserId: req.user?.id || null,
-                actorRole: "user",
-                actionType: "order_restore",
-                entityType: "order",
-                entityId: Number(id),
-                orderId: Number(id),
-                meta: { newStatus: "pending" },
-            });
+                if (
+                    Number(order.creatorId) !== userId
+                ) {
+                    return res.status(403).json({
+                        success: false,
+                        error: "Нет доступа к заказу",
+                    });
+                }
 
-            res.json({ success: true, message: 'Заказ восстановлен' });
+                if (
+                    order.status !== "expired" ||
+                    order.creatorHidden ||
+                    order.adminDeleted
+                ) {
+                    return res.status(409).json({
+                        success: false,
+                        error:
+                            "Заказ не может быть восстановлен",
+                    });
+                }
 
-        } catch (error) {
-            console.error("Ошибка при восстановлении заказа:", error);
-            res.status(500).json({ success: false, error: 'Ошибка сервера' });
+                if (order.paymentType === "guarantee") {
+                    return res.status(409).json({
+                        success: false,
+                        error:
+                            "Восстановление гарантийного заказа пока недоступно",
+                    });
+                }
+
+                const requiresPromotionPayment =
+                    Number(order.promotionCost || 0) > 0 &&
+                    !order.promotionPaidAt;
+
+                const nextStatus =
+                    requiresPromotionPayment
+                        ? "pending_payment"
+                        : "pending";
+
+                const now = new Date();
+
+                const [updatedCount] = await Order.update(
+                    {
+                        status: nextStatus,
+                        createdAt: now,
+                        updatedAt: now,
+                    },
+                    {
+                        where: {
+                            id: orderId,
+                            creatorId: userId,
+                            status: "expired",
+                            creatorHidden: false,
+                            adminDeleted: false,
+                        },
+                    }
+                );
+
+                if (updatedCount !== 1) {
+                    return res.status(409).json({
+                        success: false,
+                        error:
+                            "Состояние заказа изменилось. Обновите страницу.",
+                    });
+                }
+
+                await req.logAction?.({
+                    req,
+                    actorUserId: userId,
+                    actorRole: "user",
+                    actionType: "order_restore",
+                    entityType: "order",
+                    entityId: orderId,
+                    orderId,
+                    meta: {
+                        newStatus: nextStatus,
+                        requiresPromotionPayment,
+                    },
+                });
+
+                if (nextStatus === "pending") {
+                    io.emit("orderUpdated");
+                }
+
+                return res.json({
+                    success: true,
+                    status: nextStatus,
+                    requiresPromotionPayment,
+                    message: requiresPromotionPayment
+                        ? "Заказ восстановлен и ожидает оплаты продвижения"
+                        : "Заказ восстановлен",
+                });
+            } catch (error) {
+                console.error(
+                    "Ошибка при восстановлении заказа:",
+                    error
+                );
+
+                return res.status(500).json({
+                    success: false,
+                    error: "Ошибка сервера",
+                });
+            }
         }
-    });
+    );
 
     router.post("/", authenticateToken, upload.array("images", 5), async (req, res) => {
         try {
@@ -1663,15 +1564,16 @@ module.exports = (io) => {
                 },
             });
 
-            await notifyAdminsAboutNewOrder({
-                order: newOrder,
-                category: selectedCategory,
-                subcategory:
-                selectedSubcategory,
-                creatorId: userId,
-            });
+            if (canPublishOrder(newOrder)) {
+                await notifyAdminsAboutNewOrder({
+                    order: newOrder,
+                    category: selectedCategory,
+                    subcategory: selectedSubcategory,
+                    creatorId: userId,
+                });
 
-            io.emit("orderUpdated");
+                io.emit("orderUpdated");
+            }
             return res.status(201).json({
                 ...newOrder.toJSON(),
 
@@ -3136,7 +3038,7 @@ module.exports = (io) => {
         }
     });
 
-    router.get("/creator/:userId", async (req, res) => {
+    router.get("/creator/:userId", authenticateToken, async (req, res) => {
         const creatorId = Number(req.params.userId);
 
         if (
@@ -3148,16 +3050,18 @@ module.exports = (io) => {
             });
         }
 
+        const isOwner =
+            Number(req.user.id) === creatorId;
+
         try {
             const orders = await Order.findAll({
                 where: {
                     creatorId,
 
                     status: {
-                        [Op.in]: [
-                            "pending",
-                            "pending_payment",
-                        ],
+                        [Op.in]: isOwner
+                            ? ["pending", "pending_payment"]
+                            : ["pending"],
                     },
 
                     creatorHidden: false,

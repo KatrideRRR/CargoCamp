@@ -10,7 +10,9 @@ const authenticateToken = require('../middlewares/userAuth'); // если нуж
 const { randomUUID } = require('crypto');
 const yooKassa = require('../config/yookassaClient');
 const { sendOrderPush } = require("../utils/orderPushService");
-
+const {
+    publishPaidOrder,
+} = require("../services/orderPublicationService");
 const {
     sendAdminNotification,
     adminUsersUrl,
@@ -836,8 +838,11 @@ router.post('/order/promotion/create', authenticateToken, async (req, res) => {
                 });
 
                 if (!result.duplicate) {
-                    req.app.locals.io?.emit("orderUpdated");
-
+                    await publishPaidOrder({
+                        db,
+                        io: req.app.locals.io,
+                        orderId: order.id,
+                    });
                     void sendBusinessCashPayment({
                         provider: "yookassa",
                         paymentId: payment.id,
@@ -1761,7 +1766,11 @@ router.post("/yookassa/webhook", async (req, res) => {
                 return res.sendStatus(200);
             }
 
-            io?.emit("orderUpdated");
+            await publishPaidOrder({
+                db,
+                io,
+                orderId,
+            });
 
             void sendBusinessCashPayment({
                 provider: "yookassa",
@@ -2007,14 +2016,11 @@ router.get(
             if (result.newlyApplied) {
                 const io = req.app.locals.io;
 
-                try {
-                    io?.emit("orderUpdated");
-                } catch (error) {
-                    console.error(
-                        "Promotion socket error:",
-                        error
-                    );
-                }
+                await publishPaidOrder({
+                    db,
+                    io,
+                    orderId,
+                });
 
                 void sendBusinessCashPayment({
                     provider: result.provider,

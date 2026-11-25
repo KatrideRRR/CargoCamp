@@ -11,7 +11,9 @@ const {
     processTBankCardNotification,
 } = require("../services/tbankCardBindingService");
 const { sendOrderPush } = require("../utils/orderPushService");
-
+const {
+    publishPaidOrder,
+} = require("../services/orderPublicationService");
 const {
     sendAdminNotification,
     adminUsersUrl,
@@ -832,7 +834,11 @@ router.post("/webhook", async (req, res) => {
                 return res.status(200).send("OK");
             }
 
-            io?.emit("orderUpdated");
+            await publishPaidOrder({
+                db,
+                io,
+                orderId,
+            });
 
             void sendBusinessCashPayment({
                 provider: "tbank",

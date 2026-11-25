@@ -181,6 +181,42 @@ const MyOrdersPage = () => {
     const [paymentProfile, setPaymentProfile] = useState(null);
     const [promotionNotice, setPromotionNotice] = useState("");
 
+    useEffect(() => {
+        const params = new URLSearchParams(
+            window.location.search
+        );
+
+        const result = params.get(
+            "promotionResult"
+        );
+
+        if (!result) return;
+
+        if (result === "failed") {
+            setPromotionNotice(
+                "Заказ сохранён, но продвижение не оплачено. Повторите оплату. До её подтверждения заказ не виден исполнителям."
+            );
+        } else if (result === "processing") {
+            setPromotionNotice(
+                "Заказ сохранён. Платёж обрабатывается. Заказ будет опубликован после подтверждения оплаты."
+            );
+        } else if (result === "pending") {
+            setPromotionNotice(
+                "Заказ сохранён и ожидает оплаты продвижения. Вы можете продолжить оплату."
+            );
+        }
+
+        params.delete("promotionResult");
+
+        const query = params.toString();
+
+        window.history.replaceState(
+            window.history.state,
+            "",
+            `${window.location.pathname}${query ? `?${query}` : ""}`
+        );
+    }, []);
+
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [currentImages, setCurrentImages] = useState([]);
