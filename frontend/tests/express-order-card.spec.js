@@ -1252,29 +1252,110 @@ test.describe("ExpressOrderCard — дополнительные сценари�
     );
 
     test(
-        "исполнителю отображается только один активный экспресс-заказ",
+        "исполнитель видит текущий и следующий забронированный экспресс-заказ",
         async ({ page }) => {
             await openActiveOrdersPage(page, {
                 expressOrders: [
-                    baseTaxiOrder,
                     {
                         ...baseCourierOrder,
-                        status: "accepted",
+
+                        status: "reserved",
+
+                        reservationSourceOrderId: 201,
+
+                        reservationApprovedAt:
+                            new Date().toISOString(),
+                    },
+
+                    {
+                        ...baseTaxiOrder,
+
+                        status: "in_progress",
                     },
                 ],
             });
 
+            const currentOrder =
+                expressCard(
+                    page,
+                    "Экспресс №201"
+                );
+
+            const reservedOrder =
+                page.locator(
+                    ".express-reserved-card"
+                );
+
             await expect(
-                page.locator(".order-card.express-card")
+                page.locator(
+                    ".order-card.express-card"
+                )
             ).toHaveCount(1);
 
             await expect(
-                expressCard(page, "Экспресс №201")
+                currentOrder
             ).toBeVisible();
 
             await expect(
-                expressCard(page, "Экспресс №202")
+                reservedOrder
+            ).toHaveCount(1);
+
+            await expect(
+                reservedOrder
+            ).toBeVisible();
+
+            await expect(
+                reservedOrder
+            ).toContainText(
+                "Следующий заказ"
+            );
+
+            await expect(
+                reservedOrder
+            ).toContainText(
+                "№202"
+            );
+
+            await expect(
+                reservedOrder
+            ).toContainText(
+                "Ожидает освобождения"
+            );
+
+            await expect(
+                reservedOrder.getByRole(
+                    "button",
+                    {
+                        name:
+                            "Отменить бронирование",
+
+                        exact: true,
+                    }
+                )
+            ).toBeEnabled();
+
+            await expect(
+                reservedOrder.getByRole(
+                    "button",
+                    {
+                        name:
+                            /Еду к точке|Начать|Завершить/,
+                    }
+                )
             ).toHaveCount(0);
+            const cards = page.locator(
+                ".order-card.express-card, .express-reserved-card"
+            );
+
+            await expect(cards).toHaveCount(2);
+
+            await expect(
+                cards.nth(0)
+            ).toHaveClass(/express-card/);
+
+            await expect(
+                cards.nth(1)
+            ).toHaveClass(/express-reserved-card/);
         }
     );
 });

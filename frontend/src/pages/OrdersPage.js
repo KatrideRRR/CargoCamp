@@ -27,6 +27,17 @@ import {
     orderHasSocialDiscount,
     getSocialCommissionPreview,
 } from "../utils/socialCommissionPreview";
+import ExpressNextOrderButton
+    from "../components/ExpressNextOrderButton";
+
+import ExpressPendingReservation
+    from "../components/ExpressPendingReservation";
+
+import {
+    getMyExpressReservation,
+} from "../utils/expressReservationApi";
+
+import "../styles/ExpressReservedOrderCard.css";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 const publicApi = axios.create({
@@ -230,6 +241,21 @@ const OrdersPage = () => {
     const [showLocationPicker, setShowLocationPicker] = useState(false);
 
     const [drawerOpen, setDrawerOpen] = useState(false);
+
+    const [
+        pendingExpressReservation,
+        setPendingExpressReservation,
+    ] = useState(null);
+
+    const [
+        expressReservationLoading,
+        setExpressReservationLoading,
+    ] = useState(false);
+
+    const [
+        expressReservationError,
+        setExpressReservationError,
+    ] = useState("");
 
     const [activeTab, setActiveTab] = useState("all");
     const [selectedCategory, setSelectedCategory] = useState("");
@@ -494,6 +520,91 @@ const OrdersPage = () => {
             });
         }
     }, [userId]);
+
+    const refreshExpressReservation =
+        useCallback(async () => {
+            if (!userId) {
+                setPendingExpressReservation(null);
+                return;
+            }
+
+            setExpressReservationLoading(true);
+            setExpressReservationError("");
+
+            try {
+                const request =
+                    await getMyExpressReservation();
+
+                setPendingExpressReservation(
+                    request
+                );
+            } catch {
+                setExpressReservationError(
+                    "Не удалось проверить следующее бронирование."
+                );
+            } finally {
+                setExpressReservationLoading(false);
+            }
+        }, [userId]);
+
+    useEffect(() => {
+        if (
+            !userId ||
+            busyState.loading
+        ) {
+            return;
+        }
+
+        if (!busyState.canRequestNextExpress) {
+            setPendingExpressReservation(null);
+            setExpressReservationError("");
+            return;
+        }
+
+        const refresh = () => {
+            void refreshExpressReservation();
+        };
+
+        const refreshOnChange = () => {
+            void fetchBusyState();
+            refresh();
+        };
+
+        refresh();
+
+        const interval =
+            setInterval(refresh, 15000);
+
+        socket.on(
+            "expressReservationsUpdated",
+            refreshOnChange
+        );
+
+        window.addEventListener(
+            "focus",
+            refreshOnChange
+        );
+
+        return () => {
+            clearInterval(interval);
+
+            socket.off(
+                "expressReservationsUpdated",
+                refreshOnChange
+            );
+
+            window.removeEventListener(
+                "focus",
+                refreshOnChange
+            );
+        };
+    }, [
+        userId,
+        busyState.loading,
+        busyState.canRequestNextExpress,
+        fetchBusyState,
+        refreshExpressReservation,
+    ]);
 
     const savePendingOrderRequest = ({ orderId, proposedSum, comment, availableAt }) => {
         sessionStorage.setItem(
@@ -1469,6 +1580,32 @@ const OrdersPage = () => {
                     </div>
                 )}
 
+                {pendingExpressReservation && (
+                    <ExpressPendingReservation
+                        request={pendingExpressReservation}
+                        onChanged={() => {
+                            void refreshExpressReservation();
+                            void fetchBusyState();
+                        }}
+                    />
+                )}
+
+                {expressReservationError &&
+                    busyState.canRequestNextExpress && (
+                        <div role="alert">
+                            <p>{expressReservationError}</p>
+
+                            <button
+                                type="button"
+                                onClick={
+                                    refreshExpressReservation
+                                }
+                            >
+                                Повторить
+                            </button>
+                        </div>
+                    )}
+
                 <div className="orders-list-wrap">
                     {!userLocation?.latitude || !userLocation?.longitude ? (
                         <div className="empty glass">
@@ -1518,6 +1655,10 @@ const OrdersPage = () => {
                                     !isCreator &&
                                     !order.executorId &&
                                     ["pending", "created"].includes(String(order.status || "pending"));
+
+                                const canRequestNext =
+                                    canAcceptExpress &&
+                                    busyState.canRequestNextExpress === true;
 
                                 const canTakeOrder = canRequestRegular || canAcceptExpress;
 
@@ -1727,8 +1868,10 @@ const OrdersPage = () => {
                                                     />
                                                 )}
 
-                                                {isExpress && canAcceptExpress && (
-                                                    <button
+                                                {isExpress &&
+                                                    canAcceptExpress &&
+                                                    !canRequestNext && (
+                                                        <button
                                                         className="btn btn-primary"
                                                         disabled={busyState.loading || busyState.hasAnyBusy}
                                                         title={busyState.hasAnyBusy ? busyHintText : ""}
@@ -1807,6 +1950,33 @@ const OrdersPage = () => {
                                                         {busyState.loading ? "Проверка..." : "Принять"}
                                                     </button>
                                                 )}
+
+                                                {canRequestNext && (
+                                                    <ExpressNextOrderButton
+                                                        orderId={order.expressId}
+
+                                                        sourceOrderId={
+                                                            busyState.currentExpressOrder?.id
+                                                        }
+
+                                                        disabled={
+                                                            busyState.loading ||
+                                                            expressReservationLoading ||
+                                                            Boolean(expressReservationError) ||
+                                                            Boolean(pendingExpressReservation)
+                                                        }
+
+                                                        onRequested={(request) => {
+                                                            setPendingExpressReservation(
+                                                                request
+                                                            );
+
+                                                            toast.success(
+                                                                "Предложение отправлено заказчику"
+                                                            );
+                                                        }}
+                                                    />
+                                                )}
                                             </div>
 
                                             {busyState.hasBusyRegular && canRequestRegular && (
@@ -1816,9 +1986,19 @@ const OrdersPage = () => {
                                                 </div>
                                             )}
 
-                                            {busyState.hasAnyBusy && canAcceptExpress && (
+                                            {busyState.hasAnyBusy &&
+                                                canAcceptExpress &&
+                                                !canRequestNext && (
+                                                    <div className="blocked-order-hint">
+                                                        {busyHintText}
+                                                    </div>
+                                                )}
+
+                                            {canRequestNext && (
                                                 <div className="blocked-order-hint">
-                                                    {busyHintText}
+                                                    {pendingExpressReservation
+                                                        ? "Ожидаем ответа на предыдущее предложение."
+                                                        : "Можно запросить следующий заказ в пределах 1 км от точки Б."}
                                                 </div>
                                             )}
 

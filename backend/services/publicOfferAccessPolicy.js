@@ -34,7 +34,7 @@ function requiresCurrentOffer(method, rawPath) {
     }
 
     // Принятие нового экспресс-заказа.
-    return /^\/express\/express-orders\/\d+\/accept$/.test(
+    return /^\/express\/express-orders\/\d+\/(accept|reservation\/request|reservation\/approve)$/.test(
         path
     );
 }

@@ -171,9 +171,88 @@ async function setupMyOrdersMocks(page, options = {}) {
         profileBody = user,
         regularStatus = 200,
         expressStatus = 200,
+
+        expressReservationRequests = {},
+        onExpressReservationApprove = null,
     } = options;
 
     await mockOrderAssets(page);
+
+    await page.route(
+        "**/api/orders/active-orders",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    success: true,
+                    orders: [],
+                },
+            });
+        }
+    );
+
+    await page.route(
+        "**/api/express/express-orders/me?mode=active",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    success: true,
+                    orders: [],
+                },
+            });
+        }
+    );
+
+    await page.route(
+        "**/api/express/express-orders/*/reservation/requests",
+        async (route) => {
+            if (
+                route.request().method() !== "GET"
+            ) {
+                await route.fallback();
+                return;
+            }
+
+            const match =
+                route.request().url().match(
+                    /express-orders\/(\d+)\/reservation\/requests/
+                );
+
+            const orderId = match?.[1];
+
+            await route.fulfill({
+                status: 200,
+
+                json: {
+                    success: true,
+
+                    requests:
+                        expressReservationRequests[
+                            orderId
+                            ] || [],
+                },
+            });
+        }
+    );
+
+    if (onExpressReservationApprove) {
+        await page.route(
+            "**/api/express/express-orders/*/reservation/approve",
+            async (route) => {
+                if (
+                    route.request().method() !== "POST"
+                ) {
+                    await route.fallback();
+                    return;
+                }
+
+                await onExpressReservationApprove(
+                    route
+                );
+            }
+        );
+    }
 
     await page.route("**/api/orders/me/status", async (route) => {
         await route.fulfill({
@@ -1210,3 +1289,142 @@ test.describe("MyOrdersPage — дополнительные сценарии", 
     });
 
 });
+
+test(
+    "заказчик подтверждает предложение следующего экспресс-заказа",
+    async ({ page }) => {
+        let approvalBody = null;
+
+        const createdOrders =
+            structuredClone(expressOrders);
+
+        const proposal = {
+            id: 501,
+
+            executor: {
+                id: 20,
+
+                username:
+                    "Тестовый водитель",
+
+                rating: 4.9,
+
+                vehicleBrand:
+                    "Toyota",
+
+                vehicleModel:
+                    "Camry",
+
+                vehicleColor:
+                    "Белый",
+            },
+
+            expiresAt:
+                new Date(
+                    Date.now() + 120000
+                ).toISOString(),
+        };
+
+        await openMyOrdersPage(page, {
+            express: createdOrders,
+
+            expressReservationRequests: {
+                201: [proposal],
+            },
+
+            onExpressReservationApprove:
+                async (route) => {
+                    approvalBody =
+                        route.request()
+                            .postDataJSON();
+
+                    const index =
+                        createdOrders.findIndex(
+                            (order) =>
+                                Number(order.id) === 201
+                        );
+
+                    if (index >= 0) {
+                        createdOrders[index] = {
+                            ...createdOrders[index],
+
+                            status: "reserved",
+
+                            executorId: 20,
+                        };
+                    }
+
+                    await route.fulfill({
+                        status: 200,
+
+                        json: {
+                            success: true,
+
+                            order: {
+                                id: 201,
+
+                                status: "reserved",
+
+                                executorId: 20,
+                            },
+                        },
+                    });
+                },
+        });
+
+        const card =
+            orderCard(
+                page,
+                "Экспресс №201"
+            );
+
+        const proposals =
+            card.locator(
+                ".cc-express-requests"
+            );
+
+        await expect(
+            proposals
+        ).toBeVisible();
+
+        await expect(
+            proposals
+        ).toContainText(
+            "Тестовый водитель"
+        );
+
+        await expect(
+            proposals
+        ).toContainText(
+            "Toyota Camry"
+        );
+
+        page.once(
+            "dialog",
+            (dialog) =>
+                dialog.accept()
+        );
+
+        await proposals.getByRole(
+            "button",
+            {
+                name:
+                    "Согласиться подождать",
+
+                exact: true,
+            }
+        ).click();
+
+        await expect
+            .poll(
+                () => approvalBody
+            )
+            .toEqual({
+                requestId: 501,
+            });
+
+        await expect(
+            card
+        ).toHaveCount(0);
+    }
+);
