@@ -60,6 +60,39 @@ function normalizeBoolean(value) {
     return null;
 }
 
+function parseLocationCoordinates(rawLat, rawLng) {
+    const isMissing = (value) =>
+        value === null ||
+        value === undefined ||
+        (typeof value === "string" && value.trim() === "");
+
+    if (isMissing(rawLat) || isMissing(rawLng)) {
+        return null;
+    }
+
+    if (
+        !["number", "string"].includes(typeof rawLat) ||
+        !["number", "string"].includes(typeof rawLng)
+    ) {
+        return null;
+    }
+
+    const latitude = Number(rawLat);
+    const longitude = Number(rawLng);
+
+    if (
+        !Number.isFinite(latitude) ||
+        !Number.isFinite(longitude) ||
+        Math.abs(latitude) > 90 ||
+        Math.abs(longitude) > 180 ||
+        (latitude === 0 && longitude === 0)
+    ) {
+        return null;
+    }
+
+    return { latitude, longitude };
+}
+
 function getOrderTiming(order) {
     const isAsap = normalizeBoolean(
         order?.isAsap ?? order?.is_asap
@@ -178,6 +211,8 @@ const OrdersPage = () => {
 
     const [ordersRaw, setOrdersRaw] = useState([]);
     const [expressRaw, setExpressRaw] = useState([]);
+    const ordersRequestIdRef = useRef(0);
+    const expressRequestIdRef = useRef(0);
     const [creatorsInfo, setCreatorsInfo] = useState({});
     const [categories, setCategories] = useState([]);
     const [subcategories, setSubcategories] = useState([]);
@@ -336,6 +371,8 @@ const OrdersPage = () => {
     }, [fetchProfile]);
 
     const fetchOrders = useCallback(async () => {
+        const requestId = ++ordersRequestIdRef.current;
+
         try {
             const res = await publicApi.get("/orders/all");
 
@@ -343,13 +380,32 @@ const OrdersPage = () => {
                 ? res.data
                 : Array.isArray(res.data?.orders)
                     ? res.data.orders
-                    : [];
+                    : null;
+
+            if (!orders) {
+                throw new Error("INVALID_ORDERS_RESPONSE");
+            }
+
+            if (requestId !== ordersRequestIdRef.current) {
+                return;
+            }
 
             setOrdersRaw(orders);
         } catch (error) {
-            console.error("fetchOrders error:", error);
-            setOrdersRaw([]);
-            toast.error("Не удалось загрузить заказы");
+            if (requestId !== ordersRequestIdRef.current) {
+                return;
+            }
+
+            console.error("fetchOrders error:", {
+                status: error.response?.status,
+                code: error.code,
+                message: error.message,
+            });
+
+            toast.error(
+                "Не удалось загрузить заказы. Попробуйте обновить страницу.",
+                { toastId: "orders-loading-error" }
+            );
         }
     }, []);
 
@@ -364,19 +420,37 @@ const OrdersPage = () => {
     }, [fetchOrders]);
 
     const fetchExpress = useCallback(async () => {
+        const requestId = ++expressRequestIdRef.current;
+
         try {
             const res = await publicApi.get(
                 "/express/express-orders/available"
             );
 
-            setExpressRaw(
-                Array.isArray(res.data?.orders)
-                    ? res.data.orders
-                    : []
-            );
+            if (!Array.isArray(res.data?.orders)) {
+                throw new Error("INVALID_EXPRESS_ORDERS_RESPONSE");
+            }
+
+            if (requestId !== expressRequestIdRef.current) {
+                return;
+            }
+
+            setExpressRaw(res.data.orders);
         } catch (error) {
-            console.error("fetchExpress error:", error);
-            setExpressRaw([]);
+            if (requestId !== expressRequestIdRef.current) {
+                return;
+            }
+
+            console.error("fetchExpress error:", {
+                status: error.response?.status,
+                code: error.code,
+                message: error.message,
+            });
+
+            toast.error(
+                "Не удалось загрузить экспресс-заказы.",
+                { toastId: "express-orders-loading-error" }
+            );
         }
     }, []);
 
@@ -675,12 +749,19 @@ const OrdersPage = () => {
     useEffect(() => {
         if (!profile) return;
 
-        const lat = Number(profile.locationLat);
-        const lng = Number(profile.locationLng);
-        const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+        const savedCoordinates = parseLocationCoordinates(
+            profile.locationLat,
+            profile.locationLng
+        );
 
-        if (hasCoords) {
-            setUserLocation({ latitude: lat, longitude: lng });
+        if (savedCoordinates) {
+            const {
+                latitude: lat,
+                longitude: lng,
+            } = savedCoordinates;
+
+            setUserLocation(savedCoordinates);
+            setIsGeolocationDenied(false);
 
             const addr = profile.locationAddress;
             if (addr && !looksLikeCoordsString(addr)) {
@@ -754,15 +835,25 @@ const OrdersPage = () => {
             return;
         }
 
-        const lat = Number(profile.locationLat);
-        const lng = Number(profile.locationLng);
+        const savedCoordinates = parseLocationCoordinates(
+            profile.locationLat,
+            profile.locationLng
+        );
 
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-            toast.info("В профиле нет сохранённых координат. Укажи их в Профиле → Местоположение.");
+        if (!savedCoordinates) {
+            toast.info(
+                "В профиле нет сохранённых координат. Укажите местоположение в профиле."
+            );
             return;
         }
 
-        setUserLocation({ latitude: lat, longitude: lng });
+        const {
+            latitude: lat,
+            longitude: lng,
+        } = savedCoordinates;
+
+        setUserLocation(savedCoordinates);
+        setIsGeolocationDenied(false);
 
         const addr = profile.locationAddress;
         if (addr && !looksLikeCoordsString(addr)) {

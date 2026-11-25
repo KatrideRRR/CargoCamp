@@ -58,6 +58,9 @@ const {
     buildCompletionPaymentSnapshot,
 } = require("../services/completionPaymentSnapshotService");
 const {
+    buildOrderContractDetails,
+} = require("../services/orderContractDetailsService");
+const {
     getCompletionPhase,
 } = require("../services/orderCompletionWorkflowService");
 const {
