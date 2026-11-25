@@ -78,7 +78,19 @@ const BottomMenu = () => {
                 }
 
                 const data = await res.json();
-                const debt = Number(data?.debt || 0);
+                const rawDebt = data?.debt;
+                const debt = Number(rawDebt);
+
+                if (
+                    rawDebt == null ||
+                    rawDebt === "" ||
+                    !Number.isSafeInteger(debt) ||
+                    debt < 0
+                ) {
+                    throw new Error(
+                        "Некорректная сумма задолженности"
+                    );
+                }
 
                 setDebtCount(debt > 0 ? 1 : 0);
             } catch (e) {
@@ -100,6 +112,11 @@ const BottomMenu = () => {
 
         window.addEventListener(
             "focus",
+            handleDebtRefresh
+        );
+
+        window.addEventListener(
+            "cargocamp:debt-updated",
             handleDebtRefresh
         );
 
@@ -185,23 +202,31 @@ const BottomMenu = () => {
 
         subscribe();
 
-        window.removeEventListener(
-            "focus",
-            handleDebtRefresh
-        );
-
-        document.removeEventListener(
-            "visibilitychange",
-            handleVisibility
-        );
-
-        socket.off(
-            "activeOrdersUpdated",
-            handleDebtRefresh
-        );
-
         return () => {
-            socket.off("connect", subscribe);
+            window.removeEventListener(
+                "focus",
+                handleDebtRefresh
+            );
+
+            window.removeEventListener(
+                "cargocamp:debt-updated",
+                handleDebtRefresh
+            );
+
+            document.removeEventListener(
+                "visibilitychange",
+                handleVisibility
+            );
+
+            socket.off(
+                "activeOrdersUpdated",
+                handleDebtRefresh
+            );
+
+            socket.off(
+                "connect",
+                subscribe
+            );
 
             socket.off(
                 "new_notification",
@@ -317,7 +342,13 @@ const BottomMenu = () => {
 
                 <button
                     className={`bottom-menu__item ${isActive("/profile") ? "is-active" : ""}`}
-                    onClick={() => navigate("/profile")}
+                    onClick={() =>
+                        navigate(
+                            debtCount > 0
+                                ? "/profile?section=debt"
+                                : "/profile"
+                        )
+                    }
                     type="button"
                     aria-label="Профиль"
                 >

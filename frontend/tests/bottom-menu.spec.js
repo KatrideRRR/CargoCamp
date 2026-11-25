@@ -242,6 +242,166 @@ test.describe("BottomMenu", () => {
     });
 
     test(
+        "при задолженности профиль открывается с переходом к оплате",
+        async ({ page }) => {
+            await openPageWithBottomMenu(
+                page,
+                "/?platform=web",
+                {
+                    debt: 20000,
+                }
+            );
+
+            const profileButton =
+                menuItem(
+                    page,
+                    "Профиль"
+                );
+
+            await expect(
+                profileButton.locator(
+                    ".bottom-menu__badge"
+                )
+            ).toHaveText("!");
+
+            await profileButton.click();
+
+            await expect(page).toHaveURL(
+                /\/profile\?section=debt/
+            );
+        }
+    );
+
+    test(
+        "без задолженности профиль открывается без финансового перехода",
+        async ({ page }) => {
+            await openPageWithBottomMenu(
+                page,
+                "/?platform=web",
+                {
+                    debt: 0,
+                }
+            );
+
+            const profileButton =
+                menuItem(
+                    page,
+                    "Профиль"
+                );
+
+            await expect(
+                profileButton.locator(
+                    ".bottom-menu__badge"
+                )
+            ).not.toBeVisible();
+
+            await profileButton.click();
+
+            await expect(page).toHaveURL(
+                /\/profile$/
+            );
+        }
+    );
+
+    test(
+        "бейдж задолженности обновляется после подтверждения оплаты",
+        async ({ page }) => {
+            await openPageWithBottomMenu(
+                page,
+                "/?platform=web",
+                {
+                    debt: 20000,
+                }
+            );
+
+            const badge =
+                menuItem(page, "Профиль")
+                    .locator(".bottom-menu__badge");
+
+            await expect(badge)
+                .toHaveText("!");
+
+            await page.route(
+                "**/api/orders/me/status",
+                async (route) => {
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            debt: 0,
+                        },
+                    });
+                }
+            );
+
+            await page.evaluate(() => {
+                window.dispatchEvent(
+                    new Event(
+                        "cargocamp:debt-updated"
+                    )
+                );
+            });
+
+            await expect(badge)
+                .not.toBeVisible();
+        }
+    );
+
+    test(
+        "ошибка обновления задолженности не скрывает бейдж",
+        async ({ page }) => {
+            await openPageWithBottomMenu(
+                page,
+                "/?platform=web",
+                {
+                    debt: 20000,
+                }
+            );
+
+            const badge =
+                menuItem(page, "Профиль")
+                    .locator(".bottom-menu__badge");
+
+            await expect(badge)
+                .toHaveText("!");
+
+            await page.route(
+                "**/api/orders/me/status",
+                async (route) => {
+                    await route.fulfill({
+                        status: 503,
+                        json: {
+                            message:
+                                "Сервис недоступен",
+                        },
+                    });
+                }
+            );
+
+            const failedResponse =
+                page.waitForResponse(
+                    (response) =>
+                        response.url().includes(
+                            "/api/orders/me/status"
+                        ) &&
+                        response.status() === 503
+                );
+
+            await page.evaluate(() => {
+                window.dispatchEvent(
+                    new Event(
+                        "cargocamp:debt-updated"
+                    )
+                );
+            });
+
+            await failedResponse;
+
+            await expect(badge)
+                .toHaveText("!");
+        }
+    );
+
+    test(
         "повторное уведомление о сообщении не увеличивает счётчик",
         async ({ page }) => {
             const connections =

@@ -1,7 +1,10 @@
 import { toast } from "react-toastify";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { useNavigate } from "react-router-dom";
+import {
+    useNavigate,
+    useLocation,
+} from "react-router-dom";
 import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrentLocation";
 import { useAuth } from "../utils/authContext";
 import axios from "axios";
@@ -24,6 +27,8 @@ import {
     ChevronRight,
     X,
 } from "lucide-react";
+import { App as CapacitorApp } from "@capacitor/app";
+import { openPaymentPage } from "../utils/openPaymentPage";
 
 const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -138,6 +143,8 @@ async function reverseGeocodeYandex({ lat, lng, apiKey }) {
 
 const ProfilePage = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+
     const { logout, isAuthenticated } = useAuth();
 
     const YM_KEY = process.env.REACT_APP_YANDEX_API_KEY;
@@ -171,9 +178,46 @@ const ProfilePage = () => {
     const [suggestionSending, setSuggestionSending] = useState(false);
 
     const [paymentMethodId, setPaymentMethodId] = useState(null);
+    const [cardBinding, setCardBinding] =
+        useState(false);
+    const cardBindingRef = useRef(false);
 
     const [hasDebt, setHasDebt] = useState(false);
     const [debtAmount, setDebtAmount] = useState(0);
+
+    const [debtPayLoading, setDebtPayLoading] =
+        useState(false);
+
+    const debtPayRef = useRef(false);
+    const debtSectionRef = useRef(null);
+
+    useEffect(() => {
+        const params = new URLSearchParams(
+            location.search
+        );
+
+        if (
+            params.get("section") !== "debt" ||
+            !hasDebt
+        ) {
+            return;
+        }
+
+        const frame = requestAnimationFrame(() => {
+            debtSectionRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+            });
+        });
+
+        return () => {
+            cancelAnimationFrame(frame);
+        };
+    }, [
+        location.search,
+        location.key,
+        hasDebt,
+    ]);
 
     const [locationDraft, setLocationDraft] = useState("");
     const [locLoading, setLocLoading] = useState(false);
@@ -358,21 +402,45 @@ const ProfilePage = () => {
     };
 
     const loadDebtStatus = async () => {
-        const token = localStorage.getItem("authToken");
-
-        if (!token) return;
-
         try {
-            const response = await axios.get(`${apiUrl}/api/orders/me/status`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const response =
+                await axiosInstance.get(
+                    "/orders/me/status"
+                );
 
-            const debt = response.data.debt || 0;
+            const rawDebt =
+                response.data?.debt;
+
+            const debt = Number(rawDebt);
+
+            if (
+                rawDebt == null ||
+                rawDebt === "" ||
+                !Number.isSafeInteger(debt) ||
+                debt < 0
+            ) {
+                throw new Error(
+                    "Сервер вернул некорректную задолженность"
+                );
+            }
 
             setDebtAmount(debt);
             setHasDebt(debt > 0);
-        } catch (e) {
-            console.error("Ошибка проверки долга:", e);
+
+            window.dispatchEvent(
+                new Event(
+                    "cargocamp:debt-updated"
+                )
+            );
+
+            return debt;
+        } catch (error) {
+            console.error(
+                "Ошибка проверки задолженности:",
+                error.message
+            );
+
+            return null;
         }
     };
 
@@ -769,28 +837,169 @@ const ProfilePage = () => {
     }, [profile?.id]);
 
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
+        let disposed = false;
+        let nativeListener = null;
+        let running = false;
+        let retryTimer = null;
 
-        const shouldRefresh =
-            params.get("bindReturn") === "1" ||
-            params.get("debtReturn") === "1" ||
-            params.get("premiumReturn") === "1";
+        const params = new URLSearchParams(
+            window.location.search
+        );
 
-        if (!shouldRefresh) return;
+        const hasPaymentReturn =
+            params.has("bindReturn") ||
+            params.has("debtReturn") ||
+            params.has("premiumReturn");
 
-        const timer = setTimeout(async () => {
+        const refreshFinance = async () => {
+            if (disposed || running) return false;
+
+            running = true;
+
             try {
-                await fetchProfileData();
+                const freshProfile =
+                    await fetchProfileData();
+
+                if (!freshProfile || disposed) {
+                    return false;
+                }
+
                 await loadDebtStatus();
 
-                window.history.replaceState({}, "", window.location.pathname);
-            } catch (e) {
-                console.error("refresh after payment return error:", e);
-                window.location.reload();
-            }
-        }, 1800);
+                return !disposed;
+            } catch (error) {
+                console.warn(
+                    "Не удалось обновить финансовые данные:",
+                    error.message
+                );
 
-        return () => clearTimeout(timer);
+                return false;
+            } finally {
+                running = false;
+            }
+        };
+
+        let remainingAttempts = 0;
+
+        const retryRefresh = async () => {
+            if (
+                disposed ||
+                remainingAttempts <= 0
+            ) {
+                return;
+            }
+
+            remainingAttempts -= 1;
+
+            const refreshed =
+                await refreshFinance();
+
+            if (disposed) return;
+
+            if (refreshed && hasPaymentReturn) {
+                const cleanParams =
+                    new URLSearchParams(
+                        window.location.search
+                    );
+
+                [
+                    "bindReturn",
+                    "bindToken",
+                    "debtReturn",
+                    "premiumReturn",
+                ].forEach(
+                    (key) => cleanParams.delete(key)
+                );
+
+                const query =
+                    cleanParams.toString();
+
+                window.history.replaceState(
+                    window.history.state,
+                    "",
+                    `${window.location.pathname}${
+                        query ? `?${query}` : ""
+                    }${window.location.hash}`
+                );
+            }
+
+            if (remainingAttempts > 0) {
+                retryTimer = setTimeout(
+                    retryRefresh,
+                    2000
+                );
+            }
+        };
+
+        const startRefresh = () => {
+            if (disposed) return;
+
+            clearTimeout(retryTimer);
+
+            remainingAttempts = 6;
+
+            void retryRefresh();
+        };
+
+        const handleVisibility = () => {
+            if (!document.hidden) {
+                startRefresh();
+            }
+        };
+
+        window.addEventListener(
+            "focus",
+            startRefresh
+        );
+
+        document.addEventListener(
+            "visibilitychange",
+            handleVisibility
+        );
+
+        if (Capacitor.isNativePlatform()) {
+            CapacitorApp.addListener(
+                "appStateChange",
+                ({ isActive }) => {
+                    if (isActive) {
+                        startRefresh();
+                    }
+                }
+            ).then((handle) => {
+                if (disposed) {
+                    void handle.remove();
+                } else {
+                    nativeListener = handle;
+                }
+            }).catch((error) => {
+                console.warn(
+                    "Finance lifecycle listener:",
+                    error.message
+                );
+            });
+        }
+
+        if (hasPaymentReturn) {
+            startRefresh();
+        }
+
+        return () => {
+            disposed = true;
+
+            clearTimeout(retryTimer);
+
+            window.removeEventListener(
+                "focus",
+                startRefresh
+            );
+
+            document.removeEventListener(
+                "visibilitychange",
+                handleVisibility
+            );
+
+            nativeListener?.remove();
+        };
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -1039,83 +1248,126 @@ const ProfilePage = () => {
     };
 
     const handlePayDebt = async () => {
-        try {
-            const token = localStorage.getItem("authToken");
+        if (debtPayRef.current) return;
 
-            if (!token) {
-                toast.error("Вы не авторизованы");
+        debtPayRef.current = true;
+        setDebtPayLoading(true);
+
+        try {
+            const currentDebt =
+                await loadDebtStatus();
+
+            if (currentDebt === null) {
+                toast.error(
+                    "Не удалось проверить задолженность"
+                );
+
                 return;
             }
 
-            if (!debtAmount || debtAmount <= 0) {
-                toast.info("Долгов нет");
+            if (currentDebt === 0) {
+                toast.info("Задолженности нет");
                 return;
             }
 
             const endpoint =
                 selectedDebtProvider === "tbank"
-                    ? "/api/tbank-payments/debt/create"
-                    : "/api/payments/debt/create";
+                    ? "/tbank-payments/debt/create"
+                    : "/payments/debt/create";
 
-            const res = await axios.post(
-                `${apiUrl}${endpoint}`,
-                {
-                    returnPath: "/profile?debtReturn=1",
-                },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
+            const res =
+                await axiosInstance.post(
+                    endpoint,
+                    {
+                        returnPath:
+                            "/profile?debtReturn=1",
+                    }
+                );
 
             if (!res.data?.success) {
-                toast.error(res.data?.error || "Ошибка создания платежа");
+                toast.error(
+                    res.data?.error ||
+                    "Не удалось создать платёж"
+                );
+
                 return;
             }
 
             if (res.data.noDebt) {
-                toast.info("Долгов нет");
+                await loadDebtStatus();
+
+                toast.info(
+                    "Задолженности нет"
+                );
+
                 return;
             }
 
             if (res.data.paidBySavedCard) {
-                toast.info("Пробуем списать с привязанной карты...");
+                toast.info(
+                    "Проверяем подтверждение оплаты..."
+                );
 
-                setTimeout(async () => {
-                    await loadDebtStatus();
-
-                    try {
-                        const refreshed = await axios.get(
-                            `${apiUrl}/api/auth/profile`,
-                            {
-                                headers: { Authorization: `Bearer ${token}` },
-                            }
+                for (
+                    let attempt = 0;
+                    attempt < 6;
+                    attempt++
+                ) {
+                    if (attempt > 0) {
+                        await new Promise(
+                            (resolve) =>
+                                setTimeout(
+                                    resolve,
+                                    2000
+                                )
                         );
-
-                        setProfile(refreshed.data);
-                        setPaymentMethodId(
-                            refreshed.data.yookassaPaymentMethodId || null
-                        );
-                    } catch (e) {
-                        console.error("profile refresh after debt pay error:", e);
                     }
-                }, 2500);
+
+                    const remainingDebt =
+                        await loadDebtStatus();
+
+                    if (remainingDebt === 0) {
+                        await fetchProfileData();
+
+                        toast.success(
+                            "Задолженность погашена"
+                        );
+
+                        return;
+                    }
+                }
+
+                toast.info(
+                    "Подтверждение платежа ещё не получено. Проверьте состояние платежа перед повторной оплатой."
+                );
 
                 return;
             }
 
             if (!res.data.confirmationUrl) {
-                toast.error("Ссылка на оплату не получена");
+                toast.error(
+                    "Ссылка на оплату не получена"
+                );
+
                 return;
             }
 
-            window.location.href = res.data.confirmationUrl;
-        } catch (e) {
-            console.error("handlePayDebt error:", e);
-            toast.error(
-                e.response?.data?.error || "Ошибка при оплате задолженности"
+            openPaymentPage(
+                res.data.confirmationUrl
             );
+        } catch (error) {
+            console.error(
+                "Debt payment error:",
+                error.message
+            );
+
+            toast.error(
+                error.response?.data?.error ||
+                "Не удалось оплатить задолженность"
+            );
+        } finally {
+            debtPayRef.current = false;
+            setDebtPayLoading(false);
         }
     };
 
@@ -1284,34 +1536,41 @@ const ProfilePage = () => {
     }, [loadedProfileId]);
 
     const handleBindTBankCard = async () => {
+        if (cardBindingRef.current) return;
+
+        cardBindingRef.current = true;
+        setCardBinding(true);
+
         try {
-            const token =
-                localStorage.getItem("authToken");
+            const response =
+                await axiosInstance.post(
+                    "/payment-cards/tbank/bind/create",
+                    {}
+                );
 
-            const response = await axios.post(
-                `${apiUrl}/api/payment-cards/tbank/bind/create`,
-                {},
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
-
-            if (!response.data?.confirmationUrl) {
+            if (
+                !response.data?.success ||
+                !response.data.confirmationUrl
+            ) {
                 toast.error(
+                    response.data?.error ||
                     "Не удалось получить ссылку для привязки"
                 );
+
                 return;
             }
 
-            window.location.href =
-                response.data.confirmationUrl;
+            openPaymentPage(
+                response.data.confirmationUrl
+            );
         } catch (error) {
             toast.error(
                 error.response?.data?.error ||
                 "Ошибка привязки карты Т-Банка"
             );
+        } finally {
+            cardBindingRef.current = false;
+            setCardBinding(false);
         }
     };
 
@@ -1384,6 +1643,7 @@ const ProfilePage = () => {
     const handleBindCard = async () => {
         if (CARD_BIND_SCREENSHOT_MODE) {
             setDemoCardBound(true);
+
             setDemoCardData({
                 cardType: "Visa",
                 cardLastFour: "1234",
@@ -1393,38 +1653,50 @@ const ProfilePage = () => {
             return;
         }
 
+        if (cardBindingRef.current) return;
+
+        cardBindingRef.current = true;
+        setCardBinding(true);
+
         try {
-            const token = localStorage.getItem("authToken");
-
-            if (!token) {
-                toast.error("Вы не авторизованы");
-                return;
-            }
-
-            const res = await axios.post(
-                `${apiUrl}/api/payments/card/bind/create`,
-                {},
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
+            const res = await axiosInstance.post(
+                "/payments/card/bind/create",
+                {}
             );
 
             if (!res.data?.success) {
-                toast.error(res.data?.error || "Ошибка привязки карты");
+                toast.error(
+                    res.data?.error ||
+                    "Ошибка привязки карты"
+                );
+
                 return;
             }
 
             if (!res.data.confirmationUrl) {
-                toast.error("Ссылка на привязку карты не получена");
+                toast.error(
+                    "Ссылка на привязку карты не получена"
+                );
+
                 return;
             }
 
-            window.location.href = res.data.confirmationUrl;
-        } catch (e) {
-            console.error("bind card error:", e);
-            toast.error(e.response?.data?.error || "Ошибка привязки карты");
+            openPaymentPage(
+                res.data.confirmationUrl
+            );
+        } catch (error) {
+            console.error(
+                "YooKassa card binding:",
+                error.message
+            );
+
+            toast.error(
+                error.response?.data?.error ||
+                "Не удалось начать привязку карты"
+            );
+        } finally {
+            cardBindingRef.current = false;
+            setCardBinding(false);
         }
     };
 
@@ -1844,6 +2116,7 @@ const ProfilePage = () => {
                             </div>
                         ) : (
                             <button
+                                disabled={cardBinding}
                                 type="button"
                                 className="btn btn-primary profile-finance-bind-button"
                                 onClick={
@@ -1855,7 +2128,9 @@ const ProfilePage = () => {
                                         }
                                 }
                             >
-                                + Привязать карту
+                                {cardBinding
+                                    ? "Подключение..."
+                                    : "+ Привязать карту"}
                             </button>
                         )}
 
@@ -1896,6 +2171,7 @@ const ProfilePage = () => {
                                 </div>
                             ) : (
                                 <button
+                                    disabled={cardBinding}
                                     type="button"
                                     className="btn btn-primary profile-finance-bind-button"
                                     onClick={() => {
@@ -1903,7 +2179,9 @@ const ProfilePage = () => {
                                         setShowAgreement(true);
                                     }}
                                 >
-                                    + Привязать через Т-Банк
+                                    {cardBinding
+                                        ? "Подключение..."
+                                        : "+ Привязать через Т-Банк"}
                                 </button>
                             )}
                         </div>
@@ -1951,7 +2229,10 @@ const ProfilePage = () => {
                         {/* Задолженность по комиссии */}
 
                         {hasDebt && (
-                            <div className="alert alert-danger profile-finance-debt">
+                            <div
+                                ref={debtSectionRef}
+                                className="alert alert-danger profile-finance-debt"
+                            >
                                 <div>
                                     <div className="alert-title">
                                         Задолженность по комиссии
@@ -1967,7 +2248,7 @@ const ProfilePage = () => {
                                         title="Способ погашения"
                                         selectedProvider={selectedDebtProvider}
                                         onSelect={setSelectedDebtProvider}
-                                        disabled={loading}
+                                        disabled={loading || debtPayLoading}
                                     />
                                 </div>
 
@@ -1975,8 +2256,11 @@ const ProfilePage = () => {
                                     type="button"
                                     className="btn btn-danger"
                                     onClick={handlePayDebt}
+                                    disabled={debtPayLoading}
                                 >
-                                    Оплатить задолженность
+                                    {debtPayLoading
+                                        ? "Проверяем оплату..."
+                                        : "Оплатить задолженность"}
                                 </button>
                             </div>
                         )}
