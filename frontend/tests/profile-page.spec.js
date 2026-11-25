@@ -163,6 +163,66 @@ async function setupProfileMocks(page, options = {}) {
         });
     });
 
+    await page.route(
+        "**/api/account-deletion/status",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+
+                json: {
+                    success: true,
+                    request: null,
+                },
+            });
+        }
+    );
+
+    await page.route(
+        "**/api/account-deletion/request",
+        async (route) => {
+            await route.fulfill({
+                status: 201,
+
+                json: {
+                    success: true,
+                    requested: true,
+                    alreadyRequested: false,
+                },
+            });
+        }
+    );
+
+    await page.route(
+        "**/api/legal/consents/*",
+        async (route) => {
+            const url = new URL(
+                route.request().url()
+            );
+
+            const code =
+                url.pathname.split("/").pop();
+
+            await route.fulfill({
+                status: 200,
+
+                json: {
+                    success: true,
+
+                    document: {
+                        code,
+
+                        version: "2026-11-25",
+
+                        sha256: "a".repeat(64),
+
+                        text:
+                            "Тестовое согласие на обработку персональных данных.",
+                    },
+                },
+            });
+        }
+    );
+
 // Актуальные социальные льготы.
     await page.route("**/api/benefits/me", async (route) => {
         if (route.request().method() !== "GET") {
@@ -428,6 +488,68 @@ test.describe("ProfilePage", () => {
         await expect(page.locator(".header-mini-name")).toHaveText("testuser");
         await expect(page.locator(".header-mini-pill")).toContainText("4.2");
     });
+
+    test(
+        "пользователь может зарегистрировать запрос удаления аккаунта",
+        async ({ page }) => {
+            await openProfilePage(page);
+
+            await page.getByRole(
+                "button",
+                {
+                    name: "Удалить аккаунт",
+                    exact: true,
+                }
+            ).click();
+
+            await page.getByLabel(
+                "Пароль аккаунта",
+                {
+                    exact: true,
+                }
+            ).fill("test-password");
+
+            await page.getByLabel(
+                "Я подтверждаю запрос на удаление аккаунта."
+            ).check();
+
+            const requestPromise =
+                page.waitForRequest(
+                    (request) =>
+                        request.url().includes(
+                            "/api/account-deletion/request"
+                        ) &&
+                        request.method() === "POST"
+                );
+
+            await page.getByRole(
+                "button",
+                {
+                    name: "Подтвердить удаление",
+                    exact: true,
+                }
+            ).click();
+
+            const request =
+                await requestPromise;
+
+            expect(
+                request.postDataJSON()
+            ).toEqual({
+                password: "test-password",
+                confirmed: true,
+            });
+
+            await expect(
+                page.getByText(
+                    "Запрос на удаление зарегистрирован",
+                    {
+                        exact: true,
+                    }
+                )
+            ).toBeVisible();
+        }
+    );
 
     test("ставит web-класс при platform=web", async ({ page }) => {
         await openProfilePage(page, {
@@ -779,7 +901,23 @@ test.describe("ProfilePage", () => {
             buffer: Buffer.from("mock-passport"),
         });
 
-        await identity.locator('input[type="checkbox"]').check();
+        const submitButton = identity.locator(
+            ".cc-identity-submit"
+        );
+
+        await expect(submitButton).toBeDisabled();
+
+        await identity.getByRole("checkbox", {
+            name: /Подтверждаю, что отправляю свои документы/,
+        }).check();
+
+        await expect(submitButton).toBeDisabled();
+
+        await identity.getByRole("checkbox", {
+            name: /Я ознакомился с отдельным согласием/,
+        }).check();
+
+        await expect(submitButton).toBeEnabled();
 
         page.once("dialog", (dialog) => dialog.accept());
 
@@ -790,6 +928,30 @@ test.describe("ProfilePage", () => {
             .toContain('name="documentType"');
 
         expect(submittedBody).toContain("passport_rf");
+
+        expect(submittedBody).toContain(
+            'name="consentVersion"'
+        );
+
+        expect(submittedBody).toContain(
+            'name="consentSha256"'
+        );
+
+        expect(submittedBody).toContain(
+            'name="consentConfirmed"'
+        );
+
+        expect(submittedBody).toContain(
+            "2026-11-25"
+        );
+
+        expect(submittedBody).toContain(
+            "a".repeat(64)
+        );
+
+        expect(submittedBody).toMatch(
+            /name="consentConfirmed"\r?\n\r?\ntrue/
+        );
 
         await expect(
             identity.locator(".cc-identity-success")
@@ -846,6 +1008,52 @@ test.describe("ProfilePage", () => {
         ).toHaveCount(0);
     });
 
+    test(
+        "не позволяет загружать документы для временно недоступных льгот",
+        async ({ page }) => {
+            const section =
+                page.locator(".cc-benefits");
+
+            await section
+                .locator(".cc-benefits-heading")
+                .click();
+
+            const disabledPrograms =
+                section.locator(".cc-benefit-item")
+                    .filter({
+                        hasText: /Приём новых заявок временно недоступен/,
+                    });
+
+            await expect(
+                disabledPrograms
+            ).toHaveCount(2);
+
+            await expect(
+                disabledPrograms.locator(
+                    'input[type="file"]'
+                )
+            ).toHaveCount(0);
+
+            await expect(
+                disabledPrograms.locator(
+                    ".cc-benefit-submit"
+                )
+            ).toHaveCount(0);
+
+            const pension =
+                section.locator(".cc-benefit-item")
+                    .filter({
+                        hasText: "Пенсионер",
+                    });
+
+            await expect(
+                pension.locator(
+                    'input[type="file"]'
+                )
+            ).toHaveCount(1);
+        }
+    );
+
     test("отправляет документ на социальную льготу", async ({ page }) => {
         let submittedBody = null;
 
@@ -878,6 +1086,14 @@ test.describe("ProfilePage", () => {
 
         await expect(
             pension.locator(".cc-benefit-submit")
+        ).toBeDisabled();
+
+        await pension.getByRole("checkbox", {
+            name: /Я ознакомился с отдельным согласием/,
+        }).check();
+
+        await expect(
+            pension.locator(".cc-benefit-submit")
         ).toBeEnabled();
 
         page.once("dialog", (dialog) => dialog.accept());
@@ -887,6 +1103,30 @@ test.describe("ProfilePage", () => {
         await expect
             .poll(() => submittedBody)
             .toContain('name="document"');
+
+        expect(submittedBody).toContain(
+            'name="consentVersion"'
+        );
+
+        expect(submittedBody).toContain(
+            'name="consentSha256"'
+        );
+
+        expect(submittedBody).toContain(
+            'name="consentConfirmed"'
+        );
+
+        expect(submittedBody).toContain(
+            "2026-11-25"
+        );
+
+        expect(submittedBody).toContain(
+            "a".repeat(64)
+        );
+
+        expect(submittedBody).toMatch(
+            /name="consentConfirmed"\r?\n\r?\ntrue/
+        );
 
         await expect(
             section.locator(".cc-benefits-success")

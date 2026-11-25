@@ -1,7 +1,12 @@
 const express = require("express");
 const multer = require("multer");
 const { Op } = require("sequelize");
-
+const {
+    validateConsent,
+    recordConsent,
+} = require(
+    "../services/personalDataConsentService"
+);
 const authenticateToken =
     require("../middlewares/userAuth");
 const {
@@ -157,6 +162,20 @@ router.post(
         try {
             const userId = Number(req.user.id);
 
+            const consentDocument =
+                validateConsent({
+                    code: "identity_verification",
+
+                    version:
+                    req.body.consentVersion,
+
+                    sha256:
+                    req.body.consentSha256,
+
+                    confirmed:
+                        req.body.consentConfirmed === "true",
+                });
+
             const files = Array.isArray(req.files)
                 ? req.files
                 : [];
@@ -273,6 +292,12 @@ router.post(
                             );
                         }
 
+                        await recordConsent({
+                            req,
+                            userId,
+                            document: consentDocument,
+                            transaction,
+                        });
                         /*
                          * Создаём заявку.
                          *

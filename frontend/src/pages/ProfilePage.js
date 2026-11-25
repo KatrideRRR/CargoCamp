@@ -27,6 +27,7 @@ import {
     ChevronRight,
     X,
 } from "lucide-react";
+import AccountDeletionSection from "../components/AccountDeletionSection";
 import { App as CapacitorApp } from "@capacitor/app";
 import { openPaymentPage } from "../utils/openPaymentPage";
 
@@ -2907,6 +2908,8 @@ const ProfilePage = () => {
 
                     </div>
                 </div>
+
+                <AccountDeletionSection />
 
                 <div className="profile-actions glass">
                     <button

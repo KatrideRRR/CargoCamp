@@ -113,7 +113,11 @@ test.describe("InfoPage", () => {
             "Стороны договариваются о стоимости и сроках."
         );
         await expect(card).toContainText(
-            "Способ оплаты зависит от заказа"
+            "Заказчик оплачивает работу непосредственно исполнителю."
+        );
+
+        await expect(card).toContainText(
+            "Онлайн через CargoCamp оплачиваются только собственные услуги платформы"
         );
     });
 
@@ -126,30 +130,77 @@ test.describe("InfoPage", () => {
 
         await expect(details).not.toHaveAttribute("open", "");
 
-        await expect(
-            details.getByText("Настоящая Политика регулирует порядок обработки")
-        ).not.toBeVisible();
+        const policy = details.locator(
+            '[data-privacy-version="2026-11-25"]'
+        );
+
+        await expect(policy).toHaveCount(1);
+        await expect(policy).not.toBeVisible();
     });
 
-    test("открывает политику конфиденциальности", async ({ page }) => {
-        const details = page.locator("details").filter({
-            has: page.locator(".info-card-title", {
-                hasText: "Политика конфиденциальности",
-            }),
-        });
+    test(
+        "открывает политику конфиденциальности",
+        async ({ page }) => {
+            const details = page.locator("details").filter({
+                has: page.locator(".info-card-title", {
+                    hasText: "Политика конфиденциальности",
+                }),
+            });
 
-        await details.locator("summary").click();
+            await details.locator("summary").click();
 
-        await expect(details).toHaveAttribute("open", "");
+            await expect(details).toHaveAttribute(
+                "open",
+                ""
+            );
 
-        await expect(details).toContainText("1. Общие положения");
-        await expect(details).toContainText("2. Какие данные мы собираем");
-        await expect(details).toContainText("3. Цели обработки данных");
-        await expect(details).toContainText("4. Передача данных третьим лицам");
-        await expect(details).toContainText("Мы не продаём персональные данные.");
-        await expect(details).toContainText("partner@cargocamp.ru");
-        await expect(details).toContainText("+7 (979) 019-99-79");
-    });
+            const policy = details.locator(
+                '[data-privacy-version="2026-11-25"]'
+            );
+
+            await expect(policy).toBeVisible();
+
+            for (const heading of [
+                "1. Общие положения",
+                "2. Правовые основания обработки",
+                "3. Категории обрабатываемых данных",
+                "4. Цели обработки",
+                "5. Местоположение",
+                "6. Проверка документов",
+                "7. Банковские карты и платежи",
+                "8. Получатели персональных данных",
+                "9. Способы обработки и защита",
+                "10. Хранение персональных данных",
+                "11. Права пользователя",
+                "12. Удаление аккаунта",
+                "13. Контакты оператора",
+            ]) {
+                await expect(
+                    policy.getByRole("heading", {
+                        name: heading,
+                        exact: true,
+                    })
+                ).toBeVisible();
+            }
+
+            await expect(policy).toContainText(
+                "оно оформляется отдельно от публичной оферты"
+            );
+
+            await expect(policy).toContainText(
+                "Документы не предназначены для публичного распространения."
+            );
+
+            await expect(
+                policy.getByRole("link", {
+                    name: "partner@cargocamp.ru",
+                })
+            ).toHaveAttribute(
+                "href",
+                "mailto:partner@cargocamp.ru"
+            );
+        }
+    );
 
     test("закрывает политику конфиденциальности повторным кликом", async ({ page }) => {
         const details = page.locator("details").filter({
@@ -229,8 +280,14 @@ test.describe("InfoPage", () => {
         await expect(privacy).toHaveAttribute("open", "");
         await expect(offer).toHaveAttribute("open", "");
 
+        await expect(
+            privacy.locator(
+                '[data-privacy-version="2026-11-25"]'
+            )
+        ).toBeVisible();
+
         await expect(privacy).toContainText(
-            "Какие данные мы собираем"
+            "3. Категории обрабатываемых данных"
         );
 
         await expect(offer).toContainText(

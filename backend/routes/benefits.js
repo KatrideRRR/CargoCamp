@@ -2,7 +2,12 @@ const express = require("express");
 
 const authenticateToken =
     require("../middlewares/userAuth");
-
+const {
+    validateConsent,
+    recordConsent,
+} = require(
+    "../services/personalDataConsentService"
+);
 const {
     getMyBenefitOverview,
     getCurrentBenefitVerification,
@@ -30,6 +35,33 @@ const {
 } = require("../services/privateDocumentStorage");
 
 const router = express.Router();
+
+function checkBenefitAvailability(
+    req,
+    res,
+    next
+) {
+    const code = String(
+        req.params.benefitCode || ""
+    );
+
+    if (
+        code === "disability_status" ||
+        code === "large_family_parent"
+    ) {
+        return res.status(403).json({
+            success: false,
+
+            code:
+                "BENEFIT_TEMPORARILY_UNAVAILABLE",
+
+            message:
+                "Приём новых заявок по этой категории временно недоступен.",
+        });
+    }
+
+    return next();
+}
 
 /*
  * Возвращает пользователю только
@@ -103,6 +135,7 @@ function benefitHttpError(status, message) {
 router.post(
     "/me/:benefitCode/apply",
     authenticateToken,
+    checkBenefitAvailability,
     benefitUpload.single("document"),
 
     async (req, res) => {
@@ -131,6 +164,20 @@ router.post(
                     message: "Приложите подтверждающий документ",
                 });
             }
+
+            const consentDocument =
+                validateConsent({
+                    code: "pension_verification",
+
+                    version:
+                    req.body.consentVersion,
+
+                    sha256:
+                    req.body.consentSha256,
+
+                    confirmed:
+                        req.body.consentConfirmed === "true",
+                });
 
             const result = await sequelize.transaction(
                 async (transaction) => {
@@ -204,6 +251,13 @@ router.post(
                             "Слишком много заявок. Повторите попытку позже."
                         );
                     }
+
+                    await recordConsent({
+                        req,
+                        userId,
+                        document: consentDocument,
+                        transaction,
+                    });
 
                     const stored =
                         await savePrivateDocument(

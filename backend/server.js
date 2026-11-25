@@ -1,4 +1,3 @@
-
 const path = require("path");
 const fs = require("fs");
 const dotenv = require("dotenv");
@@ -141,6 +140,8 @@ const orderChangesRoutes = require("./routes/orderChanges");
 const adminPepRoutes = require("./routes/adminPep");
 const orderCompletionFlowRoutes = require("./routes/orderCompletionFlow");
 const publicOfferRoutes = require("./routes/publicOffer");
+const personalDataConsentRoutes = require("./routes/personalDataConsents");
+const accountDeletionRoutes = require("./routes/accountDeletion");
 const db = require("./models");
 const sequelize = require("./config/database");
 
@@ -374,6 +375,8 @@ app.use(
     })
 );
 
+app.use("/api/account-deletion", accountDeletionRoutes);
+app.use("/api/legal/consents", personalDataConsentRoutes);
 app.use("/api/contracts/acts", actRemediationRoutes);
 app.use("/api/contracts/acts", actAcceptanceRoutes);
 app.use("/api/contracts/signing", contractSigningRoutes);

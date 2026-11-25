@@ -1,7 +1,7 @@
-
 import { test, expect } from "./fixtures/safeTest";
 import { mockAppShell } from "./utils/mockAppShell";
 import { createMockJwt } from "./utils/mockAuthSession";
+import offerDocument from "../src/components/PublicOfferDocument.json";
 
 test("существующий пользователь принимает новую оферту", async ({ page }) => {
     const fakeToken = createMockJwt({
@@ -29,7 +29,7 @@ test("существующий пользователь принимает но�
                 status: 200,
                 json: {
                     version: "2026-11-09",
-                    sha256: "mock-offer-sha256",
+                    sha256: offerDocument.sha256,
                     accepted: false,
                     acceptedAt: null,
                 },
@@ -90,7 +90,7 @@ test("существующий пользователь принимает но�
 
     await expect.poll(() => acceptPayload).toEqual({
         version: "2026-11-09",
-        sha256: "mock-offer-sha256",
+        sha256: offerDocument.sha256,
         confirmed: true,
     });
 
