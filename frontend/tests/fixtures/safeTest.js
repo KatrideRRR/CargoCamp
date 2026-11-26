@@ -69,6 +69,24 @@ const test = base.extend({
                 }
             );
 
+            await context.route(
+                "**/api/account-deletion/status",
+                async (route) => {
+                    if (route.request().method() !== "GET") {
+                        await route.fallback();
+                        return;
+                    }
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                            request: null,
+                        },
+                    });
+                }
+            );
+
             await context.routeWebSocket(
                 "**/*",
                 (webSocket) => {
