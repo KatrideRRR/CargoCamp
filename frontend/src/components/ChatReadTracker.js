@@ -58,7 +58,6 @@ export default function ChatReadTracker({
             }
 
             let lastIncomingId = 0;
-            let lastKnownReadId = 0;
 
             for (
                 const message of
@@ -87,19 +86,7 @@ export default function ChatReadTracker({
                     lastIncomingId,
                     messageId
                 );
-
-                if (message.readAt) {
-                    lastKnownReadId = Math.max(
-                        lastKnownReadId,
-                        messageId
-                    );
-                }
             }
-
-            confirmedIdRef.current = Math.max(
-                confirmedIdRef.current,
-                lastKnownReadId
-            );
 
             if (
                 lastIncomingId <=

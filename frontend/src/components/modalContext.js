@@ -1,5 +1,5 @@
 import { toast } from "react-toastify";
-import React, { createContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { socket } from "../socketClient";
 import axiosInstance from "../utils/axiosInstance";
@@ -218,7 +218,8 @@ export const ModalProvider = ({ children }) => {
 
     const [debtModalData, setDebtModalData] = useState(null);
     const [debtPayLoading, setDebtPayLoading] = useState(false);
-
+    const debtPaymentRequestRef =
+        useRef(false);
     const [completionSuccessData, setCompletionSuccessData] = useState(null);
 
     const [selectedDebtProvider, setSelectedDebtProvider] = useState("yookassa");
@@ -1069,90 +1070,179 @@ export const ModalProvider = ({ children }) => {
         setDebtModalData(null);
     };
 
-    const payDebt = async ({ returnPath, provider }) => {
-        try {
-            setDebtPayLoading(true);
+    const payDebt = async ({
+                               returnPath,
+                               provider,
+                           }) => {
+        if (debtPaymentRequestRef.current) {
+            return;
+        }
 
+        debtPaymentRequestRef.current = true;
+        setDebtPayLoading(true);
+
+        try {
             const endpoint =
                 provider === "tbank"
                     ? "/tbank-payments/debt/create"
                     : "/payments/debt/create";
 
-            const res = await axiosInstance.post(endpoint, {
-                returnPath: returnPath || "/profile?debtReturn=1",
-            });
+            const res =
+                await axiosInstance.post(
+                    endpoint,
+                    {
+                        returnPath:
+                            returnPath ||
+                            "/profile?debtReturn=1",
+                    }
+                );
 
             if (!res.data?.success) {
-                toast.error(res.data?.error || "Ошибка оплаты");
-                setDebtPayLoading(false);
+                toast.error(
+                    res.data?.error ||
+                    "Ошибка оплаты"
+                );
+
                 return;
             }
+
+            const refreshDebt = async () => {
+                const refreshed =
+                    await axiosInstance.get(
+                        "/auth/profile"
+                    );
+
+                const rawDebt =
+                    refreshed.data?.debt;
+
+                const freshDebt =
+                    Number(rawDebt);
+
+                if (
+                    rawDebt == null ||
+                    rawDebt === "" ||
+                    !Number.isSafeInteger(
+                        freshDebt
+                    ) ||
+                    freshDebt < 0
+                ) {
+                    throw new Error(
+                        "Некорректная задолженность"
+                    );
+                }
+
+                setCurrUser(
+                    refreshed.data
+                );
+
+                window.dispatchEvent(
+                    new Event(
+                        "cargocamp:debt-updated"
+                    )
+                );
+
+                setDebtModalData((prev) =>
+                    prev
+                        ? {
+                            ...prev,
+                            amount: freshDebt,
+                        }
+                        : prev
+                );
+
+                setNotificationData((prev) =>
+                    prev
+                        ? {
+                            ...prev,
+                            debt: freshDebt,
+                            needPay: freshDebt > 0,
+                        }
+                        : prev
+                );
+
+                return freshDebt;
+            };
 
             if (res.data.noDebt) {
-                toast.info("Долгов нет");
-                setDebtModalData(null);
-                setNotificationData(null);
-                setDebtPayLoading(false);
+                const freshDebt =
+                    await refreshDebt();
+
+                if (freshDebt === 0) {
+                    setDebtModalData(null);
+                    setNotificationData(null);
+
+                    toast.info(
+                        "Задолженности нет"
+                    );
+                }
+
                 return;
             }
 
-            /**
-             * Это актуально для ЮKassa, если есть сохранённая карта.
-             * Для Т-Банка сейчас будет обычный редирект.
-             */
             if (res.data.paidBySavedCard) {
-                toast.info("Пробуем списать с привязанной карты...");
+                toast.info(
+                    "Проверяем подтверждение оплаты..."
+                );
 
-                setTimeout(async () => {
-                    try {
-                        const refreshed = await axiosInstance.get("/auth/profile");
-                        setCurrUser(refreshed.data);
-
-                        const freshDebt = Number(refreshed.data.debt || 0);
-
-                        if (freshDebt === 0) {
-                            setDebtModalData(null);
-                            setNotificationData(null);
-                            toast.success("Комиссия оплачена");
-                        } else {
-                            toast.warning(
-                                "Платёж не завершён или не прошёл. Задолженность осталась."
-                            );
-
-                            setNotificationData((prev) =>
-                                prev
-                                    ? {
-                                        ...prev,
-                                        debt: freshDebt,
-                                        needPay: true,
-                                        paid: false,
-                                        autoPaymentProcessing: false,
-                                        autoPaymentPaid: false,
-                                    }
-                                    : prev
-                            );
-                        }
-                    } catch (e) {
-                        console.error(e);
-                        toast.error("Не удалось обновить профиль после оплаты");
-                    } finally {
-                        setDebtPayLoading(false);
+                for (
+                    let attempt = 0;
+                    attempt < 6;
+                    attempt++
+                ) {
+                    if (attempt > 0) {
+                        await new Promise(
+                            (resolve) =>
+                                setTimeout(
+                                    resolve,
+                                    2000
+                                )
+                        );
                     }
-                }, 3000);
+
+                    const freshDebt =
+                        await refreshDebt();
+
+                    if (freshDebt === 0) {
+                        setDebtModalData(null);
+                        setNotificationData(null);
+
+                        toast.success(
+                            "Комиссия оплачена"
+                        );
+
+                        return;
+                    }
+                }
+
+                toast.info(
+                    "Подтверждение платежа ещё не получено. Проверьте его состояние перед повторной оплатой."
+                );
 
                 return;
             }
 
             if (!res.data.confirmationUrl) {
-                toast.error("Ссылка на оплату не получена");
-                setDebtPayLoading(false);
+                toast.error(
+                    "Ссылка на оплату не получена"
+                );
+
                 return;
             }
 
-            window.location.href = res.data.confirmationUrl;
-        } catch (e) {
-            console.error(e);
-            toast.error(e.response?.data?.error || "Ошибка оплаты комиссии");
+            window.location.href =
+                res.data.confirmationUrl;
+        } catch (error) {
+            console.error(
+                "Debt payment error:",
+                error.message
+            );
+
+            toast.error(
+                error.response?.data?.error ||
+                "Ошибка оплаты комиссии"
+            );
+        } finally {
+            debtPaymentRequestRef.current = false;
             setDebtPayLoading(false);
         }
     };

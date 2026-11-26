@@ -2,6 +2,7 @@ import { test, expect } from "./fixtures/safeTest";
 import { mockAppShell } from "./utils/mockAppShell";
 import { createMockJwt } from "./utils/mockAuthSession";
 const FRONT_URL = "http://localhost:3000";
+import { mockChatSocket } from "./utils/mockChatSocket";
 
 const testUser = {
     id: 123,
@@ -239,6 +240,450 @@ test.describe("BottomMenu", () => {
             "Нижнее меню"
         );
     });
+
+    test(
+        "при задолженности профиль открывается с переходом к оплате",
+        async ({ page }) => {
+            await openPageWithBottomMenu(
+                page,
+                "/?platform=web",
+                {
+                    debt: 20000,
+                }
+            );
+
+            const profileButton =
+                menuItem(
+                    page,
+                    "Профиль"
+                );
+
+            await expect(
+                profileButton.locator(
+                    ".bottom-menu__badge"
+                )
+            ).toHaveText("!");
+
+            await profileButton.click();
+
+            await expect(page).toHaveURL(
+                /\/profile\?section=debt/
+            );
+        }
+    );
+
+    test(
+        "без задолженности профиль открывается без финансового перехода",
+        async ({ page }) => {
+            await openPageWithBottomMenu(
+                page,
+                "/?platform=web",
+                {
+                    debt: 0,
+                }
+            );
+
+            const profileButton =
+                menuItem(
+                    page,
+                    "Профиль"
+                );
+
+            await expect(
+                profileButton.locator(
+                    ".bottom-menu__badge"
+                )
+            ).not.toBeVisible();
+
+            await profileButton.click();
+
+            await expect(page).toHaveURL(
+                /\/profile$/
+            );
+        }
+    );
+
+    test(
+        "бейдж задолженности обновляется после подтверждения оплаты",
+        async ({ page }) => {
+            await openPageWithBottomMenu(
+                page,
+                "/?platform=web",
+                {
+                    debt: 20000,
+                }
+            );
+
+            const badge =
+                menuItem(page, "Профиль")
+                    .locator(".bottom-menu__badge");
+
+            await expect(badge)
+                .toHaveText("!");
+
+            await page.route(
+                "**/api/orders/me/status",
+                async (route) => {
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            debt: 0,
+                        },
+                    });
+                }
+            );
+
+            await page.evaluate(() => {
+                window.dispatchEvent(
+                    new Event(
+                        "cargocamp:debt-updated"
+                    )
+                );
+            });
+
+            await expect(badge)
+                .not.toBeVisible();
+        }
+    );
+
+    test(
+        "ошибка обновления задолженности не скрывает бейдж",
+        async ({ page }) => {
+            await openPageWithBottomMenu(
+                page,
+                "/?platform=web",
+                {
+                    debt: 20000,
+                }
+            );
+
+            const badge =
+                menuItem(page, "Профиль")
+                    .locator(".bottom-menu__badge");
+
+            await expect(badge)
+                .toHaveText("!");
+
+            await page.route(
+                "**/api/orders/me/status",
+                async (route) => {
+                    await route.fulfill({
+                        status: 503,
+                        json: {
+                            message:
+                                "Сервис недоступен",
+                        },
+                    });
+                }
+            );
+
+            const failedResponse =
+                page.waitForResponse(
+                    (response) =>
+                        response.url().includes(
+                            "/api/orders/me/status"
+                        ) &&
+                        response.status() === 503
+                );
+
+            await page.evaluate(() => {
+                window.dispatchEvent(
+                    new Event(
+                        "cargocamp:debt-updated"
+                    )
+                );
+            });
+
+            await failedResponse;
+
+            await expect(badge)
+                .toHaveText("!");
+        }
+    );
+
+    test(
+        "повторное уведомление о сообщении не увеличивает счётчик",
+        async ({ page }) => {
+            const connections =
+                await mockChatSocket(page);
+
+            await openPageWithBottomMenu(
+                page,
+                "/?platform=web"
+            );
+
+            await expect.poll(
+                () => connections.some(
+                    (connection) =>
+                        connection.clientMessages.some(
+                            (message) =>
+                                message.includes(
+                                    "subscribeToNotifications"
+                                )
+                        )
+                )
+            ).toBe(true);
+
+            const connection = connections.find(
+                (item) =>
+                    item.clientMessages.some(
+                        (message) =>
+                            message.includes(
+                                "subscribeToNotifications"
+                            )
+                    )
+            );
+
+            const notification = {
+                id: 901,
+                type: "new_message",
+                orderId: 101,
+                orderType: "regular",
+                isRead: false,
+            };
+
+            const badge = menuItem(
+                page,
+                "В работе"
+            ).locator(".bottom-menu__badge");
+
+            connection.emit(
+                "new_notification",
+                notification
+            );
+
+            await expect(badge).toHaveText("1");
+
+            connection.emit(
+                "new_notification",
+                notification
+            );
+
+            connection.emit(
+                "new_notification",
+                {
+                    ...notification,
+                    id: 902,
+                }
+            );
+
+            await expect(badge).toHaveText("2");
+
+            connection.emit(
+                "new_notification",
+                []
+            );
+
+            await expect(badge).not.toBeVisible();
+        }
+    );
+
+    test(
+        "восстанавливает счётчики из серверных уведомлений",
+        async ({ page }) => {
+            const connections =
+                await mockChatSocket(page);
+
+            await openPageWithBottomMenu(
+                page,
+                "/?platform=web"
+            );
+
+            await expect.poll(
+                () => connections.some(
+                    (connection) =>
+                        connection.clientMessages.some(
+                            (message) =>
+                                message.includes(
+                                    "subscribeToNotifications"
+                                )
+                        )
+                )
+            ).toBe(true);
+
+            const connection = connections.find(
+                (item) =>
+                    item.clientMessages.some(
+                        (message) =>
+                            message.includes(
+                                "subscribeToNotifications"
+                            )
+                    )
+            );
+
+            const notifications = [
+                {
+                    id: 901,
+                    type: "new_message",
+                    isRead: false,
+                },
+                {
+                    id: 902,
+                    type: "new_message",
+                    isRead: false,
+                },
+                {
+                    id: 903,
+                    type: "order_request",
+                    isRead: false,
+                },
+                {
+                    id: 904,
+                    type: "reservation_cancelled",
+                    isRead: false,
+                },
+                {
+                    id: 905,
+                    type: "order_request",
+                    title: "Бронирование отменено",
+                    isRead: false,
+                },
+                {
+                    id: 906,
+                    type: "new_message",
+                    isRead: true,
+                },
+            ];
+
+            connection.emit(
+                "new_notification",
+                notifications
+            );
+
+            await expect(
+                menuItem(page, "В работе")
+                    .locator(".bottom-menu__badge")
+            ).toHaveText("2");
+
+            await expect(
+                menuItem(page, "Мои заказы")
+                    .locator(".bottom-menu__badge")
+            ).toHaveText("1");
+
+            connection.emit(
+                "new_notification",
+                [notifications[1]]
+            );
+
+            await expect(
+                menuItem(page, "В работе")
+                    .locator(".bottom-menu__badge")
+            ).toHaveText("1");
+
+            await expect(
+                menuItem(page, "Мои заказы")
+                    .locator(".bottom-menu__badge")
+            ).not.toBeVisible();
+        }
+    );
+
+    test(
+        "просмотр Моих заказов отмечает отклики прочитанными на сервере",
+        async ({ page }) => {
+            const connections =
+                await mockChatSocket(page);
+
+            let readRequestsCalls = 0;
+
+            const findConnection = () =>
+                connections.find(
+                    (item) =>
+                        item.clientMessages.some(
+                            (message) =>
+                                message.includes(
+                                    "subscribeToNotifications"
+                                )
+                        )
+                );
+
+            await page.route(
+                "**/api/orders/notifications/read-requests",
+                async (route) => {
+                    expect(
+                        route.request().method()
+                    ).toBe("POST");
+
+                    readRequestsCalls += 1;
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                            updatedCount: 1,
+                        },
+                    });
+
+                    findConnection()?.emit(
+                        "new_notification",
+                        [
+                            {
+                                id: 902,
+                                type: "new_message",
+                                isRead: false,
+                            },
+                        ]
+                    );
+                }
+            );
+
+            await openPageWithBottomMenu(
+                page,
+                "/?platform=web"
+            );
+
+            await expect.poll(
+                () => Boolean(findConnection())
+            ).toBe(true);
+
+            findConnection().emit(
+                "new_notification",
+                [
+                    {
+                        id: 901,
+                        type: "order_request",
+                        isRead: false,
+                    },
+                    {
+                        id: 902,
+                        type: "new_message",
+                        isRead: false,
+                    },
+                ]
+            );
+
+            const myOrders = menuItem(
+                page,
+                "Мои заказы"
+            );
+
+            await expect(
+                myOrders.locator(
+                    ".bottom-menu__badge"
+                )
+            ).toHaveText("1");
+
+            await myOrders.click();
+
+            await expect(page).toHaveURL(
+                /\/my-orders\/123/
+            );
+
+            await expect.poll(
+                () => readRequestsCalls
+            ).toBe(1);
+
+            await expect(
+                myOrders.locator(
+                    ".bottom-menu__badge"
+                )
+            ).not.toBeVisible();
+
+            await expect(
+                menuItem(page, "В работе")
+                    .locator(".bottom-menu__badge")
+            ).toHaveText("1");
+        }
+    );
 
     test("показывает основные пункты меню", async ({ page }) => {
         await openPageWithBottomMenu(page, "/?platform=web");

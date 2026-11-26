@@ -1143,6 +1143,38 @@ test.describe("OrdersPage", () => {
         await expect(modalImage).not.toBeVisible();
     });
 
+    test(
+        "пользователь без сохранённых координат получает заказы после определения GPS",
+        async ({ page, context }) => {
+            await context.grantPermissions(["geolocation"]);
+
+            await context.setGeolocation({
+                latitude: 44.9521,
+                longitude: 34.1024,
+                accuracy: 10,
+            });
+
+            await openOrdersPage(page, {
+                profileBody: {
+                    ...viewer,
+                    locationLat: null,
+                    locationLng: null,
+                    locationAddress: "",
+                },
+            });
+
+            await expect(
+                orderCard(page, "Заказ №101")
+            ).toBeVisible({
+                timeout: 30000,
+            });
+
+            await expect(
+                orderCard(page, "Экспресс №201")
+            ).toBeVisible();
+        }
+    );
+
     test("если нет координат пользователя, показывает пустое состояние местоположения", async ({ page }) => {
         await openOrdersPage(page, {
             profileBody: {

@@ -5,6 +5,7 @@ import axiosInstance from "../utils/axiosInstance";
 import { useAuth } from "../utils/authContext";
 import PublicOffer, {
     PUBLIC_OFFER_VERSION,
+    PUBLIC_OFFER_SHA256,
 } from "./PublicOffer";
 import "../styles/PublicOfferGate.css";
 
@@ -58,7 +59,8 @@ export default function PublicOfferGate({ children }) {
                 if (
                     !data?.version ||
                     !data?.sha256 ||
-                    data.version !== PUBLIC_OFFER_VERSION
+                    data.version !== PUBLIC_OFFER_VERSION ||
+                    data.sha256 !== PUBLIC_OFFER_SHA256
                 ) {
                     setStatus({
                         userId,

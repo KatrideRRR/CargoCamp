@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import axiosInstance from "../utils/axiosInstance";
-
+import PersonalDataConsent from "./PersonalDataConsent";
 import "../styles/UserIdentityVerification.css";
 
 const apiUrl = process.env.REACT_APP_API_URL;
@@ -153,7 +153,10 @@ export default function UserIdentityVerification({
 
     const [documentType, setDocumentType] =
         useState("passport_rf");
-
+    const [
+        identityConsent,
+        setIdentityConsent,
+    ] = useState(null);
     const [files, setFiles] = useState([]);
     const [confirmed, setConfirmed] = useState(false);
 
@@ -277,6 +280,14 @@ export default function UserIdentityVerification({
             return;
         }
 
+        if (!identityConsent?.confirmed) {
+            setFormError(
+                "Необходимо отдельно принять согласие на обработку персональных данных."
+            );
+
+            return;
+        }
+
         if (
             !window.confirm(
                 "Отправить документы на проверку личности?"
@@ -297,6 +308,21 @@ export default function UserIdentityVerification({
             formData.append(
                 "documentType",
                 documentType
+            );
+
+            formData.append(
+                "consentVersion",
+                identityConsent.version
+            );
+
+            formData.append(
+                "consentSha256",
+                identityConsent.sha256
+            );
+
+            formData.append(
+                "consentConfirmed",
+                "true"
             );
 
             files.forEach((file) => {
@@ -577,20 +603,29 @@ export default function UserIdentityVerification({
                                 </span>
                             </label>
 
+                            <PersonalDataConsent
+                                code="identity_verification"
+                                disabled={submitting}
+                                onChange={setIdentityConsent}
+                            />
+
                             <button
                                 type="button"
                                 className="cc-identity-submit"
                                 disabled={
                                     submitting ||
                                     !confirmed ||
+                                    !identityConsent?.confirmed ||
                                     files.length === 0
                                 }
                                 onClick={handleSubmit}
+
                             >
                                 {submitting
                                     ? "Отправляем..."
                                     : "Отправить на проверку"}
                             </button>
+                            setIdentityConsent(null);
                         </div>
                     )}
 

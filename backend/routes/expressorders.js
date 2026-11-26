@@ -16,40 +16,94 @@ const {
 const {
     hasSocialCommissionBenefit,
 } = require("../services/benefitService");
-
+const {
+    requestExpressReservation,
+    listExpressReservationRequests,
+    approveExpressReservation,
+    rejectExpressReservation,
+    cancelExpressReservation,
+    activateNextExpressOrder,
+    getMyPendingExpressReservation,
+} = require(
+    "../services/expressReservationService"
+);
 const {
     calculateExpressCommission,
 } = require("../utils/expressCommissionPolicy");
 
 /* ================= helpers ================= */
 
-async function hasBusyRegularOrder(Order, executorId) {
-    const busyOrder = await Order.findOne({
-        where: {
-            executorId,
-            status: {
-                [Op.notIn]: ["completed", "cancelled", "expired"],
-            },
-        },
-    });
+async function hasBusyRegularOrder(
+    Order,
+    executorId,
+    transaction
+) {
+    const busyOrder =
+        await Order.findOne({
+            where: {
+                executorId,
 
-    return !!busyOrder;
+                status: {
+                    [Op.notIn]: [
+                        "completed",
+                        "cancelled",
+                        "expired",
+                    ],
+                },
+            },
+
+            transaction,
+
+            ...(transaction
+                ? {
+                    lock:
+                    transaction.LOCK.UPDATE,
+                }
+                : {}),
+        });
+
+    return Boolean(busyOrder);
 }
 
-async function hasBusyExpressOrder(ExpressOrder, executorId, excludeExpressOrderId = null) {
+async function hasBusyExpressOrder(
+    ExpressOrder,
+    executorId,
+    excludeExpressOrderId = null,
+    transaction
+) {
     const where = {
         executorId,
+
         status: {
-            [Op.notIn]: ["completed", "cancelled"],
+            [Op.notIn]: [
+                "completed",
+                "cancelled",
+            ],
         },
     };
 
     if (excludeExpressOrderId) {
-        where.id = { [Op.ne]: excludeExpressOrderId };
+        where.id = {
+            [Op.ne]:
+            excludeExpressOrderId,
+        };
     }
 
-    const busyOrder = await ExpressOrder.findOne({ where });
-    return !!busyOrder;
+    const busyOrder =
+        await ExpressOrder.findOne({
+            where,
+
+            transaction,
+
+            ...(transaction
+                ? {
+                    lock:
+                    transaction.LOCK.UPDATE,
+                }
+                : {}),
+        });
+
+    return Boolean(busyOrder);
 }
 
 function toNum(v) {
@@ -435,6 +489,102 @@ async function bumpSavedAddressUsage({ userId, id, transaction }) {
     addr.useCount = (addr.useCount || 0) + 1;
     addr.lastUsedAt = new Date();
     await addr.save({ transaction });
+}
+
+function sendReservationError(res, error) {
+    if (!error.httpStatus) {
+        console.error(
+            "Express reservation error:",
+            error
+        );
+    }
+
+    return res
+        .status(error.httpStatus || 500)
+        .json({
+            success: false,
+
+            code: error.httpStatus
+                ? error.code || null
+                : null,
+
+            message: error.httpStatus
+                ? error.message
+                : "Не удалось обработать бронирование",
+        });
+}
+
+async function publishReservationEvent({
+                                           req,
+                                           creatorId,
+                                           executorId,
+                                           orderId,
+                                           title,
+                                           message,
+                                           notifyUserId,
+                                       }) {
+    const io = req.app.locals.io;
+
+    const payload = {
+        orderId,
+        orderType: "express",
+        creatorId,
+        executorId,
+    };
+
+    const participants = [
+        ...new Set(
+            [creatorId, executorId]
+                .filter(Boolean)
+                .map(Number)
+        ),
+    ];
+
+    try {
+        for (const userId of participants) {
+            emitToUserEverywhere(
+                io,
+                userId,
+                "expressReservationsUpdated",
+                payload
+            );
+
+            emitToUserEverywhere(
+                io,
+                userId,
+                "expressOrdersUpdated",
+                payload
+            );
+
+            emitToUserEverywhere(
+                io,
+                userId,
+                "activeOrdersUpdated",
+                payload
+            );
+        }
+
+        if (notifyUserId) {
+            await notifyUser({
+                userId: notifyUserId,
+
+                type: "express_reservation",
+
+                title,
+                body: message,
+
+                orderId,
+                orderType: "express",
+
+                data: payload,
+            });
+        }
+    } catch (error) {
+        console.error(
+            "Express reservation notification error:",
+            error
+        );
+    }
 }
 
 /* ================= orders ================= */
@@ -1255,7 +1405,12 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
             return res.status(404).json({ success: false, message: "Пользователь не найден" });
         }
 
-        const busyRegular = await hasBusyRegularOrder(Order, executorId);
+        const busyRegular =
+            await hasBusyRegularOrder(
+                Order,
+                executorId,
+                t
+            );
         if (busyRegular) {
             await t.rollback();
             return res.status(409).json({
@@ -1264,7 +1419,13 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
             });
         }
 
-        const busyTaxi = await hasBusyExpressOrder(ExpressOrder, executorId);
+        const busyTaxi =
+            await hasBusyExpressOrder(
+                ExpressOrder,
+                executorId,
+                null,
+                t
+            );
         if (busyTaxi) {
             await t.rollback();
             return res.status(409).json({
@@ -1404,7 +1565,23 @@ router.post("/express-orders/:id/accept", authenticateToken, async (req, res) =>
             transaction: t,
         });
 
+        await sequelize.query(
+            `
+    UPDATE express_reservation_requests
+    SET
+        status = 'rejected',
+        resolved_at = CURRENT_TIMESTAMP(3)
+    WHERE order_id = :orderId
+      AND status = 'pending'
+    `,
+            {
+                replacements: {
+                    orderId: order.id,
+                },
 
+                transaction: t,
+            }
+        );
 
         await req.logAction({
             req,
@@ -1793,6 +1970,262 @@ router.post("/express-orders/:id/arrived", authenticateToken, async (req, res) =
         });    }
 });
 
+router.post(
+    "/express-orders/:id/reservation/request",
+
+    authenticateToken,
+
+    async (req, res) => {
+        try {
+            const result =
+                await requestExpressReservation({
+                    orderId:
+                    req.params.id,
+
+                    executorId:
+                    req.user.id,
+
+                    sourceOrderId:
+                    req.body?.sourceOrderId,
+
+                    latitude:
+                    req.body?.latitude,
+
+                    longitude:
+                    req.body?.longitude,
+                });
+
+            await publishReservationEvent({
+                req,
+
+                creatorId:
+                result.creatorId,
+
+                executorId:
+                result.executorId,
+
+                orderId:
+                result.orderId,
+
+                title:
+                    "Предложение исполнителя",
+
+                message:
+                    "Исполнитель заканчивает предыдущий заказ и предлагает принять ваш.",
+
+                notifyUserId:
+                result.creatorId,
+            });
+
+            return res.status(201).json({
+                success: true,
+                ...result,
+            });
+        } catch (error) {
+            return sendReservationError(
+                res,
+                error
+            );
+        }
+    }
+);
+
+router.get(
+    "/express-orders/:id/reservation/requests",
+
+    authenticateToken,
+
+    async (req, res) => {
+        try {
+            const requests =
+                await listExpressReservationRequests({
+                    orderId:
+                    req.params.id,
+
+                    creatorId:
+                    req.user.id,
+                });
+
+            return res.json({
+                success: true,
+                requests,
+            });
+        } catch (error) {
+            return sendReservationError(
+                res,
+                error
+            );
+        }
+    }
+);
+
+router.post(
+    "/express-orders/:id/reservation/approve",
+
+    authenticateToken,
+
+    async (req, res) => {
+        try {
+            const order =
+                await approveExpressReservation({
+                    orderId:
+                    req.params.id,
+
+                    requestId:
+                    req.body?.requestId,
+
+                    creatorId:
+                    req.user.id,
+                });
+
+            await publishReservationEvent({
+                req,
+
+                creatorId:
+                order.creatorId,
+
+                executorId:
+                order.executorId,
+
+                orderId:
+                order.id,
+
+                title:
+                    "Следующий заказ подтверждён",
+
+                message:
+                    "Заказчик согласился подождать завершения текущей поездки.",
+
+                notifyUserId:
+                order.executorId,
+            });
+
+            return res.json({
+                success: true,
+                order,
+            });
+        } catch (error) {
+            return sendReservationError(
+                res,
+                error
+            );
+        }
+    }
+);
+
+router.post(
+    "/express-orders/:id/reservation/reject",
+
+    authenticateToken,
+
+    async (req, res) => {
+        try {
+            const result =
+                await rejectExpressReservation({
+                    orderId:
+                    req.params.id,
+
+                    requestId:
+                    req.body?.requestId,
+
+                    userId:
+                    req.user.id,
+                });
+
+            const byCreator =
+                Number(req.user.id) ===
+                Number(result.creatorId);
+
+            await publishReservationEvent({
+                req,
+
+                ...result,
+
+                title:
+                    "Предложение отменено",
+
+                message:
+                    "Предложение следующего заказа больше не актуально.",
+
+                notifyUserId:
+                    byCreator
+                        ? result.executorId
+                        : result.creatorId,
+            });
+
+            return res.json({
+                success: true,
+                ...result,
+            });
+        } catch (error) {
+            return sendReservationError(
+                res,
+                error
+            );
+        }
+    }
+);
+
+router.post(
+    "/express-orders/:id/reservation/cancel",
+
+    authenticateToken,
+
+    async (req, res) => {
+        try {
+            const result =
+                await cancelExpressReservation({
+                    orderId:
+                    req.params.id,
+
+                    userId:
+                    req.user.id,
+                });
+
+            const order =
+                result.order;
+
+            const byCreator =
+                Number(req.user.id) ===
+                Number(order.creatorId);
+
+            await publishReservationEvent({
+                req,
+
+                creatorId:
+                order.creatorId,
+
+                executorId:
+                result.previousExecutorId,
+
+                orderId:
+                order.id,
+
+                title:
+                    "Бронирование отменено",
+
+                message:
+                    "Следующий заказ снова доступен для принятия.",
+
+                notifyUserId:
+                    byCreator
+                        ? result.previousExecutorId
+                        : order.creatorId,
+            });
+
+            return res.json({
+                success: true,
+                order,
+            });
+        } catch (error) {
+            return sendReservationError(
+                res,
+                error
+            );
+        }
+    }
+);
+
 router.post("/express-orders/:id/start-waiting", authenticateToken, async (req, res) => {
     try {
         const executorId = req.user.id;
@@ -2025,6 +2458,27 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
                 });
             }
 
+            const executor =
+                await User.findByPk(
+                    executorId,
+                    {
+                        transaction: t,
+
+                        lock:
+                        t.LOCK.UPDATE,
+                    }
+                );
+
+            if (!executor) {
+                await t.rollback();
+
+                return res.status(404).json({
+                    success: false,
+
+                    message:
+                        "Исполнитель не найден",
+                });
+            }
             const order =
                 await ExpressOrder.findByPk(
                     id,
@@ -2087,16 +2541,6 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
                         "Комиссия по этому заказу уже обработана",
                 });
             }
-
-            const executor =
-                await User.findByPk(
-                    executorId,
-                    {
-                        transaction: t,
-                        lock:
-                        t.LOCK.UPDATE,
-                    }
-                );
 
             if (!executor) {
                 await t.rollback();
@@ -2223,6 +2667,12 @@ router.post("/express-orders/:id/complete", authenticateToken, async (req, res) 
             await order.save({
                 transaction: t,
             });
+            const nextExpressOrder =
+                await activateNextExpressOrder({
+                    sourceOrder: order,
+                    executorId,
+                    transaction: t,
+                });
 try{
             await req.logAction({
                 req,
@@ -2279,6 +2729,30 @@ try{
     );
 }
             await t.commit();
+
+            if (nextExpressOrder) {
+                await publishReservationEvent({
+                    req,
+
+                    creatorId:
+                    nextExpressOrder.creatorId,
+
+                    executorId:
+                    nextExpressOrder.executorId,
+
+                    orderId:
+                    nextExpressOrder.id,
+
+                    title:
+                        "Исполнитель освободился",
+
+                    message:
+                        "Предыдущий заказ завершён. Ваш заказ принят исполнителем.",
+
+                    notifyUserId:
+                    nextExpressOrder.creatorId,
+                });
+            }
 
             // Обращаемся к банку только ПОСЛЕ COMMIT.
 // Если результат неизвестен, новый платёж
@@ -2465,6 +2939,10 @@ try {
                 success: true,
 
                 order,
+
+                nextOrder:
+                    nextExpressOrder || null,
+
 
                 commission: {
                     premium:
@@ -2814,5 +3292,31 @@ router.delete("/express-addresses/me/:id", authenticateToken, async (req, res) =
         res.status(500).json({ success: false, message: "Ошибка сервера" });
     }
 });
+
+router.get(
+    "/express-orders/reservation/me",
+
+    authenticateToken,
+
+    async (req, res) => {
+        try {
+            const request =
+                await getMyPendingExpressReservation({
+                    executorId:
+                    req.user.id,
+                });
+
+            return res.json({
+                success: true,
+                request,
+            });
+        } catch (error) {
+            return sendReservationError(
+                res,
+                error
+            );
+        }
+    }
+);
 
 module.exports = router;

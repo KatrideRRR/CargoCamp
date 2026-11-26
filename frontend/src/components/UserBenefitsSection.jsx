@@ -6,7 +6,7 @@ import React, {
 
 import axios from "axios";
 import axiosInstance from "../utils/axiosInstance";
-
+import PersonalDataConsent from "./PersonalDataConsent";
 import "../styles/UserBenefitsSection.css";
 import {
     UserRound,
@@ -153,7 +153,10 @@ function UserBenefitsSection({
 
     const [uploadingCode, setUploadingCode] =
         useState(null);
-
+    const [
+        pensionConsent,
+        setPensionConsent,
+    ] = useState(null);
     const [opened, setOpened] = useState(false);
 
     const loadBenefits = useCallback(async () => {
@@ -237,6 +240,22 @@ function UserBenefitsSection({
     const handleSubmit = async (code) => {
         if (uploadingCode) return;
 
+        if (code !== "pension_recipient") {
+            setError(
+                "Приём новых заявок по этой категории временно недоступен."
+            );
+
+            return;
+        }
+
+        if (!pensionConsent?.confirmed) {
+            setError(
+                "Необходимо принять отдельное согласие на обработку персональных данных."
+            );
+
+            return;
+        }
+
         const file = selectedFiles[code];
 
         const validationError = validateFile(file);
@@ -264,6 +283,21 @@ function UserBenefitsSection({
             const formData = new FormData();
 
             formData.append("document", file);
+
+            formData.append(
+                "consentVersion",
+                pensionConsent.version
+            );
+
+            formData.append(
+                "consentSha256",
+                pensionConsent.sha256
+            );
+
+            formData.append(
+                "consentConfirmed",
+                "true"
+            );
 
             /*
              * Здесь используем обычный axios.
@@ -514,8 +548,9 @@ function UserBenefitsSection({
                                                 </p>
                                             )}
 
-                                        {canApply && (
-                                            <div className="cc-benefit-upload">
+                                        {canApply &&
+                                            program.code === "pension_recipient" && (
+                                                <div className="cc-benefit-upload">
                                                 <div className="cc-benefit-file-label">
                                                     Подтверждающий документ
                                                 </div>
@@ -559,11 +594,18 @@ function UserBenefitsSection({
                                                     </p>
                                                 )}
 
+                                                    <PersonalDataConsent
+                                                        code="pension_verification"
+                                                        disabled={Boolean(uploadingCode)}
+                                                        onChange={setPensionConsent}
+                                                    />
+
                                                 <button
                                                     type="button"
                                                     className="cc-benefit-submit"
                                                     disabled={
                                                         !file ||
+                                                        !pensionConsent?.confirmed ||
                                                         Boolean(
                                                             uploadingCode
                                                         )
@@ -578,8 +620,16 @@ function UserBenefitsSection({
                                                         ? "Отправляем..."
                                                         : "Отправить на проверку"}
                                                 </button>
+                                                    setPensionConsent(null);
                                             </div>
+
                                         )}
+                                        {canApply &&
+                                            program.code !== "pension_recipient" && (
+                                                <p className="cc-benefit-date">
+                                                    Приём новых заявок временно недоступен.
+                                                </p>
+                                            )}
                                     </article>
                                 );
                             })}

@@ -147,6 +147,7 @@ module.exports = (sequelize, DataTypes) => {
             status: {
                 type: DataTypes.ENUM(
                     'created',
+                    'reserved',
                     'accepted',
                     'on_the_way_to_A',
                     'arrived_at_A',
@@ -160,6 +161,23 @@ module.exports = (sequelize, DataTypes) => {
                 defaultValue: 'created',
             },
 
+            reservationSourceOrderId: {
+                type: DataTypes.INTEGER.UNSIGNED,
+                allowNull: true,
+                field: "reservation_source_order_id",
+            },
+
+            reservationApprovedAt: {
+                type: DataTypes.DATE(3),
+                allowNull: true,
+                field: "reservation_approved_at",
+            },
+
+            reservationActivatedAt: {
+                type: DataTypes.DATE(3),
+                allowNull: true,
+                field: "reservation_activated_at",
+            },
             /* === Детали === */
             subcategory: {
                 type: DataTypes.STRING(100),

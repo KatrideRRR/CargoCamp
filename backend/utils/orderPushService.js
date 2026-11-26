@@ -59,6 +59,25 @@ async function sendOrderPush({
     const order = await Order.findByPk(orderId);
     if (!order) return { ok: false, reason: "order_not_found" };
 
+    if (
+        order.status !== "pending" ||
+        order.paymentType === "guarantee" ||
+        order.creatorHidden ||
+        order.adminDeleted
+    ) {
+        return {
+            ok: false,
+            reason: "order_not_published",
+        };
+    }
+
+    if (!order.promotionPaidAt) {
+        return {
+            ok: false,
+            reason: "promotion_not_paid",
+        };
+    }
+
     if (!order.is_push_notified) return { ok: false, reason: "push_not_enabled" };
 
     const coords = parseOrderCoords(order);

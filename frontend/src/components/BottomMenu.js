@@ -11,6 +11,7 @@ import { ListTodo, Home, ClipboardList, PackagePlus, UserRound } from "lucide-re
 import { useNavigate, useLocation } from "react-router-dom";
 import { socket } from "../socketClient";
 import { Capacitor } from "@capacitor/core";
+import axiosInstance from "../utils/axiosInstance";
 
 const BottomMenu = () => {
     const navigate = useNavigate();
@@ -27,6 +28,7 @@ const BottomMenu = () => {
  * доставки одного уведомления.
  */
     const unreadMessageIdsRef = useRef(new Set());
+    const unreadRequestIdsRef = useRef(new Set());
 
     const platform = useMemo(() => {
         const params = new URLSearchParams(window.location.search);
@@ -49,10 +51,14 @@ const BottomMenu = () => {
         location.pathname.startsWith("/messages");
 
     useEffect(() => {
-        if (!user?.id || shouldHide) return;
-
         unreadMessageIdsRef.current = new Set();
+        unreadRequestIdsRef.current = new Set();
+
         setMessageCount(0);
+        setRequestCount(0);
+        setDebtCount(0);
+
+        if (!user?.id) return;
 
         const fetchDebt = async () => {
             try {
@@ -65,8 +71,26 @@ const BottomMenu = () => {
                     },
                 });
 
+                if (!res.ok) {
+                    throw new Error(
+                        `Debt request failed: ${res.status}`
+                    );
+                }
+
                 const data = await res.json();
-                const debt = Number(data?.debt || 0);
+                const rawDebt = data?.debt;
+                const debt = Number(rawDebt);
+
+                if (
+                    rawDebt == null ||
+                    rawDebt === "" ||
+                    !Number.isSafeInteger(debt) ||
+                    debt < 0
+                ) {
+                    throw new Error(
+                        "Некорректная сумма задолженности"
+                    );
+                }
 
                 setDebtCount(debt > 0 ? 1 : 0);
             } catch (e) {
@@ -76,85 +100,178 @@ const BottomMenu = () => {
 
         fetchDebt();
 
+        const handleDebtRefresh = () => {
+            void fetchDebt();
+        };
+
+        const handleVisibility = () => {
+            if (!document.hidden) {
+                void fetchDebt();
+            }
+        };
+
+        window.addEventListener(
+            "focus",
+            handleDebtRefresh
+        );
+
+        window.addEventListener(
+            "cargocamp:debt-updated",
+            handleDebtRefresh
+        );
+
+        document.addEventListener(
+            "visibilitychange",
+            handleVisibility
+        );
+
+        socket.on(
+            "activeOrdersUpdated",
+            handleDebtRefresh
+        );
+
         const subscribe = () => {
             socket.emit("register", user.id);
             socket.emit("subscribeToNotifications", user.id);
         };
 
-        subscribe();
+        const getNotificationId = (item) => {
+            const id =
+                item?.id ??
+                item?.notificationId ??
+                item?.data?.notificationId;
 
-        socket.on("connect", subscribe);
-        socket.on("reconnect", subscribe);
+            return id == null ? null : String(id);
+        };
+
+        const applyNotification = (item) => {
+            const id = getNotificationId(item);
+
+            if (!id) return;
+
+            const isRead =
+                item.isRead === true ||
+                item.isRead === 1 ||
+                item.isRead === "1";
+
+            if (item.type === "new_message") {
+                if (isRead) {
+                    unreadMessageIdsRef.current.delete(id);
+                } else {
+                    unreadMessageIdsRef.current.add(id);
+                }
+            }
+
+            if (
+                item.type === "order_request" &&
+                item.title !== "Бронирование отменено"
+            ) {
+                if (isRead) {
+                    unreadRequestIdsRef.current.delete(id);
+                } else {
+                    unreadRequestIdsRef.current.add(id);
+                }
+            }
+        };
 
         const handleNewNotification = (payload) => {
             if (Array.isArray(payload)) {
-                /*
-                 * Полный снимок непрочитанных
-                 * уведомлений с сервера.
-                 */
-                const unreadIds = new Set();
+                unreadMessageIdsRef.current = new Set();
+                unreadRequestIdsRef.current = new Set();
 
-                for (const item of payload) {
-                    if (
-                        item?.type !== "new_message" ||
-                        item?.isRead === true
-                    ) {
-                        continue;
-                    }
-
-                    const id =
-                        item.id ??
-                        item.notificationId ??
-                        item.data?.notificationId;
-
-                    if (id != null) {
-                        unreadIds.add(String(id));
-                    }
-                }
-
-                unreadMessageIdsRef.current = unreadIds;
-            } else if (
-                payload?.type === "new_message" &&
-                payload?.isRead !== true
-            ) {
-                /*
-                 * Новое одиночное уведомление.
-                 * Один и тот же ID не увеличивает
-                 * счётчик повторно.
-                 */
-                const id =
-                    payload.id ??
-                    payload.notificationId ??
-                    payload.data?.notificationId;
-
-                if (id != null) {
-                    unreadMessageIdsRef.current.add(
-                        String(id)
-                    );
-                }
+                payload.forEach(applyNotification);
+            } else if (payload) {
+                applyNotification(payload);
             }
 
             setMessageCount(
                 unreadMessageIdsRef.current.size
             );
+
+            setRequestCount(
+                unreadRequestIdsRef.current.size
+            );
         };
 
-        const orderRequestEvent = `orderRequest:${user.id}`;
+        socket.on(
+            "new_notification",
+            handleNewNotification
+        );
 
-        const handleOrderRequest = () => {
-            setRequestCount((prev) => prev + 1);
-        };
+        socket.on("connect", subscribe);
 
-        socket.on("new_notification", handleNewNotification);
-        socket.on(orderRequestEvent, handleOrderRequest);
+        subscribe();
 
         return () => {
-            socket.off("connect", subscribe);
-            socket.off("reconnect", subscribe);
-            socket.off("new_notification", handleNewNotification);
-            socket.off(orderRequestEvent, handleOrderRequest);
+            window.removeEventListener(
+                "focus",
+                handleDebtRefresh
+            );
+
+            window.removeEventListener(
+                "cargocamp:debt-updated",
+                handleDebtRefresh
+            );
+
+            document.removeEventListener(
+                "visibilitychange",
+                handleVisibility
+            );
+
+            socket.off(
+                "activeOrdersUpdated",
+                handleDebtRefresh
+            );
+
+            socket.off(
+                "connect",
+                subscribe
+            );
+
+            socket.off(
+                "new_notification",
+                handleNewNotification
+            );
         };
-    }, [user?.id, shouldHide]);
+    }, [user?.id]);
+
+    useEffect(() => {
+        if (!user?.id) return;
+
+        const myOrdersPath =
+            `/my-orders/${user.id}`;
+
+        if (
+            location.pathname !== myOrdersPath &&
+            !location.pathname.startsWith(
+                `${myOrdersPath}/`
+            )
+        ) {
+            return;
+        }
+
+        if (requestCount === 0) return;
+
+        const markRequestsAsRead = async () => {
+            try {
+                await axiosInstance.post(
+                    "/orders/notifications/read-requests"
+                );
+            } catch (error) {
+                console.error(
+                    "Ошибка прочтения откликов:",
+                    error.response?.status ||
+                    error.message
+                );
+            }
+        };
+
+        void markRequestsAsRead();
+    }, [
+        user?.id,
+        location.pathname,
+        requestCount,
+    ]);
 
     const isActive = (path) => {
         return location.pathname === path || location.pathname.startsWith(path + "/");
@@ -162,8 +279,8 @@ const BottomMenu = () => {
 
     const handleMyOrdersClick = () => {
         if (!user?.id) return;
+
         navigate(`/my-orders/${user.id}`);
-        setRequestCount(0);
     };
 
     const handleOpenActive = () => {
@@ -225,7 +342,13 @@ const BottomMenu = () => {
 
                 <button
                     className={`bottom-menu__item ${isActive("/profile") ? "is-active" : ""}`}
-                    onClick={() => navigate("/profile")}
+                    onClick={() =>
+                        navigate(
+                            debtCount > 0
+                                ? "/profile?section=debt"
+                                : "/profile"
+                        )
+                    }
                     type="button"
                     aria-label="Профиль"
                 >

@@ -10,7 +10,10 @@ import Modal from "react-modal";
 import { FaCreditCard, FaMoneyBillWave, FaQuestionCircle, FaUniversity } from "react-icons/fa";
 import { Capacitor } from "@capacitor/core";
 import PromotionRetryPayment from "../components/PromotionRetryPayment";
+import ExpressReservationRequests
+    from "../components/ExpressReservationRequests";
 
+import "../styles/ExpressReservedOrderCard.css";
 import {
     Zap,
     Clock3,
@@ -180,6 +183,42 @@ const MyOrdersPage = () => {
 
     const [paymentProfile, setPaymentProfile] = useState(null);
     const [promotionNotice, setPromotionNotice] = useState("");
+
+    useEffect(() => {
+        const params = new URLSearchParams(
+            window.location.search
+        );
+
+        const result = params.get(
+            "promotionResult"
+        );
+
+        if (!result) return;
+
+        if (result === "failed") {
+            setPromotionNotice(
+                "Заказ сохранён, но продвижение не оплачено. Повторите оплату. До её подтверждения заказ не виден исполнителям."
+            );
+        } else if (result === "processing") {
+            setPromotionNotice(
+                "Заказ сохранён. Платёж обрабатывается. Заказ будет опубликован после подтверждения оплаты."
+            );
+        } else if (result === "pending") {
+            setPromotionNotice(
+                "Заказ сохранён и ожидает оплаты продвижения. Вы можете продолжить оплату."
+            );
+        }
+
+        params.delete("promotionResult");
+
+        const query = params.toString();
+
+        window.history.replaceState(
+            window.history.state,
+            "",
+            `${window.location.pathname}${query ? `?${query}` : ""}`
+        );
+    }, []);
 
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -609,6 +648,10 @@ const MyOrdersPage = () => {
         socket.on("activeOrdersUpdated", fetchOrders);
 
         socket.on("expressOrdersUpdated", fetchOrders);
+        socket.on(
+            "expressReservationsUpdated",
+            fetchOrders
+        );
         socket.on("expressOrderAccepted", removeAcceptedExpressFromMyOrders);
         socket.on("expressOrderStatusChanged", removeAcceptedExpressFromMyOrders);
         socket.on("expressStatusChanged", removeAcceptedExpressFromMyOrders);
@@ -618,6 +661,10 @@ const MyOrdersPage = () => {
             socket.off("activeOrdersUpdated", fetchOrders);
 
             socket.off("expressOrdersUpdated", fetchOrders);
+            socket.off(
+                "expressReservationsUpdated",
+                fetchOrders
+            );
             socket.off("expressOrderAccepted", removeAcceptedExpressFromMyOrders);
             socket.off("expressOrderStatusChanged", removeAcceptedExpressFromMyOrders);
             socket.off("expressStatusChanged", removeAcceptedExpressFromMyOrders);
@@ -749,7 +796,7 @@ const MyOrdersPage = () => {
                             return (
                                 <li
                                     className={`${styles.orderCard} ${isExpress ? styles.orderCardExpress : ""}`}
-                                    key={order.id}
+                                    key={`${order.kind}-${order.id}`}
                                 >
                                     <div className={styles.orderContent}>
                                         {/* Header row */}
@@ -793,6 +840,17 @@ const MyOrdersPage = () => {
                                                 <span className={styles.financeType}>{paymentLabel}</span>
                                             </div>
                                         </div>
+
+                                        {isExpress &&
+                                            order.status === "created" &&
+                                            !order.executorId && (
+                                                <ExpressReservationRequests
+                                                    orderId={order.id}
+                                                    onUpdated={() => {
+                                                        void fetchOrders();
+                                                    }}
+                                                />
+                                            )}
 
                                         {/* Meta */}
                                         <div className={styles.metaGrid}>

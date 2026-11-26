@@ -244,3 +244,63 @@ test("ошибка БД не разрешает новую операцию", as
         }
     );
 });
+
+test(
+    "Новые обязательства по экспресс-бронированию требуют действующей оферты",
+    () => {
+        assert.equal(
+            requiresCurrentOffer(
+                "POST",
+                "/express/express-orders/101/reservation/request"
+            ),
+            true
+        );
+
+        assert.equal(
+            requiresCurrentOffer(
+                "POST",
+                "/express/express-orders/101/reservation/approve"
+            ),
+            true
+        );
+    }
+);
+
+test(
+    "Отмена и отклонение экспресс-бронирования доступны без новой оферты",
+    () => {
+        for (const action of [
+            "reject",
+            "cancel",
+        ]) {
+            assert.equal(
+                requiresCurrentOffer(
+                    "POST",
+                    `/express/express-orders/101/reservation/${action}`
+                ),
+                false
+            );
+        }
+    }
+);
+
+test(
+    "Чтение предложений экспресс-заказа не требует нового принятия оферты",
+    () => {
+        assert.equal(
+            requiresCurrentOffer(
+                "GET",
+                "/express/express-orders/101/reservation/requests"
+            ),
+            false
+        );
+
+        assert.equal(
+            requiresCurrentOffer(
+                "GET",
+                "/express/express-orders/reservation/me"
+            ),
+            false
+        );
+    }
+);

@@ -1357,12 +1357,45 @@ function CreateOrderPage() {
             return;
         }
 
+        let createdOrderId = null;
+
+        const openCreatedOrder = (
+            orderId,
+            paymentResult = "pending"
+        ) => {
+            const user = JSON.parse(
+                localStorage.getItem("user") || "{}"
+            );
+
+            if (!user?.id) {
+                navigate("/orders", {
+                    replace: true,
+                });
+
+                return;
+            }
+
+            const params = new URLSearchParams({
+                orderId: String(orderId),
+                promotionResult: paymentResult,
+            });
+
+            navigate(
+                `/my-orders/${user.id}?${params.toString()}`,
+                {
+                    replace: true,
+                }
+            );
+        };
+
         try {
             const response = await axios.post(`${apiUrl}/api/orders/`, data, {
                 headers: {Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data"},
             });
 
             const orderId = response.data.id;
+
+            createdOrderId = orderId;
 
             if (cleanPromotionTotal > 0) {
                 const endpoint =
@@ -1381,8 +1414,11 @@ function CreateOrderPage() {
                 );
 
                 if (!payResp.data?.success) {
-                    setError(payResp.data?.error || "Не удалось оплатить продвижение");
-                    setIsSubmitting(false);
+                    openCreatedOrder(
+                        orderId,
+                        "failed"
+                    );
+
                     return;
                 }
 
@@ -1393,8 +1429,11 @@ function CreateOrderPage() {
                         return;
                     }
 
-                    alert("Заказ создан. Платёж с привязанной карты обрабатывается.");
-                    navigate("/orders");
+                    openCreatedOrder(
+                        orderId,
+                        "processing"
+                    );
+
                     return;
                 }
 
@@ -1403,14 +1442,26 @@ function CreateOrderPage() {
                     return;
                 }
 
-                setError("Не удалось получить ссылку на оплату");
-                setIsSubmitting(false);
+                openCreatedOrder(
+                    orderId,
+                    "pending"
+                );
+
+                return;
             } else {
                 alert("Заказ успешно создан");
                 navigate("/orders");
             }
         } catch (err) {
             console.error("Ошибка при создании заказа:", err);
+            if (createdOrderId) {
+                openCreatedOrder(
+                    createdOrderId,
+                    "pending"
+                );
+
+                return;
+            }
             setError(err.response?.data?.message || "Не удалось создать заказ. Попробуйте снова.");
             setIsSubmitting(false);
         }

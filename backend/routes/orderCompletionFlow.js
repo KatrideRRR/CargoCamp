@@ -50,7 +50,6 @@ const {
 
 const router = express.Router();
 
-router.use(authenticateToken);
 router.use((req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
     next();
@@ -227,7 +226,7 @@ async function safeLog(req, actionType, orderId, meta = {}) {
 
 function registerOrderCompletionFlow(io) {
     // Первое или второе подтверждение завершения.
-    router.post("/complete/:id", async (req, res) => {
+    router.post("/complete/:id", authenticateToken, async (req, res) => {
         try {
             const orderId = Number(req.params.id);
 
@@ -329,7 +328,7 @@ function registerOrderCompletionFlow(io) {
     });
 
     // Исполнитель сообщил, что исправил недостатки.
-    router.post("/:id/corrections/submit", async (req, res) => {
+    router.post("/:id/corrections/submit", authenticateToken, async (req, res) => {
         try {
             const orderId = Number(req.params.id);
 
@@ -366,7 +365,7 @@ function registerOrderCompletionFlow(io) {
     });
 
     // Заказчик принял либо отклонил исправления.
-    router.post("/:id/corrections/review", async (req, res) => {
+    router.post("/:id/corrections/review", authenticateToken, async (req, res) => {
         try {
             const orderId = Number(req.params.id);
 
@@ -429,7 +428,7 @@ function registerOrderCompletionFlow(io) {
 
     // Повторное формирование документа после сбоя PDF.
     // Финансовых операций этот маршрут не выполняет.
-    router.post("/:id/ensure-completion-act", async (req, res) => {
+    router.post("/:id/ensure-completion-act", authenticateToken, async (req, res) => {
         try {
             const orderId = Number(req.params.id);
             const order = await loadFullOrder(orderId);
@@ -460,7 +459,7 @@ function registerOrderCompletionFlow(io) {
     });
 
     // Документы, которые пользователь ещё не подписал.
-    router.get("/pending-act-signatures", async (req, res) => {
+    router.get("/pending-act-signatures", authenticateToken, async (req, res) => {
         try {
             const userId = Number(req.user.id);
 

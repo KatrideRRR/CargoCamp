@@ -1,0 +1,100 @@
+.express-reserved-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    padding: 16px;
+
+    border: 1px solid rgba(217, 119, 6, 0.35);
+    border-radius: 16px;
+
+    background: rgba(217, 119, 6, 0.05);
+    color: inherit;
+}
+
+.express-reserved-header {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.express-reserved-badge {
+    display: inline-flex;
+
+    padding: 5px 10px;
+
+    border-radius: 20px;
+
+    background: rgba(217, 119, 6, 0.14);
+
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.express-reserved-route {
+    display: grid;
+    gap: 10px;
+}
+
+.express-reserved-card p {
+    margin: 0;
+}
+
+.express-reserved-price {
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.cc-express-requests {
+    display: flex;
+    flex-direction: column;
+
+    gap: 12px;
+
+    margin: 12px 0;
+}
+
+.cc-express-requests h4 {
+    margin: 0;
+
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.cc-express-next-action {
+    display: flex;
+    flex-direction: column;
+
+    gap: 8px;
+}
+
+.cc-express-next-action [role="alert"],
+.cc-express-requests [role="alert"],
+.express-reserved-card [role="alert"] {
+    color: #dc2626;
+
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.express-reserved-card button {
+    width: 100%;
+}
+
+.express-reserved-card small {
+    opacity: 0.8;
+}
+
+@media (prefers-color-scheme: dark) {
+    .cc-express-next-action [role="alert"],
+    .cc-express-requests [role="alert"],
+    .express-reserved-card [role="alert"] {
+        color: #fca5a5;
+    }
+
+    .express-reserved-card {
+        background:
+                rgba(217, 119, 6, 0.09);
+    }
+}

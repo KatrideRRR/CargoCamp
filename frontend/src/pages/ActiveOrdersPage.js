@@ -22,6 +22,7 @@ import VerifiedAssignmentCard from "../components/VerifiedAssignmentCard";
 import OrderWorkPhotos from "../components/OrderWorkPhotos";
 import DisputeEvidenceInput from "../components/DisputeEvidenceInput";
 import OrderChangePanel from "../components/OrderChangePanel";
+import ExpressReservedOrderCard from "../components/ExpressReservedOrderCard";
 import ContractSigningPanel
     from "../components/ContractSigningPanel";
 import "../styles/ActiveOrdersPageDark.css";
@@ -1594,6 +1595,19 @@ const ActiveOrdersPage = () => {
         socket.on("expressOrderStatusChanged", onAnyOrderUpdate);
         socket.on("expressStatusChanged", onAnyOrderUpdate);
         socket.on("expressOrderCompleted", onAnyOrderUpdate);
+        socket.on(
+            "expressReservationsUpdated",
+            onAnyOrderUpdate
+        );
+
+        const handleLocalExpressUpdate = () => {
+            onAnyOrderUpdate();
+        };
+
+        window.addEventListener(
+            "cargocamp:express-orders-updated",
+            handleLocalExpressUpdate
+        );
         socket.on("expressOrderCompletedForExecutor", onAnyOrderUpdate);
         socket.on("expressOrderCancelled", onAnyOrderUpdate);
 
@@ -1611,6 +1625,15 @@ const ActiveOrdersPage = () => {
             socket.off("expressOrderStatusChanged", onAnyOrderUpdate);
             socket.off("expressStatusChanged", onAnyOrderUpdate);
             socket.off("expressOrderCompleted", onAnyOrderUpdate);
+            socket.off(
+                "expressReservationsUpdated",
+                onAnyOrderUpdate
+            );
+
+            window.removeEventListener(
+                "cargocamp:express-orders-updated",
+                handleLocalExpressUpdate
+            );
             socket.off("expressOrderCompletedForExecutor", onAnyOrderUpdate);
             socket.off("expressOrderCancelled", onAnyOrderUpdate);
         };
@@ -1720,7 +1743,20 @@ const ActiveOrdersPage = () => {
 
     const visibleExpressOrders =
         activeView === "performing"
-            ? (performingOrders.length > 0 ? [] : performingExpressOrders.slice(0, 1))
+            ? [...performingExpressOrders].sort(
+                (a, b) => {
+                    const aReserved =
+                        a.status === "reserved";
+
+                    const bReserved =
+                        b.status === "reserved";
+
+                    return (
+                        Number(aReserved) -
+                        Number(bReserved)
+                    );
+                }
+            )
             : createdExpressOrders;
 
     const hasAnyVisible =
@@ -2372,7 +2408,22 @@ const ActiveOrdersPage = () => {
 
                                     {/* express активные заказы */}
                                     {visibleExpressOrders.map((eo) => (
-                                        <ExpressOrderCard
+                                        eo.status === "reserved" ? (
+                                            <ExpressReservedOrderCard
+                                                key={`express-reserved-${eo.id}`}
+                                                order={eo}
+                                                userId={user.id}
+                                                onUpdated={() => {
+                                                    window.dispatchEvent(
+                                                        new Event(
+                                                            "cargocamp:express-orders-updated"
+                                                        )
+                                                    );
+                                                }}
+                                            />
+                                        ) : (
+                                            <ExpressOrderCard
+
                                             key={`express-${eo.id}-${eo.status}-${eo.updatedAt || eo.completedAt || ""}`}
                                             order={eo}
                                             userId={user.id}
@@ -2439,6 +2490,7 @@ const ActiveOrdersPage = () => {
                                                 callPhone(phone);
                                             }}
                                         />
+                                        )
                                     ))}
                                 </ul>
                             ) : (

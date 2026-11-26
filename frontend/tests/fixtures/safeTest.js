@@ -2,7 +2,9 @@ const {
     test: base,
     expect,
 } = require("@playwright/test");
-
+const offerDocument = require(
+    "../../src/components/PublicOfferDocument.json"
+);
 const FRONT_ORIGIN = "http://localhost:3000";
 
 const test = base.extend({
@@ -58,11 +60,29 @@ const test = base.extend({
                         status: 200,
                         contentType: "application/json",
                         body: JSON.stringify({
-                            version: "2026-11-09",
-                            sha256: "isolated-playwright-offer",
+                            version: offerDocument.version,
+                            sha256: offerDocument.sha256,
                             accepted: true,
                             acceptedAt: "2026-11-12T00:00:00.000Z",
                         }),
+                    });
+                }
+            );
+
+            await context.route(
+                "**/api/account-deletion/status",
+                async (route) => {
+                    if (route.request().method() !== "GET") {
+                        await route.fallback();
+                        return;
+                    }
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                            request: null,
+                        },
                     });
                 }
             );

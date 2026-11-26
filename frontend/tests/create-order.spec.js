@@ -1607,17 +1607,47 @@ test.describe(
         // ------------------------------------------------
 
         test(
-            "показывает ошибку банка без перехода на оплату",
+            "при отказе банка сохраняет заказ и предлагает повторную оплату",
             async ({ page }) => {
+                let paymentRequests = 0;
+                let paymentBody = null;
+
                 await page.route(
                     "**/api/payments/order/promotion/create",
                     async (route) => {
+                        paymentRequests++;
+
+                        paymentBody =
+                            route.request().postDataJSON();
+
                         await route.fulfill({
                             status: 200,
                             json: {
                                 success: false,
-                                error:
-                                    "Тестовый платёж отклонён",
+                                error: "Тестовый платёж отклонён",
+                            },
+                        });
+                    }
+                );
+
+                await page.route(
+                    "**/api/orders/creator/1",
+                    async (route) => {
+                        await route.fulfill({
+                            status: 200,
+                            json: [],
+                        });
+                    }
+                );
+
+                await page.route(
+                    "**/api/express/express-orders/me?mode=created",
+                    async (route) => {
+                        await route.fulfill({
+                            status: 200,
+                            json: {
+                                success: true,
+                                orders: [],
                             },
                         });
                     }
@@ -1634,21 +1664,28 @@ test.describe(
 
                 await clickCreateOrderButton(page);
 
-                await expect(
-                    page.locator(".createOrderErrorToast__message")
-                ).toContainText(
-                    "Тестовый платёж отклонён"
-                );
-
                 await expect(page).toHaveURL(
-                    /\/create-order(?:\?|$)/
+                    /\/my-orders\/1(?:\?|$)/
                 );
 
                 await expect(
-                    page.getByRole("button", {
-                        name: "Создать заказ",
-                    })
-                ).toBeEnabled();
+                    page.getByText(
+                        "Заказ сохранён, но продвижение не оплачено. Повторите оплату. До её подтверждения заказ не виден исполнителям.",
+                        { exact: true }
+                    )
+                ).toBeVisible();
+
+                await expect.poll(
+                    () => paymentRequests
+                ).toBe(1);
+
+                expect(paymentBody).toEqual({
+                    orderId: 777,
+                });
+
+                await expect(page).not.toHaveURL(
+                    /payment\.example\.test/
+                );
             }
         );
     }

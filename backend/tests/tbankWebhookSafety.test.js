@@ -133,6 +133,14 @@ test(
                     async sendOrderPush() {},
                 },
 
+                "../services/orderPublicationService": {
+                    async publishPaidOrder() {
+                        assert.fail(
+                            "Погашение задолженности не должно публиковать заказ"
+                        );
+                    },
+                },
+
                 "../services/adminNotificationService": {
                     async sendAdminNotification() {},
                     adminUsersUrl: () => "/admin/users",

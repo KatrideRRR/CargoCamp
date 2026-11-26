@@ -50,6 +50,9 @@ async function createHarness({
         logs: [],
         notifications: [],
         benefitLookups: 0,
+
+        reservationActivations: [],
+        reservationQueries: [],
     };
 
     const executor = {
@@ -128,6 +131,12 @@ async function createHarness({
         const executorBefore = snapshot(executor);
         const preparedCount = calls.prepared.length;
 
+        const reservationActivationsCount =
+            calls.reservationActivations.length;
+
+        const reservationQueriesCount =
+            calls.reservationQueries.length;
+
         let finished = null;
 
         return {
@@ -153,6 +162,12 @@ async function createHarness({
 
                 calls.prepared.length = preparedCount;
 
+                calls.reservationActivations.length =
+                    reservationActivationsCount;
+
+                calls.reservationQueries.length =
+                    reservationQueriesCount;
+
                 finished = "rollback";
                 release();
             },
@@ -160,6 +175,40 @@ async function createHarness({
     }
 
     const sequelize = {
+        async query(sql, options = {}) {
+            const normalizedSql =
+                String(sql)
+                    .replace(/\s+/g, " ")
+                    .trim();
+
+            assert.ok(
+                options.transaction,
+                "SQL-запрос бронирования должен выполняться в транзакции"
+            );
+
+            if (
+                /^UPDATE express_reservation_requests SET status = 'rejected', resolved_at = CURRENT_TIMESTAMP\(3\) WHERE order_id = :orderId AND status = 'pending'$/i
+                    .test(normalizedSql)
+            ) {
+                assert.equal(
+                    Number(options.replacements?.orderId),
+                    order.id
+                );
+
+                calls.reservationQueries.push({
+                    sql: normalizedSql,
+                    orderId:
+                    options.replacements.orderId,
+                });
+
+                return [undefined, 0];
+            }
+
+            throw new Error(
+                `UNEXPECTED_SQL_QUERY: ${normalizedSql}`
+            );
+        },
+
         async transaction(callback) {
             const transaction =
                 await makeTransaction();
@@ -334,6 +383,63 @@ async function createHarness({
 
             "../services/expressOrderLifecycleService":
             lifecycle,
+
+            "../services/expressReservationService": {
+                async requestExpressReservation() {
+                    throw new Error(
+                        "UNEXPECTED_RESERVATION_REQUEST"
+                    );
+                },
+
+                async listExpressReservationRequests() {
+                    throw new Error(
+                        "UNEXPECTED_RESERVATION_LIST"
+                    );
+                },
+
+                async approveExpressReservation() {
+                    throw new Error(
+                        "UNEXPECTED_RESERVATION_APPROVAL"
+                    );
+                },
+
+                async rejectExpressReservation() {
+                    throw new Error(
+                        "UNEXPECTED_RESERVATION_REJECTION"
+                    );
+                },
+
+                async cancelExpressReservation() {
+                    throw new Error(
+                        "UNEXPECTED_RESERVATION_CANCELLATION"
+                    );
+                },
+
+                async activateNextExpressOrder({
+                                                   sourceOrder,
+                                                   executorId,
+                                                   transaction,
+                                               }) {
+                    assert.ok(transaction);
+
+                    assert.equal(
+                        sourceOrder.status,
+                        "completed"
+                    );
+
+                    assert.equal(
+                        Number(sourceOrder.executorId),
+                        Number(executorId)
+                    );
+
+                    calls.reservationActivations.push({
+                        sourceOrderId: sourceOrder.id,
+                        executorId,
+                    });
+
+                    return null;
+                },
+            },
 
             "../services/benefitService": {
                 async hasSocialCommissionBenefit() {
@@ -891,5 +997,118 @@ test(
         assert.equal(h.executor.debt, 0);
         assert.equal(h.calls.prepared.length, 0);
         assert.equal(h.calls.charged.length, 0);
+    }
+);
+
+test(
+    "Express acceptance closes pending reservation requests",
+    async () => {
+        const h = await createHarness();
+
+        try {
+            const result =
+                await h.post("accept");
+
+            assert.equal(
+                result.status,
+                200
+            );
+
+            assert.equal(
+                h.calls.reservationQueries.length,
+                1
+            );
+
+            assert.equal(
+                Number(
+                    h.calls.reservationQueries[0].orderId
+                ),
+                h.order.id
+            );
+        } finally {
+            await h.close();
+        }
+    }
+);
+
+test(
+    "Express completion invokes reservation activation only once",
+    async () => {
+        const h = await createHarness();
+
+        try {
+            await h.beginWork();
+
+            const first =
+                await h.post("complete");
+
+            assert.equal(
+                first.status,
+                200
+            );
+
+            assert.equal(
+                first.body.nextOrder,
+                null
+            );
+
+            assert.equal(
+                h.calls.reservationActivations.length,
+                1
+            );
+
+            assert.equal(
+                h.calls.reservationActivations[0].sourceOrderId,
+                h.order.id
+            );
+
+            const second =
+                await h.post("complete");
+
+            assert.equal(
+                second.status,
+                409
+            );
+
+            assert.equal(
+                h.calls.reservationActivations.length,
+                1
+            );
+        } finally {
+            await h.close();
+        }
+    }
+);
+
+test(
+    "Failed commission preparation does not activate reservation",
+    async () => {
+        const h = await createHarness();
+
+        try {
+            await h.beginWork();
+
+            h.flags.failPrepare = true;
+
+            const result =
+                await h.post("complete");
+
+            assert.equal(
+                result.status,
+                500
+            );
+
+            assert.equal(
+                h.order.status,
+                "in_progress"
+            );
+
+            assert.equal(
+                h.calls.reservationActivations.length,
+                0
+            );
+        } finally {
+            await h.close();
+        }
     }
 );
