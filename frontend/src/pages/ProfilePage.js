@@ -1324,20 +1324,24 @@ const ProfilePage = () => {
         }
     };
 
-    const saveLocation = async ({ address, lat, lng, source }) => {
+    const saveLocation = async ({
+                                    address,
+                                    lat,
+                                    lng,
+                                    source,
+                                }) => {
         const token = localStorage.getItem("authToken");
 
         if (!token) {
             toast.error("Вы не авторизованы");
-            return;
+            return false;
         }
 
         const cleanAddress = String(address || "").trim();
 
         if (!cleanAddress) {
             setLocError("Введите адрес");
-            toast.error("Введите адрес");
-            return;
+            return false;
         }
 
         setLocLoading(true);
@@ -1345,14 +1349,28 @@ const ProfilePage = () => {
 
         try {
             let finalAddress = cleanAddress;
-            let finalLat = Number(lat);
-            let finalLng = Number(lng);
+
+            let finalLat =
+                lat == null || String(lat).trim() === ""
+                    ? NaN
+                    : Number(lat);
+
+            let finalLng =
+                lng == null || String(lng).trim() === ""
+                    ? NaN
+                    : Number(lng);
+
             let finalSource = source || "manual";
 
             const hasCoords =
                 Number.isFinite(finalLat) &&
                 Number.isFinite(finalLng) &&
-                !(Math.abs(finalLat) < 0.000001 && Math.abs(finalLng) < 0.000001);
+                Math.abs(finalLat) <= 90 &&
+                Math.abs(finalLng) <= 180 &&
+                !(
+                    Math.abs(finalLat) < 0.000001 &&
+                    Math.abs(finalLng) < 0.000001
+                );
 
             if (!hasCoords) {
                 const resolved = await geocodeAddressYandex({
@@ -1361,9 +1379,12 @@ const ProfilePage = () => {
                 });
 
                 if (!resolved) {
-                    setLocError("Не удалось определить координаты адреса. Выберите адрес из подсказки, GPS или на карте.");
-                    toast.error("Не удалось определить координаты адреса");
-                    return;
+                    setLocError(
+                        "Не удалось определить координаты адреса. " +
+                        "Выберите адрес из подсказки, GPS или на карте."
+                    );
+
+                    return false;
                 }
 
                 finalAddress = resolved.address;
@@ -1380,31 +1401,52 @@ const ProfilePage = () => {
                     lng: finalLng,
                     source: finalSource,
                 },
-                { headers: { Authorization: `Bearer ${token}` } }
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
             );
-
-            toast.success("Местоположение сохранено");
 
             setAddressSuggestions([]);
             setAddressQuery("");
+
             setPickedCoords({
                 lat: finalLat,
                 lng: finalLng,
             });
+
             setLocationDraft(finalAddress);
+            setGpsCandidate(null);
 
             setProfile((prev) => ({
                 ...prev,
                 ...res.data.location,
             }));
-        } catch (e) {
-            console.error(e);
-            setLocError(e.response?.data?.message || "Ошибка сохранения");
+
+            toast.success("Местоположение сохранено");
+
+            closeProfileSheet();
+
+            return true;
+
+        } catch (error) {
+            console.error(
+                "Location save error:",
+                error
+            );
+
+            setLocError(
+                error.response?.data?.message ||
+                "Не удалось сохранить местоположение. " +
+                "Проверьте соединение и повторите попытку."
+            );
+
+            return false;
         } finally {
             setLocLoading(false);
         }
     };
-
     const detectGps = async () => {
         setLocLoading(true);
         setLocError(null);
@@ -3300,9 +3342,7 @@ const ProfilePage = () => {
                                         lat: gpsCandidate.lat,
                                         lng: gpsCandidate.lng,
                                         source: "gps",
-                                    }).then(() =>
-                                        setGpsCandidate(null)
-                                    )
+                                    })
                                 }
                             >
                                 Да, сохранить

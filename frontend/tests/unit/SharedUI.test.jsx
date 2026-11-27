@@ -8,12 +8,14 @@ import {
 
 import "@testing-library/jest-dom";
 
-import TextField from "./TextField";
-import SectionCard from "./SectionCard";
-import SettingsRow from "./SettingsRow";
-import StatusBadge from "./StatusBadge";
-import EmptyState from "./EmptyState";
-import LoadingState from "./LoadingState";
+import {
+    TextField,
+    SectionCard,
+    SettingsRow,
+    StatusBadge,
+    EmptyState,
+    LoadingState,
+} from "../../src/components/ui";
 
 
 describe("CargoCamp UI — TextField", () => {

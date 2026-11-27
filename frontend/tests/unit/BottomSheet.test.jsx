@@ -11,9 +11,11 @@ import "@testing-library/jest-dom";
 
 import Modal from "react-modal";
 
-import Button from "../src/components/ui/Button";
-import BottomSheet from "../src/components/ui/BottomSheet";
-import ConfirmSheet from "../src/components/ui/ConfirmSheet";
+import {
+    BottomSheet,
+    Button,
+    ConfirmSheet,
+} from "../../src/components/ui";
 
 let appRoot;
 

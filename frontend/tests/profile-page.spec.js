@@ -449,9 +449,7 @@ async function openProfilePage(page, options = {}) {
         throw new Error("ProfilePage редиректит на /login. Fake JWT не применился.");
     }
 
-    await expect(page.locator(".profile-title")).toHaveText("Профиль", {
-        timeout: 15000,
-    });
+    await expectProfileLoaded(page);
 }
 
 async function clickByDom(page, selector, textIncludes) {
@@ -472,22 +470,66 @@ async function clickByDom(page, selector, textIncludes) {
     });
 }
 
+async function openProfileSheet(
+    page,
+    rowName,
+    dialogName
+) {
+    await page.getByRole("button", {
+        name: rowName,
+    }).click();
+
+    const dialog = page.getByRole("dialog", {
+        name: dialogName,
+        exact: true,
+    });
+
+    await expect(dialog).toBeVisible();
+
+    return dialog;
+}
+
+async function expectProfileLoaded(page) {
+    await expect(
+        page.getByRole("heading", {
+            name: "Профиль",
+            exact: true,
+        })
+    ).toBeVisible();
+}
+
 test.describe("ProfilePage", () => {
     test.beforeEach(async ({ page }) => {
         await openProfilePage(page);
     });
 
-    test("отображает страницу профиля", async ({ page }) => {
-        await expect(page.locator(".profile-page")).toBeVisible();
+    test(
+        "отображает страницу профиля",
+        async ({ page }) => {
+            await expectProfileLoaded(page);
 
-        await expect(page.locator(".profile-title")).toHaveText("Профиль");
-        await expect(page.locator(".profile-subtitle")).toHaveText(
-            "Управление аккаунтом и оплатой"
-        );
+            await expect(
+                page.locator(".profile-page")
+            ).toBeVisible();
 
-        await expect(page.locator(".header-mini-name")).toHaveText("testuser");
-        await expect(page.locator(".header-mini-pill")).toContainText("4.2");
-    });
+            const account = page.locator(
+                ".cc-profile-account"
+            );
+
+            await expect(
+                account.getByRole("heading", {
+                    name: "testuser",
+                    exact: true,
+                })
+            ).toBeVisible();
+
+            await expect(account)
+                .toContainText("ID: 123");
+
+            await expect(account)
+                .toContainText("Рейтинг: 4.2");
+        }
+    );
 
     test(
         "пользователь может зарегистрировать запрос удаления аккаунта",
@@ -577,14 +619,41 @@ test.describe("ProfilePage", () => {
         await expect(page.locator(".profile-page")).toHaveClass(/profile-page--android/);
     });
 
-    test("показывает identity-блок пользователя", async ({ page }) => {
-        await expect(page.locator(".identity-name")).toHaveText("testuser");
-        await expect(page.locator(".identity-main")).toContainText("ID: 123");
-        await expect(page.locator(".identity-main")).toContainText("Рейтинг: 4.2");
+    test(
+        "показывает данные пользователя и аватар",
+        async ({ page }) => {
+            const account = page.locator(
+                ".cc-profile-account"
+            );
 
-        await expect(page.locator(".profile-avatar")).toBeVisible();
-        await expect(page.locator(".profile-avatar")).toHaveAttribute("src", /avatar_123\.jpg/);
-    });
+            await expect(account).toBeVisible();
+
+            await expect(
+                account.getByRole("heading", {
+                    name: "testuser",
+                    exact: true,
+                })
+            ).toBeVisible();
+
+            await expect(account)
+                .toContainText("ID: 123");
+
+            await expect(account)
+                .toContainText("Рейтинг: 4.2");
+
+            const avatar = account.getByRole("img", {
+                name: "Аватар",
+                exact: true,
+            });
+
+            await expect(avatar).toBeVisible();
+
+            await expect(avatar).toHaveAttribute(
+                "src",
+                /avatar_123\.jpg$/
+            );
+        }
+    );
 
     test("если аватара нет, показывает placeholder с первой буквой", async ({ page }) => {
         await openProfilePage(page, {
@@ -594,7 +663,9 @@ test.describe("ProfilePage", () => {
             },
         });
 
-        await expect(page.locator(".profile-avatar-placeholder")).toHaveText("T");
+        await expect(page.locator(
+            ".cc-profile-account__avatar > span"
+        )).toHaveText("T");
     });
 
     test("кнопка Поддержка ведёт на /support", async ({ page }) => {
@@ -603,84 +674,227 @@ test.describe("ProfilePage", () => {
         await expect(page).toHaveURL(/\/support/);
     });
 
-    test("показывает привязанную карту", async ({ page }) => {
-        const paymentsCard = page.locator(".profile-finance-card")
+    test(
+        "показывает привязанную карту",
+        async ({ page }) => {
+            const dialog = await openProfileSheet(
+                page,
+                /^Банковские карты/,
+                "Банковские карты"
+            );
 
-        await expect(paymentsCard).toContainText("Привязана");
-        await expect(paymentsCard).toContainText("VISA");
-        await expect(paymentsCard).toContainText("•••• 1234");
+            await expect(dialog)
+                .toContainText("VISA");
 
-        await expect(
-            paymentsCard.getByRole("button", { name: "Отвязать" })
-        ).toBeVisible();
-    });
+            await expect(dialog)
+                .toContainText("•••• 1234");
 
-    test("если карта не привязана, показывает кнопку Привязать карту", async ({ page }) => {
-        await openProfilePage(page, {
-            profileBody: profileWithoutCard,
-        });
+            await expect(
+                dialog.getByRole("button", {
+                    name: "Отвязать",
+                    exact: true,
+                })
+            ).toBeVisible();
+        }
+    );
 
-        const paymentsCard =page.locator(".profile-finance-card")
-
-        await expect(paymentsCard.getByRole("button", { name: /Привязать карту/ })).toBeVisible();
-    });
-
-    test("открывает подтверждение удаления карты и отменяет", async ({ page }) => {
-        const paymentsCard = page.locator(".profile-finance-card")
-
-        await paymentsCard.getByRole("button", { name: "Отвязать" }).click();
-
-        await expect(page.locator(".modal-window-compact")).toBeVisible();
-        await expect(page.locator(".modal-window-compact")).toContainText("Удалить карту?");
-        await expect(page.locator(".modal-window-compact")).toContainText("VISA •••• 1234");
-
-        await page.locator(".modal-window-compact").getByRole("button", { name: "Отмена" }).click();
-
-        await expect(page.locator(".modal-window-compact")).not.toBeVisible();
-    });
-
-    test("удаляет привязанную карту", async ({ page }) => {
-        let unbindCalled = false;
-
-        await page.route("**/api/payments/card/unbind", async (route) => {
-            unbindCalled = true;
-
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    success: true,
-                }),
+    test(
+        "показывает отсутствие сохранённых карт",
+        async ({ page }) => {
+            await openProfilePage(page, {
+                profileBody: profileWithoutCard,
             });
-        });
 
-        const paymentsCard = page.locator(".profile-finance-card")
+            const dialog = await openProfileSheet(
+                page,
+                /^Банковские карты/,
+                "Банковские карты"
+            );
 
-        await paymentsCard.getByRole("button", { name: "Отвязать" }).click();
-        await page.locator(".modal-window-compact").getByRole("button", { name: "Удалить карту" }).click();
+            await expect(dialog)
+                .toContainText(
+                    "У вас пока нет сохранённых карт"
+                );
 
-        await expect
-            .poll(() => unbindCalled, {
-                timeout: 10000,
-            })
-            .toBe(true);
+            await expect(
+                dialog.getByRole("button", {
+                    name: /Привязать карту/,
+                })
+            ).toBeVisible();
+        }
+    );
 
-        await expect(page.locator(".modal-window-compact")).not.toBeVisible();
-        await expect(paymentsCard.getByRole("button", { name: /Привязать карту/ })).toBeVisible();
-    });
+    test(
+        "отменяет отвязку без запроса к серверу",
+        async ({ page }) => {
+            let unbindCalls = 0;
 
-    test("показывает задолженность и кнопку оплаты", async ({ page }) => {
-        await openProfilePage(page, {
-            debt: 25000,
-        });
+            await page.route(
+                "**/api/payments/card/unbind",
+                async (route) => {
+                    unbindCalls += 1;
 
-        const paymentsCard = page.locator(".profile-finance-card")
+                    await route.fulfill({
+                        json: { success: true },
+                    });
+                }
+            );
 
-        await expect(paymentsCard.locator(".alert-danger")).toBeVisible();
-        await expect(paymentsCard.locator(".alert-title")).toHaveText("Задолженность по комиссии");
-        await expect(paymentsCard.locator(".alert-text")).toHaveText("250.00 ₽");
-        await expect(paymentsCard.getByRole("button", { name: "Оплатить задолженность" })).toBeVisible();
-    });
+            const dialog = await openProfileSheet(
+                page,
+                /^Банковские карты/,
+                "Банковские карты"
+            );
+
+            await dialog.getByRole("button", {
+                name: "Отвязать",
+                exact: true,
+            }).click();
+
+            const confirmation = page.getByRole(
+                "dialog",
+                {
+                    name: "Отвязать карту",
+                    exact: true,
+                }
+            );
+
+            await expect(confirmation)
+                .toContainText("•••• 1234");
+
+            await confirmation.getByRole("button", {
+                name: "Отмена",
+                exact: true,
+            }).click();
+
+            await expect(
+                page.getByRole("dialog", {
+                    name: "Банковские карты",
+                    exact: true,
+                })
+            ).toBeVisible();
+
+            expect(unbindCalls).toBe(0);
+        }
+    );
+
+    test(
+        "отвязывает карту и обновляет профиль",
+        async ({ page }) => {
+            let unbindCalls = 0;
+
+            await page.route(
+                "**/api/auth/profile",
+                async (route) => {
+                    await route.fulfill({
+                        json:
+                            unbindCalls > 0
+                                ? profileWithoutCard
+                                : profile,
+                    });
+                }
+            );
+
+            await page.route(
+                "**/api/payments/card/unbind",
+                async (route) => {
+                    unbindCalls += 1;
+
+                    await route.fulfill({
+                        json: { success: true },
+                    });
+                }
+            );
+
+            const dialog = await openProfileSheet(
+                page,
+                /^Банковские карты/,
+                "Банковские карты"
+            );
+
+            await dialog.getByRole("button", {
+                name: "Отвязать",
+                exact: true,
+            }).click();
+
+            await page.getByRole("dialog", {
+                name: "Отвязать карту",
+                exact: true,
+            }).getByRole("button", {
+                name: "Отвязать карту",
+                exact: true,
+            }).click();
+
+            await expect.poll(
+                () => unbindCalls
+            ).toBe(1);
+
+            const updatedDialog = page.getByRole(
+                "dialog",
+                {
+                    name: "Банковские карты",
+                    exact: true,
+                }
+            );
+
+            await expect(updatedDialog)
+                .toContainText(
+                    "У вас пока нет сохранённых карт"
+                );
+        }
+    );
+
+    test(
+        "показывает задолженность и кнопку оплаты",
+        async ({ page }) => {
+            await openProfilePage(page, {
+                debt: 25000,
+            });
+
+            const dialog = await openProfileSheet(
+                page,
+                /^Задолженность/,
+                "Задолженность"
+            );
+
+            await expect(dialog)
+                .toContainText("250.00 ₽");
+
+            await expect(
+                dialog.getByRole("button", {
+                    name: "Оплатить задолженность",
+                    exact: true,
+                })
+            ).toBeVisible();
+        }
+    );
+
+    test(
+        "открывает шторку при нулевой задолженности",
+        async ({ page }) => {
+            const dialog = await openProfileSheet(
+                page,
+                /^Задолженность/,
+                "Задолженность"
+            );
+
+            await expect(dialog)
+                .toContainText("Задолженности нет");
+
+            await expect(
+                dialog.getByRole("button", {
+                    name: "Оплатить задолженность",
+                })
+            ).toHaveCount(0);
+
+            await dialog.getByRole("button", {
+                name: "Понятно",
+            }).click();
+
+            await expect(dialog)
+                .not.toBeVisible();
+        }
+    );
 
     test("создаёт оплату задолженности и переходит на оплату", async ({ page }) => {
         await openProfilePage(page, {
@@ -689,7 +903,11 @@ test.describe("ProfilePage", () => {
 
         const paymentNavigation = await mockPaymentNavigation(page);
 
-        const paymentsCard = page.locator(".profile-finance-card")
+        const paymentsCard = await openProfileSheet(
+            page,
+            /^Задолженность/,
+            "Задолженность"
+        );
 
         await paymentsCard
             .getByRole("button", { name: "Оплатить задолженность" })
@@ -709,72 +927,245 @@ test.describe("ProfilePage", () => {
         );
     });
 
-    test("показывает Premium блок", async ({ page }) => {
-        const premiumCard = page.locator(".profile-card").filter({
-            hasText: "Premium",
-        });
+    test(
+        "показывает тарифы Premium",
+        async ({ page }) => {
+            const dialog = await openProfileSheet(
+                page,
+                /^CargoCamp Premium/,
+                "CargoCamp Premium"
+            );
 
-        await expect(premiumCard).toContainText("Обычный аккаунт");
-        await expect(premiumCard.getByRole("button", { name: "Купить на 7 дней" })).toBeVisible();
-        await expect(premiumCard.getByRole("button", { name: "Купить на 30 дней" })).toBeVisible();
-    });
+            await expect(dialog)
+                .toContainText("Обычный аккаунт");
 
-    test("показывает активный Premium", async ({ page }) => {
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+            await expect(
+                dialog.getByRole("button", {
+                    name: /На 7 дней/,
+                })
+            ).toContainText("2 500 ₽");
 
-        await openProfilePage(page, {
-            profileBody: {
-                ...profile,
-                subscriptionType: "premium",
-                subscriptionExpiresAt: expiresAt,
-            },
-        });
+            await expect(
+                dialog.getByRole("button", {
+                    name: /На 30 дней/,
+                })
+            ).toContainText("9 000 ₽");
+        }
+    );
 
-        const premiumCard = page.locator(".profile-card").filter({
-            hasText: "Premium",
-        });
+    test(
+        "показывает активный Premium",
+        async ({ page }) => {
+            await openProfilePage(page, {
+                profileBody: {
+                    ...profile,
 
-        await expect(premiumCard).toContainText("Премиум активен");
-    });
+                    subscriptionType: "premium",
 
-    test("создаёт оплату Premium на 7 дней и переходит на оплату", async ({ page }) => {
-        const paymentNavigation = await mockPaymentNavigation(page);
+                    subscriptionExpiresAt:
+                        new Date(
+                            Date.now() +
+                            7 * 86400000
+                        ).toISOString(),
+                },
+            });
 
-        await page
-            .getByRole("button", { name: "Купить на 7 дней" })
-            .click();
+            const dialog = await openProfileSheet(
+                page,
+                /^CargoCamp Premium/,
+                "CargoCamp Premium"
+            );
 
-        await expect
-            .poll(() => paymentNavigation.getOpenedUrl(), {
-                timeout: 10000,
-            })
-            .toBe("https://payment.example.test/premium");
+            await expect(dialog)
+                .toContainText("Премиум активен");
+        }
+    );
 
-        await expect(page).toHaveURL(
-            "https://payment.example.test/premium",
-            {
-                timeout: 10000,
+    test(
+        "выбор тарифа не инициирует списание",
+        async ({ page }) => {
+            let paymentCalls = 0;
+
+            for (const endpoint of [
+                "**/api/payments/premium/create",
+                "**/api/tbank-payments/premium/create",
+            ]) {
+                await page.route(
+                    endpoint,
+                    async (route) => {
+                        paymentCalls += 1;
+
+                        await route.fulfill({
+                            json: { success: false },
+                        });
+                    }
+                );
+            }
+
+            const dialog = await openProfileSheet(
+                page,
+                /^CargoCamp Premium/,
+                "CargoCamp Premium"
+            );
+
+            await dialog.getByRole("button", {
+                name: /На 7 дней/,
+            }).click();
+
+            const paymentDialog = page.getByRole(
+                "dialog",
+                {
+                    name: "Оплата Premium",
+                    exact: true,
+                }
+            );
+
+            await expect(paymentDialog)
+                .toContainText("2 500 ₽");
+
+            await expect(paymentDialog)
+                .toContainText("•••• 1234");
+
+            expect(paymentCalls).toBe(0);
+        }
+    );
+
+    for (const provider of [
+        {
+            name: "ЮKassa",
+            endpoint: "**/api/payments/premium/create",
+        },
+        {
+            name: "Т-Банк",
+            endpoint: "**/api/tbank-payments/premium/create",
+        },
+    ]) {
+        test(
+            `оплачивает Premium без привязки через ${provider.name}`,
+            async ({ page }) => {
+                await openProfilePage(page, {
+                    profileBody: profileWithoutCard,
+                });
+
+                const navigation =
+                    await mockPaymentNavigation(page);
+
+                let submittedBody = null;
+
+                await page.route(
+                    provider.endpoint,
+                    async (route) => {
+                        submittedBody =
+                            route.request()
+                                .postDataJSON();
+
+                        await route.fulfill({
+                            json: {
+                                success: true,
+
+                                confirmationUrl:
+                                    "https://payment.example.test/premium",
+                            },
+                        });
+                    }
+                );
+
+                const dialog =
+                    await openProfileSheet(
+                        page,
+                        /^CargoCamp Premium/,
+                        "CargoCamp Premium"
+                    );
+
+                await dialog.getByRole("button", {
+                    name: /На 7 дней/,
+                }).click();
+
+                await page.getByRole("dialog", {
+                    name: "Оплата Premium",
+                    exact: true,
+                }).getByRole("button", {
+                    name: "Оплатить без привязки",
+                    exact: true,
+                }).click();
+
+                const providerDialog =
+                    page.getByRole("dialog", {
+                        name: "Способ оплаты",
+                        exact: true,
+                    });
+
+                await providerDialog
+                    .getByRole("button", {
+                        name: new RegExp(
+                            provider.name
+                        ),
+                    }).click();
+
+                await providerDialog
+                    .getByRole("button", {
+                        name: "Оплатить 2 500 ₽",
+                        exact: true,
+                    }).click();
+
+                await expect.poll(
+                    () => submittedBody
+                ).toEqual({
+                    duration: "7d",
+                    paymentMode: "redirect",
+                });
+
+                await expect.poll(
+                    () => navigation.getOpenedUrl()
+                ).toBe(
+                    "https://payment.example.test/premium"
+                );
             }
         );
-    });
+    }
 
-    test("показывает актуальные секции подтверждений", async ({ page }) => {
-        const card = page.locator(".profile-verification-card");
+    test(
+        "показывает актуальные секции подтверждений",
+        async ({ page }) => {
+            const verificationCard = page.locator(
+                ".profile-verification-card"
+            );
 
-        await expect(card).toContainText("Подтверждения и льготы");
+            await expect(
+                verificationCard
+            ).toBeVisible();
 
-        await expect(
-            card.locator(".cc-identity .verification-panel-title")
-        ).toHaveText("Подтверждение личности");
+            await expect(
+                verificationCard
+            ).toContainText(
+                "Подтверждения и льготы"
+            );
 
-        await expect(
-            card.locator(".cc-benefits .verification-panel-title")
-        ).toHaveText("Социальные льготы");
+            await expect(
+                verificationCard.locator(
+                    ".cc-identity .verification-panel-title"
+                )
+            ).toBeVisible();
 
-        await expect(
-            card.locator(".verification-panel-vehicle")
-        ).toBeVisible();
-    });
+            await expect(
+                verificationCard.locator(
+                    ".cc-benefits .verification-panel-title"
+                )
+            ).toBeVisible();
+
+            await expect(
+                page.getByRole("button", {
+                    name: /^Автомобиль/,
+                })
+            ).toBeVisible();
+
+            await expect(
+                verificationCard.locator(
+                    ".verification-panel-vehicle"
+                )
+            ).toHaveCount(0);
+        }
+    );
 
     test("открывает информацию о подтверждениях", async ({ page }) => {
         const card = page.locator(".profile-verification-card");
@@ -1133,42 +1524,87 @@ test.describe("ProfilePage", () => {
         ).toContainText("Документ успешно отправлен");
     });
 
-    test("загружает аватар", async ({ page }) => {
-        let avatarCalled = false;
+    test(
+        "загружает аватар",
+        async ({ page }) => {
+            let uploadCalls = 0;
+            let submittedBody = null;
 
-        await page.route("**/api/auth/upload-avatar", async (route) => {
-            avatarCalled = true;
+            await page.route(
+                "**/api/auth/upload-avatar",
+                async (route) => {
+                    if (
+                        route.request().method() !== "POST"
+                    ) {
+                        await route.fallback();
+                        return;
+                    }
 
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    avatar: "/uploads/avatars/new_avatar.jpg",
-                }),
+                    uploadCalls += 1;
+
+                    submittedBody =
+                        route.request().postData();
+
+                    await route.fulfill({
+                        status: 200,
+
+                        json: {
+                            avatar:
+                                "/uploads/avatars/new_avatar.jpg",
+                        },
+                    });
+                }
+            );
+
+            const avatarInput = page.getByLabel(
+                "Изменить фото профиля",
+                {
+                    exact: true,
+                }
+            );
+
+            await avatarInput.setInputFiles({
+                name: "avatar.png",
+
+                mimeType: "image/png",
+
+                buffer: Buffer.from(
+                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
+                    "base64"
+                ),
             });
-        });
 
-        const avatarInput = page.locator(".avatar-block input[type='file']");
+            await expect.poll(
+                () => uploadCalls
+            ).toBe(1);
 
-        await avatarInput.setInputFiles({
-            name: "avatar.jpg",
-            mimeType: "image/jpeg",
-            buffer: Buffer.from("fake-avatar"),
-        });
+            expect(submittedBody).toContain(
+                'name="avatar"'
+            );
 
-        await expect
-            .poll(() => avatarCalled, {
-                timeout: 10000,
-            })
-            .toBe(true);
+            expect(submittedBody).toContain(
+                'filename="avatar.png"'
+            );
 
-        await expect(page.locator(".profile-avatar")).toHaveAttribute("src", /new_avatar\.jpg/);
-    });
+            await expect(
+                page.getByRole("img", {
+                    name: "Аватар",
+                    exact: true,
+                })
+            ).toHaveAttribute(
+                "src",
+                /new_avatar\.jpg$/
+            );
+        }
+    );
 
     test("показывает профессии и активные категории", async ({ page }) => {
-        const professionsCard = page.locator(".profile-card").filter({
-            hasText: "Профессии",
-        });
+        const professionsCard =
+            await openProfileSheet(
+                page,
+                /^Профессии/,
+                "Мои профессии"
+            );
 
         await expect(professionsCard).toContainText("Грузы");
         await expect(professionsCard).toContainText("Такси");
@@ -1193,9 +1629,12 @@ test.describe("ProfilePage", () => {
             });
         });
 
-        const professionsCard = page.locator(".profile-card").filter({
-            hasText: "Профессии",
-        });
+        const professionsCard =
+            await openProfileSheet(
+                page,
+                /^Профессии/,
+                "Мои профессии"
+            );
 
         await professionsCard.getByRole("button", { name: "Ремонт" }).click();
         await professionsCard.getByRole("button", { name: "Сохранить" }).click();
@@ -1210,9 +1649,12 @@ test.describe("ProfilePage", () => {
     });
 
     test("сбрасывает выбранные профессии", async ({ page }) => {
-        const professionsCard = page.locator(".profile-card").filter({
-            hasText: "Профессии",
-        });
+        const professionsCard =
+            await openProfileSheet(
+                page,
+                /^Профессии/,
+                "Мои профессии"
+            );
 
         await professionsCard.getByRole("button", { name: "Сбросить" }).click();
 
@@ -1220,115 +1662,559 @@ test.describe("ProfilePage", () => {
         await expect(professionsCard.getByRole("button", { name: "Такси" })).not.toHaveClass(/active/);
     });
 
-    test("показывает местоположение из профиля", async ({ page }) => {
-        const locationCard = page.locator(".profile-card").filter({
-            hasText: "Местоположение",
-        });
+    test(
+        "показывает местоположение из профиля",
+        async ({ page }) => {
+            const dialog = await openProfileSheet(
+                page,
+                /^Местоположение/,
+                "Местоположение"
+            );
 
-        await expect(locationCard.getByPlaceholder("Введите район / улицу / адрес")).toHaveValue(
-            "Симферополь, улица Пушкина, 1"
-        );
+            await expect(
+                dialog.getByRole("textbox", {
+                    name: "Адрес",
+                    exact: true,
+                })
+            ).toHaveValue(
+                "Симферополь, улица Пушкина, 1"
+            );
+        }
+    );
 
-        await expect(locationCard).toContainText("Источник: manual");
-    });
+    test(
+        "показывает подсказки адреса и выбирает подсказку",
+        async ({ page }) => {
+            const dialog = await openProfileSheet(
+                page,
+                /^Местоположение/,
+                "Местоположение"
+            );
 
-    test("показывает подсказки адреса и выбирает подсказку", async ({ page }) => {
-        const locationCard = page.locator(".profile-card").filter({
-            hasText: "Местоположение",
-        });
+            const input = dialog.getByRole(
+                "textbox",
+                {
+                    name: "Адрес",
+                    exact: true,
+                }
+            );
 
-        const input = locationCard.getByPlaceholder("Введите район / улицу / адрес");
+            await input.fill(
+                "Симферополь Пушкина"
+            );
 
-        await input.fill("Симферополь Пушкина");
+            const suggestion = dialog.locator(
+                ".cc-profile-address-suggestions button"
+            ).first();
 
-        await expect(page.locator(".loc-suggestions li").first()).toBeVisible({
-            timeout: 10000,
-        });
-
-        await page.evaluate(() => {
-            const suggestion = document.querySelector(".loc-suggestions li");
-
-            if (!suggestion) {
-                throw new Error("Подсказка адреса не найдена");
-            }
-
-            suggestion.click();
-        });
-
-        await expect(input).toHaveValue(
-            "Россия, Республика Крым, Симферополь, улица Пушкина, 1"
-        );
-    });
-
-    test("сохраняет местоположение вручную", async ({ page }) => {
-        let locationBody = null;
-
-        await page.route("**/api/auth/location/me", async (route) => {
-            locationBody = route.request().postDataJSON();
-
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    location: {
-                        locationAddress: locationBody.address,
-                        locationLat: locationBody.lat,
-                        locationLng: locationBody.lng,
-                        locationSource: locationBody.source,
-                    },
-                }),
-            });
-        });
-
-        const locationCard = page.locator(".profile-card").filter({
-            hasText: "Местоположение",
-        });
-
-        const input = locationCard.getByPlaceholder("Введите район / улицу / адрес");
-
-        await input.fill("Симферополь Пушкина 1");
-
-        await locationCard.getByRole("button", { name: "Сохранить" }).click();
-
-        await expect
-            .poll(() => locationBody, {
+            await expect(suggestion).toBeVisible({
                 timeout: 10000,
-            })
-            .toEqual({
-                address: "Россия, Республика Крым, Симферополь, улица Пушкина, 1",
+            });
+
+            await suggestion.click();
+
+            await expect(input).toHaveValue(
+                "Россия, Республика Крым, Симферополь, улица Пушкина, 1"
+            );
+
+            await expect(
+                dialog.locator(
+                    ".cc-profile-address-suggestions"
+                )
+            ).toHaveCount(0);
+        }
+    );
+
+    test(
+        "сохраняет местоположение вручную и закрывает шторку",
+        async ({ page }) => {
+            let locationBody = null;
+            let saveCalls = 0;
+
+            await page.route(
+                "**/api/auth/location/me",
+                async (route) => {
+                    saveCalls += 1;
+
+                    locationBody =
+                        route.request()
+                            .postDataJSON();
+
+                    await route.fulfill({
+                        status: 200,
+
+                        json: {
+                            location: {
+                                locationAddress:
+                                locationBody.address,
+
+                                locationLat:
+                                locationBody.lat,
+
+                                locationLng:
+                                locationBody.lng,
+
+                                locationSource:
+                                locationBody.source,
+                            },
+                        },
+                    });
+                }
+            );
+
+            const dialog = await openProfileSheet(
+                page,
+                /^Местоположение/,
+                "Местоположение"
+            );
+
+            await dialog.getByRole("textbox", {
+                name: "Адрес",
+                exact: true,
+            }).fill(
+                "Симферополь Пушкина 1"
+            );
+
+            await dialog.getByRole("button", {
+                name: "Сохранить",
+                exact: true,
+            }).click();
+
+            await expect.poll(
+                () => locationBody
+            ).toEqual({
+                address:
+                    "Россия, Республика Крым, Симферополь, улица Пушкина, 1",
+
                 lat: 44.9521,
+
                 lng: 34.1024,
+
                 source: "manual",
             });
-    });
 
-    test("не сохраняет пустой адрес", async ({ page }) => {
-        const locationCard = page.locator(".profile-card").filter({
-            hasText: "Местоположение",
-        });
+            expect(saveCalls).toBe(1);
 
-        const input = locationCard.getByPlaceholder("Введите район / улицу / адрес");
+            await expect(dialog)
+                .not.toBeVisible();
 
-        await input.fill("");
+            await expect(
+                page.getByRole("button", {
+                    name: /^Местоположение/,
+                })
+            ).toContainText(
+                "Симферополь, улица Пушкина, 1"
+            );
+        }
+    );
 
-        await locationCard.getByRole("button", { name: "Сохранить" }).click();
+    test(
+        "не сохраняет пустой адрес",
+        async ({ page }) => {
+            let saveCalls = 0;
 
-        await expect(locationCard.locator(".loc-error")).toHaveText("Введите адрес");
-    });
+            await page.route(
+                "**/api/auth/location/me",
+                async (route) => {
+                    saveCalls += 1;
 
-    test("открывает карту выбора местоположения", async ({ page }) => {
-        const locationCard = page.locator(".profile-card").filter({
-            hasText: "Местоположение",
-        });
+                    await route.fulfill({
+                        json: {},
+                    });
+                }
+            );
 
-        await locationCard.getByRole("button", { name: "Выбрать на карте" }).click();
+            const dialog = await openProfileSheet(
+                page,
+                /^Местоположение/,
+                "Местоположение"
+            );
 
-        await expect(page.locator("body")).toContainText(/Карта|Выбрать|Закрыть|Местоположение/i, {
-            timeout: 10000,
-        });
+            await dialog.getByRole("textbox", {
+                name: "Адрес",
+                exact: true,
+            }).fill("");
 
-        await expect(page.locator(".profile-title")).toHaveText("Профиль");
-    });
+            await expect(
+                dialog.getByRole("button", {
+                    name: "Сохранить",
+                    exact: true,
+                })
+            ).toBeDisabled();
+
+            await expect(dialog)
+                .toBeVisible();
+
+            expect(saveCalls).toBe(0);
+        }
+    );
+
+    test(
+        "при ошибке сохранения оставляет шторку открытой",
+        async ({ page }) => {
+            await page.route(
+                "**/api/auth/location/me",
+                async (route) => {
+                    await route.fulfill({
+                        status: 503,
+
+                        json: {
+                            message:
+                                "Сервис временно недоступен",
+                        },
+                    });
+                }
+            );
+
+            const dialog = await openProfileSheet(
+                page,
+                /^Местоположение/,
+                "Местоположение"
+            );
+
+            const input = dialog.getByRole(
+                "textbox",
+                {
+                    name: "Адрес",
+                    exact: true,
+                }
+            );
+
+            await dialog.getByRole("button", {
+                name: "Сохранить",
+                exact: true,
+            }).click();
+
+            await expect(
+                dialog.getByRole("alert")
+            ).toContainText(
+                "Сервис временно недоступен"
+            );
+
+            await expect(dialog)
+                .toBeVisible();
+
+            await expect(input).toHaveValue(
+                "Симферополь, улица Пушкина, 1"
+            );
+
+            await expect(
+                dialog.getByRole("button", {
+                    name: "Сохранить",
+                    exact: true,
+                })
+            ).toBeEnabled();
+        }
+    );
+
+    test(
+        "открывает встроенную карту и возвращается к адресу",
+        async ({ page }) => {
+            const dialog = await openProfileSheet(
+                page,
+                /^Местоположение/,
+                "Местоположение"
+            );
+
+            await dialog.getByRole("button", {
+                name: /^Выбрать на карте/,
+            }).click();
+
+            const mapDialog = page.getByRole(
+                "dialog",
+                {
+                    name: "Выбрать на карте",
+                    exact: true,
+                }
+            );
+
+            await expect(mapDialog)
+                .toBeVisible();
+
+            await expect(
+                mapDialog.locator(
+                    ".cc-embedded-map__canvas"
+                )
+            ).toBeVisible();
+
+            await expect(
+                page.locator(
+                    ".yandex-map-modal-overlay"
+                )
+            ).toHaveCount(0);
+
+            await expect(
+                mapDialog.getByRole("button", {
+                    name:
+                        "Подтвердить местоположение",
+                    exact: true,
+                })
+            ).toBeDisabled();
+
+            await mapDialog.getByRole("button", {
+                name: "Назад",
+                exact: true,
+            }).click();
+
+            const locationDialog = page.getByRole(
+                "dialog",
+                {
+                    name: "Местоположение",
+                    exact: true,
+                }
+            );
+
+            await expect(
+                locationDialog.getByRole("textbox", {
+                    name: "Адрес",
+                    exact: true,
+                })
+            ).toHaveValue(
+                "Симферополь, улица Пушкина, 1"
+            );
+
+            await expect(
+                page.locator(".cc-embedded-map")
+            ).toHaveCount(0);
+        }
+    );
+
+    test(
+        "для неподтверждённого автомобиля показывает форму",
+        async ({ page }) => {
+            const dialog = await openProfileSheet(
+                page,
+                /^Автомобиль/,
+                "Автомобиль"
+            );
+
+            await expect(
+                dialog.getByRole("textbox", {
+                    name: "Марка автомобиля",
+                    exact: true,
+                })
+            ).toBeVisible();
+
+            await expect(
+                dialog.getByRole("textbox", {
+                    name: "Госномер автомобиля",
+                    exact: true,
+                })
+            ).toBeVisible();
+
+            await expect(
+                dialog.getByRole("button", {
+                    name: "Отправить на проверку",
+                    exact: true,
+                })
+            ).toBeVisible();
+        }
+    );
+
+    test(
+        "для подтверждённого автомобиля показывает карточку без формы",
+        async ({ page }) => {
+            await openProfilePage(page, {
+                profileBody: {
+                    ...profile,
+
+                    vehicleBrand: "Toyota",
+
+                    vehicleModel: "Camry",
+
+                    vehicleColor: "Белый",
+
+                    vehiclePlate: "А123ВС82",
+
+                    vehicleYear: 2020,
+
+                    vehicleVerificationStatus:
+                        "verified",
+                },
+            });
+
+            const dialog = await openProfileSheet(
+                page,
+                /^Автомобиль/,
+                "Автомобиль"
+            );
+
+            await expect(dialog)
+                .toContainText("Toyota Camry");
+
+            await expect(dialog)
+                .toContainText("А123ВС82");
+
+            await expect(dialog)
+                .toContainText("Автомобиль подтверждён");
+
+            await expect(
+                dialog.getByRole("textbox", {
+                    name: "Марка автомобиля",
+                    exact: true,
+                })
+            ).toHaveCount(0);
+
+            await expect(
+                dialog.getByRole("button", {
+                    name: "Сменить автомобиль",
+                    exact: true,
+                })
+            ).toBeVisible();
+        }
+    );
+
+    test(
+        "открывает редактирование автомобиля и отменяет изменения",
+        async ({ page }) => {
+            await openProfilePage(page, {
+                profileBody: {
+                    ...profile,
+
+                    vehicleBrand: "Toyota",
+
+                    vehicleModel: "Camry",
+
+                    vehicleColor: "Белый",
+
+                    vehiclePlate: "А123ВС82",
+
+                    vehicleYear: 2020,
+
+                    vehicleVerificationStatus:
+                        "verified",
+                },
+            });
+
+            let saveCalls = 0;
+
+            await page.route(
+                "**/api/auth/vehicle/me",
+                async (route) => {
+                    saveCalls += 1;
+
+                    await route.fulfill({
+                        json: {
+                            success: true,
+                        },
+                    });
+                }
+            );
+
+            const dialog = await openProfileSheet(
+                page,
+                /^Автомобиль/,
+                "Автомобиль"
+            );
+
+            await dialog.getByRole("button", {
+                name: "Сменить автомобиль",
+                exact: true,
+            }).click();
+
+            const editor = page.getByRole(
+                "dialog",
+                {
+                    name: "Сменить автомобиль",
+                    exact: true,
+                }
+            );
+
+            const brandInput = editor.getByRole(
+                "textbox",
+                {
+                    name: "Марка автомобиля",
+                    exact: true,
+                }
+            );
+
+            await expect(brandInput)
+                .toHaveValue("Toyota");
+
+            await brandInput.fill("BMW");
+
+            await editor.getByRole("button", {
+                name: "Назад",
+                exact: true,
+            }).click();
+
+            await expect(
+                page.getByRole("dialog", {
+                    name: "Автомобиль",
+                    exact: true,
+                })
+            ).toContainText(
+                "Toyota Camry"
+            );
+
+            expect(saveCalls).toBe(0);
+
+            await page.getByRole("dialog", {
+                name: "Автомобиль",
+                exact: true,
+            }).getByRole("button", {
+                name: "Сменить автомобиль",
+                exact: true,
+            }).click();
+
+            await expect(
+                page.getByRole("textbox", {
+                    name: "Марка автомобиля",
+                    exact: true,
+                })
+            ).toHaveValue("Toyota");
+        }
+    );
+
+    test(
+        "не отправляет пустую форму автомобиля",
+        async ({ page }) => {
+            let saveCalls = 0;
+
+            await page.route(
+                "**/api/auth/vehicle/me",
+                async (route) => {
+                    saveCalls += 1;
+
+                    await route.fulfill({
+                        json: {
+                            success: true,
+                        },
+                    });
+                }
+            );
+
+            const dialog = await openProfileSheet(
+                page,
+                /^Автомобиль/,
+                "Автомобиль"
+            );
+
+            await dialog.getByRole("textbox", {
+                name: "Марка автомобиля",
+                exact: true,
+            }).fill("");
+
+            await dialog.getByRole("button", {
+                name: "Отправить на проверку",
+                exact: true,
+            }).click();
+
+            await expect(
+                page.getByText(
+                    "Укажите марку автомобиля",
+                    {
+                        exact: true,
+                    }
+                )
+            ).toBeVisible();
+
+            await expect(dialog)
+                .toBeVisible();
+
+            expect(saveCalls).toBe(0);
+        }
+    );
 
     test("переходит на отзывы пользователя", async ({ page }) => {
         await page.getByRole("button", { name: "Отзывы" }).click();
@@ -1459,9 +2345,7 @@ test.describe("ProfilePage", () => {
 
         });
 
-        await expect(page.locator(".profile-title")).toHaveText("Профиль", {
-            timeout: 15000,
-        });
+        await expectProfileLoaded(page);
 
         await expect
             .poll(() => profileCalls, {

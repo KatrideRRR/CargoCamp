@@ -61,6 +61,7 @@
     "test:e2e:headed": "playwright test --project=chromium --workers=1 --headed",
     "predeploy": "npm run build && npm run test:e2e",
     "pretest:e2e:matrix": "node scripts/checkE2eIsolation.js",
+    "test:unit": "jest --config jest.config.js --runInBand",
     "test:e2e:matrix": "playwright test --grep @release-smoke --project=chromium --project=firefox --project=webkit --project=android-chromium --project=ios-webkit --workers=1"
   },
   "eslintConfig": {

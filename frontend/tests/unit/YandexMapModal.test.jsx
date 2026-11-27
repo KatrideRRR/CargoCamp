@@ -6,11 +6,15 @@ import {
     waitFor,
 } from "@testing-library/react";
 
-import YandexMapModal from "./YandexMapModal";
+import YandexMapModal
+    from "../../src/components/YandexMapModal";
 
-jest.mock("../utils/orderNavigation", () => ({
-    getOrderCoordinatesForMap: jest.fn(),
-}));
+jest.mock(
+    "../../src/utils/orderNavigation",
+    () => ({
+        getOrderCoordinatesForMap: jest.fn(),
+    })
+);
 
 describe("YandexMapModal", () => {
     const previousApiKey =

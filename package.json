@@ -10,10 +10,11 @@
     "test:mysql": "npm run test:mysql:prepare && npm --prefix backend run test:integration:mysql",
     "test:frontend": "npm --prefix frontend run test:e2e",
     "test:admin": "npm --prefix admin-panel run test:e2e",
-    "test:all": "npm run test:backend && npm run test:mysql && npm run test:frontend && npm run test:admin && npm run test:ui:matrix",
+    "test:all": "npm run test:backend && npm run test:mysql && npm run test:frontend:unit && npm run test:frontend && npm run test:admin && npm run test:ui:matrix",
     "test:ui:matrix": "npm --prefix frontend run test:e2e:matrix && npm --prefix admin-panel run test:e2e:matrix",
     "build:check": "npm --prefix frontend run build && npm --prefix admin-panel run build",
     "test:release": "npm run test:all && npm run build:check",
+    "test:frontend:unit": "npm --prefix frontend run test:unit",
     "test:mysql:stop": "docker compose -p cargocamp-final-tests -f backend/tests/integration/compose.mysql.yml down"
   },
   "repository": {
