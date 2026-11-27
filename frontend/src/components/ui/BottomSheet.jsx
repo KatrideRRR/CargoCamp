@@ -31,6 +31,7 @@ const BottomSheet = ({
                          showCloseButton = true,
                          closeOnBackdrop = true,
                          closeOnSwipe = true,
+                         fullHeight = false,
                          className = "",
                          ariaLabel = "Дополнительные действия",
                      }) => {
@@ -184,7 +185,9 @@ const BottomSheet = ({
                     "cc-sheet-overlay--before-close",
             }}
             className={{
-                base: "cc-sheet-container",
+                base: fullHeight
+                    ? "cc-sheet-container cc-sheet-container--full-height"
+                    : "cc-sheet-container",
                 afterOpen:
                     "cc-sheet-container--after-open",
                 beforeClose:
@@ -199,6 +202,7 @@ const BottomSheet = ({
                 tabIndex={-1}
                 className={[
                     "cc-sheet",
+                    fullHeight && "cc-sheet--full-height",
                     className,
                 ]
                     .filter(Boolean)

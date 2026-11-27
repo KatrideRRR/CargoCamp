@@ -406,17 +406,49 @@ async function openCreateOrderPage(page, options = {}) {
         timeout: 15000,
     });
 
-    await expect(page.locator(".header-title")).toHaveText("Создать заказ", {
+    await expect(
+        page.getByRole("dialog", {
+            name: "Создать заказ",
+            exact: true,
+        })
+    ).toBeVisible({
         timeout: 15000,
     });
 }
 
-async function clickCreateOrderButton(page) {
-    const button = page.getByRole("button", {
-        name: /^Создать заказ$/,
+async function goToOrderStep(page, step) {
+    const dialog = page.getByRole("dialog", {
+        name: "Создать заказ",
+        exact: true,
     });
 
-    await expect(button).toBeVisible();
+    await dialog.getByRole("button", {
+        name: new RegExp(
+            `^Шаг ${step}:`
+        ),
+    }).click();
+
+    await expect(
+        dialog.locator(
+            `[data-order-step="${step}"]`
+        )
+    ).toBeVisible();
+
+    return dialog;
+}
+
+async function clickCreateOrderButton(page) {
+    const dialog =
+        await goToOrderStep(page, 4);
+
+    const button = dialog.getByRole(
+        "button",
+        {
+            name: "Создать заказ",
+            exact: true,
+        }
+    );
+
     await expect(button).toBeEnabled();
 
     await button.click({
@@ -425,16 +457,26 @@ async function clickCreateOrderButton(page) {
 }
 
 async function clickAddressCard(page) {
-    const button = page.locator(".miniCardBtn");
+    await goToOrderStep(page, 2);
+
+    const button = page.locator(
+        ".miniCardBtn"
+    );
 
     await expect(button).toBeVisible();
+
     await button.click();
 }
 
 async function clickAsapToggle(page) {
-    const button = page.locator(".timeChip .toggle");
+    await goToOrderStep(page, 2);
+
+    const button = page.locator(
+        ".timeChip .toggle"
+    );
 
     await expect(button).toBeVisible();
+
     await button.click();
 }
 
@@ -442,6 +484,7 @@ async function selectTestService(
     page,
     serviceName = "Перевозка мебели"
 ) {
+    await goToOrderStep(page, 1);
     const search = page.getByRole("textbox", {
         name: "Поиск услуги",
     });
@@ -469,11 +512,15 @@ async function fillRequiredOrderFields(page) {
     await selectTestService(page);
 
     await page
-        .locator("textarea.textarea")
-        .fill("Нужно перевезти мебель аккуратно");
+        .locator("#order-description")
+        .fill(
+            "Нужно перевезти мебель аккуратно"
+        );
+
+    await goToOrderStep(page, 3);
 
     await page
-        .locator('input[type="number"]')
+        .locator("#order-proposed-sum")
         .fill("1500");
 }
 
@@ -486,72 +533,340 @@ test.describe("CreateOrderPage", () => {
         "@release-smoke обычный заказ: поля доступны на узком экране",
         async ({ page }) => {
             await expect(
-                page.locator(".create-page")
+                page.getByRole("dialog", {
+                    name: "Создать заказ",
+                    exact: true,
+                })
             ).toBeVisible();
 
-            const description = page.locator(
-                "textarea.textarea"
-            );
-
-            const amount = page.locator(
-                'input[type="number"]'
-            ).first();
-
-            await expect(description).toBeVisible();
-            await expect(amount).toBeVisible();
-
-            await description.fill(
+            await page.locator(
+                "#order-description"
+            ).fill(
                 "Проверка формы на мобильном экране"
             );
 
-            await amount.fill("1500");
+            await goToOrderStep(page, 3);
 
-            await expect(description).toHaveValue(
+            await page.locator(
+                "#order-proposed-sum"
+            ).fill("1500");
+
+            await expect(
+                page.locator(
+                    "#order-proposed-sum"
+                )
+            ).toHaveValue("1500");
+
+            await goToOrderStep(page, 1);
+
+            await expect(
+                page.locator(
+                    "#order-description"
+                )
+            ).toHaveValue(
                 "Проверка формы на мобильном экране"
             );
 
-            await expect(amount).toHaveValue(
-                "1500"
-            );
+            for (const step of [1, 2, 3, 4]) {
+                const dialog =
+                    await goToOrderStep(page, step);
 
-            const overflow = await page.evaluate(() =>
-                document.documentElement.scrollWidth -
-                document.documentElement.clientWidth
-            );
+                const overflow =
+                    await dialog.evaluate(
+                        (element) =>
+                            element.scrollWidth -
+                            element.clientWidth
+                    );
 
-            expect(
-                overflow,
-                "Форма обычного заказа выходит за ширину экрана"
-            ).toBeLessThanOrEqual(2);
+                expect(overflow)
+                    .toBeLessThanOrEqual(2);
+            }
         }
     );
 
-    test("отображает страницу создания заказа", async ({ page }) => {
-        await expect(page.locator(".create-page")).toBeVisible();
+    test(
+        "отображает страницу создания заказа",
+        async ({ page }) => {
+            const dialog = page.getByRole(
+                "dialog",
+                {
+                    name: "Создать заказ",
+                    exact: true,
+                }
+            );
 
-        await expect(page.locator(".header-title")).toHaveText("Создать заказ");
-        await expect(page.getByRole("button", { name: /^Создать заказ$/ })).toBeVisible();
+            await expect(dialog)
+                .toBeVisible();
 
-        await expect(page.getByText("Адрес и время подставятся автоматически")).toBeVisible();
+            await expect(dialog)
+                .toContainText("Шаг 1 из 4");
 
-        await expect(
-            page.locator(".section-title", {
-                hasText: "Что нужно сделать?",
-            })
-        ).toBeVisible();
-        await expect(page.locator(".section-title", { hasText: "Описание" })).toBeVisible();
-        await expect(page.locator(".section-title", { hasText: "Оплата и продвижение" })).toBeVisible();
+            await expect(
+                dialog.getByRole("textbox", {
+                    name: "Поиск услуги",
+                })
+            ).toBeVisible();
 
-        await expect(page.getByText("Срочно")).toBeVisible();
-        await expect(page.getByText("К оплате сейчас")).toBeVisible();
-        await expect(page.locator(".totalAmount")).toHaveText("0 ₽");
+            await expect(
+                dialog.locator(
+                    "#order-description"
+                )
+            ).toBeVisible();
 
-        await expect(page.locator("textarea.textarea")).toBeVisible();
-        await expect(page.locator('input[type="number"]')).toBeVisible();
-        await expect(page.getByRole("button", { name: /Создать заказ/i })).toBeVisible();
-    });
+            await expect(
+                dialog.locator(
+                    "#order-description"
+                )
+            ).toHaveAttribute(
+                "placeholder",
+                /необязательно/i
+            );
+
+            await expect(
+                dialog.getByRole("button", {
+                    name: "Создать заказ",
+                    exact: true,
+                })
+            ).toHaveCount(0);
+
+            await goToOrderStep(page, 2);
+
+            await expect(dialog)
+                .toContainText(
+                    "Как можно скорее"
+                );
+
+            await goToOrderStep(page, 3);
+
+            await expect(
+                dialog.locator(
+                    "#order-proposed-sum"
+                )
+            ).toBeVisible();
+
+            await expect(
+                dialog.locator(".totalAmount")
+            ).toHaveText("0 ₽");
+
+            await goToOrderStep(page, 4);
+
+            await expect(
+                dialog.getByRole("button", {
+                    name: "Создать заказ",
+                    exact: true,
+                })
+            ).toBeVisible();
+        }
+    );
+
+    test(
+        "проходит четыре шага и создаёт заказ без необязательного описания",
+        async ({ page }) => {
+            let createCalls = 0;
+            let submittedBody = null;
+
+            await page.route(
+                "**/api/orders/",
+                async (route) => {
+                    createCalls += 1;
+
+                    submittedBody =
+                        route.request().postData();
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                            id: 777,
+                        },
+                    });
+                }
+            );
+
+            const dialog = page.getByRole(
+                "dialog",
+                {
+                    name: "Создать заказ",
+                    exact: true,
+                }
+            );
+
+            const next = dialog.getByRole(
+                "button",
+                {
+                    name: "Далее",
+                    exact: true,
+                }
+            );
+
+            // Без услуги нельзя продолжить.
+            await next.click();
+
+            await expect(
+                dialog.getByRole("alert")
+            ).toContainText(
+                "Выберите подходящую услугу"
+            );
+
+            await expect(dialog)
+                .toContainText("Шаг 1 из 4");
+
+            expect(createCalls).toBe(0);
+
+            await selectTestService(page);
+
+            // Описание оставляем пустым.
+            await expect(
+                page.locator("#order-description")
+            ).toHaveValue("");
+
+            await next.click();
+
+            await expect(dialog)
+                .toContainText("Шаг 2 из 4");
+
+            await expect(dialog)
+                .toContainText(
+                    "Симферополь"
+                );
+
+            await expect(dialog)
+                .toContainText(
+                    "Как можно скорее"
+                );
+
+            await next.click();
+
+            await expect(dialog)
+                .toContainText("Шаг 3 из 4");
+
+            await page.locator(
+                "#order-proposed-sum"
+            ).fill("1500");
+
+            await next.click();
+
+            await expect(dialog)
+                .toContainText("Шаг 4 из 4");
+
+            await expect(dialog)
+                .toContainText(
+                    "Перевозка мебели"
+                );
+
+            await expect(dialog)
+                .toContainText(
+                    "Без описания"
+                );
+
+            await expect(dialog)
+                .toContainText(
+                    "Не выбрано"
+                );
+
+            expect(createCalls).toBe(0);
+
+            page.once(
+                "dialog",
+                nativeDialog =>
+                    nativeDialog.accept()
+            );
+
+            await dialog.getByRole("button", {
+                name: "Создать заказ",
+                exact: true,
+            }).click();
+
+            await expect.poll(
+                () => createCalls
+            ).toBe(1);
+
+            expect(submittedBody).toMatch(
+                /name="description"\r?\n\r?\n\r?\n/
+            );
+
+            await expect(page)
+                .toHaveURL(/\/orders/);
+        }
+    );
+
+    test(
+        "возвращается из проверки к редактированию без потери данных",
+        async ({ page }) => {
+            await fillRequiredOrderFields(page);
+
+            const dialog =
+                await goToOrderStep(page, 4);
+
+            await dialog.getByRole("button", {
+                name: "Изменить: Услуга и описание",
+                exact: true,
+            }).click();
+
+            await expect(
+                page.locator("#order-description")
+            ).toHaveValue(
+                "Нужно перевезти мебель аккуратно"
+            );
+
+            await page.locator(
+                "#order-description"
+            ).fill(
+                "Обновлённое описание"
+            );
+
+            await goToOrderStep(page, 4);
+
+            await expect(dialog)
+                .toContainText(
+                    "Обновлённое описание"
+                );
+
+            await expect(dialog)
+                .toContainText(
+                    /1[\s\u00a0]?500 ₽/
+                );
+        }
+    );
+
+    test(
+        "позволяет удалить фотографию до публикации",
+        async ({ page }) => {
+            const input = page.getByLabel(
+                "Фотографии заказа",
+                {
+                    exact: true,
+                }
+            );
+
+            await input.setInputFiles({
+                name: "photo.png",
+                mimeType: "image/png",
+
+                buffer: Buffer.from(
+                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
+                    "base64"
+                ),
+            });
+
+            await expect(
+                page.locator(".cc-order-photo")
+            ).toHaveCount(1);
+
+            await page.getByRole("button", {
+                name: "Удалить фото 1",
+                exact: true,
+            }).click();
+
+            await expect(
+                page.locator(".cc-order-photo")
+            ).toHaveCount(0);
+        }
+    );
 
     test("загружает адрес из профиля", async ({ page }) => {
+        await goToOrderStep(page, 2);
+
         await expect(page.getByText("Указан")).toBeVisible({
             timeout: 10000,
         });
@@ -597,7 +912,9 @@ test.describe("CreateOrderPage", () => {
     });
 
     test("переключает срочно / ко времени", async ({ page }) => {
-        await expect(page.getByText("Срочно")).toBeVisible();
+        await goToOrderStep(page, 2);
+
+        await expect(page.getByText("Как можно скорее")).toBeVisible();
 
         await clickAsapToggle(page);
 
@@ -606,7 +923,7 @@ test.describe("CreateOrderPage", () => {
 
         await clickAsapToggle(page);
 
-        await expect(page.locator(".timeChipValue")).toHaveText("Срочно");
+        await expect(page.locator(".timeChipValue")).toHaveText("Как можно скорее");
         await expect(page.getByPlaceholder("Выберите дату и время")).not.toBeVisible();
     });
 
@@ -670,7 +987,9 @@ test.describe("CreateOrderPage", () => {
     );
 
     test("ограничивает сумму максимумом 300000", async ({ page }) => {
-        const amountInput = page.locator('input[type="number"]');
+        await goToOrderStep(page, 3);
+
+        const amountInput = page.locator("#order-proposed-sum");
 
         await amountInput.fill("999999");
 
@@ -678,7 +997,9 @@ test.describe("CreateOrderPage", () => {
     });
 
     test("очищает отрицательную сумму", async ({ page }) => {
-        const amountInput = page.locator('input[type="number"]');
+        await goToOrderStep(page, 3);
+
+        const amountInput = page.locator("#order-proposed-sum");
 
         await amountInput.fill("-10");
 
@@ -686,6 +1007,8 @@ test.describe("CreateOrderPage", () => {
     });
 
     test("показывает ошибку, если адрес пустой", async ({ page }) => {
+        await selectTestService(page);
+
         await clickAddressCard(page);
 
         await page.getByPlaceholder("Введите адрес").fill("");
@@ -698,6 +1021,8 @@ test.describe("CreateOrderPage", () => {
     });
 
     test("показывает ошибку, если адрес является координатами", async ({ page }) => {
+        await selectTestService(page);
+
         await clickAddressCard(page);
 
         await page.getByPlaceholder("Введите адрес").fill("Координаты: 44.9, 34.1");
@@ -712,8 +1037,9 @@ test.describe("CreateOrderPage", () => {
     test(
         "не создаёт заказ без выбранной услуги",
         async ({ page }) => {
-            await page
-                .locator('input[type="number"]')
+        await goToOrderStep(page, 3);
+
+            await page.locator("#order-proposed-sum")
                 .fill("1500");
 
             await clickCreateOrderButton(page);
@@ -818,6 +1144,8 @@ test.describe("CreateOrderPage", () => {
     test(
         "при выбранном продвижении показывает сумму к оплате",
         async ({ page }) => {
+        await goToOrderStep(page, 3);
+
             const highlight = page
                 .locator(".promoBox .promoOption")
                 .filter({
@@ -854,6 +1182,8 @@ test.describe("CreateOrderPage", () => {
     );
 
     test("создаёт заказ с продвижением и открывает ссылку оплаты", async ({ page }) => {
+        await goToOrderStep(page, 3);
+
         const highlight = page
             .locator(".promoBox .promoOption")
             .filter({
@@ -1044,6 +1374,8 @@ async function selectDynamicTestService(page) {
         }
     );
 
+    await goToOrderStep(page, 1);
+
     const search = page.getByRole(
         "textbox",
         {
@@ -1108,9 +1440,13 @@ async function fillDynamicTestFields(
             .fill(String(count));
     }
 
+    await goToOrderStep(page, 3);
+
     await page
         .locator("#order-proposed-sum")
         .fill(amount);
+
+    await goToOrderStep(page, 1);
 }
 
 /**
@@ -1402,6 +1738,8 @@ test.describe(
                  *
                  * Итого: 1400 ₽
                  */
+                await goToOrderStep(page, 3);
+
                 await expect(
                     page.locator(".recommendedPriceCard")
                 ).toBeVisible();
@@ -1438,6 +1776,8 @@ test.describe(
         test(
             "выбирает Т-Банк и создаёт платёж через его API",
             async ({ page }) => {
+        await goToOrderStep(page, 3);
+
                 const highlight = page
                     .locator(".promoBox .promoOption")
                     .filter({
@@ -1543,6 +1883,8 @@ test.describe(
         test(
             "после успешной оплаты сохранённой картой открывает заказы",
             async ({ page }) => {
+        await goToOrderStep(page, 3);
+
                 let paymentRequests = 0;
 
                 await page.route(
@@ -1609,6 +1951,8 @@ test.describe(
         test(
             "при отказе банка сохраняет заказ и предлагает повторную оплату",
             async ({ page }) => {
+        await goToOrderStep(page, 3);
+
                 let paymentRequests = 0;
                 let paymentBody = null;
 
@@ -1722,6 +2066,8 @@ test.describe(
         });
 
         test("в релизе доступна только прямая оплата", async ({ page }) => {
+        await goToOrderStep(page, 3);
+
             const cash = page.locator(
                 'input[name="paymentType"][value="cash"]'
             );
@@ -1737,10 +2083,10 @@ test.describe(
                 page.getByText("Предварительный расчёт гарантии")
             ).toHaveCount(0);
 
+            await goToOrderStep(page, 4);
+
             await expect(
-                page.getByRole("button", {
-                    name: /^Создать заказ$/,
-                })
+                page.getByRole("button", { name: /^Создать заказ$/ })
             ).toBeEnabled();
         });
 
@@ -1930,6 +2276,8 @@ test.describe(
         test(
             "суммирует три продвижения и отправляет их в платёж",
             async ({ page }) => {
+        await goToOrderStep(page, 3);
+
                 const promotionNames = [
                     "Выделить цветом",
                     "Рекомендуемый заказ",

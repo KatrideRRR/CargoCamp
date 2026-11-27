@@ -1,6 +1,15 @@
 import React, { Suspense, lazy, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import {
+    BrowserRouter as Router,
+    Routes,
+    Route,
+    useNavigate,
+    useLocation,
+} from "react-router-dom";
+import {
+    getOrderComposerBackground,
+} from "./components/OrderWizard";
 import Modal from "react-modal";
 import { useAuth } from "./utils/authContext";
 import {initPushNotifications, consumePendingPushNavigation,} from "./utils/pushNotifications";
@@ -243,6 +252,11 @@ function SessionLifecycle() {
 
 function App() {
     const navigate = useNavigate();
+
+    const location = useLocation();
+
+    const orderComposerBackground =
+        getOrderComposerBackground(location);
     const shownToastKeysRef = useRef(new Map());
 
     const getOrderTargetPath = (payload = {}) => {
@@ -570,8 +584,13 @@ function App() {
                             </div>
                         }
                     >
-                        <Routes>
-                            <Route path="/" element={<StartPage />} />
+                            <Routes
+                                location={
+                                    orderComposerBackground ||
+                                    location
+                                }
+                            >
+                                <Route path="/" element={<StartPage />} />
                             <Route path="/register" element={<RegisterPage />} />
                             <Route path="/login" element={<LoginPage />} />
                             <Route path="/profile" element={<ProfilePage />} />
@@ -590,7 +609,19 @@ function App() {
                             <Route path="/info" element={<InfoPage />} />
                             <Route path="/support" element={<SupportChatPage />} />
                         </Routes>
+                            {orderComposerBackground && (
+                                <Routes>
+                                    <Route
+                                        path="/create-order"
+                                        element={<CreateOrderPage />}
+                                    />
 
+                                    <Route
+                                        path="/express"
+                                        element={<CreateExpressOrder />}
+                                    />
+                                </Routes>
+                            )}
                         <BottomMenu />
 
                         <ToastContainer

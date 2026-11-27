@@ -52,6 +52,73 @@ describe("CargoCamp UI — BottomSheet", () => {
         ).not.toBeInTheDocument();
     });
 
+    test(
+        "поддерживает полноразмерный режим",
+        () => {
+            render(
+                <BottomSheet
+                    open
+                    fullHeight
+                    title="Создать заказ"
+                    onClose={jest.fn()}
+                    footer={
+                        <Button>
+                            Далее
+                        </Button>
+                    }
+                >
+                    Содержимое заказа
+                </BottomSheet>
+            );
+
+            const dialog = screen.getByRole(
+                "dialog",
+                {
+                    name: "Создать заказ",
+                }
+            );
+
+            expect(dialog).toHaveClass(
+                "cc-sheet-container--full-height"
+            );
+
+            expect(
+                dialog.querySelector(".cc-sheet")
+            ).toHaveClass(
+                "cc-sheet--full-height"
+            );
+
+            expect(
+                screen.getByRole("button", {
+                    name: "Далее",
+                })
+            ).toBeInTheDocument();
+        }
+    );
+
+    test(
+        "обычная шторка не становится полноразмерной",
+        () => {
+            render(
+                <BottomSheet
+                    open
+                    title="Настройки"
+                    onClose={jest.fn()}
+                >
+                    Настройки пользователя
+                </BottomSheet>
+            );
+
+            expect(
+                screen.getByRole("dialog", {
+                    name: "Настройки",
+                })
+            ).not.toHaveClass(
+                "cc-sheet-container--full-height"
+            );
+        }
+    );
+
     test("отображает заголовок и содержимое", () => {
         renderInApp(
             <BottomSheet

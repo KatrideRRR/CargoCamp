@@ -11,6 +11,11 @@ import PromotionOptions, {PROMOTION_PRICES} from "../components/PromotionOptions
 import YandexMapModal from "../components/YandexMapModal";
 import PaymentProviderSelect from "../components/PaymentProviderSelect";
 import DynamicServiceFields, {isDynamicFieldVisible} from "../components/DynamicServiceFields";
+import OrderWizard, {
+    OrderWizardStep,
+    OrderReview,
+    OrderPhotoPreview,
+} from "../components/OrderWizard";
 import {calculateRecommendedPrice} from "../utils/calculateRecommendedPrice";
 import { Check, Paperclip, Timer, X, ChevronUp, ChevronDown } from "lucide-react";
 
@@ -21,11 +26,6 @@ function formatGuaranteeRub(kopecks) {
     return new Intl.NumberFormat("ru-RU", {
         maximumFractionDigits: 2,
     }).format(kopecks / 100) + " ₽";
-}
-
-function isCoordsString(v) {
-    if (!v) return false;
-    return String(v).trim().startsWith("Координаты:");
 }
 
 function looksLikeCoordsString(v) {
@@ -204,7 +204,21 @@ function CreateOrderPage() {
     const [error, setError] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [images, setImages] = useState([]);
+    const [wizardStep, setWizardStep] =
+        useState(1);
 
+    const [imagesLoading, setImagesLoading] =
+        useState(false);
+
+    const submitRef = useRef(false);
+    const imageUploadRef = useRef(false);
+
+    const wizardSteps = [
+        "Услуга",
+        "Где и когда",
+        "Стоимость",
+        "Проверка",
+    ];
     const [markerPosition, setMarkerPosition] = useState(null); // [lat, lng]
     const [addressSuggestions, setAddressSuggestions] = useState([]); // [{label,address,lat,lon}]    const [images, setImages] = useState([]);
 
@@ -880,28 +894,74 @@ function CreateOrderPage() {
     }, [YM_KEY]);
 
     const handleImageChange = async (event) => {
-        const files = event.target.files;
-        const compressed = [];
+        const files = Array.from(
+            event.target.files || []
+        );
 
-        for (const file of files) {
-            try {
-                const compressedFile = await imageCompression(file, {
-                    maxSizeMB: 0.5,
-                    maxWidthOrHeight: 1024,
+        event.target.value = "";
 
-                    // В Playwright сжимаем без внешнего
-                    // Web Worker и запросов к CDN.
-                    // Для обычного приложения сохраняем Worker.
-                    useWebWorker:
-                        process.env.REACT_APP_E2E_TEST !== "1",
-                });
-                compressed.push(compressedFile);
-            } catch (e) {
-                console.error("Ошибка сжатия изображения:", e);
-            }
+        if (
+            !files.length ||
+            imageUploadRef.current
+        ) {
+            return;
         }
 
-        setImages((prev) => [...prev, ...compressed]);
+        imageUploadRef.current = true;
+        setImagesLoading(true);
+
+        const compressed = [];
+
+        try {
+            for (const file of files) {
+                if (
+                    !file.type.startsWith("image/")
+                ) {
+                    setError(
+                        "Можно прикладывать только изображения"
+                    );
+
+                    continue;
+                }
+
+                try {
+                    const compressedFile =
+                        await imageCompression(
+                            file,
+                            {
+                                maxSizeMB: 0.5,
+                                maxWidthOrHeight: 1024,
+
+                                useWebWorker:
+                                    process.env.REACT_APP_E2E_TEST !== "1",
+                            }
+                        );
+
+                    compressed.push(
+                        compressedFile
+                    );
+
+                } catch (error) {
+                    console.error(
+                        "Ошибка сжатия изображения:",
+                        error
+                    );
+
+                    setError(
+                        "Не удалось обработать одну из фотографий"
+                    );
+                }
+            }
+
+            setImages((previous) => [
+                ...previous,
+                ...compressed,
+            ]);
+
+        } finally {
+            imageUploadRef.current = false;
+            setImagesLoading(false);
+        }
     };
 
     const clearSelectedService = () => {
@@ -1235,68 +1295,183 @@ function CreateOrderPage() {
         if (!addressOpen) setAddressSuggestions([]);
     }, [addressOpen]);
 
+    const goToWizardStep = (nextStep) => {
+        if (
+            submitRef.current ||
+            imageUploadRef.current ||
+            nextStep < 1 ||
+            nextStep > wizardSteps.length
+        ) {
+            return;
+        }
+
+        setError("");
+        setWizardStep(nextStep);
+    };
+
+    const validateWizardStep = (step) => {
+        if (step === 1) {
+            if (
+                !selectedCategory ||
+                !selectedService
+            ) {
+                return "Выберите подходящую услугу из подсказки";
+            }
+
+            return validateServiceDetails() || "";
+        }
+
+        if (step === 2) {
+            if (!formData.address?.trim()) {
+                return "Адрес обязателен";
+            }
+
+            if (
+                looksLikeCoordsString(
+                    formData.address
+                )
+            ) {
+                return (
+                    "Нужно указать адрес текстом " +
+                    "(не координаты). Выберите адрес " +
+                    "на карте или введите вручную."
+                );
+            }
+
+            if (
+                !isValidOrderCoords(markerPosition)
+            ) {
+                return (
+                    "Не удалось определить координаты адреса. " +
+                    "Выберите адрес из подсказки, по GPS или на карте."
+                );
+            }
+
+            if (!isAsap) {
+                const time = new Date(
+                    formData.workTime
+                ).getTime();
+
+                if (
+                    !formData.workTime ||
+                    !Number.isFinite(time) ||
+                    time <= Date.now()
+                ) {
+                    return (
+                        "Выберите будущую дату " +
+                        "и время выполнения"
+                    );
+                }
+            }
+        }
+
+        if (step === 3) {
+            if (paymentType === "guarantee") {
+                return (
+                    "Гарантийная оплата пока не подключена. " +
+                    "Выберите обычную оплату."
+                );
+            }
+
+            const amount =
+                Number(formData.proposedSum);
+
+            if (
+                !Number.isFinite(amount) ||
+                amount <= 0
+            ) {
+                return "Укажите корректную сумму за работу";
+            }
+
+            if (amount > 300000) {
+                return (
+                    "Слишком большая стоимость заказа. " +
+                    "Максимум 300 000 ₽."
+                );
+            }
+        }
+
+        return "";
+    };
+
+    const revealWizardError = (
+        step,
+        message
+    ) => {
+        setWizardStep(step);
+        setError(message);
+
+        if (
+            step === 1 &&
+            !selectedService
+        ) {
+            setServiceSearchOpen(true);
+        }
+
+        if (step === 2) {
+            setAddressOpen(true);
+
+            if (!isAsap) {
+                setTimeOpen(true);
+            }
+        }
+    };
+
+    const nextWizardStep = () => {
+        if (
+            submitRef.current ||
+            imageUploadRef.current ||
+            addrResolving
+        ) {
+            return;
+        }
+
+        const validationError =
+            validateWizardStep(wizardStep);
+
+        if (validationError) {
+            revealWizardError(
+                wizardStep,
+                validationError
+            );
+
+            return;
+        }
+
+        goToWizardStep(wizardStep + 1);
+    };
+
     const handleSubmit = async (e) => {
-        e.preventDefault();
+        e?.preventDefault();
+
+        if (
+            submitRef.current ||
+            isSubmitting ||
+            wizardStep !== 4
+        ) {
+            return;
+        }
+
         setError("");
 
-        if (paymentType === "guarantee") {
-            setError(
-                "Гарантийная оплата пока не подключена. " +
-                "Выберите обычную оплату или дождитесь подключения."
-            );
-            return;
+        for (const step of [1, 2, 3]) {
+            const validationError =
+                validateWizardStep(step);
+
+            if (validationError) {
+                revealWizardError(
+                    step,
+                    validationError
+                );
+
+                return;
+            }
         }
 
-        if (!formData.address?.trim()) {
-            setError("Адрес обязателен");
-            setAddressOpen(true);
-            return;
-        }
-        if (isCoordsString(formData.address)) {
-            setError("Нужно указать адрес текстом (не координаты). Выберите адрес на карте или введите вручную.");
-            setAddressOpen(true);
-            return;
-        }
-        if (!selectedCategory || !selectedService) {
-            setError("Выберите подходящую услугу из подсказки");
-            setServiceSearchOpen(true);
-            return;
-        }
+        const proposedSumRaw =
+            Number(formData.proposedSum);
 
-        const serviceDetailsError =
-            validateServiceDetails();
-
-        if (serviceDetailsError) {
-            setError(serviceDetailsError);
-            return;
-        }
-
-        const proposedSumRaw = Number(formData.proposedSum);
-
-        if (!Number.isFinite(proposedSumRaw) || proposedSumRaw <= 0) {
-
-            setError("Укажите корректную сумму за работу");
-
-            return;
-
-        }
-
-        if (proposedSumRaw > 300000) {
-
-            setError("Слишком большая стоимость заказа. Максимум 300 000 ₽.");
-
-            return;
-
-        }
-
-        if (!isValidOrderCoords(markerPosition)) {
-            setError("Не удалось определить координаты адреса. Выберите адрес из подсказки, по GPS или на карте.");
-            setAddressOpen(true);
-            setIsSubmitting(false);
-            return;
-        }
-
-        if (isSubmitting) return;
+        submitRef.current = true;
         setIsSubmitting(true);
 
         const data = new FormData();
@@ -1352,8 +1527,13 @@ function CreateOrderPage() {
 
         const token = localStorage.getItem("authToken");
         if (!token) {
-            setError("Вы не авторизованы! Пожалуйста, войдите в систему.");
+            setError(
+                "Вы не авторизованы! Пожалуйста, войдите в систему."
+            );
+
+            submitRef.current = false;
             setIsSubmitting(false);
+
             return;
         }
 
@@ -1462,7 +1642,12 @@ function CreateOrderPage() {
 
                 return;
             }
-            setError(err.response?.data?.message || "Не удалось создать заказ. Попробуйте снова.");
+            setError(
+                err.response?.data?.message ||
+                "Не удалось создать заказ. Попробуйте снова."
+            );
+
+            submitRef.current = false;
             setIsSubmitting(false);
         }
     };
@@ -1491,260 +1676,149 @@ function CreateOrderPage() {
         }));
     };
 
+
+    const reviewFields = (
+        selectedService?.formConfig?.fields || []
+    )
+        .filter(field =>
+            isDynamicFieldVisible(
+                field,
+                serviceDetails
+            )
+        )
+        .map(field => {
+            const value =
+                serviceDetails?.[field.key];
+
+            const option =
+                field.options?.find(item =>
+                    String(item.value) === String(value)
+                );
+
+            return {
+                label: field.label,
+                value:
+                    typeof value === "boolean"
+                        ? value ? "Да" : "Нет"
+                        : option?.label ??
+                            (value == null ? "" : String(value)),
+            };
+        });
+
+    const reviewGroups = [
+        {
+            step: 1,
+            title: "Услуга и описание",
+            fields: [
+                {
+                    label: "Услуга",
+                    value:
+                        selectedService?.subcategoryName ||
+                        selectedService?.categoryName ||
+                        "Не выбрана",
+                },
+                ...reviewFields,
+                {
+                    label: "Описание",
+                    value:
+                        formData.description ||
+                        "Без описания",
+                },
+                {
+                    label: "Фотографии",
+                    value: String(images.length),
+                },
+            ],
+        },
+        {
+            step: 2,
+            title: "Адрес и время",
+            fields: [
+                {
+                    label: "Адрес",
+                    value: formData.address,
+                },
+                {
+                    label: "Когда выполнить",
+                    value: isAsap
+                        ? "Как можно скорее"
+                        : formData.workTime
+                            ? new Date(
+                                formData.workTime
+                            ).toLocaleString("ru-RU")
+                            : "Время не выбрано",
+                },
+            ],
+        },
+        {
+            step: 3,
+            title: "Стоимость и оплата",
+            fields: [
+                {
+                    label: "Стоимость работы",
+                    value:
+                        formData.proposedSum
+                            ? Number(formData.proposedSum)
+                                .toLocaleString("ru-RU") + " ₽"
+                            : "Не указана",
+                },
+                {
+                    label: "Оплата исполнителю",
+                    value: "Наличными",
+                },
+                {
+                    label: "Продвижение",
+                    value: promotionTotal
+                        ? [
+                            promotion.highlight && "Выделение",
+                            promotion.recommended && "Рекомендация",
+                            promotion.push && "Push-уведомление",
+                        ].filter(Boolean).join(", ")
+                        : "Не выбрано",
+                },
+                {
+                    label: "Стоимость продвижения",
+                    value: promotionTotal + " ₽",
+                },
+                ...(promotionTotal > 0
+                    ? [{
+                        label: "Оплата продвижения",
+                        value: selectedProvider === "tbank"
+                            ? "Т-Банк"
+                            : "ЮKassa",
+                    }]
+                    : []),
+            ],
+        },
+    ];
+
     return (
-        <>
-            {error && (
-                <div
-                    className="createOrderErrorToast"
-                    role="alert"
-                    aria-live="assertive"
-                >
-                    <div className="createOrderErrorToast__icon">
-                        !
-                    </div>
-
-                    <div className="createOrderErrorToast__content">
-                        <div className="createOrderErrorToast__title">
-                            Не удалось создать заказ
-                        </div>
-
-                        <div className="createOrderErrorToast__message">
-                            {error}
-                        </div>
-                    </div>
-
-                    <button
-                        type="button"
-                        className="createOrderErrorToast__close"
-                        onClick={() => setError("")}
-                        aria-label="Закрыть уведомление"
-                    >
-                        <X size={18} aria-hidden="true" />
-                    </button>
-                </div>
+        <OrderWizard
+            title="Создать заказ"
+            steps={wizardSteps}
+            step={wizardStep}
+            onStepChange={goToWizardStep}
+            onNext={nextWizardStep}
+            onPublish={handleSubmit}
+            busy={isSubmitting || imagesLoading || addrResolving}
+            dirty={Boolean(
+                selectedService ||
+                serviceQuery.trim() ||
+                formData.description.trim() ||
+                formData.proposedSum ||
+                images.length ||
+                promotionTotal ||
+                !isAsap ||
+                addressMode === "custom"
             )}
-
-            <div className="create-page">
-                <div className="create-shell">
-                    {/* Header */}
-                    <div className="glass header-card">
-                        <div className="header-top">
-                            <div className="headerTopRow">
-                                <div className="header-titles">
-                                    <div className="header-title">Создать заказ</div>
-                                    <div className="header-sub">Адрес и время подставятся автоматически</div>
-                                </div>
-
-                                {/* компактный чип времени справа */}
-                                <div className="timeChip" role="group" aria-label="Время выполнения">
-                                    <div className="timeChipText">
-                                        <div className="timeChipLabel">Время</div>
-                                        <div className="timeChipValue">{isAsap ? "Срочно" : "Ко времени"}</div>
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        className={`toggle mini ${isAsap ? "on" : ""}`}
-                                        onClick={toggleAsap}
-                                        aria-label="Срочно / ко времени"
-                                        title="Срочно / ко времени"
-                                    >
-                                        <span className="toggleKnob"/>
-                                    </button>
-                                </div>
-                            </div>
-                            {/* ✅ 2 независимые мини-карточки в 2 колонки */}
-
-                            {/* RIGHT: Time mini card */}
-                            {!isAsap && (
-                                <div className={`miniCard ${timeOpen ? "open" : ""}`}>
-                                    {timeOpen && (
-                                        <div className="miniDrop">
-                                            <div className="glass field">
-                                                <label htmlFor="order-work-time" className="cc-sr-only">
-                                                    Дата и время выполнения
-                                                </label>
-                                                <DatePicker
-                                                    id="order-work-time"
-                                                    selected={formData.workTime}
-                                                    onChange={(date) => setFormData((p) => ({...p, workTime: date}))}
-                                                    showTimeSelect
-                                                    timeFormat="HH:mm"
-                                                    timeIntervals={15}
-                                                    dateFormat="Pp"
-                                                    placeholderText="Выберите дату и время"
-                                                    minDate={new Date()}
-                                                    minTime={getMinTime(formData.workTime)}
-                                                    maxTime={new Date(0, 0, 0, 23, 59, 59)}
-                                                    className="control"
-                                                    portalId="date-picker-portal"
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            <div className="headerMiniGrid">
-                                {/* LEFT: Address mini card */}
-                                <div className={`miniCard ${addressOpen ? "open" : ""}`}>
-                                    <button
-                                        type="button"
-                                        className="miniCardBtn"
-                                        onClick={() => {
-                                            setAddressOpen((p) => !p);
-                                            setTimeOpen(false); // чтобы не было ощущения “вложенности”
-                                        }}
-                                    >
-                                        <div className="miniTop">
-                                            <span className="miniLabel">Адрес</span>
-                                            <span className="miniChevron">{addressOpen ? (
-                                                <ChevronUp size={17} aria-hidden="true" />
-                                            ) : (
-                                                <ChevronDown size={17} aria-hidden="true" />
-                                            )}
-                                            </span>
-                                        </div>
-
-                                        <div className={`miniValue ${formData.address ? "" : "danger"}`}>
-                                            {formData.address ? "Указан" : "Не указан"}
-                                        </div>
-
-                                        {/* мелким — реальный адрес (если есть), иначе подсказка */}
-                                        <div className="miniSub">
-                                            {addrResolving
-                                                ? "Определяем…"
-                                                : formData.address
-                                                    ? formData.address
-                                                    : "Нажмите, чтобы указать"}
-                                        </div>
-                                    </button>
-
-                                    {/* раскрытие адреса — только под address */}
-                                    {addressOpen && (
-                                        <div className="miniDrop">
-                                            <div className="glass field">
-                                                <label htmlFor="order-address" className="cc-sr-only">
-                                                    Адрес заказа
-                                                </label>
-                                                <input
-                                                    id="order-address"
-                                                    className="control"
-                                                    type="text"
-                                                    placeholder="Введите адрес"
-                                                    value={formData.address}
-                                                    onChange={handleAddressChange}
-                                                />
-
-                                                {addrResolveError &&
-                                                    <div className="inline-error">{addrResolveError}</div>}
-
-                                                {addressSuggestions.length > 0 && (
-                                                    <ul className="suggestions">
-                                                        {addressSuggestions.map((s, i) => (
-                                                            <li key={`${s.label}-${i}`}
-                                                                onClick={() => handleAddressSelect(s)}>
-                                                                {s.label}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                )}
-                                            </div>
-
-                                            <div className="address-row" style={{marginTop: 10, paddingTop: 10}}>
-                                                <div className="muted-strong">Адрес из профиля?</div>
-
-                                                <div className="chip-row">
-                                                    <button
-                                                        type="button"
-                                                        className={`chip-btn ${addressMode === "profile" ? "active" : ""}`}
-                                                        onClick={async () => {
-                                                            setAddressMode("profile");
-                                                            setAddrResolveError(null);
-
-                                                            const addr = profile?.locationAddress;
-                                                            const lat = Number(profile?.locationLat);
-                                                            const lng = Number(profile?.locationLng);
-                                                            const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
-
-                                                            if (addr && !looksLikeCoordsString(addr)) {
-                                                                setFormData((p) => ({...p, address: addr}));
-
-                                                                if (hasCoords) {
-                                                                    setMarkerPosition([lat, lng]);
-                                                                    return;
-                                                                }
-
-                                                                setAddrResolving(true);
-
-                                                                const resolved = await geocodeAddressYandex({
-                                                                    address: addr,
-                                                                    apiKey: YM_KEY,
-                                                                });
-
-                                                                setAddrResolving(false);
-
-                                                                if (resolved) {
-                                                                    setFormData((p) => ({
-                                                                        ...p,
-                                                                        address: resolved.address
-                                                                    }));
-                                                                    setMarkerPosition([resolved.lat, resolved.lng]);
-                                                                    return;
-                                                                }
-
-                                                                setAddrResolveError("Адрес из профиля есть, но координаты не найдены. Выберите адрес из подсказки, GPS или на карте.");
-                                                                return;
-                                                            }
-
-                                                            if (hasCoords) {
-                                                                setMarkerPosition([lat, lng]);
-                                                                setAddrResolving(true);
-                                                                const resolved = await reverseGeocodeYandex({
-                                                                    lat,
-                                                                    lng,
-                                                                    apiKey: YM_KEY
-                                                                });
-                                                                setAddrResolving(false);
-
-                                                                if (resolved) setFormData((p) => ({
-                                                                    ...p,
-                                                                    address: resolved
-                                                                }));
-                                                                else setAddrResolveError("В профиле нет распознанного адреса. Введите вручную или выберите на карте.");
-                                                                return;
-                                                            }
-
-                                                            setAddrResolveError("В профиле нет адреса. Введите вручную или выберите на карте.");
-                                                        }}
-                                                    >
-                                                        Да
-                                                    </button>
-
-                                                    <button
-                                                        type="button"
-                                                        className={`chip-btn ${addressMode === "custom" ? "active" : ""}`}
-                                                        onClick={() => setAddressMode("custom")}
-                                                    >
-                                                        Нет
-                                                    </button>
-                                                </div>
-
-                                                {addressMode === "custom" && (
-                                                    <div className="grid2" style={{marginTop: 10}}>
-                                                        <button type="button" className="action-btn subtle"
-                                                                onClick={() => setShowMapModal(true)}>
-                                                            На карте
-                                                        </button>
-                                                        <button type="button" className="action-btn subtle"
-                                                                onClick={detectGps} disabled={addrResolving}>
-                                                            GPS
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <YandexMapModal
+            error={error}
+            errorClassName="createOrderErrorToast__message"
+            contentClassName="create-page"
+            auxiliary={showMapModal ? {
+                title: "Выбрать адрес на карте",
+                onBack: () => setShowMapModal(false),
+                content: (
+                    <YandexMapModal embedded
                                                 isOpen={showMapModal}
                                                 onClose={() => setShowMapModal(false)}
                                                 initialLat={markerPosition?.[0]}
@@ -1756,23 +1830,11 @@ function CreateOrderPage() {
                                                     setShowMapModal(false);
                                                 }}
                                             />
-                                        </div>
-                                    )}
-                                </div>
-
-
-                            </div>
-                        </div>
-                    </div>
-
-                    {error && (
-                        <div className="glass alert-card alert-danger">
-                            <div className="alert-title">Ошибка</div>
-                            <div className="alert-text">{error}</div>
-                        </div>
-                    )}
-
-                    {/* Service search */}
+                ),
+            } : null}
+        >
+            <OrderWizardStep number={1}>
+                {/* Service search */}
                     <div className="glass section-card">
                         <div className="section-head">
                             <div>
@@ -2025,7 +2087,7 @@ function CreateOrderPage() {
                                 </div>
 
                                 <div className="section-sub">
-                                    Расскажите исполнителю подробнее
+                                    Необязательно. Расскажите исполнителю подробнее
                                     о необходимой работе
                                 </div>
                             </div>
@@ -2043,7 +2105,7 @@ function CreateOrderPage() {
                                 id="order-description"
                                 className="control textarea"
                                 rows={3}
-                                placeholder="Опишите, что необходимо сделать"
+                                placeholder="Описание работы (необязательно)"
                                 value={formData.description}
                                 onChange={handleDescriptionChange}
                             />
@@ -2054,30 +2116,270 @@ function CreateOrderPage() {
 
 
                             <label className="upload inline">
-                                <input type="file" multiple accept="image/*" onChange={handleImageChange}
+                                <input type="file" multiple accept="image/*" aria-label="Фотографии заказа" disabled={imagesLoading} onChange={handleImageChange}
                                        style={{display: "none"}}/>
                                 <span className="order-photo-add">
     <Paperclip size={17} strokeWidth={1.9} aria-hidden="true" />
-    Добавить фото до выполнения работы
+    Добавить фотографии (необязательно)
 </span>
                             </label>
 
                             {images.length > 0 ? (
-                                <div className="docsGrid" style={{marginTop: 12}}>
-                                    {images.map((img, i) => (
-                                        <div className="glass doc" key={i}>
-                                            <img className="docImg" src={URL.createObjectURL(img)}
-                                                 alt={`Preview ${i + 1}`}/>
-                                            <div className="docName">Фото {i + 1}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : null}
+                                
+    <div className="cc-order-photo-grid">
+        {images.map((img, index) => (
+            <OrderPhotoPreview
+                key={index}
+                file={img}
+                index={index}
+                onRemove={() =>
+                    setImages(previous =>
+                        previous.filter(
+                            (_, i) => i !== index
+                        )
+                    )
+                }
+            />
+        ))}
+    </div>
+    ) : null}
 
                         </div>
                     </div>
+            </OrderWizardStep>
 
-                    {/* Payment + promotion */}
+            <OrderWizardStep number={2}>
+                <div className="glass header-card">
+                        <div className="header-top">
+<div id="date-picker-portal" />
+                            <div className="headerTopRow">
+                                <div className="header-titles">
+                                    
+                                    <div className="header-sub">Адрес и время подставятся автоматически</div>
+                                </div>
+
+                                {/* компактный чип времени справа */}
+                                <div className="timeChip" role="group" aria-label="Время выполнения">
+                                    <div className="timeChipText">
+                                        <div className="timeChipLabel">Время</div>
+                                        <div className="timeChipValue">{isAsap ? "Как можно скорее" : "Ко времени"}</div>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        className={`toggle mini ${isAsap ? "on" : ""}`}
+                                        onClick={toggleAsap}
+                                        aria-label="Срочно / ко времени"
+                                        title="Срочно / ко времени"
+                                    >
+                                        <span className="toggleKnob"/>
+                                    </button>
+                                </div>
+                            </div>
+                            {/* ✅ 2 независимые мини-карточки в 2 колонки */}
+
+                            {/* RIGHT: Time mini card */}
+                            {!isAsap && (
+                                <div className={`miniCard ${timeOpen ? "open" : ""}`}>
+                                    {timeOpen && (
+                                        <div className="miniDrop">
+                                            <div className="glass field">
+                                                <label htmlFor="order-work-time" className="cc-sr-only">
+                                                    Дата и время выполнения
+                                                </label>
+                                                <DatePicker
+                                                    id="order-work-time"
+                                                    selected={formData.workTime}
+                                                    onChange={(date) => setFormData((p) => ({...p, workTime: date}))}
+                                                    showTimeSelect
+                                                    timeFormat="HH:mm"
+                                                    timeIntervals={15}
+                                                    dateFormat="Pp"
+                                                    placeholderText="Выберите дату и время"
+                                                    minDate={new Date()}
+                                                    minTime={getMinTime(formData.workTime)}
+                                                    maxTime={new Date(0, 0, 0, 23, 59, 59)}
+                                                    className="control"
+                                                    portalId="date-picker-portal"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="headerMiniGrid">
+                                {/* LEFT: Address mini card */}
+                                <div className={`miniCard ${addressOpen ? "open" : ""}`}>
+                                    <button
+                                        type="button"
+                                        className="miniCardBtn"
+                                        onClick={() => {
+                                            setAddressOpen((p) => !p);
+                                            
+                                        }}
+                                    >
+                                        <div className="miniTop">
+                                            <span className="miniLabel">Адрес</span>
+                                            <span className="miniChevron">{addressOpen ? (
+                                                <ChevronUp size={17} aria-hidden="true" />
+                                            ) : (
+                                                <ChevronDown size={17} aria-hidden="true" />
+                                            )}
+                                            </span>
+                                        </div>
+
+                                        <div className={`miniValue ${formData.address ? "" : "danger"}`}>
+                                            {formData.address ? "Указан" : "Не указан"}
+                                        </div>
+
+                                        {/* мелким — реальный адрес (если есть), иначе подсказка */}
+                                        <div className="miniSub">
+                                            {addrResolving
+                                                ? "Определяем…"
+                                                : formData.address
+                                                    ? formData.address
+                                                    : "Нажмите, чтобы указать"}
+                                        </div>
+                                    </button>
+
+                                    {/* раскрытие адреса — только под address */}
+                                    {addressOpen && (
+                                        <div className="miniDrop">
+                                            <div className="glass field">
+                                                <label htmlFor="order-address" className="cc-sr-only">
+                                                    Адрес заказа
+                                                </label>
+                                                <input
+                                                    id="order-address"
+                                                    className="control"
+                                                    type="text"
+                                                    placeholder="Введите адрес"
+                                                    value={formData.address}
+                                                    onChange={handleAddressChange}
+                                                />
+
+                                                {addrResolveError &&
+                                                    <div className="inline-error">{addrResolveError}</div>}
+
+                                                {addressSuggestions.length > 0 && (
+                                                    <ul className="suggestions">
+                                                        {addressSuggestions.map((s, i) => (
+                                                            <li key={`${s.label}-${i}`}
+                                                                onClick={() => handleAddressSelect(s)}>
+                                                                {s.label}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </div>
+
+                                            <div className="address-row" style={{marginTop: 10, paddingTop: 10}}>
+                                                <div className="muted-strong">Адрес из профиля?</div>
+
+                                                <div className="chip-row">
+                                                    <button
+                                                        type="button"
+                                                        className={`chip-btn ${addressMode === "profile" ? "active" : ""}`}
+                                                        onClick={async () => {
+                                                            setAddressMode("profile");
+                                                            setAddrResolveError(null);
+
+                                                            const addr = profile?.locationAddress;
+                                                            const lat = Number(profile?.locationLat);
+                                                            const lng = Number(profile?.locationLng);
+                                                            const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+
+                                                            if (addr && !looksLikeCoordsString(addr)) {
+                                                                setFormData((p) => ({...p, address: addr}));
+
+                                                                if (hasCoords) {
+                                                                    setMarkerPosition([lat, lng]);
+                                                                    return;
+                                                                }
+
+                                                                setAddrResolving(true);
+
+                                                                const resolved = await geocodeAddressYandex({
+                                                                    address: addr,
+                                                                    apiKey: YM_KEY,
+                                                                });
+
+                                                                setAddrResolving(false);
+
+                                                                if (resolved) {
+                                                                    setFormData((p) => ({
+                                                                        ...p,
+                                                                        address: resolved.address
+                                                                    }));
+                                                                    setMarkerPosition([resolved.lat, resolved.lng]);
+                                                                    return;
+                                                                }
+
+                                                                setAddrResolveError("Адрес из профиля есть, но координаты не найдены. Выберите адрес из подсказки, GPS или на карте.");
+                                                                return;
+                                                            }
+
+                                                            if (hasCoords) {
+                                                                setMarkerPosition([lat, lng]);
+                                                                setAddrResolving(true);
+                                                                const resolved = await reverseGeocodeYandex({
+                                                                    lat,
+                                                                    lng,
+                                                                    apiKey: YM_KEY
+                                                                });
+                                                                setAddrResolving(false);
+
+                                                                if (resolved) setFormData((p) => ({
+                                                                    ...p,
+                                                                    address: resolved
+                                                                }));
+                                                                else setAddrResolveError("В профиле нет распознанного адреса. Введите вручную или выберите на карте.");
+                                                                return;
+                                                            }
+
+                                                            setAddrResolveError("В профиле нет адреса. Введите вручную или выберите на карте.");
+                                                        }}
+                                                    >
+                                                        Да
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        className={`chip-btn ${addressMode === "custom" ? "active" : ""}`}
+                                                        onClick={() => setAddressMode("custom")}
+                                                    >
+                                                        Нет
+                                                    </button>
+                                                </div>
+
+                                                {addressMode === "custom" && (
+                                                    <div className="grid2" style={{marginTop: 10}}>
+                                                        <button type="button" className="action-btn subtle"
+                                                                onClick={() => setShowMapModal(true)}>
+                                                            На карте
+                                                        </button>
+                                                        <button type="button" className="action-btn subtle"
+                                                                onClick={detectGps} disabled={addrResolving}>
+                                                            GPS
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            
+                                        </div>
+                                    )}
+                                </div>
+
+
+                            </div>
+                        </div>
+                    </div>
+            </OrderWizardStep>
+
+            <OrderWizardStep number={3}>
+                {/* Payment + promotion */}
                     <div className="glass section-card">
                         <div className="section-head">
                             <div>
@@ -2582,32 +2884,16 @@ function CreateOrderPage() {
                                     : "При создании заказа ничего оплачивать не нужно."}
                         </div>
                     </div>
+            </OrderWizardStep>
 
-                    {/* actions */}
-                    <div className="glass bottomActions">
-                        <button type="button" className="action-btn subtle" onClick={() => navigate(-1)}>
-                            Назад
-                        </button>
-
-                        <button
-                            type="submit"
-                            disabled={
-                                isSubmitting ||
-                                paymentType === "guarantee"
-                            }
-                            className="action-btn primary"
-                            onClick={handleSubmit}
-                        >
-                            {paymentType === "guarantee"
-                                ? "Гарантийная оплата пока недоступна"
-                                : isSubmitting
-                                    ? "Создание…"
-                                    : "Создать заказ"}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </>
+            <OrderWizardStep number={4}>
+                <OrderReview
+                    groups={reviewGroups}
+                    payment={promotionTotal + " ₽"}
+                    onEdit={goToWizardStep}
+                />
+            </OrderWizardStep>
+        </OrderWizard>
     );
 }
 

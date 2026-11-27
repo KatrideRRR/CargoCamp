@@ -6,7 +6,10 @@ import axiosInstance from "../utils/axiosInstance";
 import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrentLocation";
 import YandexMapModal from "../components/YandexMapModal";
 import ExpressRouteMapModal from "../components/ExpressRouteMapModal";
-
+import OrderWizard, {
+    OrderWizardStep,
+    OrderReview,
+} from "../components/OrderWizard";
 import {
     CarFront,
     Package,
@@ -232,7 +235,18 @@ const CreateExpressOrder = () => {
     const suggestAbortRef = React.useRef({ from: null, to: null });
 
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [wizardStep, setWizardStep] =
+        useState(1);
 
+    const submitRef =
+        React.useRef(false);
+
+    const wizardSteps = [
+        "Тип заказа",
+        "Маршрут",
+        "Стоимость",
+        "Проверка",
+    ];
     const [form, setForm] = useState({
         subcategory: "",       // optional
         totalPrice: "",
@@ -566,40 +580,121 @@ const CreateExpressOrder = () => {
             recommended?.recommendedPrice,
         ]);
 
-    const validate = () => {
-        if (!form.fromAddress?.trim() || !form.toAddress?.trim()) return "Заполните Откуда и Куда";
-        if (!coordsOk) return "Нужны координаты точек A и B (карта/сохранённые/GPS)";
-        const totalPrice =
-            Number(form.totalPrice);
-
+    const goToWizardStep = (nextStep) => {
         if (
-            !Number.isFinite(totalPrice) ||
-            totalPrice <= 0
+            submitRef.current ||
+            nextStep < 1 ||
+            nextStep > wizardSteps.length
         ) {
-            return "Укажите корректную цену";
+            return;
         }
 
-        if (totalPrice > 300000) {
-            return "Максимальная цена заказа — 300 000 ₽";
+        setError("");
+        setWizardStep(nextStep);
+    };
+
+    const validateWizardStep = (step) => {
+        if (step === 1) {
+            if (!["taxi", "courier"].includes(type)) {
+                return "Выберите тип заказа";
+            }
         }
 
-        if (
-            !Number.isFinite(
-                Number(
-                    routeCalc.distanceKm
-                )
-            ) ||
-            Number(
-                routeCalc.distanceKm
-            ) <= 0
-        ) {
-            return "Не удалось рассчитать расстояние маршрута";
+        if (step === 2) {
+            if (
+                !form.fromAddress?.trim() ||
+                !form.toAddress?.trim()
+            ) {
+                return "Заполните Откуда и Куда";
+            }
+
+            if (
+                form.fromAddress.startsWith("Координаты:") ||
+                form.toAddress.startsWith("Координаты:")
+            ) {
+                return "Укажите адреса текстом";
+            }
+
+            if (!coordsOk) {
+                return (
+                    "Нужны координаты точек A и B " +
+                    "(карта/сохранённые/GPS)"
+                );
+            }
+
+            if (routeCalc.loading) {
+                return "Дождитесь расчёта маршрута";
+            }
+
+            if (
+                !Number.isFinite(
+                    Number(routeCalc.distanceKm)
+                ) ||
+                Number(routeCalc.distanceKm) <= 0
+            ) {
+                return (
+                    "Не удалось рассчитать расстояние маршрута"
+                );
+            }
         }
+
+        if (step === 3) {
+            const totalPrice =
+                Number(form.totalPrice);
+
+            if (
+                !Number.isFinite(totalPrice) ||
+                totalPrice <= 0
+            ) {
+                return "Укажите корректную цену";
+            }
+
+            if (totalPrice > 300000) {
+                return (
+                    "Максимальная цена заказа — 300 000 ₽"
+                );
+            }
+        }
+
         return "";
     };
 
+    const validate = () => {
+        for (const step of [1, 2, 3]) {
+            const message =
+                validateWizardStep(step);
+
+            if (message) {
+                setWizardStep(step);
+                return message;
+            }
+        }
+
+        return "";
+    };
+
+    const nextWizardStep = () => {
+        if (submitRef.current) return;
+
+        const validationError =
+            validateWizardStep(wizardStep);
+
+        if (validationError) {
+            setError(validationError);
+            return;
+        }
+
+        goToWizardStep(wizardStep + 1);
+    };
+
     const createOrder = async () => {
-        if (isSubmitting) return;
+        if (
+            isSubmitting ||
+            submitRef.current ||
+            wizardStep !== 4
+        ) {
+            return;
+        }
 
         const v = validate();
         if (v) {
@@ -608,6 +703,7 @@ const CreateExpressOrder = () => {
         }
 
         setError("");
+        submitRef.current = true;
         setIsSubmitting(true);
 
         try {
@@ -683,8 +779,14 @@ const CreateExpressOrder = () => {
             const r = await axiosInstance.post("/express/express-orders", payload);
 
             if (!r.data?.success) {
-                setError(r.data?.message || "Ошибка при создании заказа");
+                setError(
+                    r.data?.message ||
+                    "Ошибка при создании заказа"
+                );
+
+                submitRef.current = false;
                 setIsSubmitting(false);
+
                 return;
             }
 
@@ -697,6 +799,7 @@ const CreateExpressOrder = () => {
             console.error(e);
             setError(e.response?.data?.message || "Ошибка при создании заказа");
             setIsSubmitting(false);
+            submitRef.current = false;
         }
     };
 
@@ -708,15 +811,150 @@ const CreateExpressOrder = () => {
         return "Маршрут готов.";
     }, [coordsOk, routeCalc.loading, routeCalc.err, recommended]);
 
-    return (
-        <div className={`exo-page exo-page--${platform}`}>
-            <div className="exo-shell">
 
-                {/* Header */}
+    const reviewGroups = [
+        {
+            step: 1,
+            title: "Тип заказа",
+            fields: [
+                {
+                    label: "Услуга",
+                    value: type === "taxi"
+                        ? "Такси"
+                        : "Курьер",
+                },
+                {
+                    label: "Дополнительная опция",
+                    value:
+                        form.subcategory ||
+                        "Не выбрана",
+                },
+                {
+                    label: "Комментарий",
+                    value:
+                        form.description ||
+                        "Без комментария",
+                },
+            ],
+        },
+        {
+            step: 2,
+            title: "Маршрут",
+            fields: [
+                {
+                    label: "Откуда",
+                    value: form.fromAddress,
+                },
+                {
+                    label: "Куда",
+                    value: form.toAddress,
+                },
+                {
+                    label: "Расстояние и время",
+                    value: routeStatus,
+                },
+            ],
+        },
+        {
+            step: 3,
+            title: "Стоимость",
+            fields: [
+                {
+                    label: "Ваша цена",
+                    value: form.totalPrice
+                        ? Number(form.totalPrice)
+                            .toLocaleString("ru-RU") + " ₽"
+                        : "Не указана",
+                },
+                {
+                    label: "Способ оплаты",
+                    value: "Наличными",
+                },
+            ],
+        },
+    ];
+
+    return (
+        <OrderWizard
+            title="Экспресс-заказ"
+            steps={wizardSteps}
+            step={wizardStep}
+            onStepChange={goToWizardStep}
+            onNext={nextWizardStep}
+            onPublish={createOrder}
+            busy={isSubmitting}
+            dirty={Boolean(
+                form.fromAddress ||
+                form.toAddress ||
+                form.totalPrice ||
+                form.description ||
+                form.subcategory ||
+                type !== "taxi"
+            )}
+            error={error}
+            errorClassName="exo-alertText"
+            contentClassName={"exo-page exo-page--" + platform}
+            auxiliary={
+                showMapFor
+                    ? {
+                        title: showMapFor === "from"
+                            ? "Выбрать точку A"
+                            : "Выбрать точку B",
+                        onBack: () => setShowMapFor(null),
+                        content: (
+                            <YandexMapModal embedded
+                isOpen={!!showMapFor}
+                onClose={() => setShowMapFor(null)}
+                initialLat={showMapFor === "from" ? toNum(form.fromLat) : toNum(form.toLat)}
+                initialLng={showMapFor === "from" ? toNum(form.fromLng) : toNum(form.toLng)}
+                onPick={(picked) => {
+                    const addr = picked?.address;
+                    const lat = picked?.lat;
+                    const lng = picked?.lng;
+
+                    if (!addr || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+                        setShowMapFor(null);
+                        return;
+                    }
+
+                    if (showMapFor === "from") {
+                        setField("fromAddress", addr);
+                        setField("fromLat", String(lat));
+                        setField("fromLng", String(lng));
+                    } else {
+                        setField("toAddress", addr);
+                        setField("toLat", String(lat));
+                        setField("toLng", String(lng));
+                    }
+
+                    setShowMapFor(null);
+                }}
+            />
+                        ),
+                    }
+                    : showRouteModal
+                        ? {
+                            title: "Маршрут A → B",
+                            onBack: () => setShowRouteModal(false),
+                            content: (
+                                <ExpressRouteMapModal embedded
+                isOpen={showRouteModal}
+                onClose={() => setShowRouteModal(false)}
+                type={type}
+                pointA={{ address: form.fromAddress, lat: form.fromLat, lng: form.fromLng }}
+                pointB={{ address: form.toAddress, lat: form.toLat, lng: form.toLng }}
+                
+            />
+                            ),
+                        }
+                        : null
+            }
+        >
+            <OrderWizardStep number={1}>
                 <div className="exo-glass exo-header">
                     <div className="exo-headerRow">
                         <div>
-                            <div className="exo-title">Экспресс-заказ</div>
+                            
                             <div className="exo-subtitle">Две точки + цена — и готово</div>
                         </div>
                         <div className="exo-badges">
@@ -770,14 +1008,64 @@ const CreateExpressOrder = () => {
                     </div>
                 </div>
 
-                {error && (
-                    <div className="exo-glass exo-alert">
-                        <div className="exo-alertTitle">Ошибка</div>
-                        <div className="exo-alertText">{error}</div>
-                    </div>
-                )}
+                <div className="exo-glass exo-card">
+                    {/* Extra (collapsed) */}
+                    <div style={{ marginTop: 10 }}>
+                        <button
+                            type="button"
+                            className="exo-miniBtn"
+                            onClick={() => setExtraOpen((p) => !p)}
+                            style={{ width: "100%", justifyContent: "center" }}
+                        >
+                            {extraOpen ? "Скрыть дополнительно" : "Дополнительно (необязательно)"}
+                        </button>
 
-                {/* Main: route + price + create */}
+                        {extraOpen && (
+                            <div style={{ marginTop: 10 }}>
+                                {/* Subcategory chips */}
+                                <div className="exo-chipsRow">
+                                    <div className="exo-chipsTitle">Опции:</div>
+                                    <div className="exo-chips">
+                                        {subcategoryOptions[type].map((opt) => {
+                                            const selected = form.subcategory === opt.label;
+                                            const OptionIcon = opt.icon;
+                                            return (
+                                                <button
+                                                    key={opt.label}
+                                                    type="button"
+                                                    aria-pressed={selected}
+                                                    className={`exo-chip ${selected ? "selected" : ""}`}
+                                                    onClick={() => setField("subcategory", selected ? "" : opt.label)}
+                                                    title={opt.label}
+                                                >
+<span className="exo-chipIcon" aria-hidden="true">
+    <OptionIcon size={17} strokeWidth={1.9} />
+</span>
+                                                    <span className="exo-chipText">{opt.label}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="exo-field" style={{ marginTop: 10 }}>
+                  <textarea
+                      aria-label="Комментарий к экспресс-заказу"
+                      className="exo-control exo-textarea"
+                      value={form.description}
+                      onChange={(e) => setField("description", e.target.value)}
+                      placeholder="Комментарий (домофон, подъезд, позвонить заранее)…"
+                  />
+                                </div>
+
+                                
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </OrderWizardStep>
+
+            <OrderWizardStep number={2}>
                 <div className="exo-glass exo-card">
                     <div className="exo-cardTop">
                         <div>
@@ -875,7 +1163,11 @@ const CreateExpressOrder = () => {
                             Показать маршрут
                         </button>
                     </div>
+                </div>
+            </OrderWizardStep>
 
+            <OrderWizardStep number={3}>
+                <div className="exo-glass exo-card">
                     {/* Price */}
                     <div
                         className="exo-field"
@@ -1040,117 +1332,21 @@ const CreateExpressOrder = () => {
                         </div>
                     </div>
 
-                    {/* Extra (collapsed) */}
-                    <div style={{ marginTop: 10 }}>
-                        <button
-                            type="button"
-                            className="exo-miniBtn"
-                            onClick={() => setExtraOpen((p) => !p)}
-                            style={{ width: "100%", justifyContent: "center" }}
-                        >
-                            {extraOpen ? "Скрыть дополнительно" : "Дополнительно (необязательно)"}
-                        </button>
-
-                        {extraOpen && (
-                            <div style={{ marginTop: 10 }}>
-                                {/* Subcategory chips */}
-                                <div className="exo-chipsRow">
-                                    <div className="exo-chipsTitle">Опции:</div>
-                                    <div className="exo-chips">
-                                        {subcategoryOptions[type].map((opt) => {
-                                            const selected = form.subcategory === opt.label;
-                                            const OptionIcon = opt.icon;
-                                            return (
-                                                <button
-                                                    key={opt.label}
-                                                    type="button"
-                                                    aria-pressed={selected}
-                                                    className={`exo-chip ${selected ? "selected" : ""}`}
-                                                    onClick={() => setField("subcategory", selected ? "" : opt.label)}
-                                                    title={opt.label}
-                                                >
-<span className="exo-chipIcon" aria-hidden="true">
-    <OptionIcon size={17} strokeWidth={1.9} />
-</span>
-                                                    <span className="exo-chipText">{opt.label}</span>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                <div className="exo-field" style={{ marginTop: 10 }}>
-                  <textarea
-                      aria-label="Комментарий к экспресс-заказу"
-                      className="exo-control exo-textarea"
-                      value={form.description}
-                      onChange={(e) => setField("description", e.target.value)}
-                      placeholder="Комментарий (домофон, подъезд, позвонить заранее)…"
-                  />
-                                </div>
-
-                                <div className="exo-hint" style={{ marginTop: 8 }}>
-                                    Оплата сейчас: <b>наличными</b> (пока фиксировано для скорости).
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Single primary action */}
-                    <div className="exo-actionsRow" style={{ marginTop: 12 }}>
-                        <button
-                            type="button"
-                            className="exo-btn exo-btnPrimary"
-                            onClick={createOrder}
-                            disabled={isSubmitting}
-                        >
-                            {isSubmitting ? "Создаём..." : "Создать заказ"}
-                        </button>
-                    </div>
+                    <p className="exo-hint">
+                        Оплата исполнителю наличными.
+                        Создание экспресс-заказа бесплатно.
+                    </p>
                 </div>
-            </div>
+            </OrderWizardStep>
 
-            {/* Map modal */}
-            <YandexMapModal
-                isOpen={!!showMapFor}
-                onClose={() => setShowMapFor(null)}
-                initialLat={showMapFor === "from" ? toNum(form.fromLat) : toNum(form.toLat)}
-                initialLng={showMapFor === "from" ? toNum(form.fromLng) : toNum(form.toLng)}
-                onPick={(picked) => {
-                    const addr = picked?.address;
-                    const lat = picked?.lat;
-                    const lng = picked?.lng;
-
-                    if (!addr || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
-                        setShowMapFor(null);
-                        return;
-                    }
-
-                    if (showMapFor === "from") {
-                        setField("fromAddress", addr);
-                        setField("fromLat", String(lat));
-                        setField("fromLng", String(lng));
-                    } else {
-                        setField("toAddress", addr);
-                        setField("toLat", String(lat));
-                        setField("toLng", String(lng));
-                    }
-
-                    setShowMapFor(null);
-                }}
-            />
-
-            {/* Route modal */}
-            <ExpressRouteMapModal
-                isOpen={showRouteModal}
-                onClose={() => setShowRouteModal(false)}
-                type={type}
-                pointA={{ address: form.fromAddress, lat: form.fromLat, lng: form.fromLng }}
-                pointB={{ address: form.toAddress, lat: form.toLat, lng: form.toLng }}
-                onCreate={createOrder}
-            />
-
-        </div>
+            <OrderWizardStep number={4}>
+                <OrderReview
+                    groups={reviewGroups}
+                    payment="0 ₽"
+                    onEdit={goToWizardStep}
+                />
+            </OrderWizardStep>
+        </OrderWizard>
     );
 };
 

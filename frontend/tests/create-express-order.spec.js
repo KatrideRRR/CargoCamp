@@ -214,46 +214,70 @@ async function openExpressPage(page, options = {}) {
         timeout: 15000,
     });
 
-    await expect(page.locator(".exo-title")).toHaveText("Экспресс-заказ", {
+    await expect(
+        page.getByRole("dialog", {
+            name: "Экспресс-заказ",
+            exact: true,
+        })
+    ).toBeVisible({
         timeout: 15000,
     });
 }
 
-async function clickBySelector(page, selector, errorMessage) {
-    await page.evaluate(
-        ({ selector, errorMessage }) => {
-            const el = document.querySelector(selector);
-
-            if (!el) {
-                throw new Error(errorMessage || `Элемент не найден: ${selector}`);
-            }
-
-            el.click();
-        },
+async function goToExpressStep(page, step) {
+    const dialog = page.getByRole(
+        "dialog",
         {
-            selector,
-            errorMessage,
+            name: "Экспресс-заказ",
+            exact: true,
         }
     );
+
+    await dialog.getByRole("button", {
+        name: new RegExp(
+            `^Шаг ${step}:`
+        ),
+    }).click();
+
+    await expect(
+        dialog.locator(
+            `[data-order-step="${step}"]`
+        )
+    ).toBeVisible();
+
+    return dialog;
 }
 
 async function clickCreateExpressOrder(page) {
-    await clickBySelector(
-        page,
-        ".exo-btnPrimary",
-        "Кнопка создания экспресс-заказа не найдена"
-    );
+    const dialog =
+        await goToExpressStep(page, 4);
+
+    await dialog.getByRole("button", {
+        name: "Создать заказ",
+        exact: true,
+    }).click();
 }
 
 async function clickTaxiType(page) {
-    await page.locator(".exo-typeBtn").filter({ hasText: "Такси" }).click();
+    await goToExpressStep(page, 1);
+
+    await page
+        .locator(".exo-typeBtn")
+        .filter({ hasText: "Такси" })
+        .click();
 }
 
 async function clickCourierType(page) {
-    await page.locator(".exo-typeBtn").filter({ hasText: "Курьер" }).click();
+    await goToExpressStep(page, 1);
+
+    await page
+        .locator(".exo-typeBtn")
+        .filter({ hasText: "Курьер" })
+        .click();
 }
 
 async function fillRouteBySuggestions(page) {
+    await goToExpressStep(page, 2);
     const fromInput = page.getByPlaceholder("Откуда — адрес точки A");
     const toInput = page.getByPlaceholder("Куда — адрес точки B");
 
@@ -288,7 +312,7 @@ async function fillValidExpressOrder(page) {
     await expect(page.getByRole("button", { name: /Показать маршрут/i })).toBeEnabled({
         timeout: 10000,
     });
-
+    await goToExpressStep(page, 3);
     await page.locator("#express-price").fill("700");
 }
 
@@ -298,32 +322,122 @@ test.describe("CreateExpressOrder", () => {
     });
 
     test(
+        "проходит четыре шага экспресс-заказа без преждевременной публикации",
+        async ({ page }) => {
+            let createCalls = 0;
+
+            await page.route(
+                "**/api/express/express-orders",
+                async (route) => {
+                    createCalls += 1;
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                            order: {
+                                id: 900,
+                            },
+                        },
+                    });
+                }
+            );
+
+            const dialog = page.getByRole(
+                "dialog",
+                {
+                    name: "Экспресс-заказ",
+                    exact: true,
+                }
+            );
+
+            await clickCourierType(page);
+
+            const next = dialog.getByRole(
+                "button",
+                {
+                    name: "Далее",
+                    exact: true,
+                }
+            );
+
+            await next.click();
+
+            await expect(dialog)
+                .toContainText("Шаг 2 из 4");
+
+            await next.click();
+
+            await expect(
+                dialog.getByRole("alert")
+            ).toContainText(
+                "Заполните Откуда и Куда"
+            );
+
+            expect(createCalls).toBe(0);
+
+            await fillRouteBySuggestions(page);
+
+            await expect(
+                page.locator(".exo-note")
+            ).toContainText(
+                /7\.8 км|7,8 км/
+            );
+
+            await next.click();
+
+            await expect(dialog)
+                .toContainText("Шаг 3 из 4");
+
+            await page.locator(
+                "#express-price"
+            ).fill("700");
+
+            await next.click();
+
+            await expect(dialog)
+                .toContainText("Шаг 4 из 4");
+
+            await expect(dialog)
+                .toContainText("Курьер");
+
+            await expect(dialog)
+                .toContainText("700 ₽");
+
+            expect(createCalls).toBe(0);
+
+            page.once(
+                "dialog",
+                nativeDialog =>
+                    nativeDialog.accept()
+            );
+
+            await dialog.getByRole("button", {
+                name: "Создать заказ",
+                exact: true,
+            }).click();
+
+            await expect.poll(
+                () => createCalls
+            ).toBe(1);
+
+            await expect(page)
+                .toHaveURL(/\/my-orders\/1/);
+        }
+    );
+
+    test(
         "@release-smoke экспресс: такси и курьер доступны на мобильном экране",
         async ({ page }) => {
-            await expect(
-                page.locator(".exo-page")
-            ).toBeVisible();
-
-            const taxi = page.locator(
-                ".exo-typeBtn"
-            ).filter({
-                hasText: "Такси",
-            });
-
-            const courier = page.locator(
-                ".exo-typeBtn"
-            ).filter({
-                hasText: "Курьер",
-            });
-
-            await expect(taxi).toBeVisible();
-            await expect(courier).toBeVisible();
-
-            await courier.click();
+            await clickCourierType(page);
 
             await expect(
-                page.locator(".exo-typeBtn.isActive")
+                page.locator(
+                    ".exo-typeBtn.isActive"
+                )
             ).toContainText("Курьер");
+
+            await goToExpressStep(page, 2);
 
             await expect(
                 page.getByPlaceholder(
@@ -337,47 +451,101 @@ test.describe("CreateExpressOrder", () => {
                 )
             ).toBeVisible();
 
-            const price = page.locator(
+            await goToExpressStep(page, 3);
+
+            await page.locator(
                 "#express-price"
-            );
+            ).fill("700");
 
-            await price.fill("700");
+            await expect(
+                page.locator(
+                    "#express-price"
+                )
+            ).toHaveValue("700");
 
-            await expect(price).toHaveValue("700");
+            for (const step of [1, 2, 3, 4]) {
+                const dialog =
+                    await goToExpressStep(
+                        page,
+                        step
+                    );
 
-            const overflow = await page.evaluate(() =>
-                document.documentElement.scrollWidth -
-                document.documentElement.clientWidth
-            );
+                const overflow =
+                    await dialog.evaluate(
+                        (element) =>
+                            element.scrollWidth -
+                            element.clientWidth
+                    );
 
-            expect(
-                overflow,
-                "Экспресс-форма выходит за ширину экрана"
-            ).toBeLessThanOrEqual(2);
+                expect(overflow)
+                    .toBeLessThanOrEqual(2);
+            }
         }
     );
 
-    test("отображает страницу экспресс-заказа", async ({ page }) => {
-        await expect(page.locator(".exo-page")).toBeVisible();
+    test(
+        "отображает страницу экспресс-заказа",
+        async ({ page }) => {
+            const dialog = page.getByRole(
+                "dialog",
+                {
+                    name: "Экспресс-заказ",
+                    exact: true,
+                }
+            );
 
-        await expect(page.locator(".exo-title")).toHaveText("Экспресс-заказ");
-        await expect(page.getByText("Две точки + цена — и готово")).toBeVisible();
+            await expect(dialog)
+                .toContainText("Шаг 1 из 4");
 
-        await expect(page.locator(".exo-typeBtn").filter({ hasText: "Такси" })).toBeVisible();
-        await expect(page.locator(".exo-typeBtn").filter({ hasText: "Курьер" })).toBeVisible();
+            await expect(
+                dialog.locator(".exo-typeBtn")
+                    .filter({
+                        hasText: "Такси",
+                    })
+            ).toBeVisible();
 
-        await expect(page.getByPlaceholder("Откуда — адрес точки A")).toBeVisible();
-        await expect(page.getByPlaceholder("Куда — адрес точки B")).toBeVisible();
+            await expect(
+                dialog.locator(".exo-typeBtn")
+                    .filter({
+                        hasText: "Курьер",
+                    })
+            ).toBeVisible();
 
-        await expect(page.locator(".exo-cardTitle")).toHaveText("Маршрут");
-        await expect(
-            page.getByRole("spinbutton", { name: "Ваша цена" })
-        ).toBeVisible();
+            await goToExpressStep(page, 2);
 
-        await expect(page.locator("#express-price")).toBeVisible();
+            await expect(
+                page.getByPlaceholder(
+                    "Откуда — адрес точки A"
+                )
+            ).toBeVisible();
 
-        await expect(page.locator(".exo-btnPrimary")).toHaveText("Создать заказ");
-    });
+            await expect(
+                page.getByPlaceholder(
+                    "Куда — адрес точки B"
+                )
+            ).toBeVisible();
+
+            await goToExpressStep(page, 3);
+
+            await expect(
+                page.locator("#express-price")
+            ).toBeVisible();
+
+            await expect(dialog)
+                .toContainText(
+                    "Оплата исполнителю наличными"
+                );
+
+            await goToExpressStep(page, 4);
+
+            await expect(
+                dialog.getByRole("button", {
+                    name: "Создать заказ",
+                    exact: true,
+                })
+            ).toBeVisible();
+        }
+    );
 
     test("по умолчанию выбран тип Такси", async ({ page }) => {
         await expect(page.locator(".exo-typeBtn.isActive")).toContainText("Такси");

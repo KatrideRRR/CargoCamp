@@ -179,6 +179,37 @@ async function setupMyOrdersMocks(page, options = {}) {
     await mockOrderAssets(page);
 
     await page.route(
+        "**/api/auth/location/me",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    location: {
+                        locationAddress:
+                            "Симферополь, улица Пушкина, 1",
+
+                        locationLat: 44.9521,
+                        locationLng: 34.1024,
+                    },
+                },
+            });
+        }
+    );
+
+    await page.route(
+        "**/api/express/express-addresses/me",
+        async (route) => {
+            await route.fulfill({
+                status: 200,
+                json: {
+                    success: true,
+                    items: [],
+                },
+            });
+        }
+    );
+
+    await page.route(
         "**/api/orders/active-orders",
         async (route) => {
             await route.fulfill({
@@ -451,8 +482,19 @@ test.describe("MyOrdersPage", () => {
         await expect(page.getByText("Мои заказы")).toBeVisible();
 
         await expect(page.getByText("Всего:")).toBeVisible();
-        await expect(page.getByText("Разместить")).toBeVisible();
-        await expect(page.getByText("Вызвать такси / курьера")).toBeVisible();
+        await expect(
+            page.getByRole("button", {
+                name: "Обычный заказ",
+                exact: true,
+            })
+        ).toBeVisible();
+
+        await expect(
+            page.getByRole("button", {
+                name: "Экспресс-заказ",
+                exact: true,
+            })
+        ).toBeVisible();
     });
 
     test("показывает только pending и pending_payment обычные заказы", async ({ page }) => {
@@ -477,17 +519,157 @@ test.describe("MyOrdersPage", () => {
         await expect(page.locator("b").filter({ hasText: "3" })).toBeVisible();
     });
 
-    test("переходит на создание обычного заказа", async ({ page }) => {
-        await page.getByRole("button", { name: "Разместить" }).click();
+    test(
+        "открывает обычный заказ поверх списка заказов",
+        async ({ page }) => {
+            await page.getByRole("button", {
+                name: "Обычный заказ",
+                exact: true,
+            }).click();
 
-        await expect(page).toHaveURL(/\/create-order/);
-    });
+            await expect(page)
+                .toHaveURL(/\/create-order/);
 
-    test("переходит на создание экспресс-заказа", async ({ page }) => {
-        await page.getByRole("button", { name: "Вызвать такси \/ курьера" }).click();
+            const dialog = page.getByRole(
+                "dialog",
+                {
+                    name: "Создать заказ",
+                    exact: true,
+                }
+            );
 
-        await expect(page).toHaveURL(/\/express/);
-    });
+            await expect(dialog)
+                .toBeVisible();
+
+            await expect(
+                page.locator(".cc-my-orders")
+            ).toBeAttached();
+
+            await dialog.getByRole("button", {
+                name: "Закрыть",
+                exact: true,
+            }).click();
+
+            await expect(dialog)
+                .not.toBeVisible();
+
+            await expect(page)
+                .toHaveURL(/\/my-orders\/1/);
+
+            await expect(
+                page.getByText("Заказ №101")
+            ).toBeVisible();
+        }
+    );
+
+    test(
+        "открывает экспресс-заказ поверх списка заказов",
+        async ({ page }) => {
+            await page.getByRole("button", {
+                name: "Экспресс-заказ",
+                exact: true,
+            }).click();
+
+            await expect(page)
+                .toHaveURL(/\/express/);
+
+            const dialog = page.getByRole(
+                "dialog",
+                {
+                    name: "Экспресс-заказ",
+                    exact: true,
+                }
+            );
+
+            await expect(dialog)
+                .toBeVisible();
+
+            await expect(
+                page.locator(".cc-my-orders")
+            ).toBeAttached();
+
+            await dialog.getByRole("button", {
+                name: "Закрыть",
+                exact: true,
+            }).click();
+
+            await expect(dialog)
+                .not.toBeVisible();
+
+            await expect(page)
+                .toHaveURL(/\/my-orders\/1/);
+        }
+    );
+
+    test(
+        "предупреждает о потере заполненного заказа при закрытии",
+        async ({ page }) => {
+            await page.getByRole("button", {
+                name: "Обычный заказ",
+                exact: true,
+            }).click();
+
+            const dialog = page.getByRole(
+                "dialog",
+                {
+                    name: "Создать заказ",
+                    exact: true,
+                }
+            );
+
+            await dialog.locator(
+                "#order-description"
+            ).fill(
+                "Необходимо выполнить работу"
+            );
+
+            await dialog.getByRole("button", {
+                name: "Закрыть",
+                exact: true,
+            }).click();
+
+            const confirmation = page.getByRole(
+                "dialog",
+                {
+                    name: "Закрыть заказ?",
+                    exact: true,
+                }
+            );
+
+            await expect(confirmation)
+                .toBeVisible();
+
+            await confirmation.getByRole("button", {
+                name: "Продолжить редактирование",
+                exact: true,
+            }).click();
+
+            await expect(
+                page.locator(
+                    "#order-description"
+                )
+            ).toHaveValue(
+                "Необходимо выполнить работу"
+            );
+
+            await dialog.getByRole("button", {
+                name: "Закрыть",
+                exact: true,
+            }).click();
+
+            await confirmation.getByRole("button", {
+                name: "Закрыть без сохранения",
+                exact: true,
+            }).click();
+
+            await expect(page)
+                .toHaveURL(/\/my-orders\/1/);
+
+            await expect(
+                page.getByRole("dialog")
+            ).toHaveCount(0);
+        }
+    );
 
     test("показывает данные обычного заказа", async ({ page }) => {
         const card = orderCard(page, "Заказ №101");

@@ -749,17 +749,42 @@ const MyOrdersPage = () => {
 
                     <div className={styles.topActions}>
                         <button
-                            onClick={() => navigate("/create-order")}
-                            className={`${styles.createButton} ${hasNewRequests ? styles.newRequest : ""}`}
+                            type="button"
+                            onClick={() =>
+                                navigate(
+                                    `/create-order?platform=${platform}`,
+                                    {
+                                        state: {
+                                            orderComposerBackground:
+                                            location,
+                                        },
+                                    }
+                                )
+                            }
+                            className={
+                                `${styles.createButton} ` +
+                                `${hasNewRequests ? styles.newRequest : ""}`
+                            }
                         >
-                            Разместить
+                            Обычный заказ
                         </button>
 
                         <button
-                            onClick={() => navigate("/express")}
+                            type="button"
+                            onClick={() =>
+                                navigate(
+                                    `/express?platform=${platform}`,
+                                    {
+                                        state: {
+                                            orderComposerBackground:
+                                            location,
+                                        },
+                                    }
+                                )
+                            }
                             className={styles.expressButton}
                         >
-                            Вызвать такси / курьера
+                            Экспресс-заказ
                         </button>
                     </div>
                 </div>

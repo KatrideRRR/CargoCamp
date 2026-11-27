@@ -39,6 +39,7 @@ export default function ExpressRouteMapModal({
                                                  pointB, // { address, lat, lng }
                                                  type,   // taxi|courier (для формулы)
                                                  onCreate, // создать заказ
+                                                 embedded = false,
                                                  pricing = { taxi: { base: 150, perKm: 20 }, courier: { base: 120, perKm: 15 } },
                                                  onRouteCalculated, // optional callback: ({distanceKm, durationMin})
                                              }) {
@@ -168,14 +169,10 @@ export default function ExpressRouteMapModal({
         };
     }, [isOpen, apiKey, coordsOk, pointA, pointB, onRouteCalculated]);
 
-    return (
-        <Modal
-            isOpen={isOpen}
-            onRequestClose={onClose}
-            className="exo-modal exo-modalWide"
-            overlayClassName="exo-overlay"
-            contentLabel="Маршрут A → B"
-        >
+    if (!isOpen) return null;
+
+    const content = (
+        <>
             <div className="exo-modalHead">
                 <div>
                     <div className="exo-modalTitle">Маршрут A → B</div>
@@ -184,7 +181,16 @@ export default function ExpressRouteMapModal({
                     </div>
                 </div>
 
-                <button className="exo-x" onClick={onClose} type="button">✖</button>
+                {!embedded && (
+                    <button
+                        className="exo-x"
+                        onClick={onClose}
+                        type="button"
+                        aria-label="Закрыть маршрут"
+                    >
+                        ✖
+                    </button>
+                )}
             </div>
 
             <div className="exo-modalBody">
@@ -220,15 +226,56 @@ export default function ExpressRouteMapModal({
                     </div>
                 </div>
 
-                <div className="exo-modalActions" style={{ marginTop: 12 }}>
-                    <button className="exo-btn exo-btnGhost" type="button" onClick={onClose}>
-                        Назад
-                    </button>
-                    <button className="exo-btn exo-btnPrimary" type="button" onClick={onCreate} disabled={!coordsOk || !!err || loading}>
-                        Создать заказ
-                    </button>
-                </div>
+                {!embedded && (
+                    <div
+                        className="exo-modalActions"
+                        style={{ marginTop: 12 }}
+                    >
+                        <button
+                            className="exo-btn exo-btnGhost"
+                            type="button"
+                            onClick={onClose}
+                        >
+                            Назад
+                        </button>
+
+                        {typeof onCreate === "function" && (
+                            <button
+                                className="exo-btn exo-btnPrimary"
+                                type="button"
+                                onClick={onCreate}
+                                disabled={
+                                    !coordsOk ||
+                                    !!err ||
+                                    loading
+                                }
+                            >
+                                Создать заказ
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
+        </>
+    );
+
+    if (embedded) {
+        return (
+            <div className="cc-embedded-express-route">
+                {content}
+            </div>
+        );
+    }
+
+    return (
+        <Modal
+            isOpen={isOpen}
+            onRequestClose={onClose}
+            className="exo-modal exo-modalWide"
+            overlayClassName="exo-overlay"
+            contentLabel="Маршрут A → B"
+        >
+            {content}
         </Modal>
     );
 }
