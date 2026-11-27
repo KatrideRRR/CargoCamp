@@ -28,6 +28,10 @@ import {
     Check,
     ChevronRight,
     X,
+    MapPin,
+    Camera,
+    Navigation,
+    Map,
 } from "lucide-react";
 import AccountDeletionSection from "../components/AccountDeletionSection";
 import { App as CapacitorApp } from "@capacitor/app";
@@ -41,6 +45,8 @@ import {
     LoadingState,
     SheetScreen,
     PaymentCardOption,
+    TextField,
+    StatusBadge,
 } from "../components/ui";
 
 import {
@@ -369,9 +375,6 @@ const ProfilePage = () => {
         useState(false);
 
     const [vehiclePhotoUploading, setVehiclePhotoUploading] =
-        useState(false);
-
-    const [vehicleVerificationOpen, setVehicleVerificationOpen] =
         useState(false);
 
     // Только для демо-режима
@@ -1708,80 +1711,6 @@ const ProfilePage = () => {
         }
     };
 
-    const loadedProfileId = profile?.id;
-
-
-
-    useEffect(() => {
-        if (!loadedProfileId) {
-            return;
-        }
-
-        const params =
-            new URLSearchParams(
-                window.location.search
-            );
-
-        const targetSection =
-            params.get("section");
-
-        /*
-         * Если пришли именно из модалки
-         * "добавьте автомобиль".
-         */
-        if (
-            targetSection ===
-            "verification"
-        ) {
-            setVehicleVerificationOpen(true);
-
-            const timer =
-                setTimeout(() => {
-                    document
-                        .getElementById(
-                            "vehicle-verification-section"
-                        )
-                        ?.scrollIntoView({
-                            behavior: "smooth",
-                            block: "center",
-                        });
-
-                    /*
-                     * Сразу убираем section,
-                     * чтобы следующий вход
-                     * в профиль был обычным.
-                     */
-                    params.delete("section");
-
-                    const query =
-                        params.toString();
-
-                    window.history.replaceState(
-                        {},
-                        "",
-                        `${window.location.pathname}${
-                            query
-                                ? `?${query}`
-                                : ""
-                        }`
-                    );
-                }, 300);
-
-            return () =>
-                clearTimeout(timer);
-        }
-
-        /*
-         * Обычное открытие профиля:
-         * всегда начинаем сверху.
-         */
-        window.scrollTo({
-            top: 0,
-            left: 0,
-            behavior: "auto",
-        });
-    }, [loadedProfileId]);
-
     const handleBindTBankCard = async () => {
         if (cardBindingRef.current) return;
 
@@ -2173,142 +2102,89 @@ const ProfilePage = () => {
     return (
         <div className={`profile-page profile-page--${platform} ${platform === "ios" ? "ios-safe-top ios-safe-bottom" : ""}`}>
             <div className="profile-shell">
-                <div className="profile-header glass">
-                    <div className="profile-header-top">
-                        <div>
-                            <h1 className="profile-title">Профиль</h1>
-                            <p className="profile-subtitle">
-                                Управление аккаунтом и оплатой
-                            </p>
+                <header className="cc-profile-heading">
 
-                            {profile && (
-                                <div className="header-mini">
-                                    <span className="header-mini-name">
-                                        {profile.username}
-                                    </span>
-                                    <span className="header-mini-pill">
-                                        ★ {profile.rating ? Number(profile.rating).toFixed(1) : "—"}
-                                    </span>
-                                </div>
+                    <h1>Профиль</h1>
+
+                </header>
+
+                {profile && (
+                    <div className="cc-profile-account">
+
+                        <div className="cc-profile-account__avatar">
+
+                            {profile.avatar ? (
+                                <img
+                                    src={`${apiUrl}${profile.avatar}`}
+                                    alt="Аватар"
+                                />
+                            ) : (
+                                <span>
+                    {profile.username
+                        ? profile.username
+                            .charAt(0)
+                            .toUpperCase()
+                        : "U"}
+                </span>
                             )}
+
+                            <label
+                                className="cc-profile-account__camera"
+                                title="Изменить фото профиля"
+                            >
+                                <Camera
+                                    size={17}
+                                    aria-hidden="true"
+                                />
+
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    aria-label="Изменить фото профиля"
+                                    disabled={avatarUploading}
+                                    onChange={(event) => {
+                                        const file =
+                                            event.target.files?.[0];
+
+                                        if (file) {
+                                            handleAvatarUpload(file);
+                                        }
+
+                                        event.target.value = "";
+                                    }}
+                                />
+                            </label>
+
                         </div>
-                    </div>
 
-                    {profile && (
-                        <div className="profile-identity">
-                            <div className="identity-row">
-                                <div className="avatar-block">
-                                    {profile.avatar ? (
-                                        <img
-                                            src={`${apiUrl}${profile.avatar}`}
-                                            alt="Аватар"
-                                            className="profile-avatar"
-                                        />
-                                    ) : (
-                                        <div className="profile-avatar profile-avatar-placeholder">
-                                            {profile.username
-                                                ? profile.username.charAt(0).toUpperCase()
-                                                : "U"}
-                                        </div>
-                                    )}
+                        <div className="cc-profile-account__info">
 
-                                    <label className="avatar-upload-btn">
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            style={{ display: "none" }}
-                                            onChange={(e) =>
-                                                handleAvatarUpload(e.target.files?.[0])
-                                            }
-                                        />
-                                        <span>
-                                            {avatarUploading
-                                                ? "Загрузка..."
-                                                : "Фото профиля"}
-                                        </span>
-                                    </label>
-                                </div>
+                            <h2>{profile.username}</h2>
 
-                                <div className="identity-main">
-                                    <div className="identity-name">
-                                        {profile.username}
-                                    </div>
+                            <div className="cc-profile-account__meta">
 
-                                    <div className="identity-meta">
-                                        <span className="identity-pill">
-                                            ID: {profile.id}
-                                        </span>
+                <span>
+                    ID: {profile.id}
+                </span>
 
-                                        <span className="identity-pill">
-                                            Рейтинг: {renderRating(profile.rating)}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="profile-quick-actions">
-                                    <div className="profile-support-call-row">
-    <span className="profile-support-call-label">
-        Нужна помощь? Позвоните нам
-    </span>
-
-                                        <SupportPhoneLink showIcon />
-                                    </div>
-                                    <button
-                                        type="button"
-                                        className="profile-quick-action profile-quick-action-support"
-                                        onClick={() => navigate("/support")}
-                                    >
-        <span className="profile-quick-action-icon">
-            <FaHeadset />
-        </span>
-
-                                        <span className="profile-quick-action-content">
-            <strong>Поддержка</strong>
-            <small>Помощь и вопросы</small>
-        </span>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        className="profile-quick-action profile-quick-action-idea"
-                                        onClick={openSuggestionModal}
-                                    >
-        <span className="profile-quick-action-icon">
-            <FaLightbulb />
-        </span>
-
-                                        <span className="profile-quick-action-content">
-            <strong>Предложить идею</strong>
-            <small>Помогите улучшить CargoCamp</small>
-        </span>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        className="profile-quick-action profile-quick-action-disabled"
-                                        disabled
-                                        aria-disabled="true"
-                                        title="Раздел достижений находится в разработке"
-                                    >
-        <span className="profile-quick-action-icon">
-            <FaTrophy />
-        </span>
-
-                                        <span className="profile-quick-action-content">
-            <strong>Достижения</strong>
-            <small>Бонусы и активные навыки</small>
-        </span>
-
-                                        <span className="profile-coming-soon">
-            Скоро
-        </span>
-                                    </button>
-                                </div>
+                                <span>
+                    Рейтинг: {
+                                    renderRating(profile.rating)
+                                }
+                </span>
 
                             </div>
+
+                            {avatarUploading && (
+                                <span className="cc-profile-note">
+                    Загрузка фотографии...
+                </span>
+                            )}
+
                         </div>
-                    )}
-                </div>
+
+                    </div>
+                )}
 
                 {/* =========================================
     ОПЛАТА И PREMIUM
@@ -2396,159 +2272,39 @@ const ProfilePage = () => {
                         }
                         onClick={() => openProfileSheet("professions")}
                     />
-                </SectionCard>
 
-                <div className="profile-card profile-location-card glass">
-                    <div className="card-head">
-                        <div>
-                            <h2 className="card-title">Местоположение</h2>
-                            <p className="card-subtitle">
-                                Сохраняется для автоподстановки в заказах и
-                                фильтрации
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="loc-row">
-                        <div className="loc-input-wrap">
-                            <input
-                                className="loc-input"
-                                value={locationDraft}
-                                onChange={(e) => {
-                                    const v = e.target.value;
-
-                                    setLocationDraft(v);
-                                    setPickedCoords(null);
-                                    setAddressQuery(v);
-                                }}
-                                placeholder="Введите район / улицу / адрес"
-                                autoComplete="off"
-                            />
-
-                            {addressSuggestions.length > 0 && (
-                                <ul className="loc-suggestions">
-                                    {addressSuggestions.map((s, i) => (
-                                        <li
-                                            key={`${s.label}-${i}`}
-                                            onClick={() => {
-                                                setLocationDraft(s.label);
-                                                setPickedCoords({
-                                                    lat: s.lat,
-                                                    lng: s.lng,
-                                                });
-                                                setAddressSuggestions([]);
-                                                setAddressQuery("");
-                                            }}
-                                        >
-                                            {s.label}
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-
-                        <button
-                            className="btn btn-primary"
-                            disabled={locLoading}
-                            onClick={() =>
-                                saveLocation({
-                                    address: locationDraft,
-                                    lat: pickedCoords?.lat || null,
-                                    lng: pickedCoords?.lng || null,
-                                    source: "manual",
-                                })
-                            }
-                        >
-                            Сохранить
-                        </button>
-                    </div>
-
-                    <div className="grid-2 profile-mt-10">
-                        <button
-                            className="btn btn-ghost"
-                            disabled={locLoading}
-                            onClick={detectGps}
-                        >
-                            Определить по GPS
-                        </button>
-
-                        <button
-                            className="btn btn-ghost"
-                            onClick={() => setShowMapModal(true)}
-                        >
-                            Выбрать на карте
-                        </button>
-                    </div>
-
-                    {gpsCandidate && (
-                        <div className="gps-confirm">
-                            <div className="gps-title">
-                                Мы определили координаты. Верно?
-                            </div>
-
-                            <div className="gps-sub">
-                                {gpsCandidate.address}
-                            </div>
-
-                            <div className="gps-actions">
-                                <button
-                                    className="btn btn-primary"
-                                    onClick={() =>
-                                        saveLocation({
-                                            address:
-                                                locationDraft ||
-                                                gpsCandidate.address,
-                                            lat: gpsCandidate.lat,
-                                            lng: gpsCandidate.lng,
-                                            source: "gps",
-                                        }).then(() => setGpsCandidate(null))
-                                    }
-                                >
-                                    Да, сохранить
-                                </button>
-
-                                <button
-                                    className="btn btn-ghost"
-                                    onClick={() => setGpsCandidate(null)}
-                                >
-                                    Нет, введу вручную
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    <YandexMapModal
-                        isOpen={showMapModal}
-                        onClose={() => setShowMapModal(false)}
-                        initialLat={profile?.locationLat}
-                        initialLng={profile?.locationLng}
-                        showOrders={false}
-                        onPick={(picked) => {
-                            setLocationDraft(picked.address);
-                            setAddressSuggestions([]);
-                            setAddressQuery("");
-
-                            saveLocation({
-                                address: picked.address,
-                                lat: picked.lat,
-                                lng: picked.lng,
-                                source: "map",
-                            });
-
-                            setShowMapModal(false);
-                        }}
+                    <SettingsRow
+                        icon={<MapPin />}
+                        title="Местоположение"
+                        description={
+                            profile?.locationAddress ||
+                            "Укажите ваш адрес"
+                        }
+                        onClick={() =>
+                            openProfileSheet("location")
+                        }
                     />
 
-                    {profile?.locationSource && (
-                        <div className="loc-meta">
-                            <span className="identity-pill">
-                                Источник: {profile.locationSource}
-                            </span>
-                        </div>
-                    )}
+                    <SettingsRow
+                        icon={<CarFront />}
+                        title="Автомобиль"
+                        description={
+                            [
+                                profile?.vehicleBrand,
+                                profile?.vehicleModel,
+                                profile?.vehiclePlate,
+                            ]
+                                .filter(Boolean)
+                                .join(" · ") ||
+                            "Добавить автомобиль"
+                        }
+                        onClick={() =>
+                            openProfileSheet("vehicle")
+                        }
+                    />
+                </SectionCard>
 
-                    {locError && <div className="loc-error">{locError}</div>}
-                </div>
+
 
                 <div className="profile-card glass profile-verification-card">
                     <div className="card-head">
@@ -2582,346 +2338,7 @@ const ProfilePage = () => {
                         <UserIdentityVerification
                             userId={profile?.id}
                         />
-                        {/* =========================
-            АВТОМОБИЛЬ
-        ========================= */}
 
-                        <div
-                            id="vehicle-verification-section"
-                            className="verification-panel verification-panel-vehicle"
-                        >
-                            <button
-                                type="button"
-                                className="verification-panel-head"
-                                onClick={() =>
-                                    setVehicleVerificationOpen(
-                                        (prev) => !prev
-                                    )
-                                }
-                                aria-expanded={
-                                    vehicleVerificationOpen
-                                }
-                            >
-                                <div className="verification-panel-head-main">
-                                    <div className="verification-panel-icon verification-panel-icon-car">
-                                        <CarFront size={22} aria-hidden="true" />
-                                    </div>
-
-                                    <div className="verification-panel-heading">
-                                        <div className="verification-panel-title">
-                                            Автомобиль для такси
-                                        </div>
-
-                                        <div className="verification-panel-subtitle">
-                                            {profile?.vehicleBrand ||
-                                            profile?.vehicleModel ||
-                                            profile?.vehiclePlate ? (
-                                                <>
-                                                    {[
-                                                        profile
-                                                            ?.vehicleColor,
-                                                        profile
-                                                            ?.vehicleBrand,
-                                                        profile
-                                                            ?.vehicleModel,
-                                                    ]
-                                                        .filter(Boolean)
-                                                        .join(" ")}
-
-                                                    {profile
-                                                        ?.vehiclePlate
-                                                        ? ` · ${profile.vehiclePlate}`
-                                                        : ""}
-                                                </>
-                                            ) : (
-                                                "Добавьте автомобиль, чтобы принимать заказы такси"
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="verification-panel-head-side">
-                    <span
-                        className={`vehicle-status vehicle-status-${
-                            profile?.vehicleVerificationStatus ||
-                            "none"
-                        }`}
-                    >
-                        {
-                            vehicleVerificationStatusText
-                        }
-                    </span>
-
-                                    <span
-                                        className={`verification-chevron ${
-                                            vehicleVerificationOpen
-                                                ? "open"
-                                                : ""
-                                        }`}
-                                    >
-<ChevronRight size={18} aria-hidden="true" />
-                                    </span>
-                                </div>
-                            </button>
-
-                            {vehicleVerificationOpen && (
-                                <div className="verification-panel-content">
-                                    <div className="vehicle-verification-intro">
-                                        <strong>
-                                            Данные автомобиля
-                                        </strong>
-
-                                        <span>
-                            Для курьерских заказов автомобиль
-                            не требуется. Для заказов такси
-                            автомобиль должен быть подтверждён
-                            администратором.
-                        </span>
-                                    </div>
-
-                                    {profile?.vehicleVerificationStatus ===
-                                        "rejected" &&
-                                        profile?.vehicleVerificationNote && (
-                                            <div className="vehicle-rejected-note">
-                                                <strong>
-                                                    Причина отказа:
-                                                </strong>{" "}
-                                                {
-                                                    profile
-                                                        .vehicleVerificationNote
-                                                }
-                                            </div>
-                                        )}
-
-                                    {profile?.vehicleVerificationStatus ===
-                                        "pending" && (
-                                            <div className="vehicle-pending-note">
-                                                Данные автомобиля отправлены
-                                                администратору. До подтверждения
-                                                принимать заказы такси нельзя.
-                                            </div>
-                                        )}
-
-                                    {profile?.vehicleVerificationStatus ===
-                                        "verified" && (
-                                            <div className="vehicle-verified-note">
-                                                <strong>
-                                                    <Check size={16} aria-hidden="true" />{" "}
-                                                    Автомобиль подтверждён
-                                                </strong>
-
-                                                <span>
-                                Вы можете принимать заказы
-                                такси. Если изменить данные,
-                                потребуется повторная проверка.
-                            </span>
-                                            </div>
-                                        )}
-
-                                    <div className="vehicle-form-grid">
-                                        <label className="vehicle-field">
-                                            <span>Марка *</span>
-
-                                            <input
-                                                type="text"
-                                                value={
-                                                    vehicleForm.vehicleBrand
-                                                }
-                                                onChange={(e) =>
-                                                    setVehicleForm(
-                                                        (prev) => ({
-                                                            ...prev,
-                                                            vehicleBrand:
-                                                            e.target
-                                                                .value,
-                                                        })
-                                                    )
-                                                }
-                                                placeholder="Toyota"
-                                                maxLength={100}
-                                            />
-                                        </label>
-
-                                        <label className="vehicle-field">
-                                            <span>Модель *</span>
-
-                                            <input
-                                                type="text"
-                                                value={
-                                                    vehicleForm.vehicleModel
-                                                }
-                                                onChange={(e) =>
-                                                    setVehicleForm(
-                                                        (prev) => ({
-                                                            ...prev,
-                                                            vehicleModel:
-                                                            e.target
-                                                                .value,
-                                                        })
-                                                    )
-                                                }
-                                                placeholder="Camry"
-                                                maxLength={100}
-                                            />
-                                        </label>
-
-                                        <label className="vehicle-field">
-                                            <span>Цвет *</span>
-
-                                            <input
-                                                type="text"
-                                                value={
-                                                    vehicleForm.vehicleColor
-                                                }
-                                                onChange={(e) =>
-                                                    setVehicleForm(
-                                                        (prev) => ({
-                                                            ...prev,
-                                                            vehicleColor:
-                                                            e.target
-                                                                .value,
-                                                        })
-                                                    )
-                                                }
-                                                placeholder="Белый"
-                                                maxLength={100}
-                                            />
-                                        </label>
-
-                                        <label className="vehicle-field">
-                                            <span>Госномер *</span>
-
-                                            <input
-                                                type="text"
-                                                value={
-                                                    vehicleForm.vehiclePlate
-                                                }
-                                                onChange={(e) =>
-                                                    setVehicleForm(
-                                                        (prev) => ({
-                                                            ...prev,
-                                                            vehiclePlate:
-                                                                e.target.value.toUpperCase(),
-                                                        })
-                                                    )
-                                                }
-                                                placeholder="А123ВС82"
-                                                maxLength={30}
-                                            />
-                                        </label>
-
-                                        <label className="vehicle-field">
-                            <span>
-                                Год выпуска
-                            </span>
-
-                                            <input
-                                                type="number"
-                                                value={
-                                                    vehicleForm.vehicleYear
-                                                }
-                                                onChange={(e) =>
-                                                    setVehicleForm(
-                                                        (prev) => ({
-                                                            ...prev,
-                                                            vehicleYear:
-                                                            e.target
-                                                                .value,
-                                                        })
-                                                    )
-                                                }
-                                                placeholder="2020"
-                                                min="1950"
-                                                max={
-                                                    new Date().getFullYear() +
-                                                    1
-                                                }
-                                            />
-                                        </label>
-                                    </div>
-
-                                    <div className="vehicle-photo-block">
-                                        <div className="vehicle-photo-head">
-                                            <div>
-                                                <strong>
-                                                    Фото автомобиля
-                                                </strong>
-
-                                                <div className="vehicle-photo-hint">
-                                                    Загрузите фотографию,
-                                                    на которой хорошо видны
-                                                    автомобиль и государственный
-                                                    номер.
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {profile?.vehiclePhoto && (
-                                            <div className="vehicle-photo-preview">
-                                                <img
-                                                    src={buildFileUrl(
-                                                        profile.vehiclePhoto
-                                                    )}
-                                                    alt="Автомобиль"
-                                                />
-                                            </div>
-                                        )}
-
-                                        <label className="upload-glass vehicle-photo-upload">
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                style={{
-                                                    display: "none",
-                                                }}
-                                                disabled={
-                                                    vehiclePhotoUploading
-                                                }
-                                                onChange={(e) => {
-                                                    const file =
-                                                        e.target.files?.[0];
-
-                                                    uploadVehiclePhoto(
-                                                        file
-                                                    );
-
-                                                    e.target.value = "";
-                                                }}
-                                            />
-
-                                            <span>
-                                {vehiclePhotoUploading
-                                    ? "Загрузка..."
-                                    : profile?.vehiclePhoto
-                                        ? "Изменить фото"
-                                        : "Загрузить фото автомобиля"}
-                            </span>
-                                        </label>
-                                    </div>
-
-                                    <div className="vehicle-verification-actions">
-                                        <button
-                                            type="button"
-                                            className="btn btn-primary"
-                                            disabled={
-                                                vehicleSaving ||
-                                                vehiclePhotoUploading
-                                            }
-                                            onClick={saveVehicle}
-                                        >
-                                            {vehicleSaving
-                                                ? "Сохраняем..."
-                                                : profile?.vehicleVerificationStatus ===
-                                                "verified"
-                                                    ? "Сохранить изменения"
-                                                    : "Отправить на проверку"}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Социальные льготы */}
                         <UserBenefitsSection
                             userId={profile?.id}
                             embedded
@@ -2929,6 +2346,48 @@ const ProfilePage = () => {
 
                     </div>
                 </div>
+
+                <SectionCard
+                    title="Помощь и поддержка"
+                    padded={false}
+                    className="cc-profile-group"
+                >
+
+                    <SettingsRow
+                        icon={<FaHeadset />}
+                        title="Поддержка"
+                        description="Помощь и вопросы"
+                        onClick={() =>
+                            navigate("/support")
+                        }
+                    />
+
+                    <SettingsRow
+                        icon={<FaLightbulb />}
+                        title="Предложить идею"
+                        description="Помогите улучшить CargoCamp"
+                        onClick={openSuggestionModal}
+                    />
+
+                    <SettingsRow
+                        icon={<FaTrophy />}
+                        title="Достижения"
+                        value="Скоро"
+                        disabled
+                        onClick={() => {}}
+                    />
+
+                    <div className="cc-profile-support-phone">
+
+        <span>
+            Нужна помощь? Позвоните нам
+        </span>
+
+                        <SupportPhoneLink showIcon />
+
+                    </div>
+
+                </SectionCard>
 
                 <AccountDeletionSection />
 
@@ -3625,6 +3084,195 @@ const ProfilePage = () => {
             </BottomSheet>
 
             <BottomSheet
+                open={activeProfileSheet === "location"}
+                onClose={closeProfileSheet}
+                title="Местоположение"
+                description="Используется для автоподстановки адреса и фильтрации заказов"
+                busy={locLoading}
+            >
+                <div className="cc-profile-sheet-stack">
+
+                    <div className="cc-profile-address-field">
+
+                        <TextField
+                            aria-label="Адрес"
+                            placeholder="Введите район, улицу или адрес"
+                            leftIcon={<MapPin size={20} />}
+                            value={locationDraft}
+                            autoComplete="off"
+                            disabled={locLoading}
+                            onChange={(event) => {
+                                const value =
+                                    event.target.value;
+
+                                setLocationDraft(value);
+                                setPickedCoords(null);
+                                setAddressQuery(value);
+                            }}
+                        />
+
+                        {addressSuggestions.length > 0 && (
+                            <div
+                                className="cc-profile-address-suggestions"
+                            >
+                                {addressSuggestions.map(
+                                    (suggestion, index) => (
+                                        <button
+                                            key={`${suggestion.label}-${index}`}
+                                            type="button"
+                                            disabled={locLoading}
+                                            onClick={() => {
+                                                setLocationDraft(
+                                                    suggestion.label
+                                                );
+
+                                                setPickedCoords({
+                                                    lat: suggestion.lat,
+                                                    lng: suggestion.lng,
+                                                });
+
+                                                setAddressSuggestions([]);
+                                                setAddressQuery("");
+                                            }}
+                                        >
+                                            <MapPin
+                                                size={18}
+                                                aria-hidden="true"
+                                            />
+
+                                            <span>
+                                    {suggestion.label}
+                                </span>
+                                        </button>
+                                    )
+                                )}
+                            </div>
+                        )}
+
+                    </div>
+
+                    <Button
+                        fullWidth
+                        loading={locLoading}
+                        disabled={!locationDraft.trim()}
+                        onClick={() =>
+                            saveLocation({
+                                address: locationDraft,
+                                lat: pickedCoords?.lat ?? null,
+                                lng: pickedCoords?.lng ?? null,
+                                source: "manual",
+                            })
+                        }
+                    >
+                        Сохранить
+                    </Button>
+
+                    <div className="cc-profile-location-options">
+
+                        <SettingsRow
+                            icon={<Navigation />}
+                            title="Определить по GPS"
+                            description="Использовать текущее местоположение"
+                            disabled={locLoading}
+                            onClick={detectGps}
+                        />
+
+                        <SettingsRow
+                            icon={<Map />}
+                            title="Выбрать на карте"
+                            description="Указать точку вручную"
+                            disabled={locLoading}
+                            onClick={() => {
+                                closeProfileSheet();
+                                setShowMapModal(true);
+                            }}
+                        />
+
+                    </div>
+
+                    {gpsCandidate && (
+                        <div className="cc-profile-payment-card">
+
+                            <h3 className="cc-profile-section-title">
+                                Подтвердите местоположение
+                            </h3>
+
+                            <p className="cc-profile-note">
+                                {gpsCandidate.address}
+                            </p>
+
+                            <Button
+                                fullWidth
+                                loading={locLoading}
+                                onClick={() =>
+                                    saveLocation({
+                                        address:
+                                            locationDraft ||
+                                            gpsCandidate.address,
+
+                                        lat: gpsCandidate.lat,
+                                        lng: gpsCandidate.lng,
+                                        source: "gps",
+                                    }).then(() =>
+                                        setGpsCandidate(null)
+                                    )
+                                }
+                            >
+                                Да, сохранить
+                            </Button>
+
+                            <Button
+                                variant="secondary"
+                                fullWidth
+                                disabled={locLoading}
+                                onClick={() =>
+                                    setGpsCandidate(null)
+                                }
+                            >
+                                Нет, введу вручную
+                            </Button>
+
+                        </div>
+                    )}
+
+                    {locError && (
+                        <div
+                            className="cc-ui-error"
+                            role="alert"
+                        >
+                            {locError}
+                        </div>
+                    )}
+
+                </div>
+            </BottomSheet>
+
+            <YandexMapModal
+                isOpen={showMapModal}
+                onClose={() => {
+                    setShowMapModal(false);
+                    openProfileSheet("location");
+                }}
+                initialLat={profile?.locationLat}
+                initialLng={profile?.locationLng}
+                showOrders={false}
+                onPick={(picked) => {
+                    setLocationDraft(picked.address);
+                    setAddressSuggestions([]);
+                    setAddressQuery("");
+
+                    saveLocation({
+                        address: picked.address,
+                        lat: picked.lat,
+                        lng: picked.lng,
+                        source: "map",
+                    });
+
+                    setShowMapModal(false);
+                    openProfileSheet("location");
+                }}
+            />
+            <BottomSheet
                 open={activeProfileSheet === "debt"}
                 onClose={closeProfileSheet}
                 title="Задолженность"
@@ -3686,6 +3334,251 @@ const ProfilePage = () => {
 
                     </div>
                 )}
+            </BottomSheet>
+
+            <BottomSheet
+                open={activeProfileSheet === "vehicle"}
+                onClose={closeProfileSheet}
+                title="Автомобиль"
+                description="Данные автомобиля для выполнения заказов такси"
+                busy={
+                    vehicleSaving ||
+                    vehiclePhotoUploading
+                }
+            >
+                <div className="cc-profile-sheet-stack">
+
+                    <div className="cc-profile-vehicle-status">
+
+                        <StatusBadge
+                            tone={
+                                {
+                                    verified: "success",
+                                    pending: "warning",
+                                    rejected: "danger",
+                                }[
+                                    profile?.vehicleVerificationStatus
+                                    ] || "neutral"
+                            }
+                            icon={<CarFront size={15} />}
+                        >
+                            {vehicleVerificationStatusText}
+                        </StatusBadge>
+
+                        <p className="cc-profile-note">
+                            Для курьерских заказов автомобиль
+                            не требуется. Для работы в такси
+                            необходимо подтверждение автомобиля.
+                        </p>
+
+                    </div>
+
+                    {profile?.vehicleVerificationStatus ===
+                        "rejected" &&
+                        profile?.vehicleVerificationNote && (
+                            <div
+                                className="cc-ui-error"
+                                role="alert"
+                            >
+                                <strong>
+                                    Причина отказа:
+                                </strong>{" "}
+
+                                {profile.vehicleVerificationNote}
+                            </div>
+                        )}
+
+                    {profile?.vehicleVerificationStatus ===
+                        "pending" && (
+                            <div className="cc-profile-vehicle-notice">
+
+                                Данные автомобиля отправлены
+                                администратору. До подтверждения
+                                принимать заказы такси нельзя.
+
+                            </div>
+                        )}
+
+                    {profile?.vehicleVerificationStatus ===
+                        "verified" && (
+                            <div className="cc-profile-vehicle-notice">
+
+                                Автомобиль подтверждён.
+                                При изменении данных потребуется
+                                повторная проверка.
+
+                            </div>
+                        )}
+
+                    <div className="cc-profile-vehicle-form">
+
+                        <TextField
+                            aria-label="Марка автомобиля"
+                            placeholder="Марка автомобиля *"
+                            value={vehicleForm.vehicleBrand}
+                            required
+                            maxLength={100}
+                            disabled={vehicleSaving}
+                            onChange={(event) =>
+                                setVehicleForm((prev) => ({
+                                    ...prev,
+
+                                    vehicleBrand:
+                                    event.target.value,
+                                }))
+                            }
+                        />
+
+                        <TextField
+                            aria-label="Модель автомобиля"
+                            placeholder="Модель автомобиля *"
+                            value={vehicleForm.vehicleModel}
+                            required
+                            maxLength={100}
+                            disabled={vehicleSaving}
+                            onChange={(event) =>
+                                setVehicleForm((prev) => ({
+                                    ...prev,
+
+                                    vehicleModel:
+                                    event.target.value,
+                                }))
+                            }
+                        />
+
+                        <TextField
+                            aria-label="Цвет автомобиля"
+                            placeholder="Цвет автомобиля *"
+                            value={vehicleForm.vehicleColor}
+                            required
+                            maxLength={100}
+                            disabled={vehicleSaving}
+                            onChange={(event) =>
+                                setVehicleForm((prev) => ({
+                                    ...prev,
+
+                                    vehicleColor:
+                                    event.target.value,
+                                }))
+                            }
+                        />
+
+                        <TextField
+                            aria-label="Госномер автомобиля"
+                            placeholder="Госномер *"
+                            value={vehicleForm.vehiclePlate}
+                            required
+                            maxLength={30}
+                            disabled={vehicleSaving}
+                            onChange={(event) =>
+                                setVehicleForm((prev) => ({
+                                    ...prev,
+
+                                    vehiclePlate:
+                                        event.target.value
+                                            .toUpperCase(),
+                                }))
+                            }
+                        />
+
+                        <TextField
+                            type="number"
+                            aria-label="Год выпуска"
+                            placeholder="Год выпуска"
+                            value={vehicleForm.vehicleYear}
+                            min={1950}
+                            max={
+                                new Date().getFullYear() + 1
+                            }
+                            disabled={vehicleSaving}
+                            onChange={(event) =>
+                                setVehicleForm((prev) => ({
+                                    ...prev,
+
+                                    vehicleYear:
+                                    event.target.value,
+                                }))
+                            }
+                        />
+
+                    </div>
+
+                    <div className="cc-profile-vehicle-photo">
+
+                        <h3 className="cc-profile-section-title">
+                            Фото автомобиля
+                        </h3>
+
+                        <p className="cc-profile-note">
+                            На фотографии должны быть хорошо
+                            видны автомобиль и государственный
+                            номер.
+                        </p>
+
+                        {profile?.vehiclePhoto && (
+                            <img
+                                src={buildFileUrl(
+                                    profile.vehiclePhoto
+                                )}
+                                alt="Автомобиль"
+                                className="cc-profile-vehicle-image"
+                            />
+                        )}
+
+                        <label className="cc-profile-upload">
+
+                            <Camera
+                                size={23}
+                                aria-hidden="true"
+                            />
+
+                            <span>
+                    {vehiclePhotoUploading
+                        ? "Загрузка..."
+                        : profile?.vehiclePhoto
+                            ? "Изменить фото"
+                            : "Загрузить фото автомобиля"}
+                </span>
+
+                            <input
+                                type="file"
+                                accept="image/*"
+                                aria-label="Фото автомобиля"
+                                disabled={
+                                    vehicleSaving ||
+                                    vehiclePhotoUploading
+                                }
+                                onChange={(event) => {
+                                    const file =
+                                        event.target.files?.[0];
+
+                                    if (file) {
+                                        uploadVehiclePhoto(file);
+                                    }
+
+                                    event.target.value = "";
+                                }}
+                            />
+
+                        </label>
+
+                    </div>
+
+                    <Button
+                        fullWidth
+                        loading={vehicleSaving}
+                        disabled={vehiclePhotoUploading}
+                        onClick={saveVehicle}
+                    >
+                        {vehicleSaving
+                            ? "Сохраняем..."
+                            : profile?.vehicleVerificationStatus ===
+                            "verified"
+                                ? "Сохранить изменения"
+                                : "Отправить на проверку"}
+                    </Button>
+
+                </div>
             </BottomSheet>
 
             {showSuggestionModal && (

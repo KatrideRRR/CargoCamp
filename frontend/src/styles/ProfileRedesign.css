@@ -554,3 +554,355 @@
 .cc-premium-plan-option:active {
     background: var(--cc-primary-soft);
 }
+
+/* =========================================================
+   PROFILE ACCOUNT HEADER
+   ========================================================= */
+
+.cc-profile-heading {
+    width: 100%;
+    padding: 4px 4px 0;
+}
+
+.cc-profile-heading h1 {
+    margin: 0;
+
+    color: var(--cc-text);
+
+    font-size: var(--cc-font-heading);
+    font-weight: var(--cc-weight-bold);
+    letter-spacing: -0.035em;
+    line-height: 1.25;
+}
+
+.cc-profile-account {
+    display: flex;
+    align-items: center;
+
+    gap: 18px;
+
+    padding: 20px;
+
+    min-width: 0;
+
+    background: var(--cc-surface);
+    border: 1px solid var(--cc-border);
+
+    border-radius: var(--cc-radius-xl);
+}
+
+.cc-profile-account__avatar {
+    position: relative;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 76px;
+    height: 76px;
+    flex-shrink: 0;
+
+    border-radius: 50%;
+
+    background: var(--cc-primary-soft);
+    color: var(--cc-primary);
+
+    font-size: 30px;
+    font-weight: var(--cc-weight-bold);
+}
+
+.cc-profile-account__avatar > img {
+    display: block;
+
+    width: 100%;
+    height: 100%;
+
+    border-radius: 50%;
+
+    object-fit: cover;
+}
+
+.cc-profile-account__camera {
+    position: absolute;
+
+    right: -3px;
+    bottom: -3px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 32px;
+    height: 32px;
+
+    background: var(--cc-primary);
+    color: var(--cc-on-primary);
+
+    border: 3px solid var(--cc-surface);
+    border-radius: 50%;
+
+    cursor: pointer;
+}
+
+.cc-profile-account__camera input,
+.cc-profile-upload input {
+    position: absolute;
+    inset: 0;
+
+    width: 100%;
+    height: 100%;
+
+    opacity: 0;
+    cursor: pointer;
+}
+
+.cc-profile-account__camera:focus-within,
+.cc-profile-upload:focus-within {
+    outline: 2px solid var(--cc-primary);
+    outline-offset: 3px;
+}
+
+.cc-profile-account__info {
+    display: flex;
+    flex-direction: column;
+
+    gap: 8px;
+
+    min-width: 0;
+    flex: 1;
+}
+
+.cc-profile-account__info h2 {
+    margin: 0;
+
+    color: var(--cc-text);
+
+    font-size: var(--cc-font-title);
+    font-weight: var(--cc-weight-bold);
+
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.cc-profile-account__meta {
+    display: flex;
+    flex-wrap: wrap;
+
+    gap: 5px 12px;
+
+    color: var(--cc-muted);
+
+    font-size: var(--cc-font-small);
+}
+
+
+/* =========================================================
+   LOCATION SHEET
+   ========================================================= */
+
+.cc-profile-address-field {
+    width: 100%;
+    min-width: 0;
+}
+
+.cc-profile-address-suggestions {
+    display: flex;
+    flex-direction: column;
+
+    margin-top: 8px;
+
+    background: var(--cc-surface);
+
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius-lg);
+
+    overflow: hidden;
+}
+
+.cc-profile-address-suggestions button {
+    display: flex;
+    align-items: flex-start;
+
+    gap: 10px;
+
+    min-height: 50px;
+
+    padding: 14px;
+
+    background: transparent;
+    border: 0;
+
+    color: var(--cc-text);
+
+    font: inherit;
+    text-align: left;
+    line-height: 1.5;
+
+    cursor: pointer;
+}
+
+.cc-profile-address-suggestions
+button + button {
+    border-top: 1px solid var(--cc-border);
+}
+
+.cc-profile-address-suggestions button > svg {
+    flex-shrink: 0;
+
+    margin-top: 2px;
+
+    color: var(--cc-muted);
+}
+
+.cc-profile-address-suggestions button > span {
+    min-width: 0;
+
+    overflow-wrap: anywhere;
+}
+
+.cc-profile-address-suggestions button:active {
+    background: var(--cc-primary-soft);
+}
+
+.cc-profile-address-suggestions button:focus-visible {
+    outline: 2px solid var(--cc-primary);
+    outline-offset: -2px;
+}
+
+.cc-profile-location-options {
+    overflow: hidden;
+
+    background: var(--cc-surface);
+
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius-lg);
+}
+
+
+/* =========================================================
+   VEHICLE SHEET
+   ========================================================= */
+
+.cc-profile-vehicle-status {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+
+    gap: 12px;
+}
+
+.cc-profile-vehicle-form {
+    display: flex;
+    flex-direction: column;
+
+    gap: var(--cc-space-3);
+
+    min-width: 0;
+}
+
+.cc-profile-vehicle-notice {
+    padding: 14px;
+
+    background: var(--cc-surface-soft);
+
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius-md);
+
+    color: var(--cc-text-secondary);
+
+    font-size: var(--cc-font-small);
+    line-height: 1.55;
+}
+
+.cc-profile-vehicle-photo {
+    display: flex;
+    flex-direction: column;
+
+    gap: var(--cc-space-3);
+}
+
+.cc-profile-vehicle-image {
+    display: block;
+
+    width: 100%;
+    max-height: 280px;
+
+    object-fit: contain;
+
+    background: var(--cc-surface-soft);
+    border-radius: var(--cc-radius-lg);
+}
+
+.cc-profile-upload {
+    position: relative;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 12px;
+
+    min-height: 64px;
+
+    padding: 14px;
+
+    background: var(--cc-primary-soft);
+
+    border: 1px dashed var(--cc-primary);
+    border-radius: var(--cc-radius-lg);
+
+    color: var(--cc-primary);
+
+    font-size: var(--cc-font-body);
+    font-weight: var(--cc-weight-medium);
+
+    text-align: center;
+    cursor: pointer;
+}
+
+.cc-profile-upload > svg {
+    flex-shrink: 0;
+}
+
+
+/* =========================================================
+   SUPPORT
+   ========================================================= */
+
+.cc-profile-support-phone {
+    display: flex;
+    flex-direction: column;
+
+    gap: 8px;
+
+    padding: 16px;
+
+    border-top: 1px solid var(--cc-border);
+}
+
+.cc-profile-support-phone > span {
+    color: var(--cc-muted);
+
+    font-size: var(--cc-font-small);
+}
+
+
+/* =========================================================
+   SMALL SCREENS
+   ========================================================= */
+
+@media (max-width: 360px) {
+    .cc-profile-account {
+        gap: 14px;
+        padding: 16px;
+    }
+
+    .cc-profile-account__avatar {
+        width: 64px;
+        height: 64px;
+    }
+
+    .cc-profile-account__info h2 {
+        font-size: var(--cc-font-subtitle);
+    }
+}
