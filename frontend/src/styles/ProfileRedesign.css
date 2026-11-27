@@ -1,0 +1,381 @@
+/* =========================================================
+   CARGOCAMP — PROFILE REDESIGN
+   ========================================================= */
+
+.cc-profile-group {
+    margin: 0;
+    overflow: hidden;
+}
+
+.cc-profile-group .cc-section__header {
+    margin-bottom: 4px;
+}
+
+.cc-profile-group .cc-section__title {
+    font-size: var(--cc-font-subtitle);
+}
+
+.cc-profile-group .cc-settings-row {
+    min-height: 70px;
+}
+
+
+/* =========================================================
+   SHEET CONTENT
+
+   BottomSheet renders through a portal.
+   Do not depend on .profile-page as an ancestor.
+   ========================================================= */
+
+.cc-profile-sheet-stack {
+    display: flex;
+    flex-direction: column;
+
+    gap: var(--cc-space-4);
+
+    width: 100%;
+    min-width: 0;
+
+    padding: 2px 0 8px;
+
+    color: var(--cc-text);
+}
+
+.cc-profile-section-title {
+    margin: 0;
+
+    color: var(--cc-text);
+
+    font-size: var(--cc-font-body);
+    font-weight: var(--cc-weight-semibold);
+    line-height: 1.4;
+}
+
+.cc-profile-note {
+    margin: 0;
+
+    color: var(--cc-muted);
+
+    font-size: var(--cc-font-small);
+    line-height: 1.55;
+
+    overflow-wrap: anywhere;
+}
+
+
+/* =========================================================
+   PAYMENT CARDS
+   ========================================================= */
+
+.cc-profile-payment-card {
+    display: flex;
+    flex-direction: column;
+
+    gap: var(--cc-space-3);
+
+    padding: var(--cc-space-4);
+
+    background: var(--cc-surface-soft);
+
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius-xl);
+}
+
+.cc-profile-payment-card__head {
+    display: flex;
+    align-items: center;
+
+    gap: var(--cc-space-3);
+}
+
+.cc-profile-payment-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+
+    background: var(--cc-primary-soft);
+    color: var(--cc-primary);
+
+    border-radius: var(--cc-radius-md);
+}
+
+.cc-profile-payment-icon--tbank {
+    background: #ffdd2d;
+    color: #111827;
+}
+
+.cc-profile-payment-card__info {
+    display: flex;
+    flex-direction: column;
+
+    gap: 5px;
+
+    min-width: 0;
+}
+
+.cc-profile-payment-card__info strong {
+    color: var(--cc-text);
+
+    font-size: var(--cc-font-subtitle);
+    font-weight: var(--cc-weight-semibold);
+}
+
+.cc-profile-payment-card__info span {
+    color: var(--cc-muted);
+
+    font-size: var(--cc-font-small);
+}
+
+.cc-profile-card-mask {
+    padding: var(--cc-space-2) 0;
+
+    color: var(--cc-text);
+
+    font-size: var(--cc-font-subtitle);
+    font-weight: var(--cc-weight-semibold);
+
+    font-variant-numeric: tabular-nums;
+
+    overflow-wrap: anywhere;
+}
+
+.cc-profile-select {
+    width: 100%;
+    min-width: 0;
+    min-height: var(--cc-control-lg);
+
+    padding: 12px;
+
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius-md);
+
+    background: var(--cc-surface);
+    color: var(--cc-text);
+
+    font-family: var(--cc-font-family);
+    font-size: var(--cc-font-body);
+}
+
+.cc-profile-select:focus-visible {
+    outline: 2px solid var(--cc-primary);
+    outline-offset: 2px;
+}
+
+
+/* =========================================================
+   DEBT
+   ========================================================= */
+
+.cc-profile-debt {
+    display: flex;
+    flex-direction: column;
+
+    gap: var(--cc-space-3);
+
+    padding: var(--cc-space-4);
+
+    background: var(--cc-surface);
+
+    border: 1px solid var(--cc-danger);
+    border-radius: var(--cc-radius-xl);
+
+    scroll-margin-top: var(--app-page-top);
+    scroll-margin-bottom: var(--app-page-bottom);
+}
+
+.cc-profile-debt__title {
+    color: var(--cc-danger);
+
+    font-size: var(--cc-font-body);
+    font-weight: var(--cc-weight-semibold);
+}
+
+.cc-profile-debt__amount {
+    color: var(--cc-danger);
+
+    font-size: var(--cc-font-heading);
+    font-weight: var(--cc-weight-bold);
+
+    font-variant-numeric: tabular-nums;
+}
+
+
+/* =========================================================
+   PREMIUM
+   ========================================================= */
+
+.cc-profile-premium-intro {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    gap: var(--cc-space-3);
+
+    padding: var(--cc-space-5);
+
+    background: var(--cc-primary-soft);
+    color: var(--cc-primary);
+
+    border-radius: var(--cc-radius-xl);
+
+    text-align: center;
+}
+
+.cc-profile-premium-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 56px;
+    height: 56px;
+
+    border-radius: var(--cc-radius-lg);
+
+    background: var(--cc-surface);
+    color: var(--cc-primary);
+}
+
+.cc-profile-premium-intro h3 {
+    margin: 0;
+
+    font-size: var(--cc-font-title);
+    font-weight: var(--cc-weight-bold);
+    line-height: 1.3;
+}
+
+.cc-profile-premium-intro p {
+    margin: 0;
+
+    color: var(--cc-text-secondary);
+
+    font-size: var(--cc-font-small);
+    line-height: 1.5;
+}
+
+.cc-profile-premium-plan {
+    display: flex;
+    flex-direction: column;
+
+    gap: var(--cc-space-4);
+
+    padding: var(--cc-space-4);
+
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius-xl);
+
+    background: var(--cc-surface-soft);
+}
+
+.cc-profile-premium-plan__duration {
+    color: var(--cc-text-secondary);
+
+    font-size: var(--cc-font-small);
+    font-weight: var(--cc-weight-medium);
+}
+
+.cc-profile-premium-plan__price {
+    margin-top: 6px;
+
+    color: var(--cc-text);
+
+    font-size: var(--cc-font-heading);
+    font-weight: var(--cc-weight-bold);
+
+    font-variant-numeric: tabular-nums;
+}
+
+
+/* =========================================================
+   PROFESSIONS
+   ========================================================= */
+
+.cc-profile-categories {
+    display: flex;
+    flex-direction: column;
+
+    gap: var(--cc-space-2);
+
+    width: 100%;
+    padding: 4px 0;
+}
+
+.cc-profile-category {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: var(--cc-space-3);
+
+    width: 100%;
+    min-height: var(--cc-control-lg);
+
+    padding: 12px 16px;
+
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius-lg);
+
+    background: var(--cc-surface-soft);
+    color: var(--cc-text);
+
+    text-align: left;
+    font: inherit;
+
+    cursor: pointer;
+
+    transition:
+            background-color var(--cc-duration-fast),
+            border-color var(--cc-duration-fast);
+}
+
+.cc-profile-category > span:first-child {
+    min-width: 0;
+
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.cc-profile-category--active {
+    background: var(--cc-primary-soft);
+    border-color: var(--cc-primary);
+    color: var(--cc-primary);
+}
+
+.cc-profile-category__check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+
+    border: 1px solid var(--cc-border-strong);
+    border-radius: 50%;
+}
+
+.cc-profile-category--active
+.cc-profile-category__check {
+    background: var(--cc-primary);
+    border-color: var(--cc-primary);
+    color: var(--cc-on-primary);
+}
+
+.cc-profile-category:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.cc-profile-category:focus-visible {
+    outline: 2px solid var(--cc-primary);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cc-profile-category {
+        transition: none;
+    }
+}

@@ -31,6 +31,20 @@ import AccountDeletionSection from "../components/AccountDeletionSection";
 import { App as CapacitorApp } from "@capacitor/app";
 import { openPaymentPage } from "../utils/openPaymentPage";
 
+import {
+    BottomSheet,
+    Button,
+    SectionCard,
+    SettingsRow,
+    LoadingState,
+} from "../components/ui";
+
+import {
+    BriefcaseBusiness,
+} from "lucide-react";
+
+import "../styles/ProfileRedesign.css";
+
 const apiUrl = process.env.REACT_APP_API_URL;
 
 // Включать только если нужны демо-скрины привязки карты без реальной ЮKassa
@@ -169,6 +183,17 @@ const ProfilePage = () => {
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    const [activeProfileSheet, setActiveProfileSheet] =
+        useState(null);
+
+    const openProfileSheet = (sheet) => {
+        setActiveProfileSheet(sheet);
+    };
+
+    const closeProfileSheet = () => {
+        setActiveProfileSheet(null);
+    };
 
     const [showVerificationModal, setShowVerificationModal] = useState(false);
     const [showAgreement, setShowAgreement] = useState(false);
@@ -1889,9 +1914,10 @@ const ProfilePage = () => {
 
     if (loading) {
         return (
-            <div className="profile-loading">
-                Загрузка данных профиля...
-            </div>
+            <LoadingState
+                fullPage
+                title="Загрузка данных профиля..."
+            />
         );
     }
 
@@ -2047,335 +2073,98 @@ const ProfilePage = () => {
     ОПЛАТА И PREMIUM
 ========================================= */}
 
-                <div className="profile-card glass profile-finance-card">
+                <SectionCard
+                    title="Финансы"
+                    padded={false}
+                    className="cc-profile-group"
+                >
+                    <SettingsRow
+                        icon={<CreditCard />}
+                        title="Банковские карты"
+                        description="ЮKassa и Т-Банк"
+                        value={
+                            isCardBound || profile?.tbankCardBound
+                                ? "Привязаны"
+                                : "Не привязаны"
+                        }
+                        onClick={() => openProfileSheet("cards")}
+                    />
 
-                    <div className="card-head profile-finance-header">
-                        <div>
-                            <h2 className="card-title">
-                                <CreditCard size={20} aria-hidden="true" />{" "}Оплата и Premium
-                            </h2>
+                    <SettingsRow
+                        icon={<Sparkles />}
+                        title="CargoCamp Premium"
+                        description={subscriptionLabel}
+                        onClick={() => openProfileSheet("premium")}
+                    />
 
-                            <p className="card-subtitle">
-                                Банковская карта, платежи и подписка
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* =========================
-        БАНКОВСКАЯ КАРТА
-    ========================= */}
-
-                    <div className="profile-finance-section">
-
-                        <div className="profile-finance-section-head">
-                            <div className="profile-finance-section-icon">
-                                <CreditCard size={22} aria-hidden="true" />
-                            </div>
-
-                            <div className="profile-finance-section-heading">
-                                <div className="profile-finance-section-title">
-                                    Банковская карта
-                                </div>
-
-                                <div className="profile-finance-section-subtitle">
-                                    Для удобной оплаты услуг CargoCamp
-                                </div>
-                            </div>
-
-                            <span
-                                className={`profile-finance-badge ${
-                                    isCardBound ? "active" : ""
-                                }`}
-                            >
-                {isCardBound
-                    ? "Привязана"
-                    : "Не привязана"}
-            </span>
-                        </div>
-
-                        {isCardBound ? (
-                            <div className="card-row profile-finance-card-row">
-                                <div className="card-row-text">
-                                    <div className="card-strong">
-                                        {cardTypeView || "Банковская карта"}
-                                    </div>
-
-                                    <div className="card-muted">
-                                        •••• {cardLastFourView}
-                                    </div>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    className="btn btn-ghost-danger"
-                                    onClick={() =>
-                                        setShowUnbindConfirm(true)
-                                    }
-                                >
-                                    Отвязать
-                                </button>
-                            </div>
-                        ) : (
-                            <button
-                                disabled={cardBinding}
-                                type="button"
-                                className="btn btn-primary profile-finance-bind-button"
-                                onClick={
-                                    CARD_BIND_SCREENSHOT_MODE
-                                        ? handleBindCard
-                                        : () => {
-                                            setPendingBindProvider("yookassa");
-                                            setShowAgreement(true);
-                                        }
+                    <SettingsRow
+                        icon={<CreditCard />}
+                        title="Задолженность"
+                        value={`${(debtAmount / 100).toFixed(2)} ₽`}
+                        variant={hasDebt ? "danger" : "default"}
+                        onClick={
+                            hasDebt
+                                ? () => {
+                                    debtSectionRef.current?.scrollIntoView({
+                                        behavior: "smooth",
+                                        block: "center",
+                                    });
                                 }
-                            >
-                                {cardBinding
-                                    ? "Подключение..."
-                                    : "+ Привязать карту"}
-                            </button>
-                        )}
+                                : undefined
+                        }
+                    />
+                </SectionCard>
 
-                        {CARD_BIND_SCREENSHOT_MODE && (
-                            <div className="card-demo-note">
-                                Демо-режим для скриншотов:
-                                привязка и отвязка карты
-                                выполняются без реального
-                                запроса в ЮKassa.
-                            </div>
-                        )}
-
-                        <div className="profile-finance-section">
-                            <div className="profile-finance-section-title">
-                                Карта Т-Банк
-                            </div>
-
-                            {profile?.tbankCardBound ? (
-                                <div className="card-row profile-finance-card-row">
-                                    <div className="card-row-text">
-                                        <div className="card-strong">
-                                            Карта привязана
-                                        </div>
-
-                                        <div className="card-muted">
-                                            {profile.tbankCardMask ||
-                                                "Карта Т-Банка"}
-                                        </div>
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        className="btn btn-ghost-danger"
-                                        onClick={handleUnbindTBankCard}
-                                    >
-                                        Отвязать
-                                    </button>
-                                </div>
-                            ) : (
-                                <button
-                                    disabled={cardBinding}
-                                    type="button"
-                                    className="btn btn-primary profile-finance-bind-button"
-                                    onClick={() => {
-                                        setPendingBindProvider("tbank");
-                                        setShowAgreement(true);
-                                    }}
-                                >
-                                    {cardBinding
-                                        ? "Подключение..."
-                                        : "+ Привязать через Т-Банк"}
-                                </button>
-                            )}
+                {hasDebt && (
+                    <div
+                        ref={debtSectionRef}
+                        className="cc-profile-debt"
+                    >
+                        <div className="cc-profile-debt__title">
+                            Задолженность по комиссии
                         </div>
 
-                        <div className="profile-finance-section">
-                            <div className="profile-finance-section-title">
-                                Автоматическое списание комиссии
-                            </div>
-
-                            <p className="card-muted">
-                                Выберите банк, через который CargoCamp
-                                сможет списывать комиссию за выполненные
-                                заказы. Другой банк автоматически
-                                использоваться не будет.
-                            </p>
-
-                            <select
-                                className="form-control"
-                                value={
-                                    profile?.autoCommissionProvider ||
-                                    "none"
-                                }
-                                onChange={handleAutoProviderChange}
-                            >
-                                <option value="none">
-                                    Не списывать автоматически
-                                </option>
-
-                                <option
-                                    value="yookassa"
-                                    disabled={!isCardBound}
-                                >
-                                    ЮKassa
-                                </option>
-
-                                <option
-                                    value="tbank"
-                                    disabled={!profile?.tbankCardBound}
-                                >
-                                    Т-Банк
-                                </option>
-                            </select>
+                        <div className="cc-profile-debt__amount">
+                            {(debtAmount / 100).toFixed(2)} ₽
                         </div>
 
-                        {/* Задолженность по комиссии */}
+                        <PaymentProviderSelect
+                            title="Способ погашения"
+                            selectedProvider={selectedDebtProvider}
+                            onSelect={setSelectedDebtProvider}
+                            disabled={loading || debtPayLoading}
+                        />
 
-                        {hasDebt && (
-                            <div
-                                ref={debtSectionRef}
-                                className="alert alert-danger profile-finance-debt"
-                            >
-                                <div>
-                                    <div className="alert-title">
-                                        Задолженность по комиссии
-                                    </div>
-
-                                    <div className="alert-text">
-                                        {(debtAmount / 100).toFixed(2)} ₽
-                                    </div>
-                                </div>
-
-                                <div className="debt-provider-wrap">
-                                    <PaymentProviderSelect
-                                        title="Способ погашения"
-                                        selectedProvider={selectedDebtProvider}
-                                        onSelect={setSelectedDebtProvider}
-                                        disabled={loading || debtPayLoading}
-                                    />
-                                </div>
-
-                                <button
-                                    type="button"
-                                    className="btn btn-danger"
-                                    onClick={handlePayDebt}
-                                    disabled={debtPayLoading}
-                                >
-                                    {debtPayLoading
-                                        ? "Проверяем оплату..."
-                                        : "Оплатить задолженность"}
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* =========================
-        PREMIUM
-    ========================= */}
-
-                    <div className="profile-finance-section profile-finance-premium">
-
-                        <div className="profile-finance-section-head">
-                            <div className="profile-finance-section-icon premium">
-                                <Sparkles size={22} aria-hidden="true" />
-                            </div>
-
-                            <div className="profile-finance-section-heading">
-                                <div className="profile-finance-section-title">
-                                    CargoCamp Premium
-                                </div>
-
-                                <div className="profile-finance-section-subtitle">
-                                    {subscriptionLabel}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="profile-finance-premium-description">
-                            Premium для исполнителей —
-                            работа без комиссии по условиям подписки.
-                        </div>
-
-                        <div className="premium-provider-block">
-                            <PaymentProviderSelect
-                                title="Способ оплаты Premium"
-                                selectedProvider={selectedPremiumProvider}
-                                onSelect={setSelectedPremiumProvider}
-                                disabled={loading}
-                            />
-                        </div>
-
-                        <div className="grid-2 profile-finance-premium-actions">
-                            <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={() => handleBuyPremium("7d")}
-                            >
-                                Купить на 7 дней
-                            </button>
-
-                            <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={() => handleBuyPremium("30d")}
-                            >
-                                Купить на 30 дней
-                            </button>
-                        </div>
-                    </div>
-
-                </div>
-
-                <div className="profile-card glass">
-                    <div className="card-head">
-                        <div>
-                            <h2 className="card-title">Профессии</h2>
-                            <p className="card-subtitle">
-                                По ним будут фильтроваться заказы
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="cat-grid">
-                        {sortedCategories.map((c) => {
-                            const active = categoryPick.includes(c.id);
-
-                            return (
-                                <button
-                                    key={c.id}
-                                    type="button"
-                                    className={`cat-pill ${active ? "active" : ""}`}
-                                    onClick={() => {
-                                        setCategoryPick((prev) =>
-                                            prev.includes(c.id)
-                                                ? prev.filter((x) => x !== c.id)
-                                                : [...prev, c.id]
-                                        );
-                                    }}
-                                >
-                                    {c.name}
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    <div className="grid-2 profile-mt-12">
-                        <button
-                            className="btn btn-primary"
-                            disabled={catSaving}
-                            onClick={savePreferredCategories}
+                        <Button
+                            variant="danger"
+                            fullWidth
+                            loading={debtPayLoading}
+                            onClick={handlePayDebt}
                         >
-                            {catSaving ? "Сохранение..." : "Сохранить"}
-                        </button>
-
-                        <button
-                            className="btn btn-ghost"
-                            type="button"
-                            onClick={() => setCategoryPick([])}
-                            disabled={catSaving}
-                        >
-                            Сбросить
-                        </button>
+                            {debtPayLoading
+                                ? "Проверяем оплату..."
+                                : "Оплатить задолженность"}
+                        </Button>
                     </div>
-                </div>
+                )}
+
+                <SectionCard
+                    title="Работа и услуги"
+                    padded={false}
+                    className="cc-profile-group"
+                >
+                    <SettingsRow
+                        icon={<BriefcaseBusiness />}
+                        title="Профессии"
+                        description="Настройте категории доступных заказов"
+                        value={
+                            categoryPick.length > 0
+                                ? `Выбрано: ${categoryPick.length}`
+                                : "Не выбраны"
+                        }
+                        onClick={() => openProfileSheet("professions")}
+                    />
+                </SectionCard>
 
                 <div className="profile-card profile-location-card glass">
                     <div className="card-head">
@@ -2941,6 +2730,335 @@ const ProfilePage = () => {
                     </button>
                 </div>
             </div>
+
+            <BottomSheet
+                open={activeProfileSheet === "cards"}
+                onClose={closeProfileSheet}
+                title="Банковские карты"
+                description="Управление сохранёнными картами и автоматической оплатой комиссии"
+                busy={cardBinding}
+            >
+                <div className="cc-profile-sheet-stack">
+
+                    <div className="cc-profile-payment-card">
+
+                        <div className="cc-profile-payment-card__head">
+                            <div className="cc-profile-payment-icon">
+                                <CreditCard size={24} />
+                            </div>
+
+                            <div className="cc-profile-payment-card__info">
+                                <strong>ЮKassa</strong>
+
+                                <span>
+                        {isCardBound
+                            ? "Карта привязана"
+                            : "Карта не привязана"}
+                    </span>
+                            </div>
+                        </div>
+
+                        {isCardBound ? (
+                            <>
+                                <div className="cc-profile-card-mask">
+                                    {cardTypeView || "Банковская карта"}
+                                    {" "}
+                                    •••• {cardLastFourView}
+                                </div>
+
+                                <Button
+                                    variant="outline"
+                                    fullWidth
+                                    onClick={() => {
+                                        closeProfileSheet();
+                                        setShowUnbindConfirm(true);
+                                    }}
+                                >
+                                    Отвязать
+                                </Button>
+                            </>
+                        ) : (
+                            <Button
+                                fullWidth
+                                loading={cardBinding}
+                                onClick={() => {
+                                    if (CARD_BIND_SCREENSHOT_MODE) {
+                                        handleBindCard();
+                                        return;
+                                    }
+
+                                    closeProfileSheet();
+
+                                    setPendingBindProvider("yookassa");
+
+                                    setShowAgreement(true);
+                                }}
+                            >
+                                + Привязать карту
+                            </Button>
+                        )}
+
+                        {CARD_BIND_SCREENSHOT_MODE && (
+                            <p className="cc-profile-note">
+                                Демо-режим для скриншотов:
+                                операции выполняются без реального
+                                запроса в ЮKassa.
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="cc-profile-payment-card">
+
+                        <div className="cc-profile-payment-card__head">
+                            <div className="cc-profile-payment-icon cc-profile-payment-icon--tbank">
+                                <CreditCard size={24} />
+                            </div>
+
+                            <div className="cc-profile-payment-card__info">
+                                <strong>Т-Банк</strong>
+
+                                <span>
+                        {profile?.tbankCardBound
+                            ? "Карта привязана"
+                            : "Карта не привязана"}
+                    </span>
+                            </div>
+                        </div>
+
+                        {profile?.tbankCardBound ? (
+                            <>
+                                <div className="cc-profile-card-mask">
+                                    {profile.tbankCardMask ||
+                                        "Карта Т-Банка"}
+                                </div>
+
+                                <Button
+                                    variant="outline"
+                                    fullWidth
+                                    onClick={handleUnbindTBankCard}
+                                >
+                                    Отвязать
+                                </Button>
+                            </>
+                        ) : (
+                            <Button
+                                fullWidth
+                                loading={cardBinding}
+                                onClick={() => {
+                                    closeProfileSheet();
+
+                                    setPendingBindProvider("tbank");
+
+                                    setShowAgreement(true);
+                                }}
+                            >
+                                + Привязать через Т-Банк
+                            </Button>
+                        )}
+                    </div>
+
+                    <div className="cc-profile-payment-card">
+                        <h3 className="cc-profile-section-title">
+                            Автоматическое списание комиссии
+                        </h3>
+
+                        <p className="cc-profile-note">
+                            Выберите банк, через который CargoCamp
+                            сможет списывать комиссию за выполненные
+                            заказы. Другой банк автоматически
+                            использоваться не будет.
+                        </p>
+
+                        <select
+                            className="cc-profile-select"
+                            aria-label="Автоматическое списание комиссии"
+                            value={
+                                profile?.autoCommissionProvider ||
+                                "none"
+                            }
+                            disabled={cardBinding}
+                            onChange={handleAutoProviderChange}
+                        >
+                            <option value="none">
+                                Не списывать автоматически
+                            </option>
+
+                            <option
+                                value="yookassa"
+                                disabled={!isCardBound}
+                            >
+                                ЮKassa
+                            </option>
+
+                            <option
+                                value="tbank"
+                                disabled={!profile?.tbankCardBound}
+                            >
+                                Т-Банк
+                            </option>
+                        </select>
+                    </div>
+
+                </div>
+            </BottomSheet>
+
+            <BottomSheet
+                open={activeProfileSheet === "premium"}
+                onClose={closeProfileSheet}
+                title="CargoCamp Premium"
+                description={subscriptionLabel}
+            >
+                <div className="cc-profile-sheet-stack">
+
+                    <div className="cc-profile-premium-intro">
+                        <div className="cc-profile-premium-icon">
+                            <Sparkles size={28} />
+                        </div>
+
+                        <h3>
+                            Работайте без комиссии
+                        </h3>
+
+                        <p>
+                            Premium для исполнителей —
+                            работа без комиссии по условиям подписки.
+                        </p>
+                    </div>
+
+                    <PaymentProviderSelect
+                        title="Способ оплаты Premium"
+                        selectedProvider={selectedPremiumProvider}
+                        onSelect={setSelectedPremiumProvider}
+                        disabled={loading}
+                    />
+
+                    <div className="cc-profile-premium-plan">
+                        <div>
+                            <div className="cc-profile-premium-plan__duration">
+                                Premium на 7 дней
+                            </div>
+
+                            <div className="cc-profile-premium-plan__price">
+                                2 500 ₽
+                            </div>
+                        </div>
+
+                        <Button
+                            fullWidth
+                            onClick={() => handleBuyPremium("7d")}
+                        >
+                            Купить на 7 дней
+                        </Button>
+                    </div>
+
+                    <div className="cc-profile-premium-plan">
+                        <div>
+                            <div className="cc-profile-premium-plan__duration">
+                                Premium на 30 дней
+                            </div>
+
+                            <div className="cc-profile-premium-plan__price">
+                                9 000 ₽
+                            </div>
+                        </div>
+
+                        <Button
+                            fullWidth
+                            onClick={() => handleBuyPremium("30d")}
+                        >
+                            Купить на 30 дней
+                        </Button>
+                    </div>
+
+                </div>
+            </BottomSheet>
+
+            <BottomSheet
+                open={activeProfileSheet === "professions"}
+                onClose={closeProfileSheet}
+                title="Мои профессии"
+                description="По выбранным профессиям будут фильтроваться заказы"
+                busy={catSaving}
+                footer={
+                    <div className="cc-sheet__actions">
+
+                        <Button
+                            fullWidth
+                            loading={catSaving}
+                            onClick={savePreferredCategories}
+                        >
+                            {catSaving
+                                ? "Сохранение..."
+                                : "Сохранить"}
+                        </Button>
+
+                        <Button
+                            variant="secondary"
+                            fullWidth
+                            disabled={catSaving}
+                            onClick={() => setCategoryPick([])}
+                        >
+                            Сбросить
+                        </Button>
+
+                    </div>
+                }
+            >
+                <div className="cc-profile-categories">
+
+                    {sortedCategories.map((category) => {
+                        const active =
+                            categoryPick.includes(category.id);
+
+                        return (
+                            <button
+                                key={category.id}
+                                type="button"
+                                className={[
+                                    "cc-profile-category",
+                                    active &&
+                                    "cc-profile-category--active",
+                                ]
+                                    .filter(Boolean)
+                                    .join(" ")}
+                                aria-pressed={active}
+                                disabled={catSaving}
+                                onClick={() => {
+                                    setCategoryPick((prev) =>
+                                        prev.includes(category.id)
+                                            ? prev.filter(
+                                                (id) =>
+                                                    id !== category.id
+                                            )
+                                            : [
+                                                ...prev,
+                                                category.id,
+                                            ]
+                                    );
+                                }}
+                            >
+                    <span>
+                        {category.name}
+                    </span>
+
+                                <span
+                                    className="cc-profile-category__check"
+                                    aria-hidden="true"
+                                >
+                        {active && <Check size={16} />}
+                    </span>
+                            </button>
+                        );
+                    })}
+
+                    {sortedCategories.length === 0 && (
+                        <p className="cc-profile-note">
+                            Список профессий пока недоступен.
+                        </p>
+                    )}
+
+                </div>
+            </BottomSheet>
 
             {showSuggestionModal && (
                 <div
