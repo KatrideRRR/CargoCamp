@@ -106,7 +106,8 @@
       "^.+\\.jsx?$": "babel-jest"
     },
     "moduleNameMapper": {
-      "^axios$": "axios/dist/node/axios.cjs"
+      "^axios$": "axios/dist/node/axios.cjs",
+      "^lucide-react$": "<rootDir>/node_modules/lucide-react/dist/cjs/lucide-react.js"
     }
   }
 }
