@@ -9,8 +9,14 @@ import React, {
 import {
     UserRound,
     Paperclip,
-    ChevronRight,
 } from "lucide-react";
+
+import {
+    BottomSheet,
+    SettingsRow,
+    Button,
+    SheetScreen,
+} from "./ui";
 import axios from "axios";
 import axiosInstance from "../utils/axiosInstance";
 import PersonalDataConsent from "./PersonalDataConsent";
@@ -143,6 +149,11 @@ export default function UserIdentityVerification({
     const submittingRef = useRef(false);
 
     const [opened, setOpened] = useState(false);
+    const [identityScreen, setIdentityScreen] =
+        useState("main");
+
+    const [identityDirection, setIdentityDirection] =
+        useState(1);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
 
@@ -225,6 +236,40 @@ export default function UserIdentityVerification({
         Boolean(userId) &&
         CAN_APPLY.has(status);
 
+    const closeVerificationSheet = () => {
+        if (submittingRef.current || submitting) {
+            return;
+        }
+
+        setOpened(false);
+        setIdentityScreen("main");
+        setIdentityDirection(1);
+
+        setFiles([]);
+        setConfirmed(false);
+        setIdentityConsent(null);
+        setFormError("");
+        setSuccess("");
+    };
+
+    const openVerificationSheet = () => {
+        setIdentityScreen("main");
+        setIdentityDirection(1);
+
+        setOpened(true);
+        setFormError("");
+        setSuccess("");
+    };
+
+    const backToIdentityForm = () => {
+        if (submittingRef.current || submitting) {
+            return;
+        }
+
+        setIdentityDirection(-1);
+        setIdentityScreen("main");
+    };
+
     const handleSelectFiles = (event) => {
         const selected = Array.from(
             event.target.files || []
@@ -257,7 +302,9 @@ export default function UserIdentityVerification({
         setFormError("");
     };
 
-    const handleSubmit = async () => {
+    const handleSubmit = async (
+        explicitlyConfirmed = false
+    ) => {
         if (
             submittingRef.current ||
             submitting ||
@@ -288,11 +335,9 @@ export default function UserIdentityVerification({
             return;
         }
 
-        if (
-            !window.confirm(
-                "Отправить документы на проверку личности?"
-            )
-        ) {
+        if (explicitlyConfirmed !== true) {
+            setIdentityDirection(1);
+            setIdentityScreen("confirm");
             return;
         }
 
@@ -352,10 +397,14 @@ export default function UserIdentityVerification({
 
             setFiles([]);
             setConfirmed(false);
+            setIdentityConsent(null);
 
             setSuccess(
                 "Документы отправлены на проверку."
             );
+
+            setIdentityDirection(-1);
+            setIdentityScreen("main");
 
             await loadStatus();
         } catch (error) {
@@ -367,67 +416,52 @@ export default function UserIdentityVerification({
     };
 
     return (
-        <section className="verification-panel cc-identity">
-            <button
-                type="button"
-                className="verification-panel-head"
+        <>
+            <SettingsRow
+                className="cc-identity"
+                icon={<UserRound />}
+                title="Подтверждение личности"
+                description={
+                    loading
+                        ? "Проверяем статус..."
+                        : loadError
+                            ? "Статус недоступен"
+                            : statusInfo.title
+                }
                 aria-expanded={opened}
-                aria-controls={`${inputId}-content`}
-                onClick={() => setOpened((prev) => !prev)}
+                aria-controls={
+                    opened
+                        ? `${inputId}-content`
+                        : undefined
+                }
+                onClick={openVerificationSheet}
+            />
+
+            <BottomSheet
+                open={opened}
+                onClose={closeVerificationSheet}
+                title={
+                    identityScreen === "confirm"
+                        ? "Отправка документов"
+                        : "Подтверждение личности"
+                }
+                busy={submitting}
             >
-                <span className="verification-panel-head-main">
-                    <span
-                        className="verification-panel-icon"
-                        aria-hidden="true"
-                    >
-<UserRound size={22} aria-hidden="true" />
-                    </span>
-
-                    <span className="verification-panel-heading">
-                        <span className="verification-panel-title">
-                            Подтверждение личности
-                        </span>
-
-                        <span className="verification-panel-subtitle">
-                            Для подтверждённых сделок
-                            и дополнительного доверия
-                        </span>
-                    </span>
-                </span>
-
-                <span className="verification-panel-head-side">
-                    <span
-                        className={
-                            "verification-summary-status " +
-                            (loadError
-                                ? "rejected"
-                                : statusInfo.className)
-                        }
-                    >
-                        {loading
-                            ? "Загрузка..."
-                            : loadError
-                                ? "Ошибка"
-                                : statusInfo.title}
-                    </span>
-
-                    <span
-                        className={`verification-chevron ${
-                            opened ? "open" : ""
-                        }`}
-                        aria-hidden="true"
-                    >
-                        <ChevronRight size={18} aria-hidden="true" />
-
-                    </span>
-                </span>
-            </button>
-
-            {opened && (
-                <div
-                    id={`${inputId}-content`}
-                    className="verification-panel-content cc-identity-content"
+                <SheetScreen
+                    screen={identityScreen}
+                    direction={identityDirection}
+                    busy={submitting}
+                    onBack={
+                        identityScreen === "confirm"
+                            ? backToIdentityForm
+                            : undefined
+                    }
                 >
+                    {identityScreen === "main" && (
+                        <div
+                            id={`${inputId}-content`}
+                            className="cc-identity cc-identity-content cc-verification-sheet"
+                        >
                     <div className="verification-info-box">
                         <strong>
                             Проверка личности CargoCamp
@@ -609,23 +643,21 @@ export default function UserIdentityVerification({
                                 onChange={setIdentityConsent}
                             />
 
-                            <button
-                                type="button"
+                            <Button
                                 className="cc-identity-submit"
+                                fullWidth
+                                loading={submitting}
                                 disabled={
-                                    submitting ||
                                     !confirmed ||
                                     !identityConsent?.confirmed ||
                                     files.length === 0
                                 }
-                                onClick={handleSubmit}
-
+                                onClick={() => handleSubmit(false)}
                             >
                                 {submitting
                                     ? "Отправляем..."
                                     : "Отправить на проверку"}
-                            </button>
-                            setIdentityConsent(null);
+                            </Button>
                         </div>
                     )}
 
@@ -646,8 +678,74 @@ export default function UserIdentityVerification({
                             ? "Обновляем..."
                             : "Обновить статус"}
                     </button>
-                </div>
-            )}
-        </section>
+                        </div>
+                    )}
+
+                    {identityScreen === "confirm" && (
+                        <div className="cc-verification-sheet">
+
+                            <div className="cc-verification-confirm-icon">
+                                <UserRound
+                                    size={34}
+                                    aria-hidden="true"
+                                />
+                            </div>
+
+                            <h3 className="cc-verification-confirm-title">
+                                Отправить документы?
+                            </h3>
+
+                            <p className="cc-profile-note">
+                                Документы будут переданы на ручную
+                                проверку личности в CargoCamp.
+                            </p>
+
+                            <div className="cc-verification-document-summary">
+                                <strong>
+                                    Выбрано файлов: {files.length}
+                                </strong>
+
+                                {files.map((file, index) => (
+                                    <span
+                                        key={`${file.name}-${index}`}
+                                    >
+                            {file.name}
+                        </span>
+                                ))}
+                            </div>
+
+                            {formError && (
+                                <div
+                                    className="cc-ui-error"
+                                    role="alert"
+                                >
+                                    {formError}
+                                </div>
+                            )}
+
+                            <Button
+                                fullWidth
+                                loading={submitting}
+                                onClick={() =>
+                                    handleSubmit(true)
+                                }
+                            >
+                                Подтвердить отправку
+                            </Button>
+
+                            <Button
+                                variant="secondary"
+                                fullWidth
+                                disabled={submitting}
+                                onClick={backToIdentityForm}
+                            >
+                                Отмена
+                            </Button>
+
+                        </div>
+                    )}
+                </SheetScreen>
+            </BottomSheet>
+        </>
     );
 }

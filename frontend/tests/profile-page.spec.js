@@ -489,6 +489,22 @@ async function openProfileSheet(
     return dialog;
 }
 
+async function openIdentitySheet(page) {
+    return openProfileSheet(
+        page,
+        /^Подтверждение личности/,
+        "Подтверждение личности"
+    );
+}
+
+async function openBenefitsSheet(page) {
+    return openProfileSheet(
+        page,
+        /^Социальные льготы/,
+        "Социальные льготы"
+    );
+}
+
 async function expectProfileLoaded(page) {
     await expect(
         page.getByRole("heading", {
@@ -1127,30 +1143,26 @@ test.describe("ProfilePage", () => {
     test(
         "показывает актуальные секции подтверждений",
         async ({ page }) => {
-            const verificationCard = page.locator(
+            const card = page.locator(
                 ".profile-verification-card"
             );
 
-            await expect(
-                verificationCard
-            ).toBeVisible();
+            await expect(card).toBeVisible();
 
-            await expect(
-                verificationCard
-            ).toContainText(
+            await expect(card).toContainText(
                 "Подтверждения и льготы"
             );
 
             await expect(
-                verificationCard.locator(
-                    ".cc-identity .verification-panel-title"
-                )
+                card.getByRole("button", {
+                    name: /^Подтверждение личности/,
+                })
             ).toBeVisible();
 
             await expect(
-                verificationCard.locator(
-                    ".cc-benefits .verification-panel-title"
-                )
+                card.getByRole("button", {
+                    name: /^Социальные льготы/,
+                })
             ).toBeVisible();
 
             await expect(
@@ -1160,264 +1172,437 @@ test.describe("ProfilePage", () => {
             ).toBeVisible();
 
             await expect(
-                verificationCard.locator(
-                    ".verification-panel-vehicle"
-                )
+                page.getByRole("dialog")
             ).toHaveCount(0);
         }
     );
 
-    test("открывает информацию о подтверждениях", async ({ page }) => {
-        const card = page.locator(".profile-verification-card");
+    test(
+        "открывает информацию о подтверждениях",
+        async ({ page }) => {
+            const dialog = await openProfileSheet(
+                page,
+                "Подробнее о подтверждениях",
+                "О верификации пользователя"
+            );
 
-        await card.getByRole("button", { name: "Подробнее" }).click();
+            await expect(dialog).toContainText(
+                "Подтверждение личности"
+            );
 
-        const modal = page.locator(".modal-window");
+            await expect(dialog).toContainText(
+                "Автомобиль для такси"
+            );
 
-        await expect(modal).toBeVisible();
-        await expect(modal).toContainText("О верификации пользователя");
+            await expect(dialog).toContainText(
+                "Социальные льготы"
+            );
 
-        await modal.getByRole("button", { name: "Закрыть" }).click();
+            await dialog.getByRole("button", {
+                name: "Понятно",
+                exact: true,
+            }).click();
 
-        await expect(modal).not.toBeVisible();
-    });
+            await expect(dialog).not.toBeVisible();
+        }
+    );
 
-    test("отображает неподтверждённую личность", async ({ page }) => {
-        const identity = page.locator(".cc-identity");
+    test(
+        "отображает неподтверждённую личность",
+        async ({ page }) => {
+            await expect(
+                page.getByRole("button", {
+                    name: /^Подтверждение личности/,
+                })
+            ).toContainText("Не подтверждена");
 
-        await expect(
-            identity.locator(".verification-summary-status")
-        ).toHaveText("Не подтверждена");
+            const identity =
+                await openIdentitySheet(page);
 
-        await identity.locator(".verification-panel-head").click();
+            await expect(
+                identity.locator("select")
+            ).toHaveValue("passport_rf");
 
-        await expect(
-            identity.locator("select")
-        ).toHaveValue("passport_rf");
+            await expect(
+                identity.locator(".cc-identity-submit")
+            ).toBeDisabled();
+        }
+    );
 
-        await expect(
-            identity.locator(".cc-identity-submit")
-        ).toBeDisabled();
-    });
-
-    test("для подтверждённой личности скрывает повторную подачу", async ({ page }) => {
-        await openProfilePage(page, {
-            identityBody: {
-                success: true,
-                verification: {
-                    status: "verified",
-                    verifiedAt: "2026-11-01T12:00:00Z",
-                },
-            },
-        });
-
-        const identity = page.locator(".cc-identity");
-
-        await expect(
-            identity.locator(".verification-summary-status")
-        ).toHaveText("Подтверждена");
-
-        await identity.locator(".verification-panel-head").click();
-
-        await expect(
-            identity.locator(".cc-identity-form")
-        ).toHaveCount(0);
-    });
-
-    test("при проверке личности блокирует повторную заявку", async ({ page }) => {
-        await openProfilePage(page, {
-            identityBody: {
-                success: true,
-                verification: {
-                    status: "pending",
-                },
-            },
-        });
-
-        const identity = page.locator(".cc-identity");
-
-        await identity.locator(".verification-panel-head").click();
-
-        await expect(identity).toContainText("На проверке");
-
-        await expect(
-            identity.locator(".cc-identity-form")
-        ).toHaveCount(0);
-
-        await expect(
-            identity.locator(".cc-identity-note")
-        ).toContainText("после рассмотрения заявки");
-    });
-
-    test("отклоняет недопустимый файл для проверки личности", async ({ page }) => {
-        const identity = page.locator(".cc-identity");
-
-        await identity.locator(".verification-panel-head").click();
-
-        await identity.locator('input[type="file"]').setInputFiles({
-            name: "document.exe",
-            mimeType: "application/octet-stream",
-            buffer: Buffer.from("invalid-file"),
-        });
-
-        await expect(
-            identity.locator(".cc-identity-error")
-        ).toContainText("Поддерживаются только PDF, JPG и PNG");
-
-        await expect(
-            identity.locator(".cc-identity-submit")
-        ).toBeDisabled();
-    });
-
-    test("отправляет документы личности через multipart API", async ({ page }) => {
-        let submittedBody = null;
-
-        await page.route("**/api/identity/me/apply", async (route) => {
-            submittedBody = route.request().postData();
-
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({ success: true }),
-            });
-        });
-
-        const identity = page.locator(".cc-identity");
-
-        await identity.locator(".verification-panel-head").click();
-
-        await identity.locator('input[type="file"]').setInputFiles({
-            name: "passport.jpg",
-            mimeType: "image/jpeg",
-            buffer: Buffer.from("mock-passport"),
-        });
-
-        const submitButton = identity.locator(
-            ".cc-identity-submit"
-        );
-
-        await expect(submitButton).toBeDisabled();
-
-        await identity.getByRole("checkbox", {
-            name: /Подтверждаю, что отправляю свои документы/,
-        }).check();
-
-        await expect(submitButton).toBeDisabled();
-
-        await identity.getByRole("checkbox", {
-            name: /Я ознакомился с отдельным согласием/,
-        }).check();
-
-        await expect(submitButton).toBeEnabled();
-
-        page.once("dialog", (dialog) => dialog.accept());
-
-        await identity.locator(".cc-identity-submit").click();
-
-        await expect
-            .poll(() => submittedBody)
-            .toContain('name="documentType"');
-
-        expect(submittedBody).toContain("passport_rf");
-
-        expect(submittedBody).toContain(
-            'name="consentVersion"'
-        );
-
-        expect(submittedBody).toContain(
-            'name="consentSha256"'
-        );
-
-        expect(submittedBody).toContain(
-            'name="consentConfirmed"'
-        );
-
-        expect(submittedBody).toContain(
-            "2026-11-25"
-        );
-
-        expect(submittedBody).toContain(
-            "a".repeat(64)
-        );
-
-        expect(submittedBody).toMatch(
-            /name="consentConfirmed"\r?\n\r?\ntrue/
-        );
-
-        await expect(
-            identity.locator(".cc-identity-success")
-        ).toContainText("Документы отправлены на проверку");
-    });
-
-    test("отображает статусы подтверждённых и ожидающих льгот", async ({ page }) => {
-        await openProfilePage(page, {
-            benefitsBody: {
-                success: true,
-                benefits: [
-                    {
-                        code: "pension_recipient",
+    test(
+        "для подтверждённой личности скрывает повторную подачу",
+        async ({ page }) => {
+            await openProfilePage(page, {
+                identityBody: {
+                    success: true,
+                    verification: {
                         status: "verified",
+                        verifiedAt: "2026-11-01T12:00:00Z",
                     },
-                    {
-                        code: "disability_status",
+                },
+            });
+
+            await expect(
+                page.getByRole("button", {
+                    name: /^Подтверждение личности/,
+                })
+            ).toContainText("Подтверждена");
+
+            const identity =
+                await openIdentitySheet(page);
+
+            await expect(identity).toContainText(
+                "Личность подтверждена"
+            );
+
+            await expect(
+                identity.locator(".cc-identity-form")
+            ).toHaveCount(0);
+        }
+    );
+
+    test(
+        "при проверке личности блокирует повторную заявку",
+        async ({ page }) => {
+            await openProfilePage(page, {
+                identityBody: {
+                    success: true,
+                    verification: {
                         status: "pending",
                     },
-                ],
-            },
-        });
+                },
+            });
 
-        const section = page.locator(".cc-benefits");
+            const identity =
+                await openIdentitySheet(page);
 
-        await expect(
-            section.locator(".cc-benefits-header-status")
-        ).toHaveText("Подтверждено: 1");
+            await expect(identity)
+                .toContainText("На проверке");
 
-        await section.locator(".cc-benefits-heading").click();
+            await expect(
+                identity.locator(".cc-identity-form")
+            ).toHaveCount(0);
 
-        const pension = section.locator(".cc-benefit-item").filter({
-            hasText: "Пенсионер",
-        });
+            await expect(
+                identity.locator(".cc-identity-note")
+            ).toContainText(
+                "после рассмотрения заявки"
+            );
+        }
+    );
 
-        const disability = section.locator(".cc-benefit-item").filter({
-            hasText: "Льгота по инвалидности",
-        });
+    test(
+        "отклоняет недопустимый файл для проверки личности",
+        async ({ page }) => {
+            const identity =
+                await openIdentitySheet(page);
 
-        await expect(
-            pension.locator(".cc-benefit-status")
-        ).toContainText("Подтверждена");
+            await identity
+                .locator('input[type="file"]')
+                .setInputFiles({
+                    name: "document.exe",
+                    mimeType: "application/octet-stream",
+                    buffer: Buffer.from("invalid-file"),
+                });
 
-        await expect(
-            disability.locator(".cc-benefit-status")
-        ).toContainText("На проверке");
+            await expect(
+                identity.locator(".cc-identity-error")
+            ).toContainText(
+                "Поддерживаются только PDF, JPG и PNG"
+            );
 
-        await expect(
-            pension.locator('input[type="file"]')
-        ).toHaveCount(0);
+            await expect(
+                identity.locator(".cc-identity-submit")
+            ).toBeDisabled();
+        }
+    );
 
-        await expect(
-            disability.locator('input[type="file"]')
-        ).toHaveCount(0);
-    });
+    test(
+        "отправляет документы личности через multipart API",
+        async ({ page }) => {
+            let submittedBody = null;
+            let submittedCalls = 0;
+
+            await page.route(
+                "**/api/identity/me/apply",
+                async (route) => {
+                    submittedCalls += 1;
+
+                    submittedBody =
+                        route.request().postData();
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                        },
+                    });
+                }
+            );
+
+            const identity =
+                await openIdentitySheet(page);
+
+            await identity
+                .locator('input[type="file"]')
+                .setInputFiles({
+                    name: "passport.jpg",
+                    mimeType: "image/jpeg",
+                    buffer: Buffer.from("mock-passport"),
+                });
+
+            const submitButton = identity.locator(
+                ".cc-identity-submit"
+            );
+
+            await expect(submitButton)
+                .toBeDisabled();
+
+            await identity.getByRole("checkbox", {
+                name: /Подтверждаю, что отправляю свои документы/,
+            }).check();
+
+            await expect(submitButton)
+                .toBeDisabled();
+
+            await identity.getByRole("checkbox", {
+                name: /Я ознакомился с отдельным согласием/,
+            }).check();
+
+            await expect(submitButton)
+                .toBeEnabled();
+
+            await submitButton.click();
+
+            const confirmation = page.getByRole(
+                "dialog",
+                {
+                    name: "Отправка документов",
+                    exact: true,
+                }
+            );
+
+            await expect(confirmation)
+                .toBeVisible();
+
+            await expect(confirmation)
+                .toContainText("passport.jpg");
+
+            expect(submittedCalls).toBe(0);
+
+            await confirmation.getByRole("button", {
+                name: "Подтвердить отправку",
+                exact: true,
+            }).click();
+
+            await expect.poll(
+                () => submittedCalls
+            ).toBe(1);
+
+            expect(submittedBody).toContain(
+                'name="documentType"'
+            );
+
+            expect(submittedBody).toContain(
+                "passport_rf"
+            );
+
+            expect(submittedBody).toContain(
+                'name="documents"'
+            );
+
+            expect(submittedBody).toContain(
+                'filename="passport.jpg"'
+            );
+
+            expect(submittedBody).toContain(
+                'name="consentVersion"'
+            );
+
+            expect(submittedBody).toContain(
+                'name="consentSha256"'
+            );
+
+            expect(submittedBody).toContain(
+                "2026-11-25"
+            );
+
+            expect(submittedBody).toContain(
+                "a".repeat(64)
+            );
+
+            expect(submittedBody).toMatch(
+                /name="consentConfirmed"\r?\n\r?\ntrue/
+            );
+
+            await expect(
+                page.getByRole("dialog", {
+                    name: "Подтверждение личности",
+                    exact: true,
+                }).locator(".cc-identity-success")
+            ).toContainText(
+                "Документы отправлены на проверку"
+            );
+        }
+    );
+
+    test(
+        "отмена подтверждения личности не отправляет документы",
+        async ({ page }) => {
+            let submittedCalls = 0;
+
+            await page.route(
+                "**/api/identity/me/apply",
+                async (route) => {
+                    submittedCalls += 1;
+
+                    await route.fulfill({
+                        json: {
+                            success: true,
+                        },
+                    });
+                }
+            );
+
+            const identity =
+                await openIdentitySheet(page);
+
+            await identity
+                .locator('input[type="file"]')
+                .setInputFiles({
+                    name: "passport.jpg",
+                    mimeType: "image/jpeg",
+                    buffer: Buffer.from("mock-passport"),
+                });
+
+            await identity.getByRole("checkbox", {
+                name: /Подтверждаю, что отправляю свои документы/,
+            }).check();
+
+            await identity.getByRole("checkbox", {
+                name: /Я ознакомился с отдельным согласием/,
+            }).check();
+
+            await identity
+                .locator(".cc-identity-submit")
+                .click();
+
+            await page.getByRole("dialog", {
+                name: "Отправка документов",
+                exact: true,
+            }).getByRole("button", {
+                name: "Отмена",
+                exact: true,
+            }).click();
+
+            const returnedIdentity =
+                page.getByRole("dialog", {
+                    name: "Подтверждение личности",
+                    exact: true,
+                });
+
+            await expect(
+                returnedIdentity.locator(
+                    ".cc-identity-files"
+                )
+            ).toContainText("passport.jpg");
+
+            expect(submittedCalls).toBe(0);
+
+            await returnedIdentity.getByRole("button", {
+                name: "Закрыть",
+                exact: true,
+            }).click();
+
+            await expect(returnedIdentity)
+                .not.toBeVisible();
+
+            const reopened =
+                await openIdentitySheet(page);
+
+            await expect(
+                reopened.locator(".cc-identity-files")
+            ).toHaveCount(0);
+
+            await expect(
+                reopened.locator(".cc-identity-submit")
+            ).toBeDisabled();
+        }
+    );
+
+    test(
+        "отображает статусы подтверждённых и ожидающих льгот",
+        async ({ page }) => {
+            await openProfilePage(page, {
+                benefitsBody: {
+                    success: true,
+                    benefits: [
+                        {
+                            code: "pension_recipient",
+                            status: "verified",
+                        },
+                        {
+                            code: "disability_status",
+                            status: "pending",
+                        },
+                    ],
+                },
+            });
+
+            await expect(
+                page.getByRole("button", {
+                    name: /^Социальные льготы/,
+                })
+            ).toContainText("Подтверждено: 1");
+
+            const section =
+                await openBenefitsSheet(page);
+
+            const pension = section
+                .locator(".cc-benefit-item")
+                .filter({
+                    hasText: "Пенсионер",
+                });
+
+            const disability = section
+                .locator(".cc-benefit-item")
+                .filter({
+                    hasText: "Льгота по инвалидности",
+                });
+
+            await expect(
+                pension.locator(".cc-benefit-status")
+            ).toContainText("Подтверждена");
+
+            await expect(
+                disability.locator(".cc-benefit-status")
+            ).toContainText("На проверке");
+
+            await expect(
+                pension.locator('input[type="file"]')
+            ).toHaveCount(0);
+
+            await expect(
+                disability.locator('input[type="file"]')
+            ).toHaveCount(0);
+        }
+    );
 
     test(
         "не позволяет загружать документы для временно недоступных льгот",
         async ({ page }) => {
             const section =
-                page.locator(".cc-benefits");
+                await openBenefitsSheet(page);
 
-            await section
-                .locator(".cc-benefits-heading")
-                .click();
+            const disabledPrograms = section
+                .locator(".cc-benefit-item")
+                .filter({
+                    hasText:
+                        /Приём новых заявок временно недоступен/,
+                });
 
-            const disabledPrograms =
-                section.locator(".cc-benefit-item")
-                    .filter({
-                        hasText: /Приём новых заявок временно недоступен/,
-                    });
-
-            await expect(
-                disabledPrograms
-            ).toHaveCount(2);
+            await expect(disabledPrograms)
+                .toHaveCount(2);
 
             await expect(
                 disabledPrograms.locator(
@@ -1431,98 +1616,184 @@ test.describe("ProfilePage", () => {
                 )
             ).toHaveCount(0);
 
-            const pension =
-                section.locator(".cc-benefit-item")
-                    .filter({
-                        hasText: "Пенсионер",
-                    });
+            const pension = section
+                .locator(".cc-benefit-item")
+                .filter({
+                    hasText: "Пенсионер",
+                });
 
             await expect(
-                pension.locator(
-                    'input[type="file"]'
-                )
+                pension.locator('input[type="file"]')
             ).toHaveCount(1);
         }
     );
 
-    test("отправляет документ на социальную льготу", async ({ page }) => {
-        let submittedBody = null;
+    test(
+        "отправляет документ на социальную льготу",
+        async ({ page }) => {
+            let submittedBody = null;
+            let submittedCalls = 0;
 
-        await page.route(
-            "**/api/benefits/me/pension_recipient/apply",
-            async (route) => {
-                submittedBody = route.request().postData();
+            await page.route(
+                "**/api/benefits/me/pension_recipient/apply",
+                async (route) => {
+                    submittedCalls += 1;
 
-                await route.fulfill({
-                    status: 200,
-                    contentType: "application/json",
-                    body: JSON.stringify({ success: true }),
+                    submittedBody =
+                        route.request().postData();
+
+                    await route.fulfill({
+                        status: 200,
+                        json: {
+                            success: true,
+                        },
+                    });
+                }
+            );
+
+            const section =
+                await openBenefitsSheet(page);
+
+            const pension = section
+                .locator(".cc-benefit-item")
+                .filter({
+                    hasText: "Пенсионер",
                 });
-            }
-        );
 
-        const section = page.locator(".cc-benefits");
+            await pension
+                .locator('input[type="file"]')
+                .setInputFiles({
+                    name: "pension.pdf",
+                    mimeType: "application/pdf",
+                    buffer: Buffer.from("mock-pdf"),
+                });
 
-        await section.locator(".cc-benefits-heading").click();
+            const submitButton = pension.locator(
+                ".cc-benefit-submit"
+            );
 
-        const pension = section.locator(".cc-benefit-item").filter({
-            hasText: "Пенсионер",
-        });
+            await expect(submitButton)
+                .toBeDisabled();
 
-        await pension.locator('input[type="file"]').setInputFiles({
-            name: "pension.pdf",
-            mimeType: "application/pdf",
-            buffer: Buffer.from("mock-pdf"),
-        });
+            await pension.getByRole("checkbox", {
+                name: /Я ознакомился с отдельным согласием/,
+            }).check();
 
-        await expect(
-            pension.locator(".cc-benefit-submit")
-        ).toBeDisabled();
+            await expect(submitButton)
+                .toBeEnabled();
 
-        await pension.getByRole("checkbox", {
-            name: /Я ознакомился с отдельным согласием/,
-        }).check();
+            page.once(
+                "dialog",
+                (dialog) => dialog.accept()
+            );
 
-        await expect(
-            pension.locator(".cc-benefit-submit")
-        ).toBeEnabled();
+            await submitButton.click();
 
-        page.once("dialog", (dialog) => dialog.accept());
+            await expect.poll(
+                () => submittedCalls
+            ).toBe(1);
 
-        await pension.locator(".cc-benefit-submit").click();
+            expect(submittedBody).toContain(
+                'name="document"'
+            );
 
-        await expect
-            .poll(() => submittedBody)
-            .toContain('name="document"');
+            expect(submittedBody).toContain(
+                'filename="pension.pdf"'
+            );
 
-        expect(submittedBody).toContain(
-            'name="consentVersion"'
-        );
+            expect(submittedBody).toContain(
+                'name="consentVersion"'
+            );
 
-        expect(submittedBody).toContain(
-            'name="consentSha256"'
-        );
+            expect(submittedBody).toContain(
+                'name="consentSha256"'
+            );
 
-        expect(submittedBody).toContain(
-            'name="consentConfirmed"'
-        );
+            expect(submittedBody).toContain(
+                "2026-11-25"
+            );
 
-        expect(submittedBody).toContain(
-            "2026-11-25"
-        );
+            expect(submittedBody).toContain(
+                "a".repeat(64)
+            );
 
-        expect(submittedBody).toContain(
-            "a".repeat(64)
-        );
+            expect(submittedBody).toMatch(
+                /name="consentConfirmed"\r?\n\r?\ntrue/
+            );
 
-        expect(submittedBody).toMatch(
-            /name="consentConfirmed"\r?\n\r?\ntrue/
-        );
+            await expect(
+                section.locator(".cc-benefits-success")
+            ).toContainText(
+                "Документ успешно отправлен"
+            );
+        }
+    );
 
-        await expect(
-            section.locator(".cc-benefits-success")
-        ).toContainText("Документ успешно отправлен");
-    });
+    for (const width of [320, 375, 430]) {
+        for (const colorScheme of ["light", "dark"]) {
+            test(
+                `верификация помещается на ${width}px в теме ${colorScheme}`,
+                async ({ page }) => {
+                    await page.setViewportSize({
+                        width,
+                        height: 740,
+                    });
+
+                    await page.emulateMedia({
+                        colorScheme,
+                    });
+
+                    const identity =
+                        await openIdentitySheet(page);
+
+                    await expect(identity)
+                        .toBeVisible();
+
+                    const identityOverflow =
+                        await identity.evaluate(
+                            (element) =>
+                                element.scrollWidth >
+                                element.clientWidth + 2
+                        );
+
+                    expect(identityOverflow)
+                        .toBe(false);
+
+                    await identity.getByRole(
+                        "button",
+                        {
+                            name: "Закрыть",
+                            exact: true,
+                        }
+                    ).click();
+
+                    await expect(identity)
+                        .not.toBeVisible();
+
+                    const benefits =
+                        await openBenefitsSheet(page);
+
+                    await expect(
+                        benefits.locator(".cc-benefit-item")
+                    ).toHaveCount(3);
+
+                    const overflow =
+                        await benefits.locator(
+                            ".cc-benefit-item"
+                        ).evaluateAll(
+                            (elements) =>
+                                elements.some(
+                                    (element) =>
+                                        element.scrollWidth >
+                                        element.clientWidth + 2
+                                )
+                        );
+
+                    expect(overflow).toBe(false);
+                }
+            );
+        }
+    }
 
     test(
         "загружает аватар",

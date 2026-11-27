@@ -32,6 +32,7 @@ import {
     Camera,
     Navigation,
     Map,
+    Info,
 } from "lucide-react";
 import AccountDeletionSection from "../components/AccountDeletionSection";
 import { App as CapacitorApp } from "@capacitor/app";
@@ -2419,46 +2420,30 @@ const ProfilePage = () => {
 
 
 
-                <div className="profile-card glass profile-verification-card">
-                    <div className="card-head">
-                        <div>
-                            <h2 className="card-title">
-                                <ShieldCheck size={20} aria-hidden="true" />{" "}Подтверждения и льготы
-                            </h2>
+                <SectionCard
+                    title="Подтверждения и льготы"
+                    padded={false}
+                    className="cc-profile-group profile-verification-card"
+                >
 
-                            <p className="card-subtitle">
-                                Личность, автомобиль и социальные статусы
-                            </p>
-                        </div>
+                    <UserIdentityVerification
+                        userId={profile?.id}
+                    />
 
-                        <button
-                            type="button"
-                            className="profile-chip"
-                            onClick={() =>
-                                setShowVerificationModal(true)
-                            }
-                        >
-                            Подробнее
-                        </button>
-                    </div>
+                    <UserBenefitsSection
+                        userId={profile?.id}
+                        embedded
+                    />
 
-                    <div className="verification-sections">
+                    <SettingsRow
+                        icon={<Info />}
+                        title="Подробнее о подтверждениях"
+                        onClick={() =>
+                            setShowVerificationModal(true)
+                        }
+                    />
 
-                        {/* =========================
-    ПОДТВЕРЖДЕНИЕ ЛИЧНОСТИ
-========================= */}
-
-                        <UserIdentityVerification
-                            userId={profile?.id}
-                        />
-
-                        <UserBenefitsSection
-                            userId={profile?.id}
-                            embedded
-                        />
-
-                    </div>
-                </div>
+                </SectionCard>
 
                 <SectionCard
                     title="Помощь и поддержка"
@@ -3944,63 +3929,95 @@ const ProfilePage = () => {
                 </div>
             )}
 
-            {showVerificationModal && (
-                <div
-                    className="modal-overlay"
-                    onClick={() => setShowVerificationModal(false)}
-                >
-                    <div
-                        className="modal-window"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <h3>О верификации пользователя</h3>
+            <BottomSheet
+                open={showVerificationModal}
+                onClose={() =>
+                    setShowVerificationModal(false)
+                }
+                title="О верификации пользователя"
+            >
+                <div className="cc-profile-sheet-stack">
 
-                        <div className="modal-content">
-                            <p>
-                                <strong>Подтверждение личности</strong> —
-                                добровольная проверка документов пользователя.
-                                Она нужна для повышения доверия и будущих
-                                подтверждённых сделок CargoCamp.
-                            </p>
+                    <div className="cc-verification-info-card">
 
-                            <p>
-                                <strong>Автомобиль для такси</strong> —
-                                отдельная проверка данных автомобиля,
-                                необходимая для работы в такси.
-                            </p>
+                        <ShieldCheck
+                            size={25}
+                            aria-hidden="true"
+                        />
 
-                            <p>
-                                <strong>Социальные льготы</strong> —
-                                подтверждение пенсионного статуса,
-                                инвалидности или статуса многодетной семьи.
-                                Льготы применяются согласно действующим
-                                правилам CargoCamp.
-                            </p>
+                        <strong>
+                            Подтверждение личности
+                        </strong>
 
-                            <p>
-                                Новые документы для подтверждения личности
-                                и льгот передаются на ручную проверку
-                                через защищённое хранилище.
-                            </p>
+                        <p>
+                            Добровольная проверка документов
+                            пользователя. Она нужна для повышения
+                            доверия и будущих подтверждённых
+                            сделок CargoCamp.
+                        </p>
 
-                            <p>
-                                Прохождение этих проверок не обязательно
-                                для создания обычных заказов.
-                            </p>
-
-                            <button
-                                type="button"
-                                className="btn btn-ghost"
-                                onClick={() =>
-                                    setShowVerificationModal(false)
-                                }
-                            >
-                                Закрыть
-                            </button>
-                        </div>
                     </div>
+
+                    <div className="cc-verification-info-card">
+
+                        <CarFront
+                            size={25}
+                            aria-hidden="true"
+                        />
+
+                        <strong>
+                            Автомобиль для такси
+                        </strong>
+
+                        <p>
+                            Отдельная проверка данных автомобиля,
+                            необходимая для работы в такси.
+                        </p>
+
+                    </div>
+
+                    <div className="cc-verification-info-card">
+
+                        <ShieldCheck
+                            size={25}
+                            aria-hidden="true"
+                        />
+
+                        <strong>
+                            Социальные льготы
+                        </strong>
+
+                        <p>
+                            Подтверждение пенсионного статуса,
+                            инвалидности или статуса многодетной
+                            семьи. Льготы применяются согласно
+                            действующим правилам CargoCamp.
+                        </p>
+
+                    </div>
+
+                    <p className="cc-profile-note">
+                        Документы для подтверждения личности
+                        и льгот передаются на ручную проверку
+                        через защищённое хранилище.
+                    </p>
+
+                    <p className="cc-profile-note">
+                        Прохождение этих проверок не обязательно
+                        для создания обычных заказов.
+                    </p>
+
+                    <Button
+                        fullWidth
+                        onClick={() =>
+                            setShowVerificationModal(false)
+                        }
+                    >
+                        Понятно
+                    </Button>
+
                 </div>
-            )}
+            </BottomSheet>
         </div>
     );
 };

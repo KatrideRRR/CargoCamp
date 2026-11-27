@@ -3,7 +3,11 @@ import React, {
     useEffect,
     useState,
 } from "react";
-
+import {
+    BottomSheet,
+    SettingsRow,
+    Button,
+} from "./ui";
 import axios from "axios";
 import axiosInstance from "../utils/axiosInstance";
 import PersonalDataConsent from "./PersonalDataConsent";
@@ -14,7 +18,6 @@ import {
     UsersRound,
     Award,
     Paperclip,
-    ChevronRight,
 } from "lucide-react";
 
 const apiUrl = process.env.REACT_APP_API_URL;
@@ -237,6 +240,23 @@ function UserBenefitsSection({
         }));
     };
 
+    const openBenefitsSheet = () => {
+        setOpened(true);
+        setSuccess("");
+    };
+
+    const closeBenefitsSheet = () => {
+        if (uploadingCode) {
+            return;
+        }
+
+        setOpened(false);
+
+        setSelectedFiles({});
+        setPensionConsent(null);
+        setSuccess("");
+    };
+
     const handleSubmit = async (code) => {
         if (uploadingCode) return;
 
@@ -325,6 +345,8 @@ function UserBenefitsSection({
                 [code]: null,
             }));
 
+            setPensionConsent(null);
+
             setSuccess(
                 "Документ успешно отправлен. Заявка ожидает проверки."
             );
@@ -353,72 +375,38 @@ function UserBenefitsSection({
     ).length;
 
     return (
-        <section
+        <div
             className={
                 embedded
-                    ? "verification-panel cc-benefits cc-benefits--embedded"
-                    : "profile-card glass cc-benefits"
+                    ? "cc-benefits-row cc-benefits-row--embedded"
+                    : "cc-benefits-row"
             }
         >
-            <button
-                type="button"
-                className="verification-panel-head cc-benefits-heading"
+            <SettingsRow
+                icon={<Award />}
+                title="Социальные льготы"
+                description={
+                    loading
+                        ? "Проверяем статус..."
+                        : error && benefits.length === 0
+                            ? "Статус недоступен"
+                            : confirmedCount > 0
+                                ? `Подтверждено: ${confirmedCount}`
+                                : pendingCount > 0
+                                    ? `На проверке: ${pendingCount}`
+                                    : "Нет льгот"
+                }
                 aria-expanded={opened}
-                onClick={() => setOpened((prev) => !prev)}
+                onClick={openBenefitsSheet}
+            />
+
+            <BottomSheet
+                open={opened}
+                onClose={closeBenefitsSheet}
+                title="Социальные льготы"
+                busy={Boolean(uploadingCode)}
             >
-    <span className="verification-panel-head-main">
-        <span
-            className="verification-panel-icon"
-            aria-hidden="true"
-        >
-<Award size={22} aria-hidden="true" />
-        </span>
-
-        <span className="verification-panel-heading">
-            <span className="verification-panel-title">
-                Социальные льготы
-            </span>
-
-            <span className="verification-panel-subtitle">
-                Пенсионеры, инвалидность, многодетные семьи
-            </span>
-        </span>
-    </span>
-
-                <span className="verification-panel-head-side">
-        <span
-            className={`cc-benefits-header-status ${
-                confirmedCount > 0
-                    ? "is-verified"
-                    : pendingCount > 0
-                        ? "is-pending"
-                        : ""
-            }`}
-        >
-            {loading
-                ? "Загрузка..."
-                : error && benefits.length === 0
-                    ? "Ошибка загрузки"
-                    : confirmedCount > 0
-                        ? `Подтверждено: ${confirmedCount}`
-                        : pendingCount > 0
-                            ? `На проверке: ${pendingCount}`
-                            : "Нет льгот"}
-        </span>
-
-        <span
-            className={`verification-chevron ${
-                opened ? "open" : ""
-            }`}
-            aria-hidden="true"
-        >
-            <ChevronRight size={18} aria-hidden="true" />
-        </span>
-    </span>
-            </button>
-
-            {opened && (
-                <div className="verification-panel-content cc-benefits-content">
+                <div className="cc-benefits cc-benefits-content cc-verification-sheet">
                     <div className="cc-benefits-summary">
             <span>
                 Подтверждено:{" "}
@@ -600,27 +588,23 @@ function UserBenefitsSection({
                                                         onChange={setPensionConsent}
                                                     />
 
-                                                <button
-                                                    type="button"
-                                                    className="cc-benefit-submit"
-                                                    disabled={
-                                                        !file ||
-                                                        !pensionConsent?.confirmed ||
-                                                        Boolean(
-                                                            uploadingCode
-                                                        )
-                                                    }
-                                                    onClick={() =>
-                                                        handleSubmit(
-                                                            program.code
-                                                        )
-                                                    }
-                                                >
-                                                    {isUploading
-                                                        ? "Отправляем..."
-                                                        : "Отправить на проверку"}
-                                                </button>
-                                                    setPensionConsent(null);
+                                                    <Button
+                                                        className="cc-benefit-submit"
+                                                        fullWidth
+                                                        loading={isUploading}
+                                                        disabled={
+                                                            !file ||
+                                                            !pensionConsent?.confirmed ||
+                                                            Boolean(uploadingCode)
+                                                        }
+                                                        onClick={() =>
+                                                            handleSubmit(program.code)
+                                                        }
+                                                    >
+                                                        {isUploading
+                                                            ? "Отправляем..."
+                                                            : "Отправить на проверку"}
+                                                    </Button>
                                             </div>
 
                                         )}
@@ -657,8 +641,8 @@ function UserBenefitsSection({
                         </button>
                     </div>
                 </div>
-            )}
-        </section>
+            </BottomSheet>
+        </div>
     );
 }
 

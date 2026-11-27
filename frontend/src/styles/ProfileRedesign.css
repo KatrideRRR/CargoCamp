@@ -1041,3 +1041,444 @@ button + button {
         font-size: var(--cc-font-title);
     }
 }
+
+/* =========================================================
+   VERIFICATION SHEETS
+   ========================================================= */
+
+.cc-benefits-row {
+    min-width: 0;
+    width: 100%;
+}
+
+.cc-profile-group .cc-benefits-row {
+    border-top: 1px solid var(--cc-border);
+    border-bottom: 1px solid var(--cc-border);
+}
+
+.cc-profile-group .cc-benefits-row
+.cc-settings-row {
+    border-radius: 0;
+}
+
+.cc-verification-sheet {
+    display: flex;
+    flex-direction: column;
+
+    gap: 14px;
+
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+
+    padding: 0;
+    margin: 0;
+
+    color: var(--cc-text);
+}
+
+.cc-verification-sheet *,
+.cc-verification-sheet *::before,
+.cc-verification-sheet *::after {
+    box-sizing: border-box;
+}
+
+.cc-verification-sheet
+.verification-info-box,
+.cc-verification-sheet
+.cc-identity-status-detail,
+.cc-verification-info-card {
+    display: flex;
+    flex-direction: column;
+
+    gap: 10px;
+
+    min-width: 0;
+
+    padding: 16px;
+    margin: 0;
+
+    background: var(--cc-surface-soft);
+
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius-lg);
+
+    color: var(--cc-text);
+}
+
+.cc-verification-info-card > svg {
+    color: var(--cc-primary);
+}
+
+.cc-verification-info-card > strong,
+.cc-verification-sheet
+.verification-info-box > strong,
+.cc-verification-sheet
+.cc-identity-status-detail > strong {
+    color: var(--cc-text);
+
+    font-size: var(--cc-font-body);
+    font-weight: var(--cc-weight-semibold);
+
+    overflow-wrap: break-word;
+}
+
+.cc-verification-info-card > p,
+.cc-verification-sheet
+.verification-info-box > span,
+.cc-verification-sheet
+.cc-identity-status-detail > p,
+.cc-verification-sheet
+.cc-benefits-intro,
+.cc-verification-sheet
+.cc-identity-note,
+.cc-verification-sheet
+.cc-benefit-description,
+.cc-verification-sheet
+.cc-benefit-date {
+    margin: 0;
+
+    color: var(--cc-text-secondary);
+
+    font-size: var(--cc-font-small);
+    line-height: 1.55;
+
+    overflow-wrap: break-word;
+}
+
+.cc-verification-sheet
+.cc-identity-form {
+    margin: 0;
+    padding: 14px 0 0;
+
+    border-top: 1px solid var(--cc-border);
+}
+
+.cc-verification-sheet
+.cc-identity-field,
+.cc-verification-sheet
+.cc-identity-field-title,
+.cc-verification-sheet
+.cc-benefit-file-label {
+    color: var(--cc-text);
+
+    font-size: var(--cc-font-small);
+    font-weight: var(--cc-weight-medium);
+}
+
+.cc-verification-sheet
+.cc-identity-field select {
+    width: 100%;
+    min-width: 0;
+    min-height: 52px;
+
+    padding: 12px;
+
+    background: var(--cc-surface-soft);
+
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius-md);
+
+    color: var(--cc-text);
+
+    font-size: 16px;
+}
+
+.cc-verification-sheet
+.cc-identity-upload {
+    position: relative;
+}
+
+.cc-verification-sheet
+input.cc-identity-file-input[type="file"],
+.cc-verification-sheet
+input.cc-benefit-file-input[type="file"] {
+    position: absolute;
+
+    width: 1px;
+    height: 1px;
+
+    overflow: hidden;
+    opacity: 0;
+}
+
+.cc-verification-sheet
+.cc-identity-file-picker,
+.cc-verification-sheet
+.cc-benefit-file-picker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 10px;
+
+    width: 100%;
+    min-height: 52px;
+
+    padding: 12px;
+
+    background: var(--cc-primary-soft);
+
+    border: 1px dashed var(--cc-primary);
+    border-radius: var(--cc-radius-md);
+
+    color: var(--cc-primary);
+
+    font-size: var(--cc-font-body);
+    font-weight: var(--cc-weight-medium);
+
+    cursor: pointer;
+}
+
+.cc-verification-sheet
+.cc-identity-upload small,
+.cc-verification-sheet
+.cc-benefit-file-hint {
+    color: var(--cc-muted);
+
+    font-size: var(--cc-font-caption);
+    line-height: 1.5;
+}
+
+.cc-verification-sheet
+.cc-identity-confirm {
+    display: flex;
+    align-items: flex-start;
+
+    gap: 10px;
+
+    min-width: 0;
+
+    padding: 14px;
+
+    background: var(--cc-surface-soft);
+
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius-md);
+
+    color: var(--cc-text);
+
+    font-size: var(--cc-font-small);
+    line-height: 1.5;
+}
+
+.cc-verification-sheet
+.cc-identity-confirm input {
+    width: 20px;
+    height: 20px;
+
+    flex-shrink: 0;
+
+    margin: 0;
+
+    accent-color: var(--cc-primary);
+}
+
+.cc-verification-sheet
+.cc-identity-error,
+.cc-verification-sheet
+.cc-benefits-error,
+.cc-verification-sheet
+.cc-identity-reason {
+    background: var(--cc-danger-soft);
+    color: var(--cc-danger);
+    border: 0;
+
+    font-size: var(--cc-font-small);
+
+    overflow-wrap: break-word;
+}
+
+.cc-verification-sheet
+.cc-identity-success,
+.cc-verification-sheet
+.cc-benefits-success {
+    background: var(--cc-success-soft);
+    color: var(--cc-success);
+    border: 0;
+
+    font-size: var(--cc-font-small);
+}
+
+.cc-verification-sheet
+.cc-benefits-summary {
+    display: flex;
+    flex-wrap: wrap;
+
+    gap: 8px;
+
+    margin: 0;
+}
+
+.cc-verification-sheet
+.cc-benefits-summary span {
+    background: var(--cc-surface-soft);
+    color: var(--cc-muted);
+}
+
+.cc-verification-sheet
+.cc-benefits-summary strong {
+    color: var(--cc-text);
+}
+
+.cc-verification-sheet
+.cc-benefit-item {
+    min-width: 0;
+
+    padding: 16px;
+
+    background: var(--cc-surface-soft);
+
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius-lg);
+}
+
+.cc-verification-sheet
+.cc-benefit-icon {
+    background: var(--cc-primary-soft);
+    color: var(--cc-primary);
+}
+
+.cc-verification-sheet
+.cc-benefit-details strong {
+    color: var(--cc-text);
+    overflow-wrap: break-word;
+}
+
+.cc-verification-sheet
+.cc-benefit-details small {
+    color: var(--cc-muted);
+    overflow-wrap: break-word;
+}
+
+.cc-verification-sheet
+.cc-benefit-status {
+    max-width: 100%;
+
+    background: var(--cc-surface);
+    color: var(--cc-muted);
+
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
+.cc-verification-sheet
+.cc-benefit-status--verified {
+    background: var(--cc-success-soft);
+    color: var(--cc-success);
+}
+
+.cc-verification-sheet
+.cc-benefit-status--pending,
+.cc-verification-sheet
+.cc-benefit-status--expired {
+    background: var(--cc-warning-soft);
+    color: var(--cc-warning);
+}
+
+.cc-verification-sheet
+.cc-benefit-status--rejected,
+.cc-verification-sheet
+.cc-benefit-status--revoked {
+    background: var(--cc-danger-soft);
+    color: var(--cc-danger);
+}
+
+.cc-verification-sheet
+.cc-benefit-upload {
+    border-top-color: var(--cc-border);
+}
+
+.cc-verification-sheet
+.cc-benefit-upload {
+    position: relative;
+}
+
+.cc-verification-sheet
+.cc-identity-submit.cc-button,
+.cc-verification-sheet
+.cc-benefit-submit.cc-button {
+    width: 100%;
+    min-height: var(--cc-control-md);
+
+    background: var(--cc-primary);
+    color: var(--cc-on-primary);
+}
+
+.cc-verification-sheet
+.cc-identity-submit.cc-button:disabled,
+.cc-verification-sheet
+.cc-benefit-submit.cc-button:disabled {
+    opacity: 0.55;
+}
+
+.cc-verification-confirm-icon {
+    display: grid;
+    place-items: center;
+
+    width: 72px;
+    height: 72px;
+
+    margin: 4px auto;
+
+    background: var(--cc-primary-soft);
+    color: var(--cc-primary);
+
+    border-radius: 50%;
+}
+
+.cc-verification-confirm-title {
+    margin: 0;
+
+    color: var(--cc-text);
+
+    font-size: var(--cc-font-title);
+    text-align: center;
+}
+
+.cc-verification-document-summary {
+    display: flex;
+    flex-direction: column;
+
+    gap: 8px;
+
+    min-width: 0;
+
+    padding: 14px;
+
+    background: var(--cc-surface-soft);
+
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius-md);
+
+    color: var(--cc-text);
+    overflow-wrap: anywhere;
+}
+
+.cc-verification-document-summary span {
+    color: var(--cc-muted);
+    font-size: var(--cc-font-small);
+}
+
+@media (max-width: 360px) {
+    .cc-verification-sheet {
+        gap: 10px;
+    }
+
+    .cc-verification-sheet
+    .cc-benefit-item,
+    .cc-verification-info-card {
+        padding: 12px;
+    }
+
+    .cc-verification-sheet
+    .cc-benefit-top {
+        gap: 8px;
+    }
+
+    .cc-verification-sheet
+    .cc-benefit-icon {
+        flex-basis: 36px;
+        height: 36px;
+    }
+}
