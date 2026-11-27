@@ -75,7 +75,24 @@ function notifyPaymentProblem({provider, type, title, message, userId = null, or
 router.post('/premium/create', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
-        const { duration } = req.body; // "7d" | "30d"
+        const {
+            duration,
+            paymentMode = "auto",
+        } = req.body || {};
+
+        if (
+            ![
+                "auto",
+                "saved_card",
+                "redirect",
+                "redirect_bind",
+            ].includes(paymentMode)
+        ) {
+            return res.status(400).json({
+                success: false,
+                error: "Неверный способ оплаты",
+            });
+        }
 
         const prices = {
             "7d": "2500.00",
@@ -114,6 +131,9 @@ router.post('/premium/create', authenticateToken, async (req, res) => {
                 type: "premium",
                 userId: String(userId),
                 duration,
+                bindCard: paymentMode === "redirect_bind"
+                    ? "1"
+                    : "0",
             },
             receipt: {
                 customer: {
@@ -139,7 +159,20 @@ router.post('/premium/create', authenticateToken, async (req, res) => {
         /**
          * ✅ 1) Если карта привязана — пробуем списать сразу.
          */
-        if (user.yookassa_payment_method_id) {
+        if (
+            paymentMode === "saved_card" &&
+            !user.yookassa_payment_method_id
+        ) {
+            return res.status(409).json({
+                success: false,
+                error: "Сохранённая карта недоступна",
+            });
+        }
+
+        if (
+            ["auto", "saved_card"].includes(paymentMode) &&
+            user.yookassa_payment_method_id
+        ) {
             const payment = await yooKassa.createPayment(
                 {
                     ...basePayload,
@@ -250,6 +283,18 @@ router.post('/premium/create', authenticateToken, async (req, res) => {
         const payment = await yooKassa.createPayment(
             {
                 ...basePayload,
+
+                save_payment_method:
+                    paymentMode === "redirect_bind",
+
+                ...(paymentMode === "redirect_bind"
+                    ? {
+                        payment_method_data: {
+                            type: "bank_card",
+                        },
+                    }
+                    : {}),
+
                 confirmation: {
                     type: "redirect",
                     return_url: `${process.env.FRONTEND_URL}/profile?premiumReturn=1&paymentId={payment_id}`,
@@ -1529,6 +1574,48 @@ router.post("/yookassa/webhook", async (req, res) => {
                     Number(payment.amount.value) * 100
                 ),
             });
+
+            if (
+                meta.bindCard === "1" &&
+                payment.payment_method?.saved === true &&
+                payment.payment_method?.type === "bank_card" &&
+                payment.payment_method?.id
+            ) {
+                const method = payment.payment_method;
+
+                const bindingUser = await User.findByPk(
+                    Number(meta.userId)
+                );
+
+                if (
+                    bindingUser &&
+                    !bindingUser.yookassa_payment_method_id
+                ) {
+                    await bindingUser.update({
+                        yookassa_payment_method_id: method.id,
+                        yookassa_payment_method_saved_at: new Date(),
+                        cardLastFour: method.card?.last4 || null,
+                        cardType: method.card?.card_type || null,
+                    });
+
+                    await req.logAction?.({
+                        req,
+                        actorUserId: Number(meta.userId),
+                        actorRole: "webhook",
+                        actionType: "card_bound",
+                        entityType: "user",
+                        entityId: Number(meta.userId),
+                        paymentId: payment.id,
+                        severity: "info",
+                        meta: {
+                            provider: "yookassa",
+                            source: "premium_payment",
+                            cardLastFour:
+                                method.card?.last4 || null,
+                        },
+                    });
+                }
+            }
 
             if (!result.duplicate) {
                 await req.logAction?.({

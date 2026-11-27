@@ -9,6 +9,7 @@ const authenticateToken = require("../middlewares/userAuth");
 const { requestTBank, verifyNotificationToken } = require("../config/tbankClient");
 const {
     processTBankCardNotification,
+    customerKey,
 } = require("../services/tbankCardBindingService");
 const { sendOrderPush } = require("../utils/orderPushService");
 const {
@@ -112,7 +113,17 @@ function buildReceipt({ user, amountKopecks, description }) {
 router.post("/premium/create", authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
-        const { duration } = req.body;
+        const {
+            duration,
+            paymentMode = "redirect",
+        } = req.body || {};
+
+        if (!["redirect", "saved_card"].includes(paymentMode)) {
+            return res.status(400).json({
+                success: false,
+                error: "Неверный способ оплаты",
+            });
+        }
 
         const prices = {
             "7d": 2500,
@@ -136,6 +147,16 @@ router.post("/premium/create", authenticateToken, async (req, res) => {
             });
         }
 
+        if (
+            paymentMode === "saved_card" &&
+            (!user.tbankRebillId || !user.tbankCardId)
+        ) {
+            return res.status(409).json({
+                success: false,
+                error: "Сохранённая карта недоступна",
+            });
+        }
+
         const addDays = duration === "7d" ? 7 : 30;
         const amountKopecks = rubToKopecks(amountRub);
         const orderId = buildTBankOrderId("premium", userId, duration);
@@ -146,6 +167,13 @@ router.post("/premium/create", authenticateToken, async (req, res) => {
             Amount: amountKopecks,
             OrderId: orderId,
             Description: description,
+            ...(paymentMode === "saved_card"
+                ? {
+                    CustomerKey: customerKey(user.id),
+                    OperationInitiatorType: "R",
+                    PayType: "O",
+                }
+                : {}),
             SuccessURL: `${process.env.FRONTEND_URL}/profile?premiumReturn=1&provider=tbank`,
             FailURL: `${process.env.FRONTEND_URL}/profile?premiumReturn=0&provider=tbank`,
             NotificationURL: `${process.env.BACKEND_URL}/api/tbank-payments/webhook`,
@@ -178,6 +206,137 @@ router.post("/premium/create", authenticateToken, async (req, res) => {
                 tbankOrderId: orderId,
             },
         });
+
+        if (paymentMode === "saved_card") {
+            const paymentId = String(
+                payment.PaymentId || ""
+            );
+
+            if (!paymentId) {
+                throw new Error(
+                    "Т-Банк не вернул PaymentId"
+                );
+            }
+
+            try {
+                await requestTBank(
+                    "Charge",
+                    {
+                        PaymentId: paymentId,
+                        RebillId: user.tbankRebillId,
+                    }
+                );
+            } catch (chargeError) {
+                console.error(
+                    "TBank Premium charge result unknown:",
+                    {
+                        paymentId,
+                        code:
+                            chargeError?.code ||
+                            chargeError?.name ||
+                            "Error",
+                    }
+                );
+            }
+
+            let verified;
+
+            try {
+                verified = await requestTBank(
+                    "GetState",
+                    {
+                        PaymentId: paymentId,
+                    }
+                );
+            } catch (verificationError) {
+                return res.json({
+                    success: true,
+                    provider: "tbank",
+                    paymentId,
+                    paidBySavedCard: true,
+                    paymentProcessing: true,
+                    paid: false,
+                    status: "UNKNOWN",
+                });
+            }
+
+            if (
+                String(verified.PaymentId) !== paymentId ||
+                String(verified.OrderId) !== orderId ||
+                Number(verified.Amount) !== amountKopecks ||
+                String(verified.TerminalKey) !==
+                String(process.env.TBANK_TERMINAL_KEY)
+            ) {
+                throw new Error(
+                    "Не удалось подтвердить параметры платежа"
+                );
+            }
+
+            if (
+                ["REJECTED", "CANCELED", "AUTH_FAIL"]
+                    .includes(verified.Status)
+            ) {
+                return res.json({
+                    success: false,
+                    provider: "tbank",
+                    paymentId,
+                    paidBySavedCard: true,
+                    paymentProcessing: false,
+                    paid: false,
+                    status: verified.Status,
+                    error: "Не удалось оплатить сохранённой картой",
+                });
+            }
+
+            if (verified.Status === "CONFIRMED") {
+                const result = await applyConfirmedPayment({
+                    provider: "tbank",
+                    paymentId,
+                    userId,
+                    purpose: "premium",
+                    duration,
+                    amountKopecks,
+                });
+
+                if (!result.duplicate) {
+                    await req.logAction?.({
+                        req,
+                        actorUserId: userId,
+                        actorRole: "system",
+                        actionType: "premium_activated",
+                        entityType: "user",
+                        entityId: userId,
+                        paymentId,
+                        severity: "info",
+                        meta: {
+                            provider: "tbank",
+                            duration,
+                            activatedBy: "saved_card_payment",
+                        },
+                    });
+                }
+
+                return res.json({
+                    success: true,
+                    provider: "tbank",
+                    paymentId,
+                    paidBySavedCard: true,
+                    paymentProcessing: false,
+                    paid: true,
+                    status: verified.Status,
+                });
+            }
+
+            return res.json({
+                success: true,
+                provider: "tbank",
+                paymentId,
+                paidBySavedCard: true,
+                paymentProcessing: true,
+                paid: false,
+                status: verified.Status,
+            });
+        }
 
         return res.json({
             success: true,

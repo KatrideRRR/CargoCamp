@@ -14,7 +14,9 @@ import "../styles/ProfilePage.css";
 import "../styles/ProfilePageDark.css";
 import UserBenefitsSection from "../components/UserBenefitsSection";
 import UserIdentityVerification from "../components/UserIdentityVerification";
-import AgreementModal from "../components/AgreementModal";
+import {
+    CardBindingAgreement,
+} from "../components/AgreementModal";
 import YandexMapModal from "../components/YandexMapModal";
 import PaymentProviderSelect from "../components/PaymentProviderSelect";
 import SupportPhoneLink from "../components/SupportPhoneLink";
@@ -37,6 +39,8 @@ import {
     SectionCard,
     SettingsRow,
     LoadingState,
+    SheetScreen,
+    PaymentCardOption,
 } from "../components/ui";
 
 import {
@@ -187,8 +191,46 @@ const ProfilePage = () => {
     const [activeProfileSheet, setActiveProfileSheet] =
         useState(null);
 
+    const [cardScreen, setCardScreen] =
+        useState("main");
+
+    const [cardDirection, setCardDirection] =
+        useState(1);
+
+    const [autoCardSaving, setAutoCardSaving] =
+        useState(false);
+
+    const navigateCardScreen = (screen) => {
+        setCardDirection(1);
+        setCardScreen(screen);
+    };
+
+    const backCardScreen = () => {
+        setCardDirection(-1);
+
+        setCardScreen((current) =>
+            current === "agreement"
+                ? "bind"
+                : "main"
+        );
+
+        setCardAgreementChecked(false);
+    };
+
     const openProfileSheet = (sheet) => {
+        setCardScreen("main");
+        setCardDirection(1);
+
+        setPremiumDuration(null);
+        setPremiumPaymentMethod(null);
+        setPremiumDirection(1);
+
         setActiveProfileSheet(sheet);
+        setCardAgreementChecked(false);
+        setPremiumStep("plans");
+        setPremiumMode("redirect");
+        setPremiumProvider("yookassa");
+        setPremiumAgreementChecked(false);
     };
 
     const closeProfileSheet = () => {
@@ -196,8 +238,22 @@ const ProfilePage = () => {
     };
 
     const [showVerificationModal, setShowVerificationModal] = useState(false);
-    const [showAgreement, setShowAgreement] = useState(false);
-    const [showUnbindConfirm, setShowUnbindConfirm] = useState(false);
+    const [
+        cardAgreementChecked,
+        setCardAgreementChecked,
+    ] = useState(false);
+
+    const [
+        unbindCardId,
+        setUnbindCardId,
+    ] = useState(null);
+
+    const [
+        cardUnbinding,
+        setCardUnbinding,
+    ] = useState(false);
+
+    const cardUnbindingRef = useRef(false);
 
     const [showSuggestionModal, setShowSuggestionModal] = useState(false);
     const [suggestionText, setSuggestionText] = useState("");
@@ -264,7 +320,36 @@ const ProfilePage = () => {
     const [categoryPick, setCategoryPick] = useState([]);
     const [catSaving, setCatSaving] = useState(false);
 
-    const [selectedPremiumProvider, setSelectedPremiumProvider] = useState("yookassa");
+    const [premiumDuration, setPremiumDuration] =
+        useState(null);
+
+    const [premiumPaymentMethod, setPremiumPaymentMethod] =
+        useState(null);
+
+    const [premiumStep, setPremiumStep] =
+        useState("plans");
+
+    const [premiumMode, setPremiumMode] =
+        useState("redirect");
+
+    const [
+        premiumAgreementChecked,
+        setPremiumAgreementChecked,
+    ] = useState(false);
+
+    const [
+        premiumProvider,
+        setPremiumProvider,
+    ] = useState("yookassa");
+
+    const [premiumDirection, setPremiumDirection] =
+        useState(1);
+
+    const [premiumPayLoading, setPremiumPayLoading] =
+        useState(false);
+
+    const premiumPayRef = useRef(false);
+
     const [selectedDebtProvider, setSelectedDebtProvider] = useState("yookassa");
 
     const [
@@ -347,6 +432,50 @@ const ProfilePage = () => {
     const cardLastFourView = CARD_BIND_SCREENSHOT_MODE
         ? demoCardData.cardLastFour
         : profile?.cardLastFour;
+
+    const savedPaymentCards = [
+        ...(isCardBound
+            ? [
+                {
+                    id: "yookassa",
+                    title: [
+                        cardTypeView || "Банковская карта",
+                        cardLastFourView
+                            ? `•••• ${cardLastFourView}`
+                            : "",
+                    ]
+                        .filter(Boolean)
+                        .join(" "),
+                },
+            ]
+            : []),
+
+        ...(profile?.tbankCardBound
+            ? [
+                {
+                    id: "tbank",
+                    title:
+                        profile.tbankCardMask ||
+                        "Сохранённая карта",
+                },
+            ]
+            : []),
+    ];
+
+    const premiumAvailableCards =
+        savedPaymentCards.filter(
+            (card) => card.id === "yookassa"
+        );
+    const cardToUnbind =
+        savedPaymentCards.find(
+            (card) => card.id === unbindCardId
+        );
+
+    const autoCommissionCard =
+        savedPaymentCards.find(
+            (card) =>
+                card.id === profile?.autoCommissionProvider
+        );
 
     const fetchProfileData = async () => {
         const token = localStorage.getItem("authToken");
@@ -793,15 +922,23 @@ const ProfilePage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAuthenticated, navigate]);
 
+    const savedCategoryIds =
+        profile?.preferredCategoryIds;
+
     useEffect(() => {
-        if (!profile) return;
+        if (activeProfileSheet === "professions") {
+            return;
+        }
 
-        const ids = Array.isArray(profile.preferredCategoryIds)
-            ? profile.preferredCategoryIds
-            : [];
-
-        setCategoryPick(ids);
-    }, [profile]);
+        setCategoryPick(
+            Array.isArray(savedCategoryIds)
+                ? [...savedCategoryIds]
+                : []
+        );
+    }, [
+        savedCategoryIds,
+        activeProfileSheet,
+    ]);
 
     useEffect(() => {
         if (!profile) return;
@@ -1112,6 +1249,7 @@ const ProfilePage = () => {
                 ...prev,
                 preferredCategoryIds: res.data.preferredCategoryIds,
             }));
+            closeProfileSheet();
         } catch (e) {
             toast.error(e.response?.data?.message || "Не удалось сохранить");
         } finally {
@@ -1397,9 +1535,90 @@ const ProfilePage = () => {
         }
     };
 
-    const handleBuyPremium = async (duration) => {
+    const goToPremiumStep = (step) => {
+        setPremiumDirection(1);
+        setPremiumStep(step);
+    };
+
+    const goBackPremium = () => {
+        setPremiumDirection(-1);
+
+        setPremiumStep((current) => {
+            switch (current) {
+                case "agreement":
+                    return "provider";
+
+                case "provider":
+                    return "payment";
+
+                case "payment":
+                    return "plans";
+
+                default:
+                    return "plans";
+            }
+        });
+    };
+
+    const choosePremiumMode = (mode) => {
+        setPremiumMode(mode);
+        setPremiumAgreementChecked(false);
+        setPremiumProvider("yookassa");
+
+        goToPremiumStep("provider");
+    };
+
+    const handleBuyPremium = async ({
+                                        duration,
+                                        provider,
+                                        paymentMode,
+                                    }) => {
+        if (premiumPayRef.current) return;
+
+        if (!["7d", "30d"].includes(duration)) {
+            return;
+        }
+
+        if (
+            !["yookassa", "tbank"].includes(provider) ||
+            ![
+                "saved_card",
+                "redirect",
+                "redirect_bind",
+            ].includes(paymentMode)
+        ) {
+            toast.error("Неверный способ оплаты");
+            return;
+        }
+
+        if (
+            provider === "tbank" &&
+            paymentMode !== "redirect"
+        ) {
+            toast.error(
+                "Этот способ оплаты пока недоступен"
+            );
+
+            return;
+        }
+
+        if (
+            paymentMode === "redirect_bind" &&
+            !premiumAgreementChecked
+        ) {
+            toast.error(
+                "Подтвердите согласие с условиями"
+            );
+
+            return;
+        }
+
+        premiumPayRef.current = true;
+        setPremiumPayLoading(true);
+
         try {
-            const token = localStorage.getItem("authToken");
+            const token =
+                localStorage.getItem("authToken");
 
             if (!token) {
                 toast.error("Вы не авторизованы");
@@ -1407,13 +1626,16 @@ const ProfilePage = () => {
             }
 
             const endpoint =
-                selectedPremiumProvider === "tbank"
+                provider === "tbank"
                     ? "/api/tbank-payments/premium/create"
                     : "/api/payments/premium/create";
 
-            const res = await axios.post(
+            const response = await axios.post(
                 `${apiUrl}${endpoint}`,
-                { duration },
+                {
+                    duration,
+                    paymentMode,
+                },
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -1421,71 +1643,70 @@ const ProfilePage = () => {
                 }
             );
 
-            if (!res.data?.success) {
-                toast.error(res.data?.error || "Ошибка создания платежа");
+            const payment = response.data;
+
+            if (!payment?.success) {
+                toast.error(
+                    payment?.error ||
+                    "Не удалось создать платёж"
+                );
+
                 return;
             }
 
-            /**
-             * ✅ Оплата с привязанной карты.
-             */
-            if (res.data.paidBySavedCard) {
-                if (res.data.paid) {
-                    toast.success("Premium оплачен с привязанной карты ");
+            if (payment.paidBySavedCard) {
+                if (payment.paid) {
+                    toast.success(
+                        "Premium успешно оплачен"
+                    );
 
-                    try {
-                        const refreshed = await axios.get(`${apiUrl}/api/auth/profile`, {
-                            headers: { Authorization: `Bearer ${token}` },
-                        });
+                    closeProfileSheet();
 
-                        setProfile(refreshed.data);
-                        setPaymentMethodId(refreshed.data.yookassaPaymentMethodId || null);
-                    } catch (e) {
-                        console.error("profile refresh after premium pay error:", e);
-                    }
-
+                    await fetchProfileData();
                     return;
                 }
 
-                toast.info("Платёж с привязанной карты обрабатывается...");
+                toast.info(
+                    "Платёж обрабатывается. " +
+                    "Не повторяйте оплату до подтверждения."
+                );
 
-                setTimeout(async () => {
-                    try {
-                        const refreshed = await axios.get(`${apiUrl}/api/auth/profile`, {
-                            headers: { Authorization: `Bearer ${token}` },
-                        });
+                closeProfileSheet();
 
-                        setProfile(refreshed.data);
-                        setPaymentMethodId(refreshed.data.yookassaPaymentMethodId || null);
+                await fetchProfileData();
+                return;
+            }
 
-                        if (refreshed.data.subscriptionType === "premium") {
-                            toast.success("Premium активирован");
-                        } else {
-                            toast.info("Платёж ещё обрабатывается");
-                        }
-                    } catch (e) {
-                        console.error("profile refresh after premium processing error:", e);
-                    }
-                }, 2500);
+            if (!payment.confirmationUrl) {
+                toast.error(
+                    "Не получена ссылка на оплату"
+                );
 
                 return;
             }
 
-            /**
-             * ✅ Обычный redirect, если карты нет.
-             */
-            if (!res.data.confirmationUrl) {
-                toast.error("Ссылка на оплату не получена");
-                return;
-            }
+            await openPaymentPage(
+                payment.confirmationUrl
+            );
 
-            window.location.href = res.data.confirmationUrl;
-        } catch (e) {
-            console.error("handleBuyPremium error:", e);
-            toast.error(e.response?.data?.error || "Ошибка при оплате Premium");
+            closeProfileSheet();
+
+        } catch (error) {
+            console.error(
+                "Premium payment error:",
+                error
+            );
+
+            toast.error(
+                error.response?.data?.error ||
+                "Не удалось завершить запрос оплаты. " +
+                "Проверьте статус платежа перед повторной попыткой."
+            );
+        } finally {
+            premiumPayRef.current = false;
+            setPremiumPayLoading(false);
         }
     };
-
 
     const loadedProfileId = profile?.id;
 
@@ -1600,48 +1821,29 @@ const ProfilePage = () => {
         }
     };
 
-    const handleUnbindTBankCard = async () => {
+    const handleAutoProviderChange = async (provider) => {
+        if (autoCardSaving) return;
+
         if (
-            !window.confirm(
-                "Отвязать карту Т-Банка?"
+            provider !== "none" &&
+            !savedPaymentCards.some(
+                (card) => card.id === provider
             )
         ) {
+            toast.error("Сохранённая карта недоступна");
             return;
         }
 
         try {
+            setAutoCardSaving(true);
+
             const token =
                 localStorage.getItem("authToken");
 
-            await axios.post(
-                `${apiUrl}/api/payment-cards/tbank/unbind`,
-                {},
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
-
-            await fetchProfileData();
-
-            toast.success("Карта Т-Банка отвязана");
-        } catch (error) {
-            toast.error(
-                error.response?.data?.error ||
-                "Не удалось отвязать карту"
-            );
-
-            await fetchProfileData();
-        }
-    };
-
-    const handleAutoProviderChange = async (event) => {
-        const provider = event.target.value;
-
-        try {
-            const token =
-                localStorage.getItem("authToken");
+            if (!token) {
+                toast.error("Вы не авторизованы");
+                return;
+            }
 
             await axios.post(
                 `${apiUrl}/api/payment-cards/auto-provider`,
@@ -1658,11 +1860,15 @@ const ProfilePage = () => {
             toast.success(
                 "Настройка автоматической комиссии сохранена"
             );
+
+            backCardScreen();
         } catch (error) {
             toast.error(
                 error.response?.data?.error ||
                 "Не удалось сохранить настройку"
             );
+        } finally {
+            setAutoCardSaving(false);
         }
     };
 
@@ -1726,24 +1932,47 @@ const ProfilePage = () => {
         }
     };
 
-    const handleUnbindCard = async () => {
-        if (CARD_BIND_SCREENSHOT_MODE) {
-            setDemoCardBound(false);
-            setShowUnbindConfirm(false);
-            toast.success("Карта удалена");
+    const handleUnbindSavedCard = async () => {
+        if (
+            cardUnbindingRef.current ||
+            !cardToUnbind
+        ) {
             return;
         }
 
+        cardUnbindingRef.current = true;
+        setCardUnbinding(true);
+
         try {
-            const token = localStorage.getItem("authToken");
+            if (
+                CARD_BIND_SCREENSHOT_MODE &&
+                unbindCardId === "yookassa"
+            ) {
+                setDemoCardBound(false);
+
+                toast.success("Карта удалена");
+
+                setUnbindCardId(null);
+                backCardScreen();
+
+                return;
+            }
+
+            const token =
+                localStorage.getItem("authToken");
 
             if (!token) {
                 toast.error("Вы не авторизованы");
                 return;
             }
 
-            const res = await axios.post(
-                `${apiUrl}/api/payments/card/unbind`,
+            const endpoint =
+                unbindCardId === "tbank"
+                    ? "/api/payment-cards/tbank/unbind"
+                    : "/api/payments/card/unbind";
+
+            const response = await axios.post(
+                `${apiUrl}${endpoint}`,
                 {},
                 {
                     headers: {
@@ -1752,35 +1981,47 @@ const ProfilePage = () => {
                 }
             );
 
-            if (res.data?.success) {
-                toast.success("Карта успешно удалена");
-
-                setPaymentMethodId(null);
-
-                setProfile((prev) => ({
-                    ...prev,
-                    yookassaPaymentMethodId: null,
-                    cardLastFour: null,
-                    cardType: null,
-                }));
-
-                setShowUnbindConfirm(false);
-            } else {
-                toast.error(res.data?.error || "Ошибка при удалении карты");
+            if (response.data?.success === false) {
+                throw new Error(
+                    response.data?.error ||
+                    "Не удалось отвязать карту"
+                );
             }
-        } catch (e) {
-            console.error("unbind error:", e);
-            toast.error("Сервер не отвечает");
+
+            await fetchProfileData();
+
+            toast.success(
+                "Банковская карта отвязана"
+            );
+
+            setUnbindCardId(null);
+
+            backCardScreen();
+
+        } catch (error) {
+            toast.error(
+                error.response?.data?.error ||
+                error.message ||
+                "Не удалось отвязать карту"
+            );
+        } finally {
+            cardUnbindingRef.current = false;
+            setCardUnbinding(false);
         }
     };
 
-    const handleAgree = () => {
-        setShowAgreement(false);
+    const handleAgree = async () => {
+        if (
+            !cardAgreementChecked ||
+            cardBindingRef.current
+        ) {
+            return;
+        }
 
         if (pendingBindProvider === "tbank") {
-            handleBindTBankCard();
+            await handleBindTBankCard();
         } else {
-            handleBindCard();
+            await handleBindCard();
         }
     };
 
@@ -2081,7 +2322,7 @@ const ProfilePage = () => {
                     <SettingsRow
                         icon={<CreditCard />}
                         title="Банковские карты"
-                        description="ЮKassa и Т-Банк"
+                        description="Управление способами оплаты"
                         value={
                             isCardBound || profile?.tbankCardBound
                                 ? "Привязаны"
@@ -2102,16 +2343,7 @@ const ProfilePage = () => {
                         title="Задолженность"
                         value={`${(debtAmount / 100).toFixed(2)} ₽`}
                         variant={hasDebt ? "danger" : "default"}
-                        onClick={
-                            hasDebt
-                                ? () => {
-                                    debtSectionRef.current?.scrollIntoView({
-                                        behavior: "smooth",
-                                        block: "center",
-                                    });
-                                }
-                                : undefined
-                        }
+                        onClick={() => openProfileSheet("debt")}
                     />
                 </SectionCard>
 
@@ -2734,243 +2966,575 @@ const ProfilePage = () => {
             <BottomSheet
                 open={activeProfileSheet === "cards"}
                 onClose={closeProfileSheet}
-                title="Банковские карты"
-                description="Управление сохранёнными картами и автоматической оплатой комиссии"
-                busy={cardBinding}
+                title={
+                    {
+                        main: "Банковские карты",
+                        bind: "Привязать карту",
+                        agreement: "Соглашение",
+                        auto: "Автоматическое списание",
+                        unbind: "Отвязать карту",
+                    }[cardScreen] || "Банковские карты"
+                }
+                busy={
+                    cardBinding ||
+                    autoCardSaving ||
+                    cardUnbinding
+                }
             >
-                <div className="cc-profile-sheet-stack">
+                <SheetScreen
+                    screen={cardScreen}
+                    direction={cardDirection}
+                    busy={
+                        cardBinding ||
+                        autoCardSaving ||
+                        cardUnbinding
+                    }
+                    onBack={
+                        cardScreen !== "main"
+                            ? backCardScreen
+                            : undefined
+                    }
+                >
+                    <div className="cc-profile-sheet-stack">
 
-                    <div className="cc-profile-payment-card">
-
-                        <div className="cc-profile-payment-card__head">
-                            <div className="cc-profile-payment-icon">
-                                <CreditCard size={24} />
-                            </div>
-
-                            <div className="cc-profile-payment-card__info">
-                                <strong>ЮKassa</strong>
-
-                                <span>
-                        {isCardBound
-                            ? "Карта привязана"
-                            : "Карта не привязана"}
-                    </span>
-                            </div>
-                        </div>
-
-                        {isCardBound ? (
+                        {cardScreen === "main" && (
                             <>
-                                <div className="cc-profile-card-mask">
-                                    {cardTypeView || "Банковская карта"}
-                                    {" "}
-                                    •••• {cardLastFourView}
-                                </div>
+                                {savedPaymentCards.length === 0 && (
+                                    <p className="cc-profile-note">
+                                        У вас пока нет сохранённых карт.
+                                    </p>
+                                )}
+
+                                {savedPaymentCards.map((card) => (
+                                    <div
+                                        key={card.id}
+                                        className="cc-profile-payment-card"
+                                    >
+                                        <div className="cc-profile-card-mask">
+                                            {card.title}
+                                        </div>
+
+                                        <Button
+                                            variant="outline"
+                                            fullWidth
+                                            onClick={() => {
+                                                setUnbindCardId(card.id);
+
+                                                navigateCardScreen("unbind");
+                                            }}
+                                        >
+                                            Отвязать
+                                        </Button>
+                                    </div>
+                                ))}
 
                                 <Button
-                                    variant="outline"
                                     fullWidth
-                                    onClick={() => {
-                                        closeProfileSheet();
-                                        setShowUnbindConfirm(true);
-                                    }}
-                                >
-                                    Отвязать
-                                </Button>
-                            </>
-                        ) : (
-                            <Button
-                                fullWidth
-                                loading={cardBinding}
-                                onClick={() => {
-                                    if (CARD_BIND_SCREENSHOT_MODE) {
-                                        handleBindCard();
-                                        return;
+                                    onClick={() =>
+                                        navigateCardScreen("bind")
                                     }
+                                >
+                                    + Привязать карту
+                                </Button>
 
-                                    closeProfileSheet();
+                                <div className="cc-profile-payment-card">
 
-                                    setPendingBindProvider("yookassa");
+                                    <h3 className="cc-profile-section-title">
+                                        Автоматическое списание комиссии
+                                    </h3>
 
-                                    setShowAgreement(true);
-                                }}
-                            >
-                                + Привязать карту
-                            </Button>
+                                    <p className="cc-profile-note">
+                                        Выберите сохранённую карту для
+                                        автоматического списания комиссии
+                                        за услуги CargoCamp.
+                                    </p>
+
+                                    <PaymentCardOption
+                                        title={
+                                            autoCommissionCard?.title ||
+                                            "Не списывать автоматически"
+                                        }
+                                        selectable={false}
+                                        showChevron
+                                        onClick={() =>
+                                            navigateCardScreen("auto")
+                                        }
+                                    />
+
+                                </div>
+                            </>
                         )}
 
-                        {CARD_BIND_SCREENSHOT_MODE && (
-                            <p className="cc-profile-note">
-                                Демо-режим для скриншотов:
-                                операции выполняются без реального
-                                запроса в ЮKassa.
-                            </p>
-                        )}
-                    </div>
-
-                    <div className="cc-profile-payment-card">
-
-                        <div className="cc-profile-payment-card__head">
-                            <div className="cc-profile-payment-icon cc-profile-payment-icon--tbank">
-                                <CreditCard size={24} />
-                            </div>
-
-                            <div className="cc-profile-payment-card__info">
-                                <strong>Т-Банк</strong>
-
-                                <span>
-                        {profile?.tbankCardBound
-                            ? "Карта привязана"
-                            : "Карта не привязана"}
-                    </span>
-                            </div>
-                        </div>
-
-                        {profile?.tbankCardBound ? (
+                        {cardScreen === "bind" && (
                             <>
-                                <div className="cc-profile-card-mask">
-                                    {profile.tbankCardMask ||
-                                        "Карта Т-Банка"}
+                                <p className="cc-profile-note">
+                                    Выберите способ безопасной
+                                    привязки банковской карты.
+                                </p>
+
+                                <PaymentCardOption
+                                    title="ЮKassa"
+                                    description={
+                                        isCardBound
+                                            ? "Карта уже привязана"
+                                            : "Привязать банковскую карту"
+                                    }
+                                    selectable={false}
+                                    showChevron
+                                    disabled={isCardBound}
+                                    onClick={() => {
+                                        if (CARD_BIND_SCREENSHOT_MODE) {
+                                            handleBindCard();
+                                            backCardScreen();
+                                            return;
+                                        }
+
+                                        setPendingBindProvider("yookassa");
+
+                                        setCardAgreementChecked(false);
+                                        navigateCardScreen("agreement");
+                                    }}
+                                />
+
+                                <PaymentCardOption
+                                    title="Т-Банк"
+                                    description={
+                                        profile?.tbankCardBound
+                                            ? "Карта уже привязана"
+                                            : "Привязать банковскую карту"
+                                    }
+                                    selectable={false}
+                                    showChevron
+                                    disabled={!!profile?.tbankCardBound}
+                                    onClick={() => {
+                                        setPendingBindProvider("tbank");
+
+                                        setCardAgreementChecked(false);
+                                        navigateCardScreen("agreement");
+                                    }}
+                                />
+                            </>
+                        )}
+
+                        {cardScreen === "agreement" && (
+                            <>
+                                <CardBindingAgreement
+                                    checked={cardAgreementChecked}
+                                    onCheckedChange={
+                                        setCardAgreementChecked
+                                    }
+                                    disabled={cardBinding}
+                                />
+
+                                <Button
+                                    fullWidth
+                                    loading={cardBinding}
+                                    disabled={!cardAgreementChecked}
+                                    onClick={handleAgree}
+                                >
+                                    Подтвердить и привязать карту
+                                </Button>
+                            </>
+                        )}
+
+                        {cardScreen === "unbind" && (
+                            <>
+
+                                <div className="cc-profile-payment-card">
+
+                                    <div className="cc-profile-card-mask">
+                                        {cardToUnbind?.title ||
+                                            "Банковская карта"}
+                                    </div>
+
+                                    <p className="cc-profile-note">
+                                        После отвязки карта больше не будет
+                                        использоваться для быстрых платежей
+                                        и автоматической оплаты комиссии.
+                                    </p>
+
                                 </div>
 
                                 <Button
-                                    variant="outline"
+                                    variant="danger"
                                     fullWidth
-                                    onClick={handleUnbindTBankCard}
+                                    loading={cardUnbinding}
+                                    disabled={!cardToUnbind}
+                                    onClick={handleUnbindSavedCard}
                                 >
-                                    Отвязать
+                                    Отвязать карту
                                 </Button>
+
+                                <Button
+                                    variant="secondary"
+                                    fullWidth
+                                    disabled={cardUnbinding}
+                                    onClick={backCardScreen}
+                                >
+                                    Отмена
+                                </Button>
+
                             </>
-                        ) : (
-                            <Button
-                                fullWidth
-                                loading={cardBinding}
-                                onClick={() => {
-                                    closeProfileSheet();
-
-                                    setPendingBindProvider("tbank");
-
-                                    setShowAgreement(true);
-                                }}
-                            >
-                                + Привязать через Т-Банк
-                            </Button>
                         )}
+
+                        {cardScreen === "auto" && (
+                            <>
+                                <PaymentCardOption
+                                    title="Не списывать автоматически"
+                                    selected={
+                                        !autoCommissionCard
+                                    }
+                                    disabled={autoCardSaving}
+                                    onClick={() =>
+                                        handleAutoProviderChange("none")
+                                    }
+                                />
+
+                                {savedPaymentCards.map((card) => (
+                                    <PaymentCardOption
+                                        key={card.id}
+                                        title={card.title}
+                                        description="Сохранённая карта"
+                                        selected={
+                                            autoCommissionCard?.id === card.id
+                                        }
+                                        disabled={autoCardSaving}
+                                        onClick={() =>
+                                            handleAutoProviderChange(card.id)
+                                        }
+                                    />
+                                ))}
+
+                                {savedPaymentCards.length === 0 && (
+                                    <p className="cc-profile-note">
+                                        Для автоматической оплаты
+                                        сначала привяжите карту.
+                                    </p>
+                                )}
+                            </>
+                        )}
+
                     </div>
-
-                    <div className="cc-profile-payment-card">
-                        <h3 className="cc-profile-section-title">
-                            Автоматическое списание комиссии
-                        </h3>
-
-                        <p className="cc-profile-note">
-                            Выберите банк, через который CargoCamp
-                            сможет списывать комиссию за выполненные
-                            заказы. Другой банк автоматически
-                            использоваться не будет.
-                        </p>
-
-                        <select
-                            className="cc-profile-select"
-                            aria-label="Автоматическое списание комиссии"
-                            value={
-                                profile?.autoCommissionProvider ||
-                                "none"
-                            }
-                            disabled={cardBinding}
-                            onChange={handleAutoProviderChange}
-                        >
-                            <option value="none">
-                                Не списывать автоматически
-                            </option>
-
-                            <option
-                                value="yookassa"
-                                disabled={!isCardBound}
-                            >
-                                ЮKassa
-                            </option>
-
-                            <option
-                                value="tbank"
-                                disabled={!profile?.tbankCardBound}
-                            >
-                                Т-Банк
-                            </option>
-                        </select>
-                    </div>
-
-                </div>
+                </SheetScreen>
             </BottomSheet>
 
             <BottomSheet
                 open={activeProfileSheet === "premium"}
                 onClose={closeProfileSheet}
-                title="CargoCamp Premium"
-                description={subscriptionLabel}
+                title={
+                    {
+                        plans: "CargoCamp Premium",
+                        payment: "Оплата Premium",
+                        provider: "Способ оплаты",
+                        agreement: "Соглашение",
+                    }[premiumStep]
+                }
+                description={
+                    premiumStep === "plans"
+                        ? subscriptionLabel
+                        : undefined
+                }
+                busy={premiumPayLoading}
             >
-                <div className="cc-profile-sheet-stack">
+                <SheetScreen
+                    screen={premiumStep}
+                    direction={premiumDirection}
+                    busy={premiumPayLoading}
+                    onBack={
+                        premiumStep !== "plans"
+                            ? goBackPremium
+                            : undefined
+                    }
+                >
+                    <div className="cc-profile-sheet-stack">
 
-                    <div className="cc-profile-premium-intro">
-                        <div className="cc-profile-premium-icon">
-                            <Sparkles size={28} />
-                        </div>
+                        {premiumStep === "plans" && (
+                            <>
+                                <div className="cc-profile-premium-intro">
+                                    <div className="cc-profile-premium-icon">
+                                        <Sparkles size={28} />
+                                    </div>
 
-                        <h3>
-                            Работайте без комиссии
-                        </h3>
+                                    <h3>Работайте без комиссии</h3>
 
-                        <p>
-                            Premium для исполнителей —
-                            работа без комиссии по условиям подписки.
-                        </p>
+                                    <p>
+                                        По условиям подписки
+                                        CargoCamp Premium.
+                                    </p>
+                                </div>
+
+                                {[
+                                    {
+                                        id: "7d",
+                                        title: "На 7 дней",
+                                        price: "2 500 ₽",
+                                    },
+                                    {
+                                        id: "30d",
+                                        title: "На 30 дней",
+                                        price: "9 000 ₽",
+                                    },
+                                ].map((plan) => (
+                                    <button
+                                        key={plan.id}
+                                        type="button"
+                                        className="cc-premium-plan-option"
+                                        onClick={() => {
+                                            setPremiumDuration(plan.id);
+
+                                            setPremiumPaymentMethod(
+                                                null
+                                            );
+
+                                            goToPremiumStep(
+                                                "payment"
+                                            );
+                                        }}
+                                    >
+                                        <div>
+                                <span>
+                                    {plan.title}
+                                </span>
+
+                                            <strong>
+                                                {plan.price}
+                                            </strong>
+                                        </div>
+
+                                        <ChevronRight
+                                            size={22}
+                                            aria-hidden="true"
+                                        />
+                                    </button>
+                                ))}
+                            </>
+                        )}
+
+                        {premiumStep !== "plans" && (
+                            <div className="cc-profile-premium-plan">
+                                <div className="cc-profile-premium-plan__duration">
+                                    Premium на {
+                                    premiumDuration === "7d"
+                                        ? "7 дней"
+                                        : "30 дней"
+                                }
+                                </div>
+
+                                <div className="cc-profile-premium-plan__price">
+                                    {premiumDuration === "7d"
+                                        ? "2 500 ₽"
+                                        : "9 000 ₽"}
+                                </div>
+                            </div>
+                        )}
+
+                        {premiumStep === "payment" && (
+                            <>
+                                {premiumAvailableCards.map(
+                                    (card) => (
+                                        <PaymentCardOption
+                                            key={card.id}
+                                            title={
+                                                "Оплатить привязанной картой"
+                                            }
+                                            description={card.title}
+                                            selected={
+                                                premiumPaymentMethod ===
+                                                card.id
+                                            }
+                                            disabled={
+                                                premiumPayLoading
+                                            }
+                                            onClick={() => {
+                                                setPremiumPaymentMethod(
+                                                    card.id
+                                                );
+                                            }}
+                                        />
+                                    )
+                                )}
+
+                                {premiumAvailableCards.length > 0 && (
+                                    <Button
+                                        fullWidth
+                                        loading={premiumPayLoading}
+                                        disabled={
+                                            !premiumPaymentMethod
+                                        }
+                                        onClick={() =>
+                                            handleBuyPremium({
+                                                duration:
+                                                premiumDuration,
+
+                                                provider:
+                                                premiumPaymentMethod,
+
+                                                paymentMode:
+                                                    "saved_card",
+                                            })
+                                        }
+                                    >
+                                        Оплатить {
+                                        premiumDuration === "7d"
+                                            ? "2 500 ₽"
+                                            : "9 000 ₽"
+                                    }
+                                    </Button>
+                                )}
+
+                                <Button
+                                    fullWidth
+                                    variant={
+                                        premiumAvailableCards.length
+                                            ? "secondary"
+                                            : "primary"
+                                    }
+                                    disabled={premiumPayLoading}
+                                    onClick={() =>
+                                        choosePremiumMode(
+                                            "redirect"
+                                        )
+                                    }
+                                >
+                                    {savedPaymentCards.length
+                                        ? "Оплатить другой картой"
+                                        : "Оплатить без привязки"}
+                                </Button>
+
+                                {savedPaymentCards.length === 0 && (
+                                    <Button
+                                        variant="secondary"
+                                        fullWidth
+                                        disabled={
+                                            premiumPayLoading
+                                        }
+                                        onClick={() =>
+                                            choosePremiumMode(
+                                                "redirect_bind"
+                                            )
+                                        }
+                                    >
+                                        Оплатить и привязать карту
+                                    </Button>
+                                )}
+                            </>
+                        )}
+
+                        {premiumStep === "provider" && (
+                            <>
+                                <PaymentCardOption
+                                    title="ЮKassa"
+                                    description="Оплата банковской картой"
+                                    selected={
+                                        premiumProvider === "yookassa"
+                                    }
+                                    disabled={premiumPayLoading}
+                                    onClick={() =>
+                                        setPremiumProvider(
+                                            "yookassa"
+                                        )
+                                    }
+                                />
+
+                                <PaymentCardOption
+                                    title="Т-Банк"
+                                    description={
+                                        premiumMode === "redirect_bind"
+                                            ? "Оплата с привязкой пока недоступна"
+                                            : "Оплата банковской картой"
+                                    }
+                                    selected={
+                                        premiumProvider === "tbank"
+                                    }
+                                    disabled={
+                                        premiumPayLoading ||
+                                        premiumMode === "redirect_bind"
+                                    }
+                                    onClick={() =>
+                                        setPremiumProvider(
+                                            "tbank"
+                                        )
+                                    }
+                                />
+
+                                <Button
+                                    fullWidth
+                                    loading={premiumPayLoading}
+                                    onClick={() => {
+                                        if (
+                                            premiumMode ===
+                                            "redirect_bind"
+                                        ) {
+                                            goToPremiumStep(
+                                                "agreement"
+                                            );
+
+                                            return;
+                                        }
+
+                                        handleBuyPremium({
+                                            duration:
+                                            premiumDuration,
+
+                                            provider:
+                                            premiumProvider,
+
+                                            paymentMode:
+                                                "redirect",
+                                        });
+                                    }}
+                                >
+                                    {premiumMode === "redirect_bind"
+                                        ? "Продолжить"
+                                        : `Оплатить ${
+                                            premiumDuration === "7d"
+                                                ? "2 500 ₽"
+                                                : "9 000 ₽"
+                                        }`}
+                                </Button>
+                            </>
+                        )}
+
+                        {premiumStep === "agreement" && (
+                            <>
+                                <CardBindingAgreement
+                                    checked={
+                                        premiumAgreementChecked
+                                    }
+                                    onCheckedChange={
+                                        setPremiumAgreementChecked
+                                    }
+                                    disabled={
+                                        premiumPayLoading
+                                    }
+                                />
+
+                                <Button
+                                    fullWidth
+                                    loading={premiumPayLoading}
+                                    disabled={
+                                        !premiumAgreementChecked
+                                    }
+                                    onClick={() =>
+                                        handleBuyPremium({
+                                            duration:
+                                            premiumDuration,
+
+                                            provider:
+                                            premiumProvider,
+
+                                            paymentMode:
+                                                "redirect_bind",
+                                        })
+                                    }
+                                >
+                                    Оплатить и привязать карту
+                                </Button>
+                            </>
+                        )}
+
                     </div>
-
-                    <PaymentProviderSelect
-                        title="Способ оплаты Premium"
-                        selectedProvider={selectedPremiumProvider}
-                        onSelect={setSelectedPremiumProvider}
-                        disabled={loading}
-                    />
-
-                    <div className="cc-profile-premium-plan">
-                        <div>
-                            <div className="cc-profile-premium-plan__duration">
-                                Premium на 7 дней
-                            </div>
-
-                            <div className="cc-profile-premium-plan__price">
-                                2 500 ₽
-                            </div>
-                        </div>
-
-                        <Button
-                            fullWidth
-                            onClick={() => handleBuyPremium("7d")}
-                        >
-                            Купить на 7 дней
-                        </Button>
-                    </div>
-
-                    <div className="cc-profile-premium-plan">
-                        <div>
-                            <div className="cc-profile-premium-plan__duration">
-                                Premium на 30 дней
-                            </div>
-
-                            <div className="cc-profile-premium-plan__price">
-                                9 000 ₽
-                            </div>
-                        </div>
-
-                        <Button
-                            fullWidth
-                            onClick={() => handleBuyPremium("30d")}
-                        >
-                            Купить на 30 дней
-                        </Button>
-                    </div>
-
-                </div>
+                </SheetScreen>
             </BottomSheet>
 
             <BottomSheet
@@ -3058,6 +3622,70 @@ const ProfilePage = () => {
                     )}
 
                 </div>
+            </BottomSheet>
+
+            <BottomSheet
+                open={activeProfileSheet === "debt"}
+                onClose={closeProfileSheet}
+                title="Задолженность"
+                busy={debtPayLoading}
+            >
+                {hasDebt ? (
+                    <div className="cc-profile-sheet-stack">
+
+                        <div className="cc-profile-debt__title">
+                            Задолженность по комиссии
+                        </div>
+
+                        <div className="cc-profile-debt__amount">
+                            {(debtAmount / 100).toFixed(2)} ₽
+                        </div>
+
+                        <PaymentProviderSelect
+                            title="Способ погашения"
+                            selectedProvider={selectedDebtProvider}
+                            onSelect={setSelectedDebtProvider}
+                            disabled={debtPayLoading}
+                        />
+
+                        <Button
+                            variant="danger"
+                            fullWidth
+                            loading={debtPayLoading}
+                            onClick={handlePayDebt}
+                        >
+                            Оплатить задолженность
+                        </Button>
+
+                    </div>
+                ) : (
+                    <div className="cc-profile-sheet-stack">
+
+                        <div className="cc-profile-debt-free">
+                            <ShieldCheck
+                                size={40}
+                                aria-hidden="true"
+                            />
+
+                            <h3>Задолженности нет</h3>
+
+                            <strong>0 ₽</strong>
+
+                            <p>
+                                У вас нет неоплаченных комиссий
+                                CargoCamp.
+                            </p>
+                        </div>
+
+                        <Button
+                            fullWidth
+                            onClick={closeProfileSheet}
+                        >
+                            Понятно
+                        </Button>
+
+                    </div>
+                )}
             </BottomSheet>
 
             {showSuggestionModal && (
@@ -3167,15 +3795,6 @@ const ProfilePage = () => {
                 </div>
             )}
 
-            {showAgreement && (
-                <AgreementModal
-                    isOpen={showAgreement}
-                    onClose={() => setShowAgreement(false)}
-                    onAgree={handleAgree}
-                    onCancel={() => setShowAgreement(false)}
-                />
-            )}
-
             {showVerificationModal && (
                 <div
                     className="modal-overlay"
@@ -3229,52 +3848,6 @@ const ProfilePage = () => {
                             >
                                 Закрыть
                             </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {showUnbindConfirm && (
-                <div
-                    className="modal-overlay"
-                    onClick={() => setShowUnbindConfirm(false)}
-                >
-                    <div
-                        className="modal-window modal-window-compact"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <h3>Удалить карту?</h3>
-
-                        <div className="modal-content">
-                            <p>
-                                Вы уверены, что хотите отвязать сохранённую
-                                карту{" "}
-                                <strong>
-                                    {cardTypeView} •••• {cardLastFourView}
-                                </strong>
-                                ?
-                            </p>
-
-                            <p className="warning">
-                                После удаления карта больше не будет
-                                использоваться для быстрых платежей.
-                            </p>
-
-                            <div className="modal-actions-row">
-                                <button
-                                    className="btn btn-ghost"
-                                    onClick={() => setShowUnbindConfirm(false)}
-                                >
-                                    Отмена
-                                </button>
-
-                                <button
-                                    className="btn btn-danger"
-                                    onClick={handleUnbindCard}
-                                >
-                                    Удалить карту
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>
