@@ -437,6 +437,54 @@ async function setupOrdersMocks(page, options = {}) {
     });
 }
 
+async function openAvailableOrder(page, orderText) {
+    const card = page
+        .locator(".cc-available-order")
+        .filter({
+            hasText: orderText,
+        });
+
+    await expect(card).toBeVisible();
+
+    await card.locator(
+        ".cc-available-order__button"
+    ).click();
+
+    const dialog = page.getByRole(
+        "dialog",
+        {
+            name: "Подробности заказа",
+            exact: true,
+        }
+    );
+
+    await expect(dialog).toBeVisible();
+
+    await expect(dialog).toContainText(
+        orderText
+    );
+
+    return dialog;
+}
+
+async function openDetailsFromCard(page, card) {
+    await card.locator(
+        ".cc-available-order__button"
+    ).click();
+
+    const dialog = page.getByRole(
+        "dialog",
+        {
+            name: "Подробности заказа",
+            exact: true,
+        }
+    );
+
+    await expect(dialog).toBeVisible();
+
+    return dialog;
+}
+
 async function openOrdersPage(page, options = {}) {
     await setFakeAuth(page, options.profileBody || viewer);
     await setupOrdersMocks(page, options);
@@ -467,7 +515,12 @@ function orderCard(page, text) {
 async function openFilters(page) {
     await page.getByRole("button", { name: /Фильтры/i }).click();
 
-    await expect(page.locator(".drawer")).toBeVisible({
+    await expect(
+        page.getByRole("dialog", {
+            name: "Фильтры",
+            exact: true,
+        })
+    ).toBeVisible({
         timeout: 10000,
     });
 }
@@ -475,7 +528,24 @@ async function openFilters(page) {
 async function openRequestModal(page, cardText = "Заказ №101") {
     const card = orderCard(page, cardText);
 
-    await card.getByRole("button", { name: "Запросить выполнение" }).click();
+    await card.locator(
+        ".cc-available-order__button"
+    ).click();
+
+    const details = page.getByRole(
+        "dialog",
+        {
+            name: "Подробности заказа",
+            exact: true,
+        }
+    );
+
+    await expect(details).toBeVisible();
+
+    await details.getByRole("button", {
+        name: "Запросить выполнение",
+        exact: true,
+    }).click();
 
     await expect(page.locator(".request-order-content")).toBeVisible({
         timeout: 10000,
@@ -559,8 +629,20 @@ test.describe("OrdersPage", () => {
                 "Заказ №101"
             );
 
+        await card.locator(
+            ".cc-available-order__button"
+        ).click();
+
+        const details = page.getByRole("dialog", {
+            name: "Подробности заказа",
+            exact: true,
+        });
+
+        await expect(details).toBeVisible();
+
+
             await expect(
-                card.getByRole(
+                details.getByRole(
                     "button",
                     {
                         name: "Запросить выполнение",
@@ -569,7 +651,7 @@ test.describe("OrdersPage", () => {
             ).toBeDisabled();
 
             await expect(
-                card.locator(".blocked-order-hint")
+                details.locator(".blocked-order-hint")
             ).toContainText(
                 "активный экспресс-заказ"
             );
@@ -594,8 +676,20 @@ test.describe("OrdersPage", () => {
                 "Экспресс №201"
             );
 
+        await card.locator(
+            ".cc-available-order__button"
+        ).click();
+
+        const details = page.getByRole("dialog", {
+            name: "Подробности заказа",
+            exact: true,
+        });
+
+        await expect(details).toBeVisible();
+
+
             await expect(
-                card.getByRole(
+                details.getByRole(
                     "button",
                     {
                         name: "Принять",
@@ -604,7 +698,7 @@ test.describe("OrdersPage", () => {
             ).toBeDisabled();
 
             await expect(
-                card.locator(".blocked-order-hint")
+                details.locator(".blocked-order-hint")
             ).toContainText(
                 "активный обычный заказ"
             );
@@ -655,41 +749,188 @@ test.describe("OrdersPage", () => {
     test("свой заказ показывает с бейджем Мой заказ и без кнопки запроса", async ({ page }) => {
         const card = orderCard(page, "Заказ №104");
 
+        await card.locator(
+            ".cc-available-order__button"
+        ).click();
+
+        const details = page.getByRole("dialog", {
+            name: "Подробности заказа",
+            exact: true,
+        });
+
+        await expect(details).toBeVisible();
+
+
         await expect(card).toContainText("Мой заказ");
-        await expect(card.getByRole("button", { name: "Запросить выполнение" })).not.toBeVisible();
+        await expect(details.getByRole("button", { name: "Запросить выполнение" })).not.toBeVisible();
     });
 
     test("чужой обычный pending заказ можно запросить", async ({ page }) => {
         const card = orderCard(page, "Заказ №101");
 
-        await expect(card).toHaveClass(/can-take/);
-        await expect(card).toContainText("Можно взять");
-        await expect(card.getByRole("button", { name: "Запросить выполнение" })).toBeVisible();
-    });
+        await card.locator(
+            ".cc-available-order__button"
+        ).click();
 
-    test("переходит в детальную страницу обычного заказа", async ({ page }) => {
-        const card = orderCard(page, "Заказ №101");
-
-        await card.getByRole("button", { name: "Открыть" }).click();
-
-        await expect(page).toHaveURL(/\/order\/101/);
-    });
-
-    test("переходит в детальную страницу express-заказа", async ({ page }) => {
-        const card = orderCard(page, "Экспресс №201");
-
-        await card.getByRole("button", {
-            name: "Открыть",
+        const details = page.getByRole("dialog", {
+            name: "Подробности заказа",
             exact: true,
-        }).click();
+        });
 
-        await expect(page).toHaveURL(/\/express-order\/201/);
+        await expect(details).toBeVisible();
+
+
+        await expect(details.locator(".order-card")).toHaveClass(/can-take/);
+        await expect(details).toContainText("Можно взять");
+        await expect(details.getByRole("button", { name: "Запросить выполнение" })).toBeVisible();
     });
+
+    test(
+        "открывает подробности обычного заказа без перехода",
+        async ({ page }) => {
+            const previousUrl = page.url();
+
+            const dialog = await openAvailableOrder(
+                page,
+                "Заказ №101"
+            );
+
+            await expect(dialog)
+                .toContainText("500 ₽");
+
+            await expect(page)
+                .toHaveURL(previousUrl);
+
+            await dialog.getByRole("button", {
+                name: "Закрыть",
+                exact: true,
+            }).click();
+
+            await expect(dialog)
+                .not.toBeVisible();
+
+            await expect(page)
+                .toHaveURL(previousUrl);
+        }
+    );
+
+    test(
+        "открывает подробности экспресс-заказа без перехода",
+        async ({ page }) => {
+            const previousUrl = page.url();
+
+            const dialog = await openAvailableOrder(
+                page,
+                "Экспресс №201"
+            );
+
+            await expect(dialog)
+                .toContainText("700 ₽");
+
+            await expect(page)
+                .toHaveURL(previousUrl);
+
+            await dialog.getByRole("button", {
+                name: "Закрыть",
+                exact: true,
+            }).click();
+
+            await expect(dialog)
+                .not.toBeVisible();
+        }
+    );
+
+    test(
+        "показывает предварительную комиссию исполнителя",
+        async ({ page }) => {
+            const card = page
+                .locator(".cc-available-order")
+                .filter({
+                    hasText: "Заказ №101",
+                });
+
+            await expect(card)
+                .toBeVisible();
+
+            await expect(
+                card.locator(
+                    ".cc-available-order__commission"
+                )
+            ).toContainText("Комиссия");
+
+            await expect(
+                card.locator(
+                    ".cc-available-order__commission"
+                )
+            ).toContainText("100 ₽");
+        }
+    );
+
+    test(
+        "быстрые категории синхронизируются с фильтрами",
+        async ({ page }) => {
+            const categories = page.locator(
+                ".cc-orders-category-strip"
+            );
+
+            await expect(categories)
+                .toBeVisible();
+
+            const category = categories.getByRole(
+                "button",
+                {
+                    name: "Грузы",
+                    exact: true,
+                }
+            );
+
+            await category.click();
+
+            await expect(category)
+                .toHaveAttribute(
+                    "aria-pressed",
+                    "true"
+                );
+
+            await page.getByRole("button", {
+                name: "Фильтры",
+                exact: true,
+            }).click();
+
+            const dialog = page.getByRole(
+                "dialog",
+                {
+                    name: "Фильтры",
+                    exact: true,
+                }
+            );
+
+            const selectedOption = dialog
+                .locator("select")
+                .first()
+                .locator("option:checked");
+
+            await expect(selectedOption)
+                .toHaveText("Грузы");
+        }
+    );
 
     test("переходит на страницу жалоб", async ({ page }) => {
         const card = orderCard(page, "Заказ №101");
 
-        const link = card.getByRole("link", {
+        await card.locator(
+            ".cc-available-order__button"
+        ).click();
+
+        const details = page.getByRole("dialog", {
+            name: "Подробности заказа",
+            exact: true,
+        });
+
+        await expect(details).toBeVisible();
+
+
+        const link = details.getByRole("link", {
             name: /Жалобы/i,
         });
 
@@ -720,16 +961,37 @@ test.describe("OrdersPage", () => {
         await expect(page.getByText("Заказ №101")).not.toBeVisible();
     });
 
-    test("открывает и закрывает drawer фильтров", async ({ page }) => {
-        await openFilters(page);
+    test(
+        "открывает и закрывает шторку фильтров",
+        async ({ page }) => {
+            await page.getByRole("button", {
+                name: "Фильтры",
+                exact: true,
+            }).click();
 
-        await expect(page.locator(".drawer-title")).toHaveText("Фильтры");
-        await expect(page.locator(".drawer-sub")).toContainText("Профессии");
+            const dialog = page.getByRole(
+                "dialog",
+                {
+                    name: "Фильтры",
+                    exact: true,
+                }
+            );
 
-        await page.getByRole("button", { name: "Закрыть" }).click();
+            await expect(dialog)
+                .toBeVisible();
 
-        await expect(page.locator(".drawer")).not.toBeVisible();
-    });
+            await expect(dialog)
+                .toContainText("Профессии");
+
+            await dialog.getByRole("button", {
+                name: "Закрыть",
+                exact: true,
+            }).click();
+
+            await expect(dialog)
+                .not.toBeVisible();
+        }
+    );
 
     test("показывает профессии из профиля в фильтрах", async ({ page }) => {
         await openFilters(page);
@@ -742,7 +1004,7 @@ test.describe("OrdersPage", () => {
     test("скрывает Такси и Курьер из select категорий", async ({ page }) => {
         await openFilters(page);
 
-        const categorySelect = page.locator(".drawer select").first();
+        const categorySelect = page.getByRole("dialog", { name: "Фильтры", exact: true }).locator("select").first();
 
         await expect(categorySelect).toContainText("Грузы");
         await expect(categorySelect).toContainText("Ремонт");
@@ -753,7 +1015,7 @@ test.describe("OrdersPage", () => {
     test("фильтрует по категории и подкатегории", async ({ page }) => {
         await openFilters(page);
 
-        const selects = page.locator(".drawer select");
+        const selects = page.getByRole("dialog", { name: "Фильтры", exact: true }).locator("select");
 
         await selects.first().selectOption("1");
 
@@ -772,7 +1034,7 @@ test.describe("OrdersPage", () => {
     test("кнопка Сбросить очищает фильтры", async ({ page }) => {
         await openFilters(page);
 
-        const selects = page.locator(".drawer select");
+        const selects = page.getByRole("dialog", { name: "Фильтры", exact: true }).locator("select");
 
         await selects.first().selectOption("1");
         await expect(selects.nth(1)).toBeEnabled();
@@ -813,6 +1075,19 @@ test.describe("OrdersPage", () => {
 
         await page.getByRole("button", { name: "Показать всё" }).click();
 
+        const filters = page.getByRole("dialog", {
+            name: "Фильтры",
+            exact: true,
+        });
+
+        await filters.getByRole("button", {
+            name: "Закрыть",
+            exact: true,
+        }).click();
+
+        await expect(filters).not.toBeVisible();
+
+
         await expect(page.getByRole("button", { name: "Все" })).toHaveClass(/active/);
         await expect(page.locator(".orders-subtitle")).toContainText("все категории");
     });
@@ -820,7 +1095,12 @@ test.describe("OrdersPage", () => {
     test("открывает модалку запроса выполнения", async ({ page }) => {
         await openRequestModal(page);
 
-        await expect(page.locator(".request-order-title")).toHaveText("Запросить выполнение");
+        await expect(
+            page.getByRole("dialog", {
+                name: "Запросить выполнение",
+                exact: true,
+            })
+        ).toBeVisible();
         await expect(page.getByPlaceholder("Например: 2500")).toBeVisible();
         await expect(page.getByPlaceholder("Например: могу приехать сегодня после 18:00")).toBeVisible();
 
@@ -945,7 +1225,19 @@ test.describe("OrdersPage", () => {
 
         const card = orderCard(page, "Заказ №101");
 
-        await card.getByRole("button", { name: "Запросить выполнение" }).click();
+        await card.locator(
+            ".cc-available-order__button"
+        ).click();
+
+        const details = page.getByRole("dialog", {
+            name: "Подробности заказа",
+            exact: true,
+        });
+
+        await expect(details).toBeVisible();
+
+
+        await details.getByRole("button", { name: "Запросить выполнение" }).click();
 
         await expect(page).toHaveURL(/\/login/);
     });
@@ -968,13 +1260,25 @@ test.describe("OrdersPage", () => {
                 "Заказ №101"
             );
 
+        await card.locator(
+            ".cc-available-order__button"
+        ).click();
+
+        const details = page.getByRole("dialog", {
+            name: "Подробности заказа",
+            exact: true,
+        });
+
+        await expect(details).toBeVisible();
+
+
             await expect(
-                card.locator(".blocked-order-hint")
+                details.locator(".blocked-order-hint")
             ).toContainText(
                 "предварительный отклик"
             );
 
-            const button = card.getByRole(
+            const button = details.getByRole(
                 "button",
                 {
                     name: "Запросить выполнение",
@@ -1077,12 +1381,24 @@ test.describe("OrdersPage", () => {
 
         const card = orderCard(page, "Экспресс №201");
 
+        await card.locator(
+            ".cc-available-order__button"
+        ).click();
+
+        const details = page.getByRole("dialog", {
+            name: "Подробности заказа",
+            exact: true,
+        });
+
+        await expect(details).toBeVisible();
+
+
         page.once("dialog", async (dialog) => {
             expect(dialog.message()).toContain("экспресс-заказ №201");
             await dialog.accept();
         });
 
-        await card.getByRole("button", { name: "Принять" }).click();
+        await details.getByRole("button", { name: "Принять" }).click();
 
         await expect
             .poll(() => acceptCalled, {
@@ -1110,11 +1426,23 @@ test.describe("OrdersPage", () => {
 
         const card = orderCard(page, "Экспресс №201");
 
+        await card.locator(
+            ".cc-available-order__button"
+        ).click();
+
+        const details = page.getByRole("dialog", {
+            name: "Подробности заказа",
+            exact: true,
+        });
+
+        await expect(details).toBeVisible();
+
+
         page.once("dialog", async (dialog) => {
             await dialog.dismiss();
         });
 
-        await card.getByRole("button", { name: "Принять" }).click();
+        await details.getByRole("button", { name: "Принять" }).click();
 
         expect(acceptCalled).toBe(false);
         await expect(page).not.toHaveURL(/\/active-orders/);
@@ -1123,22 +1451,52 @@ test.describe("OrdersPage", () => {
     test("открывает модалку изображения и переключает фото", async ({ page }) => {
         const card = orderCard(page, "Заказ №101");
 
-        await card.locator(".thumb").first().click();
+        await card.locator(
+            ".cc-available-order__button"
+        ).click();
+
+        const details = page.getByRole("dialog", {
+            name: "Подробности заказа",
+            exact: true,
+        });
+
+        await expect(details).toBeVisible();
+
+
+        await details.locator(".thumb").first().click();
 
         const modalImage = page.locator(".img-full");
 
         await expect(modalImage).toBeVisible();
         await expect(modalImage).toHaveAttribute("src", /photo1\.jpg/);
 
-        await clickByDom(page, ".img-nav.right");
+        await page.getByRole("button", {
+            name: "Следующее изображение",
+            exact: true,
+        }).click();
 
         await expect(modalImage).toHaveAttribute("src", /photo2\.jpg/);
 
-        await clickByDom(page, ".img-nav.left");
+        await page.getByRole("button", {
+            name: "Предыдущее изображение",
+            exact: true,
+        }).click();
 
         await expect(modalImage).toHaveAttribute("src", /photo1\.jpg/);
 
-        await clickByDom(page, ".img-close");
+        const photos = page.getByRole("dialog", {
+            name: "Фотографии",
+            exact: true,
+        });
+
+        await photos.getByRole("button", {
+            name: "Закрыть",
+            exact: true,
+        }).click();
+
+        await expect(photos).not.toBeVisible();
+
+        await expect(details).toBeVisible();
 
         await expect(modalImage).not.toBeVisible();
     });
@@ -1257,15 +1615,49 @@ test.describe("OrdersPage", () => {
         );
     });
 
-    test("открывает карту заказов", async ({ page }) => {
-        await page.getByRole("button", { name: /Карта/i }).click();
+    test(
+        "открывает карту заказов внутри шторки",
+        async ({ page }) => {
+            const previousUrl = page.url();
 
-        await expect(page.locator("body")).toContainText(/Карта|Выбрать|Закрыть|Местоположение/i, {
-            timeout: 10000,
-        });
+            await page.getByRole("button", {
+                name: "Карта заказов",
+                exact: true,
+            }).click();
 
-        await expect(page.locator(".orders-title")).toHaveText("Все заказы");
-    });
+            const dialog = page.getByRole(
+                "dialog",
+                {
+                    name: "Заказы на карте",
+                    exact: true,
+                }
+            );
+
+            await expect(dialog)
+                .toBeVisible();
+
+            await expect(
+                dialog.locator(".cc-embedded-map")
+            ).toBeVisible();
+
+            await expect(
+                page.locator(
+                    ".yandex-map-modal-overlay"
+                )
+            ).toHaveCount(0);
+
+            await dialog.getByRole("button", {
+                name: "Закрыть",
+                exact: true,
+            }).click();
+
+            await expect(dialog)
+                .not.toBeVisible();
+
+            await expect(page)
+                .toHaveURL(previousUrl);
+        }
+    );
 
     test("показывает пустое состояние, если доступных заказов нет", async ({ page }) => {
         await openOrdersPage(page, {
@@ -1504,16 +1896,41 @@ test.describe("OrdersPage — фильтры, время и ограничени
                 "Заказ №102"
             );
 
-            await expect(
-                urgent.locator(".order-time-box--asap")
-            ).toContainText("Как можно скорее");
+
+            await urgent.locator(
+                ".cc-available-order__button"
+            ).click();
+
+            const details = page.getByRole("dialog", {
+                name: "Подробности заказа",
+                exact: true,
+            });
+
+            await expect(details).toBeVisible();
 
             await expect(
-                scheduled.locator(".order-time-box--scheduled")
+                details.locator(".order-time-box--asap")
+            ).toContainText("Как можно скорее");
+
+            await details.getByRole("button", {
+                name: "Закрыть",
+                exact: true,
+            }).click();
+
+            await expect(details).not.toBeVisible();
+
+            await scheduled.locator(
+                ".cc-available-order__button"
+            ).click();
+
+            await expect(details).toBeVisible();
+
+            await expect(
+                details.locator(".order-time-box--scheduled")
             ).toContainText("Выполнить к");
 
             await expect(
-                scheduled.locator(".order-time-box--scheduled")
+                details.locator(".order-time-box--scheduled")
             ).toContainText("2035");
         }
     );

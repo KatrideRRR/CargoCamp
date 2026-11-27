@@ -7,7 +7,6 @@ import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrent
 import { ModalContext } from "../components/modalContext";
 import axios from "axios";
 import axiosInstance from "../utils/axiosInstance";
-import Modal from "react-modal";
 import { toast } from "react-toastify";
 import { socket } from "../socketClient";
 import {
@@ -16,13 +15,22 @@ import {
 import TaxiVehicleGateModal from "../components/TaxiVehicleGateModal";
 import "../styles/OrdersPage.css";
 import "../styles/OrdersPageDark.css";
+import AvailableOrderCard
+    from "../components/AvailableOrderCard";
+
+import {
+    BottomSheet,
+    Button,
+} from "../components/ui";
+
+import "../styles/OrdersRedesign.css";
 import YandexMapModal from "../components/YandexMapModal";
 import ExpressRouteButtons from "../components/ExpressRouteButtons";
 import RegularAdvanceTimeField from "../components/RegularAdvanceTimeField";
 import { FaMapMarkedAlt, FaSlidersH, FaLocationArrow } from "react-icons/fa";
 import { FiAlertTriangle } from "react-icons/fi";
 import { FaUniversity, FaMoneyBillWave, FaCreditCard, FaQuestionCircle } from "react-icons/fa";
-import { Zap, Clock3, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Zap, Clock3, ChevronLeft, ChevronRight } from "lucide-react";
 import {
     orderHasSocialDiscount,
     getSocialCommissionPreview,
@@ -241,6 +249,32 @@ const OrdersPage = () => {
     const [showLocationPicker, setShowLocationPicker] = useState(false);
 
     const [drawerOpen, setDrawerOpen] = useState(false);
+
+    const [
+        selectedOrderId,
+        setSelectedOrderId,
+    ] = useState(null);
+
+    const [
+        selectedOrderSnapshot,
+        setSelectedOrderSnapshot,
+    ] = useState(null);
+
+    const requestSubmitRef = useRef(false);
+
+    const openOrderDetails = (order) => {
+        setSelectedOrderId(order.id);
+        setSelectedOrderSnapshot(order);
+    };
+
+    const closeOrderDetails = () => {
+        if (requestSubmitRef.current) {
+            return;
+        }
+
+        setSelectedOrderId(null);
+        setSelectedOrderSnapshot(null);
+    };
 
     const [
         pendingExpressReservation,
@@ -1236,6 +1270,30 @@ const OrdersPage = () => {
         useProfileProfessions,
     ]);
 
+    const selectedOrder = useMemo(() => {
+        if (selectedOrderId === null) {
+            return null;
+        }
+
+        return allRaw.find(
+            order =>
+                String(order.id) ===
+                String(selectedOrderId)
+        ) || null;
+
+    }, [allRaw, selectedOrderId]);
+
+    const selectedOrderForDisplay = selectedOrder
+        ? {
+            ...selectedOrderSnapshot,
+            ...selectedOrder,
+        }
+        : selectedOrderSnapshot;
+
+    const selectedOrderUnavailable =
+        selectedOrderId !== null &&
+        !selectedOrder;
+
     const locationStatusText = useMemo(() => {
         if (locLoading) return "Определяем адрес…";
         if (userLocation?.latitude && userLocation?.longitude) {
@@ -1332,7 +1390,14 @@ const OrdersPage = () => {
         setRequestModalOpen(true);
     };
 
-    const closeRequestModal = () => {
+    const closeRequestModal = (force = false) => {
+        if (
+            force !== true &&
+            requestSubmitRef.current
+        ) {
+            return;
+        }
+
         setRequestModalOpen(false);
         setRequestOrder(null);
         setRequestSum("");
@@ -1404,8 +1469,7 @@ const OrdersPage = () => {
                     availableAt: requestAvailableAt,
                 });
 
-                closeRequestModal();
-
+                closeRequestModal(true);
                 openDebtModal({
                     title: "Есть задолженность по комиссии",
                     description:
@@ -1424,11 +1488,12 @@ const OrdersPage = () => {
                 availableAt: requestAvailableAt,
             });
 
-            closeRequestModal();
+            closeRequestModal(true);
         } catch (e) {
             console.error(e);
             toast.error(e.response?.data?.message || "Ошибка. Попробуйте позже.");
         } finally {
+            requestSubmitRef.current = false;
             setRequestSubmitting(false);
         }
     };
@@ -1455,173 +1520,9 @@ const OrdersPage = () => {
         };
     }, [fetchProfile, fetchOrders, fetchExpress, fetchBusyState]);
 
-    return (
-        <div className={`orders-page orders-page--${platform}`}>
-            <div className="orders-shell">
-                <div className="orders-top glass">
-                    <div className="orders-top-left">
-                        <div className="orders-title">Все заказы</div>
 
-                        <div className="orders-subtitle">
-                            Радиус: <b>{RADIUS_KM} км</b> •{" "}
-                            {useProfileProfessions && preferredCategoryIds.length
-                                ? "по вашим профессиям"
-                                : "все категории"}{" "}
-                            • Найдено: <b>{visibleOrders.length}</b>
-                        </div>
+    const renderOrderDetails = (order) => {
 
-                        <div className="orders-location-row">
-                            <div className="orders-location-pill">
-                                <FaLocationArrow className="orders-location-main-icon" />
-                                <span className="orders-location-text">{locationStatusText}</span>
-                            </div>
-
-                            <details
-                                className="loc-menu"
-                                open={locationMenuOpen}
-                                onToggle={(e) => setLocationMenuOpen(Boolean(e.currentTarget.open))}
-                            >
-                                <summary className="loc-summary" aria-label="Местоположение">
-                                    <FaLocationArrow />
-                                    <span className="loc-summary-text">Местоположение</span>
-                                </summary>
-
-                                <div className="loc-menu-panel">
-                                    <button
-                                        className="btn btn-ghost"
-                                        onClick={pullLocationFromProfile}
-                                        disabled={locLoading}
-                                    >
-                                        Из профиля
-                                    </button>
-
-                                    <button
-                                        className="btn btn-ghost"
-                                        onClick={detectGpsNow}
-                                        disabled={locLoading}
-                                    >
-                                        GPS
-                                    </button>
-
-                                    <button
-                                        className="btn btn-ghost"
-                                        onClick={handleOpenLocationPicker}
-                                    >
-                                        Выбрать на карте
-                                    </button>
-                                </div>
-                            </details>
-                        </div>
-
-                        {(isGeolocationDenied || (!profile?.locationLat && !profile?.locationLng)) && (
-                            <div className="orders-loc-row">
-                                <input
-                                    className="loc-input"
-                                    value={locationDraft}
-                                    onChange={(e) => setLocationDraft(e.target.value)}
-                                    placeholder="Введите адрес"
-                                />
-                                <button
-                                    className="btn btn-primary"
-                                    disabled={locLoading || !locationDraft.trim()}
-                                    onClick={() => geocodeAddress(locationDraft)}
-                                >
-                                    Применить
-                                </button>
-                            </div>
-                        )}
-
-                        {locError && <div className="orders-error">{locError}</div>}
-                    </div>
-                </div>
-
-                <div className="orders-actions-bar glass">
-                    <button className="btn btn-ghost" onClick={handleOpenOrdersMap}>
-                        <FaMapMarkedAlt />
-                        <span>Карта</span>
-                    </button>
-
-                    <button className="btn btn-primary" onClick={() => setDrawerOpen(true)}>
-                        <FaSlidersH />
-                        <span>Фильтры</span>
-                    </button>
-                </div>
-
-                <div className="orders-tabs-row glass">
-                    <button
-                        className={`tab-pill ${activeTab === "all" ? "active" : ""}`}
-                        onClick={() => setActiveTab("all")}
-                    >
-                        Все
-                    </button>
-
-                    <button
-                        className={`tab-pill ${activeTab === "recommended" ? "active" : ""}`}
-                        onClick={() => setActiveTab("recommended")}
-                    >
-                        В приоритете
-                    </button>
-
-                    <button
-                        className={`tab-pill ${activeTab === "courier" ? "active" : ""}`}
-                        onClick={() => setActiveTab("courier")}
-                    >
-                        Курьер / Такси
-                    </button>
-
-                    <span className="tabs-hint">
-        Приоритетные подсвечиваются, но не поднимаются выше остальных.
-    </span>
-                </div>
-
-                {activeTab === "all" && (selectedCategory || selectedSubcategory) && (
-                    <div className="hint-text hint-text-panel">
-                        Во вкладке «Все» при включённых фильтрах заказы «Курьер/Такси» скрываются.
-                    </div>
-                )}
-
-                {pendingExpressReservation && (
-                    <ExpressPendingReservation
-                        request={pendingExpressReservation}
-                        onChanged={() => {
-                            void refreshExpressReservation();
-                            void fetchBusyState();
-                        }}
-                    />
-                )}
-
-                {expressReservationError &&
-                    busyState.canRequestNextExpress && (
-                        <div role="alert">
-                            <p>{expressReservationError}</p>
-
-                            <button
-                                type="button"
-                                onClick={
-                                    refreshExpressReservation
-                                }
-                            >
-                                Повторить
-                            </button>
-                        </div>
-                    )}
-
-                <div className="orders-list-wrap">
-                    {!userLocation?.latitude || !userLocation?.longitude ? (
-                        <div className="empty glass">
-                            <div className="empty-title">Нужно местоположение</div>
-                            <div className="empty-sub">
-                                Чтобы показывать ближайшие заказы в радиусе {RADIUS_KM} км, укажи адрес или выбери точку на карте.
-                            </div>
-                            <div className="empty-actions">
-                                <button className="btn btn-ghost" onClick={handleOpenLocationPicker}>
-                                    Выбрать на карте
-                                </button>
-                            </div>
-                        </div>
-                    ) : visibleOrders.length > 0 ? (
-                        <ul className="orders-list">
-                            {visibleOrders.map((order) => {
                                 const creator = creatorsInfo[order.creatorId] || {};
                                 const isCreator = Number(order.creatorId) === Number(userId);
                                 const isExpress = !!order.express;
@@ -1683,8 +1584,10 @@ const OrdersPage = () => {
                                     .filter(Boolean)
                                     .join(" ");
 
-                                return (
-                                    <li key={order.id} className={cardClass}>
+
+
+        return (
+                                    <article className={cardClass}>
                                         <div className="order-head">
                                             <div className="order-head-left">
                                                 <div className="order-title-row">
@@ -1824,14 +1727,7 @@ const OrdersPage = () => {
                                             </Link>
 
                                             <div className="order-main-actions">
-                                                <button
-                                                    className="btn btn-ghost"
-                                                    onClick={() =>
-                                                        navigate(isExpress ? `/express-order/${order.expressId}` : `/order/${order.id}`)
-                                                    }
-                                                >
-                                                    Открыть
-                                                </button>
+
 
                                                 {!isExpress && canRequestRegular && (
                                                     <button
@@ -2008,9 +1904,281 @@ const OrdersPage = () => {
                                                 </div>
                                             )}
                                         </div>
-                                    </li>
-                                );
-                            })}
+                                    </article>
+);
+    };
+
+    return (
+        <div className={`orders-page cc-orders-redesign orders-page--${platform}`}>
+            <div className="orders-shell">
+                <div className="orders-top glass">
+                    <div className="orders-top-left">
+                        <div className="cc-orders-heading">
+
+                            <div className="orders-title">
+                                Все заказы
+                            </div>
+
+                            <div className="cc-orders-heading__actions">
+
+                                <button
+                                    type="button"
+                                    className="cc-orders-icon-button"
+                                    aria-label="Карта заказов"
+                                    onClick={handleOpenOrdersMap}
+                                >
+                                    <FaMapMarkedAlt
+                                        size={19}
+                                        aria-hidden="true"
+                                    />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className="cc-orders-icon-button"
+                                    aria-label="Фильтры"
+                                    onClick={() =>
+                                        setDrawerOpen(true)
+                                    }
+                                >
+                                    <FaSlidersH
+                                        size={19}
+                                        aria-hidden="true"
+                                    />
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                        <div className="orders-subtitle">
+                            Радиус: <b>{RADIUS_KM} км</b> •{" "}
+                            {useProfileProfessions && preferredCategoryIds.length
+                                ? "по вашим профессиям"
+                                : "все категории"}{" "}
+                            • Найдено: <b>{visibleOrders.length}</b>
+                        </div>
+
+                        <div className="orders-location-row">
+                            <div className="orders-location-pill">
+                                <FaLocationArrow className="orders-location-main-icon" />
+                                <span className="orders-location-text">{locationStatusText}</span>
+                            </div>
+
+                            <details
+                                className="loc-menu"
+                                open={locationMenuOpen}
+                                onToggle={(e) => setLocationMenuOpen(Boolean(e.currentTarget.open))}
+                            >
+                                <summary className="loc-summary" aria-label="Местоположение">
+                                    <FaLocationArrow />
+                                    <span className="loc-summary-text">Местоположение</span>
+                                </summary>
+
+                                <div className="loc-menu-panel">
+                                    <button
+                                        className="btn btn-ghost"
+                                        onClick={pullLocationFromProfile}
+                                        disabled={locLoading}
+                                    >
+                                        Из профиля
+                                    </button>
+
+                                    <button
+                                        className="btn btn-ghost"
+                                        onClick={detectGpsNow}
+                                        disabled={locLoading}
+                                    >
+                                        GPS
+                                    </button>
+
+                                    <button
+                                        className="btn btn-ghost"
+                                        onClick={handleOpenLocationPicker}
+                                    >
+                                        Выбрать на карте
+                                    </button>
+                                </div>
+                            </details>
+                        </div>
+
+                        {(isGeolocationDenied || (!profile?.locationLat && !profile?.locationLng)) && (
+                            <div className="orders-loc-row">
+                                <input
+                                    className="loc-input"
+                                    value={locationDraft}
+                                    onChange={(e) => setLocationDraft(e.target.value)}
+                                    placeholder="Введите адрес"
+                                />
+                                <button
+                                    className="btn btn-primary"
+                                    disabled={locLoading || !locationDraft.trim()}
+                                    onClick={() => geocodeAddress(locationDraft)}
+                                >
+                                    Применить
+                                </button>
+                            </div>
+                        )}
+
+                        {locError && <div className="orders-error">{locError}</div>}
+                    </div>
+                </div>
+
+                <div className="orders-tabs-row glass">
+                    <button
+                        className={`tab-pill ${activeTab === "all" ? "active" : ""}`}
+                        onClick={() => setActiveTab("all")}
+                    >
+                        Все
+                    </button>
+
+                    <button
+                        className={`tab-pill ${activeTab === "recommended" ? "active" : ""}`}
+                        onClick={() => setActiveTab("recommended")}
+                    >
+                        В приоритете
+                    </button>
+
+                    <button
+                        className={`tab-pill ${activeTab === "courier" ? "active" : ""}`}
+                        onClick={() => setActiveTab("courier")}
+                    >
+                        Курьер / Такси
+                    </button>
+
+                </div>
+
+                <div
+                    className="cc-orders-category-strip"
+                    aria-label="Категории заказов"
+                >
+                    <button
+                        type="button"
+                        className={
+                            "cc-orders-category-chip" +
+                            (useProfileProfessions
+                                ? " is-active"
+                                : "")
+                        }
+                        aria-pressed={useProfileProfessions}
+                        onClick={() => {
+                            setUseProfileProfessions(
+                                previous => !previous
+                            );
+                        }}
+                    >
+                        Мои профессии
+                    </button>
+
+                    {categories
+                        .filter(category =>
+                            !HIDE_FROM_DRAWER.has(
+                                String(
+                                    category.name || ""
+                                ).trim()
+                            )
+                        )
+                        .map(category => {
+                            const id =
+                                String(category.id);
+
+                            const active =
+                                String(selectedCategory) === id;
+
+                            return (
+                                <button
+                                    key={id}
+                                    type="button"
+                                    className={
+                                        "cc-orders-category-chip" +
+                                        (active
+                                            ? " is-active"
+                                            : "")
+                                    }
+                                    aria-pressed={active}
+                                    onClick={() => {
+                                        const next =
+                                            active ? "" : id;
+
+                                        setSelectedCategory(next);
+                                        setSelectedSubcategory("");
+                                        setSubcategories([]);
+                                        setActiveTab("all");
+
+                                        if (next) {
+                                            fetchSubcategories(next);
+                                        }
+                                    }}
+                                >
+                                    {category.name}
+                                </button>
+                            );
+                        })}
+
+                </div>
+
+                {activeTab === "all" && (selectedCategory || selectedSubcategory) && (
+                    <div className="hint-text hint-text-panel">
+                        Во вкладке «Все» при включённых фильтрах заказы «Курьер/Такси» скрываются.
+                    </div>
+                )}
+
+                {pendingExpressReservation && (
+                    <ExpressPendingReservation
+                        request={pendingExpressReservation}
+                        onChanged={() => {
+                            void refreshExpressReservation();
+                            void fetchBusyState();
+                        }}
+                    />
+                )}
+
+                {expressReservationError &&
+                    busyState.canRequestNextExpress && (
+                        <div role="alert">
+                            <p>{expressReservationError}</p>
+
+                            <button
+                                type="button"
+                                onClick={
+                                    refreshExpressReservation
+                                }
+                            >
+                                Повторить
+                            </button>
+                        </div>
+                    )}
+
+                <div className="orders-list-wrap">
+                    {!userLocation?.latitude || !userLocation?.longitude ? (
+                        <div className="empty glass">
+                            <div className="empty-title">Нужно местоположение</div>
+                            <div className="empty-sub">
+                                Чтобы показывать ближайшие заказы в радиусе {RADIUS_KM} км, укажи адрес или выбери точку на карте.
+                            </div>
+                            <div className="empty-actions">
+                                <button className="btn btn-ghost" onClick={handleOpenLocationPicker}>
+                                    Выбрать на карте
+                                </button>
+                            </div>
+                        </div>
+                    ) : visibleOrders.length > 0 ? (
+                        <ul className="orders-list">
+                            {visibleOrders.map((order) => (
+        <AvailableOrderCard
+            key={order.id}
+            order={order}
+            creator={creatorsInfo[order.creatorId] || {}}
+            userId={userId}
+            serviceName={buildServiceLine(order)}
+            timing={
+                order.express
+                    ? null
+                    : getOrderTiming(order)
+            }
+            onOpen={openOrderDetails}
+        />
+    ))}
                         </ul>
                     ) : (
                         <div className="empty glass">
@@ -2030,21 +2198,56 @@ const OrdersPage = () => {
                     )}
                 </div>
 
-                {drawerOpen && (
-                    <>
-                        <div className="drawer-overlay" onClick={() => setDrawerOpen(false)} />
-                        <div className="drawer glass" role="dialog" aria-modal="true">
-                            <div className="drawer-head">
-                                <div>
-                                    <div className="drawer-title">Фильтры</div>
-                                    <div className="drawer-sub">Профессии берём из профиля, здесь — уточнение</div>
-                                </div>
-                                <button className="btn btn-ghost" onClick={() => setDrawerOpen(false)}>
-                                    Закрыть
-                                </button>
-                            </div>
+                <BottomSheet
+                    open={
+                        selectedOrderId !== null &&
+                        !requestModalOpen &&
+                        !isModalOpen
+                    }
+                    onClose={closeOrderDetails}
+                    title="Подробности заказа"
+                    fullHeight
+                >
+                    <div className="cc-orders-sheet">
 
-                            <div className="drawer-body">
+                        {selectedOrderUnavailable ? (
+                            <>
+
+                                <div
+                                    className="cc-ui-error"
+                                    role="alert"
+                                >
+                                    Этот заказ больше недоступен.
+                                    Возможно, он уже принят
+                                    другим исполнителем или отменён.
+                                </div>
+
+                                <Button
+                                    fullWidth
+                                    onClick={closeOrderDetails}
+                                >
+                                    Вернуться к заказам
+                                </Button>
+
+                            </>
+                        ) : selectedOrderForDisplay ? (
+                            renderOrderDetails(
+                                selectedOrderForDisplay
+                            )
+                        ) : null}
+
+                    </div>
+                </BottomSheet>
+
+
+        <BottomSheet
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+            title="Фильтры"
+            description="Профессии и категории"
+        >
+            <div className="cc-orders-sheet">
+                <div className="drawer-body">
 
                                 {profile && (
                                     <div className="drawer-section drawer-section-professions">
@@ -2208,11 +2411,22 @@ const OrdersPage = () => {
                                     Показать ({visibleOrders.length})
                                 </button>
                             </div>
-                        </div>
-                    </>
-                )}
 
-                <YandexMapModal
+            </div>
+        </BottomSheet>
+
+
+        <BottomSheet
+            open={showOrdersMap}
+            onClose={() => {
+                setShowOrdersMap(false);
+                setLocationMenuOpen(false);
+            }}
+            title="Заказы на карте"
+            fullHeight
+            closeOnSwipe={false}
+        >
+            <YandexMapModal embedded
                     isOpen={showOrdersMap}
                     onClose={() => setShowOrdersMap(false)}
                     initialLat={userLocation?.latitude ?? profile?.locationLat}
@@ -2226,8 +2440,21 @@ const OrdersPage = () => {
                         setShowOrdersMap(false);
                     }}
                 />
+        </BottomSheet>
 
-                <YandexMapModal
+
+
+        <BottomSheet
+            open={showLocationPicker}
+            onClose={() => {
+                setShowLocationPicker(false);
+                setLocationMenuOpen(false);
+            }}
+            title="Выбрать местоположение"
+            fullHeight
+            closeOnSwipe={false}
+        >
+            <YandexMapModal embedded
                     isOpen={showLocationPicker}
                     onClose={() => {
                         setShowLocationPicker(false);
@@ -2252,34 +2479,19 @@ const OrdersPage = () => {
                         setLocationMenuOpen(false);
                     }}
                 />
+        </BottomSheet>
 
-                <Modal
-                    appElement={document.getElementById("root")}
-                    isOpen={requestModalOpen}
-                    onRequestClose={closeRequestModal}
-                    contentLabel="Запросить выполнение"
-                    className="request-order-modal"
-                    overlayClassName="request-order-overlay"
-                    parentSelector={() => document.body}
-                >
-                    <div className="request-order-content">
-                        <button
-                            type="button"
-                            className="request-order-close"
-                            onClick={closeRequestModal}
-                            disabled={requestSubmitting}
-                            aria-label="Закрыть"
-                        >
-                            ×
-                        </button>
 
-                        <h2 className="request-order-title">Запросить выполнение</h2>
 
-                        <p className="request-order-subtitle">
-                            Укажите сумму, за которую готовы выполнить заказ, и при желании добавьте комментарий заказчику.
-                        </p>
-
-                        <div className="request-order-field">
+        <BottomSheet
+            open={requestModalOpen}
+            onClose={closeRequestModal}
+            title="Запросить выполнение"
+            busy={requestSubmitting}
+        >
+            <div className="cc-orders-sheet">
+                <div className="request-order-content">
+                    <div className="request-order-field">
                             <label>Ваша сумма, ₽</label>
                             <input
                                 type="text"
@@ -2329,76 +2541,68 @@ const OrdersPage = () => {
                                 {requestSubmitting ? "Отправляем..." : "Отправить запрос"}
                             </button>
                         </div>
-                    </div>
-                </Modal>
 
-                <Modal
-                    appElement={document.getElementById("root")}
-                    isOpen={isModalOpen}
-                    onRequestClose={closeModal}
-                    contentLabel="Full Image Modal"
-                    className="custom-modal"
-                    overlayClassName="custom-modal-overlay"
-                    parentSelector={() => document.body}
-                    style={{
-                        overlay: {
-                            zIndex: 99999,
-                            position: "fixed",
-                            inset: 0,
-                            display: "flex",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            backgroundColor: "rgba(0,0,0,0.6)",
-                        },
-                        content: {
-                            position: "relative",
-                            inset: "auto",
-                            background: "white",
-                            border: "none",
-                            borderRadius: "12px",
-                            padding: 0,
-                            maxWidth: "90vw",
-                            maxHeight: "90vh",
-                            overflow: "hidden",
-                            display: "flex",
-                            justifyContent: "center",
-                            alignItems: "center",
-                        },
-                    }}
+                </div>
+            </div>
+        </BottomSheet>
+
+
+
+        <BottomSheet
+            open={isModalOpen}
+            onClose={closeModal}
+            title="Фотографии"
+            fullHeight
+        >
+            <div className="cc-orders-photo-viewer">
+
+                <button
+                    className="img-nav left"
+                    type="button"
+                    aria-label="Предыдущее изображение"
+                    disabled={currentImages.length < 2}
+                    onClick={() =>
+                        setCurrentImageIndex(prev =>
+                            prev === 0
+                                ? currentImages.length - 1
+                                : prev - 1
+                        )
+                    }
                 >
-                    <button
-                        type="button"
-                        className="img-close"
-                        onClick={closeModal}
-                        aria-label="Закрыть фотографии"
-                    >
-                        <X size={20} aria-hidden="true" />
-                    </button>
+                    <ChevronLeft size={20} />
+                </button>
 
-                    <button
-                        className="img-nav left"
-                        type="button"
-                        aria-label="Предыдущее изображение"
-                        onClick={() =>
-                            setCurrentImageIndex((prev) => (prev === 0 ? currentImages.length - 1 : prev - 1))
-                        }
-                    >
-                        <ChevronLeft size={18} aria-hidden="true" />
-                    </button>
+                {currentImages[currentImageIndex] && (
+                    <img
+                        src={`${apiUrl}${currentImages[currentImageIndex]}`}
+                        alt="Фотография заказа"
+                        className="img-full"
+                    />
+                )}
 
-                    <img src={`${apiUrl}${currentImages[currentImageIndex]}`} alt="full" className="img-full" />
+                <button
+                    className="img-nav right"
+                    type="button"
+                    aria-label="Следующее изображение"
+                    disabled={currentImages.length < 2}
+                    onClick={() =>
+                        setCurrentImageIndex(prev =>
+                            prev === currentImages.length - 1
+                                ? 0
+                                : prev + 1
+                        )
+                    }
+                >
+                    <ChevronRight size={20} />
+                </button>
 
-                    <button
-                        className="img-nav right"
-                        type="button"
-                        aria-label="Следующее изображение"
-                        onClick={() =>
-                            setCurrentImageIndex((prev) => (prev === currentImages.length - 1 ? 0 : prev + 1))
-                        }
-                    >
-                        <ChevronRight size={18} aria-hidden="true" />
-                    </button>
-                </Modal>
+            </div>
+
+            <p className="cc-profile-note">
+                Фото {currentImageIndex + 1} из {currentImages.length}
+            </p>
+        </BottomSheet>
+
             </div>
 
             <TaxiVehicleGateModal
