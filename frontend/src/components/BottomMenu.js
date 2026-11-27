@@ -274,7 +274,16 @@ const BottomMenu = () => {
     ]);
 
     const isActive = (path) => {
-        return location.pathname === path || location.pathname.startsWith(path + "/");
+        const currentPath = location.pathname;
+
+        if (path === "/") {
+            return currentPath === "/";
+        }
+
+        return (
+            currentPath === path ||
+            currentPath.startsWith(`${path}/`)
+        );
     };
 
     const handleMyOrdersClick = () => {
@@ -301,13 +310,12 @@ const BottomMenu = () => {
     return (
         <nav className={`bottom-menu bottom-menu--${platform}`} aria-label="Нижнее меню">
             <div className="bottom-menu__shell">
-                <div className="bottom-menu__notch" />
-
                 <button
                     className={`bottom-menu__item ${isActive("/") ? "is-active" : ""}`}
                     onClick={() => navigate("/")}
                     type="button"
                     aria-label="Старт"
+                    aria-current={isActive("/") ? "page" : undefined}
                 >
                     <Home size={22} className="bottom-menu__icon" />
                     <span className="bottom-menu__label">Старт</span>
@@ -318,6 +326,9 @@ const BottomMenu = () => {
                     onClick={() => navigate("/orders")}
                     type="button"
                     aria-label="Заказы"
+                    aria-current={
+                        isActive("/orders") ? "page" : undefined
+                    }
                 >
                     <ListTodo size={22} className="bottom-menu__icon" />
                     <span className="bottom-menu__label">Заказы</span>
@@ -330,6 +341,9 @@ const BottomMenu = () => {
                     onClick={handleOpenActive}
                     type="button"
                     aria-label="В работе"
+                    aria-current={
+                        isActive("/active-orders") ? "page" : undefined
+                    }
                 >
                 <span className="bottom-menu__icon-wrap">
                     <ClipboardList size={22} className="bottom-menu__icon" />
@@ -351,6 +365,9 @@ const BottomMenu = () => {
                     }
                     type="button"
                     aria-label="Профиль"
+                    aria-current={
+                        isActive("/profile") ? "page" : undefined
+                    }
                 >
                     <span className="bottom-menu__icon-wrap">
     <UserRound size={22} className="bottom-menu__icon" />
@@ -369,8 +386,10 @@ const BottomMenu = () => {
                 onClick={handleMyOrdersClick}
                 type="button"
                 aria-label="Мои заказы"
+                aria-current={
+                    isActive("/my-orders") ? "page" : undefined
+                }
             >
-                <span className="bottom-menu__center-shine" />
                 <span className="bottom-menu__icon-wrap">
 <PackagePlus size={30} className="bottom-menu__center-icon" />
                     {requestCount > 0 && (

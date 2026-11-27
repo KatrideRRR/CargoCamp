@@ -26,6 +26,7 @@ import "./styles/NotificationsDark.css";
 import "./styles/ui.css";
 
 import PublicOfferGate from "./components/PublicOfferGate";
+import LoadingState from "./components/ui/LoadingState";
 
 Modal.setAppElement('#root');
 
@@ -81,9 +82,10 @@ function AuthBootGate({ children }) {
 
     if (loading) {
         return (
-            <div className="app-loading">
-                Восстанавливаем сессию CargoCamp...
-            </div>
+            <LoadingState
+                fullPage
+                title="Восстанавливаем сессию CargoCamp..."
+            />
         );
     }
 

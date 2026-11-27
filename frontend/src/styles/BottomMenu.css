@@ -1,44 +1,63 @@
+/* =========================================================
+   CARGOCAMP — BOTTOM NAVIGATION
+   ========================================================= */
+
 :root {
     --bm-left: 14px;
     --bm-right: 14px;
     --bm-bottom: 8px;
 
     --bm-shell-h: 66px;
-    --bm-center-size: 62px;
+    --bm-center-size: 58px;
 
-    --bm-text: rgba(15, 23, 42, 0.72);
-    --bm-muted: rgba(100, 116, 139, 0.88);
+    --bm-text: var(--cc-text-secondary);
+    --bm-muted: var(--cc-muted);
 
-    --bm-active: #2563eb;
-    --bm-active-soft: rgba(37, 99, 235, 0.11);
+    --bm-active: var(--cc-primary);
+    --bm-active-soft: var(--cc-primary-soft);
 
-    --bm-danger: #ef4444;
-    --bm-bg: rgba(255, 255, 255, 0.94);
-    --bm-border: rgba(15, 23, 42, 0.08);
+    --bm-danger: #dc2626;
 
-    --bm-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --bm-bg: var(--cc-surface);
+    --bm-border: var(--cc-border);
+
+    --bm-ease: var(--cc-ease-out);
 }
 
-/* ===== root fixed layer ===== */
+
+/* Fixed navigation layer */
 
 .bottom-menu {
     position: fixed !important;
-    left: var(--bm-left);
-    right: var(--bm-right);
+
+    left: max(
+            var(--bm-left),
+            var(--safe-left, 0px)
+    );
+
+    right: max(
+            var(--bm-right),
+            var(--safe-right, 0px)
+    );
+
     bottom: var(--bm-bottom) !important;
     top: auto !important;
 
     height: 82px;
-    max-width: 720px;
+    max-width: var(--cc-content-width);
+
     margin-left: auto;
     margin-right: auto;
 
+    padding-bottom: 0;
+
     z-index: 9990;
+
     color: var(--bm-text);
 
     -webkit-tap-highlight-color: transparent;
-    user-select: none;
 
+    user-select: none;
     pointer-events: none;
 
     transform: translate3d(0, 0, 0);
@@ -48,20 +67,32 @@
     -webkit-backface-visibility: hidden;
 }
 
-/* iOS: чуть выше home indicator, но не на пол-экрана */
 .bottom-menu--ios {
-    bottom: calc(6px + env(safe-area-inset-bottom, 0px)) !important;
+    bottom: calc(
+            6px + env(safe-area-inset-bottom, 0px)
+    ) !important;
 }
 
-/* Android: без safe-area, чтобы центральная кнопка не уезжала */
 .bottom-menu--android {
-    bottom: 8px !important;
+    bottom: max(
+            8px,
+            env(safe-area-inset-bottom, 0px)
+    ) !important;
 }
 
-/* ===== shell ===== */
+.bottom-menu--web {
+    bottom: max(
+            8px,
+            env(safe-area-inset-bottom, 0px)
+    ) !important;
+}
+
+
+/* Navigation shell */
 
 .bottom-menu__shell {
     position: absolute;
+
     left: 0;
     right: 0;
     bottom: 0;
@@ -69,29 +100,30 @@
     height: var(--bm-shell-h);
 
     display: grid;
-    grid-template-columns: 1fr 1fr 78px 1fr 1fr;
+
+    grid-template-columns:
+        minmax(0, 1fr)
+        minmax(0, 1fr)
+        74px
+        minmax(0, 1fr)
+        minmax(0, 1fr);
+
     align-items: center;
     gap: 3px;
 
     padding: 5px;
 
-    border-radius: 24px;
     border: 1px solid var(--bm-border);
+    border-radius: var(--cc-radius-sheet);
+
     background: var(--bm-bg);
 
-    box-shadow:
-            0 -8px 26px rgba(15, 23, 42, 0.10),
-            0 8px 24px rgba(15, 23, 42, 0.08),
-            inset 0 1px 0 rgba(255, 255, 255, 0.78);
-
-    backdrop-filter: blur(20px) saturate(1.35);
-    -webkit-backdrop-filter: blur(20px) saturate(1.35);
+    box-shadow: var(--cc-shadow-card);
 
     overflow: visible;
     pointer-events: auto;
 }
 
-/* Убираем старую ямку, она давала странные углы */
 .bottom-menu__notch {
     display: none !important;
 }
@@ -99,52 +131,65 @@
 .bottom-menu__spacer {
     width: 100%;
     height: 100%;
+
     pointer-events: none;
 }
 
-/* ===== buttons ===== */
+
+/* Shared navigation buttons */
 
 .bottom-menu__item,
 .bottom-menu__center {
     appearance: none;
     -webkit-appearance: none;
-    border: 0;
-    outline: 0;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    cursor: pointer;
-
-    position: relative;
 
     display: flex;
     align-items: center;
     justify-content: center;
 
-    -webkit-tap-highlight-color: transparent;
+    margin: 0;
+    padding: 0;
+
+    border: 0;
+    background: transparent;
+
+    color: inherit;
+    font: inherit;
+
+    cursor: pointer;
     pointer-events: auto;
+
+    -webkit-tap-highlight-color: transparent;
 }
 
 .bottom-menu__item {
-    min-width: 0;
-    height: 52px;
-
-    border-radius: 17px;
+    position: relative;
 
     flex-direction: column;
-    gap: 3px;
+    gap: 5px;
+
+    min-width: 0;
+    height: 54px;
+
+    border-radius: var(--cc-radius-lg);
 
     z-index: 2;
-    overflow: hidden;
+
+    overflow: visible;
 
     transition:
-            transform 140ms var(--bm-ease),
-            background 140ms var(--bm-ease),
-            color 140ms var(--bm-ease);
+            background-color var(--cc-duration-fast),
+            color var(--cc-duration-fast);
+}
+
+.bottom-menu__item.is-active {
+    background: var(--bm-active-soft);
+    color: var(--bm-active);
 }
 
 .bottom-menu__icon-wrap {
     position: relative;
+
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -153,31 +198,49 @@
 .bottom-menu__icon,
 .bottom-menu__center-icon {
     display: block;
-    flex: 0 0 auto;
-    stroke-width: 2.25;
+
+    flex-shrink: 0;
+
+    stroke-width: 2;
 }
 
 .bottom-menu__label {
-    font-size: 10px;
-    line-height: 1;
-    font-weight: 800;
-    letter-spacing: -0.015em;
+    max-width: 100%;
+
     color: var(--bm-muted);
+
+    font-size: 11px;
+    font-weight: var(--cc-weight-medium);
+    line-height: 1.15;
+
+    white-space: nowrap;
 }
 
-.bottom-menu__item.is-active {
+.bottom-menu__item.is-active
+.bottom-menu__label {
     color: var(--bm-active);
-    background: var(--bm-active-soft);
+    font-weight: var(--cc-weight-semibold);
 }
 
-.bottom-menu__item.is-active .bottom-menu__label {
-    color: var(--bm-active);
+.bottom-menu__item:focus-visible,
+.bottom-menu__center:focus-visible {
+    outline: 2px solid var(--cc-primary);
+    outline-offset: 3px;
 }
 
-/* ===== center button ===== */
+@media (hover: hover) {
+    .bottom-menu__item:not(.is-active):hover {
+        background: var(--cc-surface-soft);
+        color: var(--cc-text);
+    }
+}
+
+
+/* Main action — My Orders */
 
 .bottom-menu__center {
     position: absolute;
+
     left: 50%;
     bottom: 12px;
 
@@ -186,175 +249,151 @@
 
     transform: translateX(-50%);
 
-    border-radius: 24px;
+    border: 1px solid transparent;
+    border-radius: var(--cc-radius-xl);
 
-    color: #2563eb;
+    background: var(--cc-primary);
+    color: var(--cc-on-primary);
 
-    background:
-            radial-gradient(circle at 35% 18%, rgba(255, 255, 255, 1), transparent 34%),
-            linear-gradient(180deg, #ffffff 0%, #f8fbff 48%, #eef6ff 100%);
-
-    border: 1px solid rgba(147, 197, 253, 0.62);
-
-    box-shadow:
-            0 12px 26px rgba(37, 99, 235, 0.18),
-            0 5px 14px rgba(15, 23, 42, 0.10),
-            inset 0 1px 0 rgba(255, 255, 255, 1),
-            inset 0 -1px 0 rgba(191, 219, 254, 0.36);
+    box-shadow: var(--cc-shadow-card);
 
     z-index: 5;
+
     overflow: visible;
 
     transition:
-            transform 140ms var(--bm-ease),
-            box-shadow 140ms var(--bm-ease),
-            background 140ms var(--bm-ease);
+            transform var(--cc-duration-fast),
+            background-color var(--cc-duration-fast),
+            box-shadow var(--cc-duration-fast);
 }
 
-.bottom-menu__center::after {
-    content: "";
-    position: absolute;
-    inset: 5px;
-
-    border-radius: 19px;
-
-    background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.86));
-
-    border: 1px solid rgba(219, 234, 254, 0.95);
-
-    box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 1),
-            inset 0 -5px 12px rgba(37, 99, 235, 0.045);
-
-    pointer-events: none;
-    z-index: 0;
-}
-
+.bottom-menu__center::after,
 .bottom-menu__center-shine {
-    position: absolute;
-    top: 7px;
-    left: 13px;
-    right: 13px;
-    height: 11px;
-
-    border-radius: 999px;
-
-    background: linear-gradient(
-            180deg,
-            rgba(255, 255, 255, 0.95),
-            rgba(255, 255, 255, 0)
-    );
-
-    pointer-events: none;
-    z-index: 2;
+    display: none;
 }
 
 .bottom-menu__center-icon {
-    position: relative;
-    z-index: 2;
-    stroke-width: 2.05;
-    color: #2563eb;
-
-    filter:
-            drop-shadow(0 1px 0 rgba(255, 255, 255, 0.95))
-            drop-shadow(0 3px 6px rgba(37, 99, 235, 0.12));
+    color: inherit;
+    filter: none;
 }
 
 .bottom-menu__center.is-active {
-    color: #1d4ed8;
-
-    background:
-            radial-gradient(circle at 35% 18%, rgba(255, 255, 255, 1), transparent 34%),
-            linear-gradient(180deg, #ffffff 0%, #eff6ff 48%, #dbeafe 100%);
-
-    border-color: rgba(96, 165, 250, 0.72);
-
     box-shadow:
-            0 14px 28px rgba(37, 99, 235, 0.22),
-            0 6px 15px rgba(15, 23, 42, 0.10),
-            inset 0 1px 0 rgba(255, 255, 255, 1),
-            inset 0 -1px 0 rgba(147, 197, 253, 0.42);
+            0 0 0 4px var(--cc-primary-soft);
+
+    background: var(--cc-primary-hover);
+    color: var(--cc-on-primary);
 }
 
 .bottom-menu__center:active {
-    transform: translateX(-50%) scale(0.97);
+    transform:
+            translateX(-50%)
+            scale(0.96);
 }
 
-/* ===== badge ===== */
+
+/* Notification counters */
 
 .bottom-menu__badge {
     position: absolute;
-    top: -8px;
-    right: -10px;
 
-    min-width: 18px;
-    height: 18px;
-    padding: 0 5px;
+    top: -7px;
+    right: -10px;
 
     display: inline-flex;
     align-items: center;
     justify-content: center;
 
-    border-radius: 999px;
-    border: 2px solid #ffffff;
+    min-width: 19px;
+    height: 19px;
+
+    padding: 0 4px;
+
+    border-radius: var(--cc-radius-full);
+    border: 2px solid var(--bm-bg);
+
     background: var(--bm-danger);
     color: #ffffff;
 
-    font-size: 9.5px;
+    font-size: 10px;
+    font-weight: var(--cc-weight-bold);
     line-height: 1;
-    font-weight: 900;
 
-    box-shadow: 0 5px 12px rgba(239, 68, 68, 0.35);
     z-index: 6;
 }
 
 .bottom-menu__center .bottom-menu__badge {
-    top: -6px;
-    right: -8px;
+    top: -8px;
+    right: -9px;
 }
 
-/* ===== platform fine tune ===== */
 
-.bottom-menu--ios .bottom-menu__shell {
-    background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.78)),
-            rgba(255, 255, 255, 0.78);
-
-    border-color: rgba(255, 255, 255, 0.66);
-}
-
-.bottom-menu--ios .bottom-menu__center {
-    bottom: 12px;
-}
-
-.bottom-menu--android .bottom-menu__shell {
-    background: #ffffff;
-    border-color: rgba(15, 23, 42, 0.10);
-
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-}
-
-.bottom-menu--android .bottom-menu__center {
-    bottom: 10px;
-}
-
-/* ===== small screens ===== */
+/* Compact devices */
 
 @media (max-width: 380px) {
     .bottom-menu {
-        left: 8px;
-        right: 8px;
+        left: max(8px, var(--safe-left, 0px));
+        right: max(8px, var(--safe-right, 0px));
+
         height: 78px;
     }
 
     .bottom-menu__shell {
         height: 62px;
-        grid-template-columns: 1fr 1fr 70px 1fr 1fr;
+
+        grid-template-columns:
+            minmax(0, 1fr)
+            minmax(0, 1fr)
+            64px
+            minmax(0, 1fr)
+            minmax(0, 1fr);
+
         gap: 2px;
         padding: 4px;
+
         border-radius: 22px;
+    }
+
+    .bottom-menu__item {
+        height: 52px;
+    }
+
+    .bottom-menu__label {
+        font-size: 10px;
+    }
+
+    .bottom-menu__center {
+        width: 54px;
+        height: 54px;
+
+        bottom: 10px;
+
+        border-radius: 18px;
+    }
+}
+
+@media (max-width: 340px) {
+    .bottom-menu {
+        left: max(6px, var(--safe-left, 0px));
+        right: max(6px, var(--safe-right, 0px));
+
+        height: 74px;
+    }
+
+    .bottom-menu__shell {
+        height: 58px;
+
+        grid-template-columns:
+            minmax(0, 1fr)
+            minmax(0, 1fr)
+            58px
+            minmax(0, 1fr)
+            minmax(0, 1fr);
+    }
+
+    .bottom-menu__item {
+        height: 48px;
+        gap: 4px;
     }
 
     .bottom-menu__label {
@@ -362,48 +401,24 @@
     }
 
     .bottom-menu__center {
-        width: 56px;
-        height: 56px;
-        border-radius: 21px;
-        bottom: 10px;
-    }
+        width: 50px;
+        height: 50px;
 
-    .bottom-menu__center::after {
-        border-radius: 16px;
-    }
-}
-
-@media (max-width: 340px) {
-    .bottom-menu {
-        left: 6px;
-        right: 6px;
-        height: 72px;
-    }
-
-    .bottom-menu__shell {
-        height: 58px;
-        grid-template-columns: 1fr 1fr 62px 1fr 1fr;
-    }
-
-    .bottom-menu__label {
-        display: none;
-    }
-
-    .bottom-menu__item {
-        height: 48px;
-    }
-
-    .bottom-menu__center {
-        width: 54px;
-        height: 54px;
         bottom: 9px;
     }
 }
 
+
+/* Accessibility */
+
 @media (prefers-reduced-motion: reduce) {
     .bottom-menu__item,
     .bottom-menu__center {
-        transition: none !important;
-        animation: none !important;
+        transition: none;
+        animation: none;
+    }
+
+    .bottom-menu__center:active {
+        transform: translateX(-50%);
     }
 }
