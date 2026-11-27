@@ -566,6 +566,8 @@ test.describe("CreateExpressOrder", () => {
     });
 
     test("показывает адресные подсказки для точки A и выбирает адрес", async ({ page }) => {
+        await goToExpressStep(page, 2);
+
         const fromInput = page.getByPlaceholder("Откуда — адрес точки A");
 
         await fromInput.fill("Пушкина 1");
@@ -582,6 +584,8 @@ test.describe("CreateExpressOrder", () => {
     });
 
     test("показывает адресные подсказки для точки B и выбирает адрес", async ({ page }) => {
+        await goToExpressStep(page, 2);
+
         const toInput = page.getByPlaceholder("Куда — адрес точки B");
 
         await toInput.fill("Кирова 10");
@@ -610,7 +614,11 @@ test.describe("CreateExpressOrder", () => {
     });
 
     test("позволяет вручную указать цену", async ({ page }) => {
+        await goToExpressStep(page, 3);
+
         const priceInput = page.locator("#express-price");
+
+        await expect(priceInput).toBeVisible();
 
         await priceInput.fill("650");
 
@@ -652,8 +660,17 @@ test.describe("CreateExpressOrder", () => {
     });
 
     test("показывает блок статуса маршрута", async ({ page }) => {
-        await expect(page.locator(".exo-note")).toBeVisible();
-        await expect(page.getByRole("button", { name: /Показать маршрут/i })).toBeVisible();
+        await goToExpressStep(page, 2);
+
+        await expect(
+            page.locator(".exo-note")
+        ).toBeVisible();
+
+        await expect(
+            page.getByRole("button", {
+                name: /Показать маршрут/i,
+            })
+        ).toBeVisible();
     });
 
     test("кнопка Показать маршрут становится активной после выбора двух точек", async ({ page }) => {
@@ -765,7 +782,13 @@ test.describe("CreateExpressOrder", () => {
 
         await fillValidExpressOrder(page);
 
-        await page.getByRole("button", { name: /Дополнительно/i }).click();
+// Маршрут и цена уже заполнены.
+// Возвращаемся к дополнительным параметрам заказа.
+        await goToExpressStep(page, 1);
+
+        await page.getByRole("button", {
+            name: /Дополнительно/i,
+        }).click();
         await page.getByRole("button", { name: /Документы/i }).click();
         await page
             .getByPlaceholder("Комментарий (домофон, подъезд, позвонить заранее)…")

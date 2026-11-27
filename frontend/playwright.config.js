@@ -9,6 +9,9 @@ const FAKE_API_URL = "http://127.0.0.1:59999";
 module.exports = defineConfig({
     testDir: "./tests",
 
+    testMatch: "**/*.spec.js",
+    testIgnore: "**/unit/**",
+
     timeout: 30000,
 
     expect: {
