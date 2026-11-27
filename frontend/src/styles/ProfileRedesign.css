@@ -1482,3 +1482,369 @@ input.cc-benefit-file-input[type="file"] {
         height: 36px;
     }
 }
+
+/* =========================================================
+   PROFILE FINAL PAGE
+   ========================================================= */
+
+html .profile-page,
+html .profile-page.profile-page--android,
+html .profile-page.profile-page--ios,
+html .profile-page.profile-page--web {
+    background: var(--cc-bg);
+    color: var(--cc-text);
+}
+
+html .profile-page::before,
+html .profile-page::after {
+    display: none;
+}
+
+.profile-page .profile-shell {
+    width: 100%;
+    max-width: var(--cc-content-width);
+    min-width: 0;
+}
+
+.cc-profile-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    gap: 5px;
+
+    padding: 20px 12px 12px;
+
+    color: var(--cc-muted);
+
+    text-align: center;
+}
+
+.cc-profile-footer strong {
+    color: var(--cc-text-secondary);
+
+    font-size: var(--cc-font-body);
+    font-weight: var(--cc-weight-semibold);
+}
+
+.cc-profile-footer span {
+    font-size: var(--cc-font-caption);
+}
+
+
+/* =========================================================
+   LEGAL DOCUMENTS
+   ========================================================= */
+
+.cc-profile-legal-document {
+    min-width: 0;
+
+    width: 100%;
+    max-width: 100%;
+
+    color: var(--cc-text);
+
+    font-size: var(--cc-font-small);
+    line-height: 1.65;
+
+    overflow-wrap: break-word;
+}
+
+.cc-profile-legal-document h1,
+.cc-profile-legal-document h2,
+.cc-profile-legal-document h3,
+.cc-profile-legal-document h4 {
+    color: var(--cc-text);
+    line-height: 1.4;
+
+    overflow-wrap: break-word;
+}
+
+.cc-profile-legal-document p,
+.cc-profile-legal-document li {
+    color: var(--cc-text-secondary);
+}
+
+.cc-profile-legal-document a {
+    color: var(--cc-primary);
+
+    overflow-wrap: anywhere;
+}
+
+.cc-profile-signature-intro {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    gap: 12px;
+
+    padding: 18px;
+
+    background: var(--cc-primary-soft);
+
+    border-radius: var(--cc-radius-xl);
+
+    text-align: center;
+}
+
+.cc-profile-signature-icon {
+    display: grid;
+    place-items: center;
+
+    width: 64px;
+    height: 64px;
+
+    background: var(--cc-surface);
+    color: var(--cc-primary);
+
+    border-radius: var(--cc-radius-lg);
+}
+
+.cc-profile-signature-intro h3 {
+    margin: 0;
+
+    color: var(--cc-text);
+
+    font-size: var(--cc-font-subtitle);
+    font-weight: var(--cc-weight-semibold);
+}
+
+.cc-profile-signature-intro p {
+    margin: 0;
+
+    color: var(--cc-text-secondary);
+
+    font-size: var(--cc-font-small);
+    line-height: 1.5;
+}
+
+
+/* =========================================================
+   ACCOUNT DELETION
+   ========================================================= */
+
+.cc-account-deletion-row {
+    min-width: 0;
+
+    border-top: 1px solid var(--cc-border);
+}
+
+.cc-account-deletion-status {
+    display: flex;
+    align-items: flex-start;
+
+    gap: 12px;
+
+    padding: 16px;
+
+    color: var(--cc-text);
+}
+
+.cc-account-deletion-status > svg {
+    flex-shrink: 0;
+
+    color: var(--cc-primary);
+}
+
+.cc-account-deletion-status > div {
+    min-width: 0;
+    flex: 1;
+}
+
+.cc-account-deletion-status strong {
+    font-size: var(--cc-font-small);
+    font-weight: var(--cc-weight-semibold);
+
+    overflow-wrap: break-word;
+}
+
+.cc-account-deletion-status p {
+    margin: 8px 0 0;
+
+    color: var(--cc-muted);
+
+    font-size: var(--cc-font-small);
+    line-height: 1.5;
+}
+
+.cc-account-deletion-warning {
+    display: flex;
+    flex-direction: column;
+
+    gap: 12px;
+
+    padding: 16px;
+
+    background: var(--cc-danger-soft);
+    color: var(--cc-danger);
+
+    border-radius: var(--cc-radius-lg);
+}
+
+.cc-account-deletion-warning strong {
+    font-size: var(--cc-font-body);
+    font-weight: var(--cc-weight-semibold);
+}
+
+.cc-account-deletion-warning p {
+    margin: 0;
+
+    font-size: var(--cc-font-small);
+    line-height: 1.55;
+}
+
+.cc-account-deletion-confirm {
+    display: flex;
+    align-items: flex-start;
+
+    gap: 12px;
+
+    padding: 14px;
+
+    background: var(--cc-surface-soft);
+
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius-md);
+
+    color: var(--cc-text);
+
+    font-size: var(--cc-font-small);
+    line-height: 1.5;
+
+    cursor: pointer;
+}
+
+.cc-account-deletion-confirm input {
+    width: 20px;
+    height: 20px;
+
+    flex-shrink: 0;
+
+    margin: 0;
+
+    accent-color: var(--cc-primary);
+}
+
+.cc-account-deletion-confirm span {
+    min-width: 0;
+
+    overflow-wrap: break-word;
+}
+
+
+/* =========================================================
+   SUGGESTIONS
+   ========================================================= */
+
+.cc-suggestion-reward {
+    display: flex;
+    align-items: flex-start;
+
+    gap: 14px;
+
+    padding: 16px;
+
+    background: var(--cc-primary-soft);
+
+    border-radius: var(--cc-radius-lg);
+}
+
+.cc-suggestion-reward__icon {
+    display: grid;
+    place-items: center;
+
+    width: 44px;
+    height: 44px;
+
+    flex-shrink: 0;
+
+    background: var(--cc-surface);
+    color: var(--cc-primary);
+
+    border-radius: var(--cc-radius-md);
+}
+
+.cc-suggestion-reward__content {
+    min-width: 0;
+    flex: 1;
+}
+
+.cc-suggestion-reward strong {
+    color: var(--cc-text);
+
+    font-size: var(--cc-font-body);
+    font-weight: var(--cc-weight-semibold);
+}
+
+.cc-suggestion-reward p {
+    margin: 7px 0 0;
+
+    color: var(--cc-text-secondary);
+
+    font-size: var(--cc-font-small);
+    line-height: 1.55;
+
+    overflow-wrap: break-word;
+}
+
+.cc-suggestion-counter {
+    margin-top: -6px;
+
+    color: var(--cc-muted);
+
+    font-size: var(--cc-font-caption);
+
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+
+/* =========================================================
+   FINAL RESPONSIVE PROFILE
+   ========================================================= */
+
+.profile-page .cc-section,
+.profile-page .cc-section__content,
+.profile-page .cc-settings-row,
+.profile-page .cc-settings-row__main {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.profile-page .cc-section__header {
+    min-width: 0;
+}
+
+.profile-page .cc-settings-row__title,
+.profile-page .cc-settings-row__description,
+.profile-page .cc-settings-row__value {
+    word-break: normal;
+    overflow-wrap: break-word;
+}
+
+@media (max-width: 420px) {
+    .cc-profile-group .cc-settings-row {
+        min-height: 64px;
+    }
+}
+
+@media (max-width: 360px) {
+    .cc-account-deletion-warning,
+    .cc-account-deletion-confirm,
+    .cc-suggestion-reward {
+        padding: 12px;
+    }
+
+    .cc-suggestion-reward {
+        gap: 10px;
+    }
+
+    .cc-suggestion-reward__icon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .cc-profile-signature-intro {
+        padding: 14px;
+    }
+}

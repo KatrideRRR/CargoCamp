@@ -550,53 +550,85 @@ test.describe("ProfilePage", () => {
     test(
         "пользователь может зарегистрировать запрос удаления аккаунта",
         async ({ page }) => {
-            await openProfilePage(page);
+            let submittedBody = null;
+            let submittedCalls = 0;
 
-            await page.getByRole(
-                "button",
-                {
-                    name: "Удалить аккаунт",
-                    exact: true,
+            await page.route(
+                "**/api/account-deletion/request",
+                async (route) => {
+                    submittedCalls += 1;
+
+                    submittedBody =
+                        route.request()
+                            .postDataJSON();
+
+                    await route.fulfill({
+                        status: 200,
+
+                        json: {
+                            success: true,
+                            requested: true,
+                        },
+                    });
                 }
-            ).click();
+            );
 
-            await page.getByLabel(
+            const dialog = await openProfileSheet(
+                page,
+                "Удалить аккаунт",
+                "Удаление аккаунта"
+            );
+
+            const password = dialog.getByLabel(
                 "Пароль аккаунта",
                 {
                     exact: true,
                 }
-            ).fill("test-password");
+            );
 
-            await page.getByLabel(
-                "Я подтверждаю запрос на удаление аккаунта."
-            ).check();
+            const checkbox = dialog.getByRole(
+                "checkbox",
+                {
+                    name: "Я подтверждаю запрос на удаление аккаунта.",
+                }
+            );
 
-            const requestPromise =
-                page.waitForRequest(
-                    (request) =>
-                        request.url().includes(
-                            "/api/account-deletion/request"
-                        ) &&
-                        request.method() === "POST"
-                );
-
-            await page.getByRole(
+            const submit = dialog.getByRole(
                 "button",
                 {
                     name: "Подтвердить удаление",
                     exact: true,
                 }
-            ).click();
+            );
 
-            const request =
-                await requestPromise;
+            await expect(submit)
+                .toBeDisabled();
 
-            expect(
-                request.postDataJSON()
-            ).toEqual({
+            await password.fill(
+                "test-password"
+            );
+
+            await expect(submit)
+                .toBeDisabled();
+
+            await checkbox.check();
+
+            await expect(submit)
+                .toBeEnabled();
+
+            await submit.click();
+
+            await expect.poll(
+                () => submittedCalls
+            ).toBe(1);
+
+            expect(submittedBody).toEqual({
                 password: "test-password",
                 confirmed: true,
             });
+
+            await expect(dialog)
+                .not.toBeVisible();
 
             await expect(
                 page.getByText(
@@ -605,6 +637,139 @@ test.describe("ProfilePage", () => {
                         exact: true,
                     }
                 )
+            ).toBeVisible();
+
+            await expect(
+                page.getByRole("button", {
+                    name: "Удалить аккаунт",
+                    exact: true,
+                })
+            ).toHaveCount(0);
+        }
+    );
+
+    test(
+        "отмена удаления аккаунта очищает пароль и согласие",
+        async ({ page }) => {
+            let submittedCalls = 0;
+
+            await page.route(
+                "**/api/account-deletion/request",
+                async (route) => {
+                    submittedCalls += 1;
+
+                    await route.fulfill({
+                        json: {
+                            success: true,
+                            requested: true,
+                        },
+                    });
+                }
+            );
+
+            let dialog = await openProfileSheet(
+                page,
+                "Удалить аккаунт",
+                "Удаление аккаунта"
+            );
+
+            await dialog.getByLabel(
+                "Пароль аккаунта",
+                {
+                    exact: true,
+                }
+            ).fill("test-password");
+
+            await dialog.getByRole("checkbox", {
+                name: /Я подтверждаю запрос/,
+            }).check();
+
+            await dialog.getByRole("button", {
+                name: "Отмена",
+                exact: true,
+            }).click();
+
+            await expect(dialog)
+                .not.toBeVisible();
+
+            expect(submittedCalls).toBe(0);
+
+            dialog = await openProfileSheet(
+                page,
+                "Удалить аккаунт",
+                "Удаление аккаунта"
+            );
+
+            await expect(
+                dialog.getByLabel(
+                    "Пароль аккаунта",
+                    {
+                        exact: true,
+                    }
+                )
+            ).toHaveValue("");
+
+            await expect(
+                dialog.getByRole("checkbox", {
+                    name: /Я подтверждаю запрос/,
+                })
+            ).not.toBeChecked();
+
+            await expect(
+                dialog.getByRole("button", {
+                    name: "Подтвердить удаление",
+                    exact: true,
+                })
+            ).toBeDisabled();
+        }
+    );
+
+    test(
+        "не позволяет отправить запрос удаления без проверки статуса",
+        async ({ page }) => {
+            await page.route(
+                "**/api/account-deletion/status",
+                async (route) => {
+                    await route.fulfill({
+                        status: 503,
+
+                        json: {
+                            message: "Сервис недоступен",
+                        },
+                    });
+                }
+            );
+
+            await page.reload({
+                waitUntil: "domcontentloaded",
+            });
+
+            await expectProfileLoaded(page);
+
+            const dialog = await openProfileSheet(
+                page,
+                "Удалить аккаунт",
+                "Удаление аккаунта"
+            );
+
+            await expect(
+                dialog.getByRole("alert")
+            ).toContainText(
+                "Не удалось проверить статус удаления"
+            );
+
+            await expect(
+                dialog.getByRole("button", {
+                    name: "Подтвердить удаление",
+                    exact: true,
+                })
+            ).toHaveCount(0);
+
+            await expect(
+                dialog.getByRole("button", {
+                    name: "Повторить проверку",
+                    exact: true,
+                })
             ).toBeVisible();
         }
     );
@@ -689,6 +854,237 @@ test.describe("ProfilePage", () => {
 
         await expect(page).toHaveURL(/\/support/);
     });
+
+    test(
+        "открывает предложение улучшений в шторке",
+        async ({ page }) => {
+            const dialog = await openProfileSheet(
+                page,
+                /^Предложить идею/,
+                "Предложить улучшение"
+            );
+
+            await expect(dialog)
+                .toContainText(
+                    "Бонус за полезную идею"
+                );
+
+            await expect(
+                dialog.getByRole("textbox", {
+                    name: "Ваше предложение",
+                    exact: true,
+                })
+            ).toBeVisible();
+
+            await expect(
+                dialog.getByRole("button", {
+                    name: "Отправить идею",
+                    exact: true,
+                })
+            ).toBeDisabled();
+        }
+    );
+
+    test(
+        "отправляет предложение в чат поддержки",
+        async ({ page }) => {
+            let submittedBody = null;
+            let submittedCalls = 0;
+
+            await page.route(
+                "**/api/support/messages",
+                async (route) => {
+                    if (
+                        route.request().method() !== "POST"
+                    ) {
+                        await route.fallback();
+                        return;
+                    }
+
+                    submittedCalls += 1;
+
+                    submittedBody =
+                        route.request()
+                            .postDataJSON();
+
+                    await route.fulfill({
+                        status: 200,
+
+                        json: {
+                            success: true,
+                        },
+                    });
+                }
+            );
+
+            const dialog = await openProfileSheet(
+                page,
+                /^Предложить идею/,
+                "Предложить улучшение"
+            );
+
+            const input = dialog.getByRole(
+                "textbox",
+                {
+                    name: "Ваше предложение",
+                    exact: true,
+                }
+            );
+
+            const submit = dialog.getByRole(
+                "button",
+                {
+                    name: "Отправить идею",
+                    exact: true,
+                }
+            );
+
+            await input.fill("Тест");
+
+            await expect(submit)
+                .toBeDisabled();
+
+            await input.fill(
+                "Добавьте фильтрацию заказов по времени."
+            );
+
+            await expect(submit)
+                .toBeEnabled();
+
+            await submit.click();
+
+            await expect.poll(
+                () => submittedCalls
+            ).toBe(1);
+
+            expect(submittedBody.text).toContain(
+                "ПРЕДЛОЖЕНИЕ ПО РАЗВИТИЮ CARGOCAMP"
+            );
+
+            expect(submittedBody.text).toContain(
+                "Добавьте фильтрацию заказов по времени."
+            );
+
+            expect(submittedBody.text).toContain(
+                "Платформа: Web"
+            );
+
+            expect(submittedBody.text).toContain(
+                "Пользователь: testuser"
+            );
+
+            expect(submittedBody.text).toContain(
+                "ID пользователя: 123"
+            );
+
+            await expect(dialog)
+                .not.toBeVisible();
+        }
+    );
+
+    test(
+        "при ошибке отправки сохраняет введённое предложение",
+        async ({ page }) => {
+            await page.route(
+                "**/api/support/messages",
+                async (route) => {
+                    await route.fulfill({
+                        status: 503,
+
+                        json: {
+                            message:
+                                "Поддержка временно недоступна",
+                        },
+                    });
+                }
+            );
+
+            const dialog = await openProfileSheet(
+                page,
+                /^Предложить идею/,
+                "Предложить улучшение"
+            );
+
+            const input = dialog.getByRole(
+                "textbox",
+                {
+                    name: "Ваше предложение",
+                    exact: true,
+                }
+            );
+
+            const suggestion =
+                "Добавьте фильтрацию заказов по времени.";
+
+            await input.fill(suggestion);
+
+            await dialog.getByRole("button", {
+                name: "Отправить идею",
+                exact: true,
+            }).click();
+
+            await expect(
+                page.getByText(
+                    "Поддержка временно недоступна",
+                    {
+                        exact: true,
+                    }
+                )
+            ).toBeVisible();
+
+            await expect(dialog)
+                .toBeVisible();
+
+            await expect(input)
+                .toHaveValue(suggestion);
+
+            await expect(
+                dialog.getByRole("button", {
+                    name: "Отправить идею",
+                    exact: true,
+                })
+            ).toBeEnabled();
+        }
+    );
+
+    test(
+        "закрытие предложения очищает черновик",
+        async ({ page }) => {
+            let dialog = await openProfileSheet(
+                page,
+                /^Предложить идею/,
+                "Предложить улучшение"
+            );
+
+            await dialog.getByRole("textbox", {
+                name: "Ваше предложение",
+                exact: true,
+            }).fill(
+                "Тестовое предложение CargoCamp."
+            );
+
+            await dialog.getByRole("button", {
+                name: "Отмена",
+                exact: true,
+            }).click();
+
+            await expect(dialog)
+                .not.toBeVisible();
+
+            dialog = await openProfileSheet(
+                page,
+                /^Предложить идею/,
+                "Предложить улучшение"
+            );
+
+            await expect(
+                dialog.getByRole("textbox", {
+                    name: "Ваше предложение",
+                    exact: true,
+                })
+            ).toHaveValue("");
+        }
+    );
 
     test(
         "показывает привязанную карту",
@@ -2487,6 +2883,94 @@ test.describe("ProfilePage", () => {
         }
     );
 
+    test(
+        "открывает публичную оферту для ознакомления",
+        async ({ page }) => {
+            let acceptCalls = 0;
+
+            await page.route(
+                "**/api/legal/offer/accept",
+                async (route) => {
+                    acceptCalls += 1;
+
+                    await route.fulfill({
+                        json: {
+                            accepted: true,
+                        },
+                    });
+                }
+            );
+
+            const dialog = await openProfileSheet(
+                page,
+                /^Публичная оферта/,
+                "Публичная оферта"
+            );
+
+            const document = dialog.locator(
+                ".cc-profile-legal-document"
+            );
+
+            await expect(document)
+                .toBeVisible();
+
+            await expect(document)
+                .not.toBeEmpty();
+
+            await expect(
+                dialog.getByRole("button", {
+                    name: "Принять оферту",
+                    exact: true,
+                })
+            ).toHaveCount(0);
+
+            await dialog.getByRole("button", {
+                name: "Закрыть документ",
+                exact: true,
+            }).click();
+
+            await expect(dialog)
+                .not.toBeVisible();
+
+            expect(acceptCalls).toBe(0);
+        }
+    );
+
+    test(
+        "открывает информацию об электронной подписи",
+        async ({ page }) => {
+            const dialog = await openProfileSheet(
+                page,
+                /^Электронная подпись/,
+                "Электронная подпись"
+            );
+
+            await expect(dialog).toContainText(
+                "Простая электронная подпись"
+            );
+
+            await expect(dialog).toContainText(
+                "Первое подписание"
+            );
+
+            await expect(dialog).toContainText(
+                "Последующие подписания"
+            );
+
+            await expect(dialog).toContainText(
+                "Документы по заказам"
+            );
+
+            await dialog.getByRole("button", {
+                name: "Понятно",
+                exact: true,
+            }).click();
+
+            await expect(dialog)
+                .not.toBeVisible();
+        }
+    );
+
     test("переходит на отзывы пользователя", async ({ page }) => {
         await page.getByRole("button", { name: "Отзывы" }).click();
 
@@ -2505,35 +2989,107 @@ test.describe("ProfilePage", () => {
         await expect(page).toHaveURL(/\/info/);
     });
 
-    test("выходит из аккаунта", async ({ page }) => {
-        let logoutBody = null;
+    test(
+        "выходит из аккаунта после подтверждения",
+        async ({ page }) => {
+            let logoutCalls = 0;
 
-        await page.route("**/api/auth/session/logout", async (route) => {
-            logoutBody = route.request().postDataJSON();
+            await page.route(
+                "**/api/auth/session/logout",
+                async (route) => {
+                    logoutCalls += 1;
 
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({ success: true }),
-            });
-        });
+                    await route.fulfill({
+                        status: 200,
 
-        await page.getByRole("button", { name: "Выйти" }).click();
+                        json: {
+                            success: true,
+                        },
+                    });
+                }
+            );
 
-        await expect(page).toHaveURL(/\/login/);
+            await page.getByRole("button", {
+                name: "Выйти",
+                exact: true,
+            }).click();
 
-        await expect
-            .poll(() => logoutBody)
-            .toEqual({
-                sessionClient: "web",
-            });
+            const dialog = page.getByRole(
+                "dialog",
+                {
+                    name: "Выйти из аккаунта?",
+                    exact: true,
+                }
+            );
 
-        const storedToken = await page.evaluate(() =>
-            localStorage.getItem("authToken")
-        );
+            await expect(dialog).toBeVisible();
 
-        expect(storedToken).toBeNull();
-    });
+            expect(logoutCalls).toBe(0);
+
+            await dialog.getByRole("button", {
+                name: "Выйти",
+                exact: true,
+            }).click();
+
+            await expect(page)
+                .toHaveURL(/\/login/);
+
+            await expect.poll(
+                () => logoutCalls
+            ).toBe(1);
+
+            const storedToken = await page.evaluate(
+                () => localStorage.getItem("authToken")
+            );
+
+            expect(storedToken).toBeNull();
+        }
+    );
+
+    test(
+        "отмена выхода сохраняет пользовательскую сессию",
+        async ({ page }) => {
+            let logoutCalls = 0;
+
+            await page.route(
+                "**/api/auth/session/logout",
+                async (route) => {
+                    logoutCalls += 1;
+
+                    await route.fulfill({
+                        json: {
+                            success: true,
+                        },
+                    });
+                }
+            );
+
+            const dialog = await openProfileSheet(
+                page,
+                "Выйти",
+                "Выйти из аккаунта?"
+            );
+
+            await dialog.getByRole("button", {
+                name: "Остаться",
+                exact: true,
+            }).click();
+
+            await expect(dialog)
+                .not.toBeVisible();
+
+            await expect(page)
+                .toHaveURL(/\/profile/);
+
+            const storedToken = await page.evaluate(
+                () => localStorage.getItem("authToken")
+            );
+
+            expect(storedToken).not.toBeNull();
+
+            expect(logoutCalls).toBe(0);
+        }
+    );
 
     test("редиректит на login, если нет токена", async ({ page }) => {
         await page.addInitScript(() => {
@@ -2566,6 +3122,137 @@ test.describe("ProfilePage", () => {
             timeout: 10000,
         });
     });
+
+    for (const width of [
+        320,
+        360,
+        390,
+        430,
+    ]) {
+        for (const colorScheme of [
+            "light",
+            "dark",
+        ]) {
+            test(
+                `@release-smoke профиль адаптивен на ${width}px в теме ${colorScheme}`,
+                async ({ page }) => {
+                    await page.setViewportSize({
+                        width,
+                        height: 800,
+                    });
+
+                    await page.emulateMedia({
+                        colorScheme,
+                    });
+
+                    await expectProfileLoaded(
+                        page
+                    );
+
+                    const profilePage =
+                        page.locator(
+                            ".profile-page"
+                        );
+
+                    await expect(profilePage)
+                        .toBeVisible();
+
+                    const shell = profilePage.locator(
+                        ".profile-shell"
+                    );
+
+                    await expect(shell)
+                        .toBeVisible();
+
+                    const overflow =
+                        await shell.evaluate(
+                            (element) => ({
+                                scrollWidth:
+                                element.scrollWidth,
+
+                                clientWidth:
+                                element.clientWidth,
+                            })
+                        );
+
+                    expect(
+                        overflow.scrollWidth
+                    ).toBeLessThanOrEqual(
+                        overflow.clientWidth + 2
+                    );
+
+                    const overflowingRows =
+                        await profilePage
+                            .locator(".cc-settings-row")
+                            .evaluateAll(
+                                (rows) =>
+                                    rows
+                                        .filter(
+                                            (row) =>
+                                                row.scrollWidth >
+                                                row.clientWidth + 2
+                                        )
+                                        .map(
+                                            (row) =>
+                                                row.innerText
+                                        )
+                            );
+
+                    expect(
+                        overflowingRows
+                    ).toEqual([]);
+
+                    for (const title of [
+                        "Финансы",
+                        "Работа и услуги",
+                        "Подтверждения и льготы",
+                        "Документы",
+                        "Моя активность",
+                        "Помощь и поддержка",
+                        "Управление аккаунтом",
+                    ]) {
+                        await expect(
+                            profilePage.getByRole(
+                                "heading",
+                                {
+                                    name: title,
+                                    exact: true,
+                                }
+                            )
+                        ).toBeVisible();
+                    }
+
+                    const dialog =
+                        await openProfileSheet(
+                            page,
+                            /^Банковские карты/,
+                            "Банковские карты"
+                        );
+
+                    const dialogOverflow =
+                        await dialog.evaluate(
+                            (element) =>
+                                element.scrollWidth >
+                                element.clientWidth + 2
+                        );
+
+                    expect(dialogOverflow)
+                        .toBe(false);
+
+                    await dialog.getByRole(
+                        "button",
+                        {
+                            name: "Закрыть",
+                            exact: true,
+                        }
+                    ).click();
+
+                    await expect(dialog)
+                        .not.toBeVisible();
+                }
+            );
+        }
+    }
 
     test("pull-to-refresh повторно загружает профиль, долг и категории", async ({ page }) => {
         let profileCalls = 0;

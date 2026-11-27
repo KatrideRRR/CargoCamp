@@ -1,335 +1,555 @@
-import { test, expect } from "./fixtures/safeTest";
-import { mockAppShell } from "./utils/mockAppShell";
-import { createMockJwt } from "./utils/mockAuthSession";
-const FRONT_URL = "http://localhost:3000";
+import {
+    test,
+    expect,
+} from "./fixtures/safeTest";
 
-const testUser = {
+import {
+    mockAppShell,
+} from "./utils/mockAppShell";
+
+import {
+    createMockJwt,
+} from "./utils/mockAuthSession";
+
+const FRONT_URL =
+    "http://localhost:3000";
+
+const profile = {
     id: 123,
     username: "testuser",
     role: "customer",
     rating: 4.2,
     userStatus: "verified",
+
     subscriptionType: "basic",
     subscriptionExpiresAt: null,
+
     yookassaPaymentMethodId: null,
     cardType: null,
     cardLastFour: null,
+
+    tbankCardBound: false,
+    autoCommissionProvider: "none",
+
     avatar: null,
     documentPhotos: [],
     preferredCategoryIds: [],
+
     locationLat: 44.9521,
     locationLng: 34.1024,
-    locationAddress: "Симферополь, улица Пушкина, 1",
+
+    locationAddress:
+        "Симферополь, улица Пушкина, 1",
+
     locationSource: "manual",
 };
 
-async function setFakeAuth(page, user = testUser) {
-    const fakeToken = createMockJwt(user);
-
-    await page.addInitScript(({ token, user }) => {
-        localStorage.setItem("authToken", token);
-        localStorage.setItem("user", JSON.stringify(user));
-        localStorage.setItem("currentUser", JSON.stringify(user));
-        localStorage.setItem("userData", JSON.stringify(user));
-    }, {
-        token: fakeToken,
-        user,
-    });
-}
-
-async function setupProfileMocks(page, options = {}) {
-    const {
-        profileBody = testUser,
-        debt = 0,
-        bindCardBody = {
-            success: true,
-            confirmationUrl: "https://payment.example.test/bind-card",
-        },
-        onBindCard,
-    } = options;
+async function setupProfile(page) {
+    const state = {
+        bindCalls: 0,
+        paymentUrl: null,
+        bindStatus: 200,
+    };
 
     await mockAppShell(page, {
         identity: true,
         benefits: true,
     });
 
-    page.on("pageerror", (error) => {
-        console.log("[PAGE ERROR]", error.message);
-    });
+    const token = createMockJwt(profile);
 
-    page.on("console", (msg) => {
-        const text = msg.text();
+    await page.addInitScript(
+        ({ token, profile }) => {
+            localStorage.setItem(
+                "authToken",
+                token
+            );
 
-        if (
-            text.includes("Ошибка") ||
-            text.includes("error") ||
-            text.includes("React")
-        ) {
-            console.log(`[BROWSER ${msg.type()}]`, text);
+            localStorage.setItem(
+                "user",
+                JSON.stringify(profile)
+            );
+
+            localStorage.setItem(
+                "currentUser",
+                JSON.stringify(profile)
+            );
+
+            localStorage.setItem(
+                "userData",
+                JSON.stringify(profile)
+            );
+        },
+        {
+            token,
+            profile,
         }
-    });
+    );
 
-    await page.route("**/api/auth/profile", async (route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify(profileBody),
-        });
-    });
+    await page.route(
+        "**/api/auth/profile",
+        async (route) => {
+            await route.fulfill({
+                json: profile,
+            });
+        }
+    );
 
-    await page.route("**/api/orders/me/status", async (route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify({
-                debt,
-            }),
-        });
-    });
-
-    await page.route("**/api/category", async (route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify([]),
-        });
-    });
-
-    await page.route("**/api/payments/card/bind/create", async (route) => {
-        onBindCard?.();
-
-        await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify(bindCardBody),
-        });
-    });
-
-    await page.route("https://geocode-maps.yandex.ru/1.x/**", async (route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify({
-                response: {
-                    GeoObjectCollection: {
-                        featureMember: [
-                            {
-                                GeoObject: {
-                                    metaDataProperty: {
-                                        GeocoderMetaData: {
-                                            text: "Россия, Республика Крым, Симферополь, улица Пушкина, 1",
-                                        },
-                                    },
-                                    name: "Симферополь, улица Пушкина, 1",
-                                    Point: {
-                                        pos: "34.1024 44.9521",
-                                    },
-                                },
-                            },
-                        ],
-                    },
+    await page.route(
+        "**/api/orders/me/status",
+        async (route) => {
+            await route.fulfill({
+                json: {
+                    debt: 0,
                 },
-            }),
-        });
-    });
-}
+            });
+        }
+    );
 
-async function openProfileWithAgreement(page, options = {}) {
-    await setFakeAuth(page);
-    await setupProfileMocks(page, options);
+    await page.route(
+        "**/api/category",
+        async (route) => {
+            await route.fulfill({
+                json: [],
+            });
+        }
+    );
 
-    await page.goto(`${FRONT_URL}/profile?platform=web`, {
-        waitUntil: "domcontentloaded",
-        timeout: 30000,
-    });
+    await page.route(
+        "**/api/account-deletion/status",
+        async (route) => {
+            await route.fulfill({
+                json: {
+                    request: null,
+                },
+            });
+        }
+    );
 
-    if (page.url().includes("/login")) {
-        await page.screenshot({
-            path: "agreement-modal-profile-redirected-to-login.png",
-            fullPage: true,
-        });
+    await page.route(
+        "**/api/payments/card/bind/create",
+        async (route) => {
+            state.bindCalls += 1;
 
-        throw new Error("ProfilePage редиректит на /login. Fake JWT не применился.");
-    }
+            if (state.bindStatus !== 200) {
+                await route.fulfill({
+                    status: state.bindStatus,
 
-    await expect(page.locator(".profile-title")).toHaveText("Профиль", {
-        timeout: 15000,
-    });
+                    json: {
+                        message:
+                            "Привязка временно недоступна",
+                    },
+                });
 
-    const paymentsCard = page.locator(".profile-card").filter({
-        hasText: "Платежи",
-    });
+                return;
+            }
 
-    await expect(paymentsCard.getByRole("button", {
-        name: "Привязать карту",
-    })).toBeVisible();
+            await route.fulfill({
+                json: {
+                    success: true,
 
-    return paymentsCard;
-}
+                    confirmationUrl:
+                        "https://payment.example.test/bind-card",
+                },
+            });
+        }
+    );
 
-async function openAgreementModal(page) {
-    const paymentsCard = page.locator(".profile-card").filter({
-        hasText: "Платежи",
-    });
-
-    await paymentsCard.getByRole("button", {
-        name: "Привязать карту",
-    }).click();
-
-    await expect(page.locator(".agreement-modal")).toBeVisible({
-        timeout: 10000,
-    });
-}
-
-test.describe("AgreementModal", () => {
-    test.beforeEach(async ({ page }) => {
-        await openProfileWithAgreement(page);
-    });
-
-    test("по умолчанию модалка не отображается", async ({ page }) => {
-        await expect(page.locator(".agreement-modal")).not.toBeVisible();
-        await expect(page.locator(".agreement-overlay")).not.toBeVisible();
-    });
-
-    test("открывается по кнопке Привязать карту", async ({ page }) => {
-        await openAgreementModal(page);
-
-        await expect(page.locator(".agreement-overlay")).toBeVisible();
-        await expect(page.locator(".agreement-modal")).toBeVisible();
-
-        await expect(page.locator(".agreement-title")).toHaveText(
-            "Соглашение о списании средств"
-        );
-    });
-
-    test("показывает ключевые условия соглашения", async ({ page }) => {
-        await openAgreementModal(page);
-
-        const modal = page.locator(".agreement-modal");
-
-        await expect(modal).toContainText("Назначение платежа");
-        await expect(modal).toContainText("Оплата работ исполнителей онлайн не принимается");
-        await expect(modal).toContainText("200 ₽");
-        await expect(modal).toContainText("50 ₽ / 100 ₽ / 150 ₽");
-        await expect(modal).toContainText("2500 ₽");
-        await expect(modal).toContainText("9000 ₽");
-        await expect(modal).toContainText("partner@cargocamp.ru");
-    });
-
-    test("кнопка Подтвердить отключена без чекбокса", async ({ page }) => {
-        await openAgreementModal(page);
-
-        await expect(page.locator(".agreement-button")).toBeDisabled();
-
-        await expect(page.locator(".agreement-check")).toContainText(
-            "Я согласен с условиями списания средств"
-        );
-    });
-
-    test("чекбокс включает кнопку Подтвердить", async ({ page }) => {
-        await openAgreementModal(page);
-
-        await page.locator(".agreement-check input[type='checkbox']").check();
-
-        await expect(page.locator(".agreement-button")).toBeEnabled();
-    });
-
-    test("повторное открытие сбрасывает чекбокс", async ({ page }) => {
-        await openAgreementModal(page);
-
-        const checkbox = page.locator(".agreement-check input[type='checkbox']");
-
-        await checkbox.check();
-
-        await expect(page.locator(".agreement-button")).toBeEnabled();
-
-        await page.getByLabel("Закрыть").click();
-
-        await expect(page.locator(".agreement-modal")).not.toBeVisible();
-
-        await openAgreementModal(page);
-
-        await expect(page.locator(".agreement-check input[type='checkbox']")).not.toBeChecked();
-        await expect(page.locator(".agreement-button")).toBeDisabled();
-    });
-
-    test("закрывается по кнопке крестика", async ({ page }) => {
-        await openAgreementModal(page);
-
-        await page.getByLabel("Закрыть").click();
-
-        await expect(page.locator(".agreement-modal")).not.toBeVisible();
-        await expect(page.locator(".agreement-overlay")).not.toBeVisible();
-    });
-
-    test("закрывается по клику на overlay", async ({ page }) => {
-        await openAgreementModal(page);
-
-        await page.locator(".agreement-overlay").click({
-            position: {
-                x: 10,
-                y: 10,
-            },
-        });
-
-        await expect(page.locator(".agreement-modal")).not.toBeVisible();
-    });
-
-    test("клик внутри модалки не закрывает её", async ({ page }) => {
-        await openAgreementModal(page);
-
-        await page.locator(".agreement-modal").click({
-            position: {
-                x: 20,
-                y: 20,
-            },
-        });
-
-        await expect(page.locator(".agreement-modal")).toBeVisible();
-    });
-
-    test("без чекбокса не вызывает привязку карты", async ({ page }) => {
-        let bindCalled = false;
-
-        await page.route("**/api/payments/card/bind/create", async (route) => {
-            bindCalled = true;
+    await page.route(
+        "https://payment.example.test/**",
+        async (route) => {
+            state.paymentUrl =
+                route.request().url();
 
             await route.fulfill({
                 status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    success: true,
-                    confirmationUrl: "https://payment.example.test/bind-card",
-                }),
+                contentType: "text/html",
+                body: "<html><body>Payment mock</body></html>",
             });
+        }
+    );
+
+    await page.goto(
+        `${FRONT_URL}/profile?platform=web`,
+        {
+            waitUntil: "domcontentloaded",
+        }
+    );
+
+    await expect(
+        page.getByRole("heading", {
+            name: "Профиль",
+            exact: true,
+        })
+    ).toBeVisible();
+
+    return state;
+}
+
+async function openAgreement(page) {
+    await page.getByRole("button", {
+        name: /^Банковские карты/,
+    }).click();
+
+    const cards = page.getByRole(
+        "dialog",
+        {
+            name: "Банковские карты",
+            exact: true,
+        }
+    );
+
+    await cards.getByRole("button", {
+        name: /Привязать карту/,
+    }).click();
+
+    const providers = page.getByRole(
+        "dialog",
+        {
+            name: "Привязать карту",
+            exact: true,
+        }
+    );
+
+    await providers.getByRole("button", {
+        name: /^ЮKassa/,
+    }).click();
+
+    const agreement = page.getByRole(
+        "dialog",
+        {
+            name: "Соглашение",
+            exact: true,
+        }
+    );
+
+    await expect(agreement)
+        .toBeVisible();
+
+    return agreement;
+}
+
+function getAgreementCheckbox(dialog) {
+    return dialog.getByRole(
+        "checkbox",
+        {
+            name:
+                /Я согласен с условиями списания средств/,
+        }
+    );
+}
+
+function getSubmitButton(dialog) {
+    return dialog.getByRole(
+        "button",
+        {
+            name:
+                "Подтвердить и привязать карту",
+            exact: true,
+        }
+    );
+}
+
+test.describe(
+    "Соглашение о привязке карты",
+    () => {
+        let state;
+
+        test.beforeEach(async ({ page }) => {
+            state = await setupProfile(page);
         });
 
-        await openAgreementModal(page);
+        test(
+            "соглашение не открывается автоматически",
+            async ({ page }) => {
+                await expect(
+                    page.getByRole("dialog", {
+                        name: "Соглашение",
+                        exact: true,
+                    })
+                ).toHaveCount(0);
 
-        await expect(page.locator(".agreement-button")).toBeDisabled();
+                expect(state.bindCalls)
+                    .toBe(0);
+            }
+        );
 
-        expect(bindCalled).toBe(false);
-    });
+        test(
+            "открывает соглашение внутри шторки банковских карт",
+            async ({ page }) => {
+                const dialog =
+                    await openAgreement(page);
 
-    test("после подтверждения вызывает привязку карты", async ({ page }) => {
-        let bindCalled = false;
+                await expect(dialog)
+                    .toBeVisible();
 
-        await openProfileWithAgreement(page, {
-            onBindCard: () => {
-                bindCalled = true;
-            },
-        });
+                await expect(
+                    page.getByRole("dialog")
+                ).toHaveCount(1);
 
-        await openAgreementModal(page);
+                await expect(
+                    page.locator(
+                        ".agreement-overlay"
+                    )
+                ).toHaveCount(0);
+            }
+        );
 
-        await page.locator(".agreement-check input[type='checkbox']").check();
+        test(
+            "показывает условия списания средств",
+            async ({ page }) => {
+                const dialog =
+                    await openAgreement(page);
 
-        await page.locator(".agreement-button").click();
+                for (const text of [
+                    "Назначение платежа",
 
-        await expect
-            .poll(() => bindCalled, {
-                timeout: 10000,
-            })
-            .toBe(true);
-    });
-});
+                    "Оплата работ исполнителей онлайн не принимается",
+
+                    "200 ₽",
+
+                    "50 ₽ / 100 ₽ / 150 ₽",
+
+                    "2500 ₽",
+
+                    "9000 ₽",
+
+                    "partner@cargocamp.ru",
+                ]) {
+                    await expect(dialog)
+                        .toContainText(text);
+                }
+            }
+        );
+
+        test(
+            "без согласия нельзя начать привязку",
+            async ({ page }) => {
+                const dialog =
+                    await openAgreement(page);
+
+                await expect(
+                    getAgreementCheckbox(dialog)
+                ).not.toBeChecked();
+
+                await expect(
+                    getSubmitButton(dialog)
+                ).toBeDisabled();
+
+                expect(state.bindCalls)
+                    .toBe(0);
+            }
+        );
+
+        test(
+            "согласие включает кнопку подтверждения",
+            async ({ page }) => {
+                const dialog =
+                    await openAgreement(page);
+
+                await getAgreementCheckbox(
+                    dialog
+                ).check();
+
+                await expect(
+                    getSubmitButton(dialog)
+                ).toBeEnabled();
+
+                await getAgreementCheckbox(
+                    dialog
+                ).uncheck();
+
+                await expect(
+                    getSubmitButton(dialog)
+                ).toBeDisabled();
+            }
+        );
+
+        test(
+            "возврат назад не инициирует привязку",
+            async ({ page }) => {
+                const dialog =
+                    await openAgreement(page);
+
+                await getAgreementCheckbox(
+                    dialog
+                ).check();
+
+                await dialog.getByRole(
+                    "button",
+                    {
+                        name: "Назад",
+                        exact: true,
+                    }
+                ).click();
+
+                const providers =
+                    page.getByRole("dialog", {
+                        name: "Привязать карту",
+                        exact: true,
+                    });
+
+                await expect(providers)
+                    .toBeVisible();
+
+                expect(state.bindCalls)
+                    .toBe(0);
+
+                await providers.getByRole(
+                    "button",
+                    {
+                        name: /^ЮKassa/,
+                    }
+                ).click();
+
+                const reopened =
+                    page.getByRole("dialog", {
+                        name: "Соглашение",
+                        exact: true,
+                    });
+
+                await expect(
+                    getAgreementCheckbox(
+                        reopened
+                    )
+                ).not.toBeChecked();
+
+                await expect(
+                    getSubmitButton(reopened)
+                ).toBeDisabled();
+            }
+        );
+
+        test(
+            "закрытие шторки сбрасывает согласие",
+            async ({ page }) => {
+                let dialog =
+                    await openAgreement(page);
+
+                await getAgreementCheckbox(
+                    dialog
+                ).check();
+
+                await dialog.getByRole(
+                    "button",
+                    {
+                        name: "Закрыть",
+                        exact: true,
+                    }
+                ).click();
+
+                await expect(dialog)
+                    .not.toBeVisible();
+
+                dialog =
+                    await openAgreement(page);
+
+                await expect(
+                    getAgreementCheckbox(dialog)
+                ).not.toBeChecked();
+
+                expect(state.bindCalls)
+                    .toBe(0);
+            }
+        );
+
+        test(
+            "клик внутри соглашения не закрывает шторку",
+            async ({ page }) => {
+                const dialog =
+                    await openAgreement(page);
+
+                await dialog.getByText(
+                    /Назначение платежа/
+                ).first().click();
+
+                await expect(dialog)
+                    .toBeVisible();
+
+                expect(state.bindCalls)
+                    .toBe(0);
+            }
+        );
+
+        test(
+            "закрывается по нажатию на затемнение",
+            async ({ page }) => {
+                const dialog =
+                    await openAgreement(page);
+
+                await page.locator(
+                    ".cc-sheet-overlay"
+                ).click({
+                    position: {
+                        x: 5,
+                        y: 5,
+                    },
+                });
+
+                await expect(dialog)
+                    .not.toBeVisible();
+
+                expect(state.bindCalls)
+                    .toBe(0);
+            }
+        );
+
+        test(
+            "после подтверждения создаёт привязку и открывает платёжную страницу",
+            async ({ page }) => {
+                const dialog =
+                    await openAgreement(page);
+
+                await getAgreementCheckbox(
+                    dialog
+                ).check();
+
+                await getSubmitButton(
+                    dialog
+                ).click();
+
+                await expect.poll(
+                    () => state.bindCalls
+                ).toBe(1);
+
+                await expect.poll(
+                    () => state.paymentUrl
+                ).toBe(
+                    "https://payment.example.test/bind-card"
+                );
+            }
+        );
+
+        test(
+            "при ошибке привязки оставляет возможность повторить",
+            async ({ page }) => {
+                state.bindStatus = 503;
+
+                const dialog =
+                    await openAgreement(page);
+
+                await getAgreementCheckbox(
+                    dialog
+                ).check();
+
+                await getSubmitButton(
+                    dialog
+                ).click();
+
+                await expect.poll(
+                    () => state.bindCalls
+                ).toBe(1);
+
+                await expect(dialog)
+                    .toBeVisible();
+
+                await expect(
+                    getSubmitButton(dialog)
+                ).toBeEnabled();
+
+                expect(state.paymentUrl)
+                    .toBeNull();
+            }
+        );
+    }
+);

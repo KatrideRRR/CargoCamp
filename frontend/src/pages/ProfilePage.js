@@ -9,7 +9,11 @@ import { getCurrentLocation, getLocationErrorMessage } from "../utils/getCurrent
 import { useAuth } from "../utils/authContext";
 import axios from "axios";
 import axiosInstance from "../utils/axiosInstance";
-import {FaHeadset, FaLightbulb, FaTrophy, FaPaperPlane,} from "react-icons/fa";
+import {
+    FaHeadset,
+    FaLightbulb,
+    FaTrophy,
+} from "react-icons/fa";
 import "../styles/ProfilePage.css";
 import "../styles/ProfilePageDark.css";
 import UserBenefitsSection from "../components/UserBenefitsSection";
@@ -27,14 +31,20 @@ import {
     CarFront,
     Check,
     ChevronRight,
-    X,
     MapPin,
     Camera,
     Navigation,
     Map,
     Info,
+    Star,
+    History,
+    LogOut,
+    FileText,
+    FileCheck,
+    Send,
 } from "lucide-react";
 import AccountDeletionSection from "../components/AccountDeletionSection";
+import PublicOffer from "../components/PublicOffer";
 import { App as CapacitorApp } from "@capacitor/app";
 import { openPaymentPage } from "../utils/openPaymentPage";
 
@@ -47,6 +57,7 @@ import {
     SheetScreen,
     PaymentCardOption,
     TextField,
+    ConfirmSheet,
     StatusBadge,
 } from "../components/ui";
 
@@ -270,6 +281,15 @@ const ProfilePage = () => {
     ] = useState(false);
 
     const cardUnbindingRef = useRef(false);
+
+    const [showLogoutConfirm, setShowLogoutConfirm] =
+        useState(false);
+
+    const [logoutLoading, setLogoutLoading] =
+        useState(false);
+
+    const logoutRef = useRef(false);
+    const suggestionSubmitRef = useRef(false);
 
     const [showSuggestionModal, setShowSuggestionModal] = useState(false);
     const [suggestionText, setSuggestionText] = useState("");
@@ -2062,11 +2082,34 @@ const ProfilePage = () => {
     };
 
     const handleLogout = async () => {
-        await logout();
+        if (logoutRef.current) {
+            return;
+        }
 
-        navigate("/login", {
-            replace: true,
-        });
+        logoutRef.current = true;
+        setLogoutLoading(true);
+
+        try {
+            await logout();
+
+            setShowLogoutConfirm(false);
+
+            navigate("/login", {
+                replace: true,
+            });
+        } catch (error) {
+            console.error(
+                "Profile logout error:",
+                error
+            );
+
+            toast.error(
+                "Не удалось завершить выход из аккаунта"
+            );
+        } finally {
+            logoutRef.current = false;
+            setLogoutLoading(false);
+        }
     };
 
     const handleMyComplaints = () => {
@@ -2081,28 +2124,42 @@ const ProfilePage = () => {
     };
 
     const closeSuggestionModal = () => {
-        if (suggestionSending) return;
+        if (suggestionSubmitRef.current) {
+            return;
+        }
 
         setShowSuggestionModal(false);
         setSuggestionText("");
     };
 
     const submitPlatformSuggestion = async () => {
-        const cleanText = String(suggestionText || "").trim();
+        if (suggestionSubmitRef.current) {
+            return;
+        }
+
+        const cleanText =
+            String(suggestionText || "").trim();
 
         if (cleanText.length < 10) {
-            toast.info("Опишите предложение немного подробнее");
+            toast.info(
+                "Опишите предложение немного подробнее"
+            );
+
             return;
         }
 
         if (cleanText.length > 2000) {
-            toast.error("Предложение не должно превышать 2000 символов");
+            toast.error(
+                "Предложение не должно превышать 2000 символов"
+            );
+
             return;
         }
 
-        try {
-            setSuggestionSending(true);
+        suggestionSubmitRef.current = true;
+        setSuggestionSending(true);
 
+        try {
             const platformLabel =
                 platform === "ios"
                     ? "iOS"
@@ -2120,22 +2177,31 @@ const ProfilePage = () => {
                 `ID пользователя: ${profile?.id || "Неизвестно"}`,
             ].join("\n");
 
-            await axiosInstance.post("/support/messages", {
-                text: message,
-            });
+            await axiosInstance.post(
+                "/support/messages",
+                {
+                    text: message,
+                }
+            );
 
-            toast.success("Спасибо! Предложение отправлено");
+            toast.success(
+                "Спасибо! Предложение отправлено"
+            );
 
             setShowSuggestionModal(false);
             setSuggestionText("");
         } catch (error) {
-            console.error("Ошибка отправки предложения:", error);
+            console.error(
+                "Ошибка отправки предложения:",
+                error
+            );
 
             toast.error(
-                error?.response?.data?.message ||
+                error.response?.data?.message ||
                 "Не удалось отправить предложение"
             );
         } finally {
+            suggestionSubmitRef.current = false;
             setSuggestionSending(false);
         }
     };
@@ -2446,6 +2512,48 @@ const ProfilePage = () => {
                 </SectionCard>
 
                 <SectionCard
+                    title="Документы"
+                    padded={false}
+                    className="cc-profile-group"
+                >
+                    <SettingsRow
+                        icon={<FileText />}
+                        title="Публичная оферта"
+                        description="Условия использования CargoCamp"
+                        onClick={() =>
+                            openProfileSheet("publicOffer")
+                        }
+                    />
+
+                    <SettingsRow
+                        icon={<FileCheck />}
+                        title="Электронная подпись"
+                        description="Подписание документов по заказам"
+                        onClick={() =>
+                            openProfileSheet("signatureInfo")
+                        }
+                    />
+                </SectionCard>
+
+                <SectionCard
+                    title="Моя активность"
+                    padded={false}
+                    className="cc-profile-group"
+                >
+                    <SettingsRow
+                        icon={<Star />}
+                        title="Отзывы"
+                        onClick={handleMyComplaints}
+                    />
+
+                    <SettingsRow
+                        icon={<History />}
+                        title="История заказов"
+                        onClick={handleOrderHistory}
+                    />
+                </SectionCard>
+
+                <SectionCard
                     title="Помощь и поддержка"
                     padded={false}
                     className="cc-profile-group"
@@ -2475,6 +2583,14 @@ const ProfilePage = () => {
                         onClick={() => {}}
                     />
 
+                    <SettingsRow
+                        icon={<Info />}
+                        title="Информация и контакты"
+                        onClick={() =>
+                            navigate("/info")
+                        }
+                    />
+
                     <div className="cc-profile-support-phone">
 
         <span>
@@ -2487,38 +2603,154 @@ const ProfilePage = () => {
 
                 </SectionCard>
 
-                <AccountDeletionSection />
+                <SectionCard
+                    title="Управление аккаунтом"
+                    padded={false}
+                    className="cc-profile-group"
+                >
+                    <SettingsRow
+                        icon={<LogOut />}
+                        title="Выйти"
+                        variant="danger"
+                        onClick={() =>
+                            setShowLogoutConfirm(true)
+                        }
+                    />
 
-                <div className="profile-actions glass">
-                    <button
-                        onClick={handleMyComplaints}
-                        className="btn btn-ghost"
-                    >
-                        Отзывы
-                    </button>
+                    <AccountDeletionSection embedded />
+                </SectionCard>
 
-                    <button
-                        onClick={handleOrderHistory}
-                        className="btn btn-ghost"
-                    >
-                        История заказов
-                    </button>
+                <footer className="cc-profile-footer">
+                    <strong>CargoCamp</strong>
 
-                    <button
-                        onClick={() => navigate("/info")}
-                        className="btn btn-ghost"
-                    >
-                        Информация и контакты
-                    </button>
-
-                    <button
-                        onClick={handleLogout}
-                        className="btn btn-ghost-danger"
-                    >
-                        Выйти
-                    </button>
-                </div>
+                    <span>
+        Сервис локальных услуг
+    </span>
+                </footer>
             </div>
+
+            <BottomSheet
+                open={activeProfileSheet === "publicOffer"}
+                onClose={closeProfileSheet}
+                title="Публичная оферта"
+            >
+                <div className="cc-profile-sheet-stack">
+
+                    <div className="cc-profile-legal-document">
+                        <PublicOffer />
+                    </div>
+
+                    <Button
+                        fullWidth
+                        variant="secondary"
+                        onClick={closeProfileSheet}
+                    >
+                        Закрыть документ
+                    </Button>
+
+                </div>
+            </BottomSheet>
+
+            <BottomSheet
+                open={activeProfileSheet === "signatureInfo"}
+                onClose={closeProfileSheet}
+                title="Электронная подпись"
+            >
+                <div className="cc-profile-sheet-stack">
+
+                    <div className="cc-profile-signature-intro">
+
+                        <div className="cc-profile-signature-icon">
+                            <FileCheck
+                                size={34}
+                                aria-hidden="true"
+                            />
+                        </div>
+
+                        <h3>
+                            Простая электронная подпись
+                        </h3>
+
+                        <p>
+                            ПЭП используется для подписания
+                            предусмотренных сервисом документов
+                            по заказам CargoCamp.
+                        </p>
+
+                    </div>
+
+                    <div className="cc-verification-info-card">
+
+                        <strong>
+                            Первое подписание
+                        </strong>
+
+                        <p>
+                            При первой активации электронной
+                            подписи необходимо пройти
+                            подтверждение по SMS согласно
+                            действующим правилам сервиса.
+                        </p>
+
+                    </div>
+
+                    <div className="cc-verification-info-card">
+
+                        <strong>
+                            Последующие подписания
+                        </strong>
+
+                        <p>
+                            После активации ПЭП дальнейшее
+                            подписание может выполняться
+                            подтверждением соответствующего
+                            действия в приложении.
+                        </p>
+
+                    </div>
+
+                    <div className="cc-verification-info-card">
+
+                        <strong>
+                            Документы по заказам
+                        </strong>
+
+                        <p>
+                            Договоры-задания, акты и другие
+                            предусмотренные документы доступны
+                            в соответствующих заказах.
+                        </p>
+
+                    </div>
+
+                    <Button
+                        fullWidth
+                        onClick={closeProfileSheet}
+                    >
+                        Понятно
+                    </Button>
+
+                </div>
+            </BottomSheet>
+
+            <ConfirmSheet
+                open={showLogoutConfirm}
+                onClose={() => {
+                    if (!logoutRef.current) {
+                        setShowLogoutConfirm(false);
+                    }
+                }}
+                title="Выйти из аккаунта?"
+                description={
+                    "Для следующего входа потребуется " +
+                    "снова авторизоваться."
+                }
+                confirmLabel="Выйти"
+                cancelLabel="Остаться"
+                danger
+                loading={logoutLoading}
+                onConfirm={handleLogout}
+            />
 
             <BottomSheet
                 open={activeProfileSheet === "cards"}
@@ -3822,112 +4054,95 @@ const ProfilePage = () => {
                 </SheetScreen>
             </BottomSheet>
 
-            {showSuggestionModal && (
-                <div
-                    className="modal-overlay profile-suggestion-overlay"
-                    onClick={closeSuggestionModal}
-                >
-                    <div
-                        className="modal-window profile-suggestion-modal"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <button
-                            type="button"
-                            className="profile-suggestion-close"
-                            onClick={closeSuggestionModal}
-                            disabled={suggestionSending}
-                            aria-label="Закрыть"
-                        >
-                            <X size={18} aria-hidden="true" />
-                        </button>
+            <BottomSheet
+                open={showSuggestionModal}
+                onClose={closeSuggestionModal}
+                title="Предложить улучшение"
+                description={
+                    "Расскажите, что стоит добавить, " +
+                    "исправить или сделать удобнее."
+                }
+                busy={suggestionSending}
+            >
+                <div className="cc-profile-sheet-stack">
 
-                        <div className="profile-suggestion-head">
-                            <div className="profile-suggestion-icon">
-                                <FaLightbulb />
-                            </div>
+                    <div className="cc-suggestion-reward">
 
-                            <div>
-                                <h3>Предложить улучшение</h3>
+                        <div className="cc-suggestion-reward__icon">
 
-                                <p>
-                                    Расскажите, что стоит добавить, исправить
-                                    или сделать удобнее.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="profile-suggestion-reward">
-                            <strong>Бонус за полезную идею</strong>
-
-                            <span>
-                    Если предложение поможет развитию платформы,
-                    после рассмотрения мы можем подарить вам
-                    1 день Premium.
-                </span>
-                        </div>
-
-                        <label className="profile-suggestion-label">
-                            Ваше предложение
-
-                            <textarea
-                                className="profile-suggestion-textarea"
-                                value={suggestionText}
-                                onChange={(e) =>
-                                    setSuggestionText(
-                                        e.target.value.slice(0, 2000)
-                                    )
-                                }
-                                placeholder={
-                                    "Например: добавьте фильтр заказов по времени, " +
-                                    "измените работу карты или сделайте новый способ оплаты..."
-                                }
-                                rows={7}
-                                maxLength={2000}
-                                disabled={suggestionSending}
-                                autoFocus
+                            <Sparkles
+                                size={26}
+                                aria-hidden="true"
                             />
-                        </label>
 
-                        <div className="profile-suggestion-counter">
-                            {suggestionText.length} / 2000
                         </div>
 
-                        <div className="profile-suggestion-note">
-                            Предложение поступит в поддержку CargoCamp.
-                            Ответ при необходимости появится в чате поддержки.
+                        <div className="cc-suggestion-reward__content">
+
+                            <strong>
+                                Бонус за полезную идею
+                            </strong>
+
+                            <p>
+                                Если предложение поможет развитию
+                                платформы, после рассмотрения мы
+                                можем подарить вам 1 день Premium.
+                            </p>
+
                         </div>
 
-                        <div className="profile-suggestion-actions">
-                            <button
-                                type="button"
-                                className="btn btn-ghost"
-                                onClick={closeSuggestionModal}
-                                disabled={suggestionSending}
-                            >
-                                Отмена
-                            </button>
-
-                            <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={submitPlatformSuggestion}
-                                disabled={
-                                    suggestionSending ||
-                                    suggestionText.trim().length < 10
-                                }
-                            >
-                                <FaPaperPlane />
-
-                                <span>
-                        {suggestionSending
-                            ? "Отправляем..."
-                            : "Отправить идею"}
-                    </span>
-                            </button>
-                        </div>
                     </div>
+
+                    <TextField
+                        multiline
+                        rows={7}
+                        aria-label="Ваше предложение"
+                        placeholder={
+                            "Расскажите, как можно улучшить CargoCamp..."
+                        }
+                        value={suggestionText}
+                        maxLength={2000}
+                        disabled={suggestionSending}
+                        onChange={(event) =>
+                            setSuggestionText(
+                                event.target.value.slice(0, 2000)
+                            )
+                        }
+                    />
+
+                    <div className="cc-suggestion-counter">
+                        {suggestionText.length} / 2000
+                    </div>
+
+                    <p className="cc-profile-note">
+                        Предложение поступит в поддержку CargoCamp.
+                        Ответ при необходимости появится
+                        в чате поддержки.
+                    </p>
+
+                    <Button
+                        fullWidth
+                        leftIcon={<Send size={18} />}
+                        loading={suggestionSending}
+                        disabled={
+                            suggestionText.trim().length < 10
+                        }
+                        onClick={submitPlatformSuggestion}
+                    >
+                        Отправить идею
+                    </Button>
+
+                    <Button
+                        variant="secondary"
+                        fullWidth
+                        disabled={suggestionSending}
+                        onClick={closeSuggestionModal}
+                    >
+                        Отмена
+                    </Button>
+
                 </div>
-            )}
+            </BottomSheet>
 
             <BottomSheet
                 open={showVerificationModal}
