@@ -18,9 +18,13 @@ import { ensureUserAccessToken } from "./utils/userSession";
 import {resyncPushRegistration,} from "./utils/pushNotifications";
 import { disconnectSocket } from "./socketClient";
 import "./utils/axiosInstance";
+
+import "./styles/designTokens.css";
 import "./styles/global.css";
 import "./styles/darkTheme.css";
 import "./styles/NotificationsDark.css";
+import "./styles/ui.css";
+
 import PublicOfferGate from "./components/PublicOfferGate";
 
 Modal.setAppElement('#root');
