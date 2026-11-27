@@ -1184,3 +1184,227 @@ textarea.cc-field__input {
     outline: 2px solid var(--cc-primary);
     outline-offset: 2px;
 }
+
+/* =========================================================
+   SETTINGS ROW — RESPONSIVE LAYOUT
+   ========================================================= */
+
+.cc-settings-row__title {
+    word-break: normal;
+    overflow-wrap: break-word;
+    line-height: 1.35;
+}
+
+.cc-settings-row__description {
+    word-break: normal;
+    overflow-wrap: break-word;
+}
+
+.cc-settings-row__value {
+    word-break: normal;
+    overflow-wrap: break-word;
+
+    line-height: 1.4;
+}
+
+.cc-settings-row__main {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+
+/* Narrow mobile screens */
+
+@media (max-width: 420px) {
+
+    .cc-settings-row {
+        gap: 10px;
+
+        padding: 12px;
+    }
+
+    .cc-settings-row__icon {
+        flex-basis: 36px;
+
+        width: 36px;
+        height: 36px;
+    }
+
+    .cc-settings-row--has-value {
+        display: grid;
+
+        grid-template-columns:
+            minmax(0, 1fr);
+
+        grid-template-areas:
+            "main"
+            "value";
+
+        column-gap: 10px;
+        row-gap: 4px;
+
+        align-items: center;
+    }
+
+    .cc-settings-row--has-value
+    .cc-settings-row__main {
+        grid-area: main;
+    }
+
+    .cc-settings-row--has-value
+    .cc-settings-row__value {
+        grid-area: value;
+
+        max-width: 100%;
+        min-width: 0;
+
+        text-align: left;
+        font-size: 13px;
+    }
+
+    .cc-settings-row--has-value
+    .cc-settings-row__icon {
+        grid-area: icon;
+        align-self: center;
+    }
+
+    .cc-settings-row--has-value
+    .cc-settings-row__chevron {
+        grid-area: chevron;
+        align-self: center;
+    }
+
+    .cc-settings-row--has-value.cc-settings-row--has-icon {
+        grid-template-columns:
+            36px minmax(0, 1fr);
+
+        grid-template-areas:
+            "icon main"
+            "icon value";
+    }
+
+    .cc-settings-row--has-value.cc-settings-row--has-chevron {
+        grid-template-columns:
+            minmax(0, 1fr) 18px;
+
+        grid-template-areas:
+            "main chevron"
+            "value chevron";
+    }
+
+    .cc-settings-row--has-value.cc-settings-row--has-icon.cc-settings-row--has-chevron {
+        grid-template-columns:
+            36px minmax(0, 1fr) 18px;
+
+        grid-template-areas:
+            "icon main chevron"
+            "icon value chevron";
+    }
+}
+
+@media (max-width: 350px) {
+
+    .cc-settings-row {
+        gap: 8px;
+        padding: 10px;
+    }
+
+    .cc-settings-row__title {
+        font-size: 15px;
+    }
+
+    .cc-settings-row__description {
+        font-size: 13px;
+    }
+}
+
+/* =========================================================
+   PROFILE — RESPONSIVE SAFETY
+   ========================================================= */
+
+.profile-page .profile-shell {
+    min-width: 0;
+}
+
+.profile-page .profile-shell > * {
+    max-width: 100%;
+    min-width: 0;
+
+    box-sizing: border-box;
+}
+
+.cc-profile-group .cc-section__header {
+    min-width: 0;
+}
+
+.cc-profile-group .cc-section__title {
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+
+.cc-profile-account__meta > span {
+    max-width: 100%;
+    overflow-wrap: break-word;
+}
+
+.cc-profile-support-phone {
+    min-width: 0;
+}
+
+.cc-profile-support-phone a {
+    max-width: 100%;
+
+    overflow-wrap: break-word;
+}
+
+@media (max-width: 420px) {
+
+    .profile-page .profile-shell {
+        gap: 10px;
+    }
+
+    .cc-profile-group .cc-settings-row {
+        min-height: 64px;
+    }
+
+    .cc-profile-account {
+        gap: 12px;
+        padding: 16px;
+    }
+
+    .cc-profile-support-phone {
+        padding: 12px;
+    }
+
+    .cc-profile-payment-card {
+        padding: 12px;
+    }
+
+    .cc-profile-debt {
+        padding: 12px;
+    }
+}
+
+@media (max-width: 350px) {
+
+    .profile-page .profile-shell {
+        gap: 8px;
+    }
+
+    .cc-profile-account__avatar {
+        width: 56px;
+        height: 56px;
+    }
+
+    .cc-profile-account__info h2 {
+        font-size: 17px;
+    }
+
+    .cc-profile-account__meta {
+        font-size: 12px;
+    }
+
+    .cc-profile-heading h1 {
+        font-size: 25px;
+    }
+}

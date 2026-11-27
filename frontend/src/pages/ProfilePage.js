@@ -237,6 +237,15 @@ const ProfilePage = () => {
         setPremiumMode("redirect");
         setPremiumProvider("yookassa");
         setPremiumAgreementChecked(false);
+        if (sheet === "location") {
+            setLocationScreen("main");
+            setLocationDirection(1);
+        }
+        if (sheet === "vehicle") {
+            setVehicleEditing(false);
+            setVehicleDirection(1);
+            resetVehicleDraft();
+        }
     };
 
     const closeProfileSheet = () => {
@@ -311,7 +320,21 @@ const ProfilePage = () => {
     const [locLoading, setLocLoading] = useState(false);
     const [locError, setLocError] = useState(null);
     const [gpsCandidate, setGpsCandidate] = useState(null);
-    const [showMapModal, setShowMapModal] = useState(false);
+    const [locationScreen, setLocationScreen] =
+        useState("main");
+
+    const [locationDirection, setLocationDirection] =
+        useState(1);
+
+    const openLocationMap = () => {
+        setLocationDirection(1);
+        setLocationScreen("map");
+    };
+
+    const backToLocation = () => {
+        setLocationDirection(-1);
+        setLocationScreen("main");
+    };
     const [pickedCoords, setPickedCoords] = useState(null);
 
     const [addressSuggestions, setAddressSuggestions] = useState([]);
@@ -370,6 +393,47 @@ const ProfilePage = () => {
         vehiclePlate: "",
         vehicleYear: "",
     });
+
+    const resetVehicleDraft = () => {
+        setVehicleForm({
+            vehicleBrand:
+                profile?.vehicleBrand || "",
+
+            vehicleModel:
+                profile?.vehicleModel || "",
+
+            vehicleColor:
+                profile?.vehicleColor || "",
+
+            vehiclePlate:
+                profile?.vehiclePlate || "",
+
+            vehicleYear:
+                profile?.vehicleYear
+                    ? String(profile.vehicleYear)
+                    : "",
+        });
+    };
+
+    const openVehicleEditor = () => {
+        resetVehicleDraft();
+
+        setVehicleDirection(1);
+        setVehicleEditing(true);
+    };
+
+    const backToVehicleSummary = () => {
+        resetVehicleDraft();
+
+        setVehicleDirection(-1);
+        setVehicleEditing(false);
+    };
+
+    const [vehicleEditing, setVehicleEditing] =
+        useState(false);
+
+    const [vehicleDirection, setVehicleDirection] =
+        useState(1);
 
     const [vehicleSaving, setVehicleSaving] =
         useState(false);
@@ -1371,7 +1435,7 @@ const ProfilePage = () => {
                     setGpsCandidate(null);
                     setAddressSuggestions([]);
                     setAddressQuery("");
-                    setShowMapModal(true);
+                    openLocationMap();
 
                     toast.info(
                         "Координаты получены. Уточните точку на карте, чтобы определить адрес."
@@ -1396,7 +1460,7 @@ const ProfilePage = () => {
                 setGpsCandidate(null);
                 setAddressSuggestions([]);
                 setAddressQuery("");
-                setShowMapModal(true);
+                openLocationMap();
 
                 toast.info(
                     "Координаты получены. Уточните точку на карте, чтобы определить адрес."
@@ -2081,6 +2145,13 @@ const ProfilePage = () => {
                 return "Автомобиль не добавлен";
         }
     })();
+
+    const isVehicleVerified =
+        profile?.vehicleVerificationStatus ===
+        "verified";
+
+    const showVehicleSummary =
+        isVehicleVerified && !vehicleEditing;
 
     if (loading) {
         return (
@@ -3086,11 +3157,30 @@ const ProfilePage = () => {
             <BottomSheet
                 open={activeProfileSheet === "location"}
                 onClose={closeProfileSheet}
-                title="Местоположение"
-                description="Используется для автоподстановки адреса и фильтрации заказов"
+                title={
+                    locationScreen === "map"
+                        ? "Выбрать на карте"
+                        : "Местоположение"
+                }
+                description={
+                    locationScreen === "main"
+                        ? "Используется для автоподстановки адреса и фильтрации заказов"
+                        : undefined
+                }
                 busy={locLoading}
             >
-                <div className="cc-profile-sheet-stack">
+                <SheetScreen
+                    screen={locationScreen}
+                    direction={locationDirection}
+                    busy={locLoading}
+                    onBack={
+                        locationScreen === "map"
+                            ? backToLocation
+                            : undefined
+                    }
+                >
+                    {locationScreen === "main" && (
+                        <div className="cc-profile-sheet-stack">
 
                     <div className="cc-profile-address-field">
 
@@ -3182,10 +3272,7 @@ const ProfilePage = () => {
                             title="Выбрать на карте"
                             description="Указать точку вручную"
                             disabled={locLoading}
-                            onClick={() => {
-                                closeProfileSheet();
-                                setShowMapModal(true);
-                            }}
+                            onClick={openLocationMap}
                         />
 
                     </div>
@@ -3244,34 +3331,48 @@ const ProfilePage = () => {
                         </div>
                     )}
 
-                </div>
+                        </div>
+                    )}
+
+                    {locationScreen === "map" && (
+                        <YandexMapModal
+                            embedded
+                            isOpen={
+                                activeProfileSheet === "location" &&
+                                locationScreen === "map"
+                            }
+                            onClose={backToLocation}
+                            initialLat={
+                                pickedCoords?.lat ??
+                                profile?.locationLat
+                            }
+                            initialLng={
+                                pickedCoords?.lng ??
+                                profile?.locationLng
+                            }
+                            showOrders={false}
+                            onPick={(picked) => {
+                                setLocationDraft(
+                                    picked.address
+                                );
+
+                                setPickedCoords({
+                                    lat: picked.lat,
+                                    lng: picked.lng,
+                                });
+
+                                setAddressSuggestions([]);
+                                setAddressQuery("");
+                                setGpsCandidate(null);
+                                setLocError(null);
+
+                                backToLocation();
+                            }}
+                        />
+                    )}
+                </SheetScreen>
             </BottomSheet>
 
-            <YandexMapModal
-                isOpen={showMapModal}
-                onClose={() => {
-                    setShowMapModal(false);
-                    openProfileSheet("location");
-                }}
-                initialLat={profile?.locationLat}
-                initialLng={profile?.locationLng}
-                showOrders={false}
-                onPick={(picked) => {
-                    setLocationDraft(picked.address);
-                    setAddressSuggestions([]);
-                    setAddressQuery("");
-
-                    saveLocation({
-                        address: picked.address,
-                        lat: picked.lat,
-                        lng: picked.lng,
-                        source: "map",
-                    });
-
-                    setShowMapModal(false);
-                    openProfileSheet("location");
-                }}
-            />
             <BottomSheet
                 open={activeProfileSheet === "debt"}
                 onClose={closeProfileSheet}
@@ -3339,14 +3440,127 @@ const ProfilePage = () => {
             <BottomSheet
                 open={activeProfileSheet === "vehicle"}
                 onClose={closeProfileSheet}
-                title="Автомобиль"
-                description="Данные автомобиля для выполнения заказов такси"
+                title={
+                    vehicleEditing
+                        ? "Сменить автомобиль"
+                        : "Автомобиль"
+                }
+                description={
+                    showVehicleSummary
+                        ? undefined
+                        : "Данные автомобиля для выполнения заказов такси"
+                }
                 busy={
                     vehicleSaving ||
                     vehiclePhotoUploading
                 }
             >
-                <div className="cc-profile-sheet-stack">
+                <SheetScreen
+                    screen={
+                        showVehicleSummary
+                            ? "summary"
+                            : "editor"
+                    }
+                    direction={vehicleDirection}
+                    busy={
+                        vehicleSaving ||
+                        vehiclePhotoUploading
+                    }
+                    onBack={
+                        vehicleEditing
+                            ? backToVehicleSummary
+                            : undefined
+                    }
+                >
+
+                    {showVehicleSummary ? (
+                        <div className="cc-profile-sheet-stack">
+
+                            <div className="cc-vehicle-summary">
+
+                                {profile?.vehiclePhoto ? (
+                                    <img
+                                        className="cc-vehicle-summary__photo"
+                                        src={buildFileUrl(
+                                            profile.vehiclePhoto
+                                        )}
+                                        alt="Автомобиль"
+                                    />
+                                ) : (
+                                    <div className="cc-vehicle-summary__placeholder">
+                                        <CarFront
+                                            size={54}
+                                            aria-hidden="true"
+                                        />
+                                    </div>
+                                )}
+
+                                <div className="cc-vehicle-summary__body">
+
+                                    <StatusBadge
+                                        tone="success"
+                                        icon={<Check size={15} />}
+                                    >
+                                        Автомобиль подтверждён
+                                    </StatusBadge>
+
+                                    <h3>
+                                        {[
+                                            profile?.vehicleBrand,
+                                            profile?.vehicleModel,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(" ")}
+                                    </h3>
+
+                                    <div className="cc-vehicle-summary__plate">
+                                        {profile?.vehiclePlate ||
+                                            "Госномер не указан"}
+                                    </div>
+
+                                    <div className="cc-vehicle-summary__details">
+
+                                        <div>
+                                            <span>Цвет</span>
+
+                                            <strong>
+                                                {profile?.vehicleColor ||
+                                                    "Не указан"}
+                                            </strong>
+                                        </div>
+
+                                        <div>
+                                            <span>Год выпуска</span>
+
+                                            <strong>
+                                                {profile?.vehicleYear ||
+                                                    "Не указан"}
+                                            </strong>
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                            <p className="cc-profile-note">
+                                Автомобиль подтверждён администратором.
+                                Вы можете принимать заказы такси
+                                при выполнении остальных условий сервиса.
+                            </p>
+
+                            <Button
+                                variant="secondary"
+                                fullWidth
+                                onClick={openVehicleEditor}
+                            >
+                                Сменить автомобиль
+                            </Button>
+
+                        </div>
+                    ) : (
+                        <div className="cc-profile-sheet-stack">
 
                     <div className="cc-profile-vehicle-status">
 
@@ -3403,9 +3617,9 @@ const ProfilePage = () => {
                         "verified" && (
                             <div className="cc-profile-vehicle-notice">
 
-                                Автомобиль подтверждён.
-                                При изменении данных потребуется
-                                повторная проверка.
+                                При изменении данных или фотографии
+                                автомобиля может потребоваться повторное
+                                подтверждение администратором.
 
                             </div>
                         )}
@@ -3578,7 +3792,9 @@ const ProfilePage = () => {
                                 : "Отправить на проверку"}
                     </Button>
 
-                </div>
+                        </div>
+                    )}
+                </SheetScreen>
             </BottomSheet>
 
             {showSuggestionModal && (

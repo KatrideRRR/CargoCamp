@@ -4,6 +4,7 @@ import "../styles/YandexMapModal.css";
 import {
     getOrderCoordinatesForMap,
 } from "../utils/orderNavigation";
+import { Button } from "./ui";
 
 const EMPTY_ORDERS = Object.freeze([]);
 
@@ -109,6 +110,7 @@ export default function YandexMapModal({
                                            showOrders = false,
                                            orders = EMPTY_ORDERS,
                                            currentUserId = null,
+                                           embedded = false,
                                        }) {
     const apiKey = process.env.REACT_APP_YANDEX_API_KEY;
 
@@ -152,15 +154,18 @@ export default function YandexMapModal({
     }, [validInitialCoords]);
 
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen || embedded) return;
 
-        const prevOverflow = document.body.style.overflow;
+        const prevOverflow =
+            document.body.style.overflow;
+
         document.body.style.overflow = "hidden";
 
         return () => {
-            document.body.style.overflow = prevOverflow;
+            document.body.style.overflow =
+                prevOverflow;
         };
-    }, [isOpen]);
+    }, [isOpen, embedded]);
 
     const reverseGeocode = useCallback(async (lat, lng) => {
         const ymaps = ymapsRef.current;
@@ -682,6 +687,76 @@ export default function YandexMapModal({
     ]);
 
     if (!isOpen) return null;
+
+    if (embedded) {
+        return (
+            <div className="cc-embedded-map">
+
+                <p className="cc-embedded-map__hint">
+                    Нажмите на карту или переместите
+                    метку, чтобы указать местоположение.
+                </p>
+
+                <div className="cc-embedded-map__container">
+
+                    <div
+                        ref={mapNodeRef}
+                        className="cc-embedded-map__canvas"
+                        aria-label="Яндекс.Карта"
+                    />
+
+                    {loading && (
+                        <div
+                            className="cc-embedded-map__loading"
+                            role="status"
+                        >
+                            Загрузка карты...
+                        </div>
+                    )}
+
+                </div>
+
+                {error && (
+                    <div
+                        className="cc-ui-error"
+                        role="alert"
+                    >
+                        {error}
+                    </div>
+                )}
+
+                <div className="cc-embedded-map__address">
+
+                <span>
+                    Выбранное местоположение
+                </span>
+
+                    <strong>
+                        {picked?.address ||
+                            "Укажите точку на карте"}
+                    </strong>
+
+                </div>
+
+                <Button
+                    fullWidth
+                    disabled={
+                        !picked ||
+                        loading ||
+                        !!error ||
+                        picked.address ===
+                        "Определяем адрес…"
+                    }
+                    onClick={() =>
+                        onPick?.(picked)
+                    }
+                >
+                    Подтвердить местоположение
+                </Button>
+
+            </div>
+        );
+    }
 
     return createPortal(
         <div

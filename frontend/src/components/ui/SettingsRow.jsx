@@ -33,6 +33,15 @@ const SettingsRow = ({
             className={[
                 "cc-settings-row",
                 `cc-settings-row--${variant}`,
+                icon && "cc-settings-row--has-icon",
+
+                value != null &&
+                value !== "" &&
+                "cc-settings-row--has-value",
+
+                interactive &&
+                showChevron &&
+                "cc-settings-row--has-chevron",
                 interactive &&
                 "cc-settings-row--interactive",
                 disabled &&

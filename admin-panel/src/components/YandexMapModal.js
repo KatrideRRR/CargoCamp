@@ -177,7 +177,6 @@ export default function YandexMapModal({
 
     if (!isOpen) return null;
 
-    // ✅ вот тут Portal в body — чтобы модалка ВСЕГДА была поверх профиля/нижних кнопок
     return createPortal(
         <div className="glass-modal-overlay" onClick={onClose}>
             <div className="glass-modal" onClick={(e) => e.stopPropagation()}>
