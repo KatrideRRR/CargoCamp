@@ -342,32 +342,6 @@ const OrderPage = () => {
         setCurrentImageIndex((prevIndex) => (prevIndex - 1 + currentImages.length) % currentImages.length);
     };
 
-    const savePendingOrderRequest = ({ orderId, proposedSum, comment, availableAt }) => {
-        sessionStorage.setItem(
-            "pendingOrderRequestAfterDebtPayment",
-            JSON.stringify({
-                orderId,
-                proposedSum,
-                comment: comment || "",
-                returnTo: `/order/${orderId}`,
-                createdAt: Date.now(),
-                availableAt: availableAt || null,
-            })
-        );
-    };
-
-    const getPendingOrderRequest = () => {
-        try {
-            const raw = sessionStorage.getItem("pendingOrderRequestAfterDebtPayment");
-            return raw ? JSON.parse(raw) : null;
-        } catch {
-            return null;
-        }
-    };
-
-    const clearPendingOrderRequest = () => {
-        sessionStorage.removeItem("pendingOrderRequestAfterDebtPayment");
-    };
 
     const openRequestModal = () => {
         if (!order?.id) return;
@@ -496,76 +470,6 @@ const OrderPage = () => {
         fetchOrderData,
     ]);
 
-    useEffect(() => {
-        if (isExpressPage) return;
-
-        const params = new URLSearchParams(window.location.search);
-        const debtReturn = params.get("debtReturn") === "1";
-        const resumeRequest = params.get("resumeRequest") === "1";
-
-        if (!debtReturn || !resumeRequest) return;
-
-        const pendingRequest = getPendingOrderRequest();
-
-        if (!pendingRequest?.orderId || !pendingRequest?.proposedSum) {
-            params.delete("debtReturn");
-            params.delete("resumeRequest");
-
-            const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
-            window.history.replaceState({}, "", newUrl);
-
-            return;
-        }
-
-        if (Number(pendingRequest.orderId) !== Number(id)) {
-            return;
-        }
-
-        let cancelled = false;
-
-        const resume = async () => {
-            try {
-                for (let attempt = 0; attempt < 10; attempt++) {
-                    if (cancelled) return;
-
-                    const profileRes = await axiosInstance.get("/auth/profile");
-                    const debt = Number(profileRes.data?.debt || 0);
-
-                    if (debt <= 0) {
-                        await submitRegularOrderRequest({
-                            orderId: pendingRequest.orderId,
-                            proposedSum: pendingRequest.proposedSum,
-                            comment: pendingRequest.comment || "",
-                            availableAt: pendingRequest.availableAt || null,
-                        });
-
-                        clearPendingOrderRequest();
-
-                        params.delete("debtReturn");
-                        params.delete("resumeRequest");
-
-                        const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
-                        window.history.replaceState({}, "", newUrl);
-
-                        return;
-                    }
-
-                    await new Promise((resolve) => setTimeout(resolve, 1500));
-                }
-
-                toast.info("Оплата ещё обрабатывается. Попробуйте отправить запрос ещё раз через пару секунд.");
-            } catch (e) {
-                console.error("resume request after debt payment error:", e);
-                toast.error("Не удалось автоматически отправить запрос после оплаты");
-            }
-        };
-
-        resume();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [id, isExpressPage, submitRegularOrderRequest]);
 
     const submitRequestFromModal = async () => {
         if (!order?.id) {
@@ -623,21 +527,24 @@ const OrderPage = () => {
             const debt = Number(statusRes.data?.debt || 0);
 
             if (debt > 0) {
-                savePendingOrderRequest({
+                const pendingRequest = {
                     orderId: order.id,
                     proposedSum: normalizedSum,
                     comment: requestComment.trim(),
-                    availableAt: requestAvailableAt,
-                });
+                    availableAt: requestAvailableAt
+                        ? new Date(requestAvailableAt).toISOString()
+                        : null,
+                };
 
                 closeRequestModal();
 
                 openDebtModal({
-                    title: "Есть задолженность по комиссии",
+                    title: "Задолженность",
                     description:
-                        "Чтобы отправить запрос на этот заказ, сначала оплатите задолженность. После оплаты запрос отправится автоматически.",
+                        "Погасите задолженность. После подтверждения оплаты отклик отправится автоматически.",
                     amount: debt,
-                    returnPath: `/order/${order.id}?debtReturn=1&resumeRequest=1`,
+                    returnPath: `/order/${order.id}`,
+                    request: pendingRequest,
                 });
 
                 return;
@@ -658,7 +565,6 @@ const OrderPage = () => {
             setRequestSubmitting(false);
         }
     };
-
 
 
     const handleAcceptExpress = async () => {

@@ -34,10 +34,7 @@ const formatAmount = (kopecks) =>
 const getSavedCards = (profile) => {
     const cards = [];
 
-    if (
-        profile?.cardLastFour ||
-        profile?.yookassa_payment_method_id
-    ) {
+    if (profile?.yookassaPaymentMethodId) {
         cards.push({
             id: "yookassa",
             provider: "yookassa",
@@ -1123,21 +1120,31 @@ const DebtPaymentSheet = ({
 
                         {renderError()}
 
-                        <Button
-                            fullWidth
+                        {(!payment?.orderId ||
+                            (
+                                request &&
+                                Number(request.orderId) ===
+                                Number(payment.orderId)
+                            )
+                        ) ? (
+                            <Button
+                                fullWidth
+                                onClick={() => {
+                                    setPayment(null);
+                                    setError("");
 
-                            onClick={() => {
-                                setPayment(null);
-                                setError("");
-
-                                goTo(
-                                    "method",
-                                    -1
-                                );
-                            }}
-                        >
-                            Выбрать способ оплаты
-                        </Button>
+                                    goTo("method", -1);
+                                }}
+                            >
+                                Выбрать способ оплаты
+                            </Button>
+                        ) : (
+                            <p className="cc-debt-sheet__description">
+                                Вернитесь к заказу и отправьте
+                                отклик повторно, чтобы восстановить
+                                параметры запроса.
+                            </p>
+                        )}
 
                         <Button
                             fullWidth
