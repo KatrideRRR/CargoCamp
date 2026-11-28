@@ -5,6 +5,9 @@ import {
 } from "./utils/mockOrderAssets";
 
 import { createMockJwt } from "./utils/mockAuthSession";
+import {
+    mockDebtPayment,
+} from "./utils/mockDebtPayment";
 
 const FRONT_URL = "http://localhost:3000";
 
@@ -1257,29 +1260,31 @@ test.describe("OrderPage — дополнительные сценарии", () 
     );
 
     test(
-        "при задолженности сохраняет отклик вместо отправки",
+        "передаёт отклик при оплате сохранённой картой Т-Банка",
         async ({ page }) => {
             await openRegularOrderPage(page, {
                 requestStatusBody: {
                     debt: 25000,
                 },
+
+                profileBody: {
+                    ...viewer,
+                    debt: 25000,
+
+                    tbankCardBound: true,
+
+                    tbankCardMask:
+                        "МИР •••• 7788",
+
+                    autoCommissionProvider:
+                        "tbank",
+                },
             });
 
-            let requestCount = 0;
-
-            await page.route(
-                "**/api/orders/101/request",
-                async (route) => {
-                    requestCount++;
-
-                    await route.fulfill({
-                        status: 200,
-                        json: {
-                            success: true,
-                        },
-                    });
-                }
-            );
+            const payment =
+                await mockDebtPayment(page, {
+                    provider: "tbank",
+                });
 
             await openRequestModal(page);
 
@@ -1295,94 +1300,222 @@ test.describe("OrderPage — дополнительные сценарии", () 
                 name: "Отправить запрос",
             }).click();
 
+            const sheet = page.getByRole(
+                "dialog",
+                {
+                    name: "Оплата задолженности",
+                    exact: true,
+                }
+            );
+
+            await expect(sheet).toBeVisible();
+
+            await sheet.getByRole("button", {
+                name: "Оплатить и запросить",
+            }).click();
+
             await expect(
-                page.locator(".modal-title")
-            ).toHaveText("Есть задолженность по комиссии");
+                sheet.getByText(
+                    "МИР •••• 7788"
+                )
+            ).toBeVisible();
 
-            const saved = await page.evaluate(() => {
-                const raw = sessionStorage.getItem(
-                    "pendingOrderRequestAfterDebtPayment"
-                );
+            expect(
+                payment.calls.create
+            ).toBe(0);
 
-                return raw ? JSON.parse(raw) : null;
+            await sheet.getByRole("button", {
+                name: /Оплатить\s+250/,
+            }).click();
+
+            await expect.poll(
+                () => payment.calls.create
+            ).toBe(1);
+
+            expect(
+                payment.calls.bodies[0]
+            ).toMatchObject({
+                paymentMode:
+                    "saved_card",
+
+                expectedAmountKopecks:
+                    25000,
+
+                returnPath:
+                    "/order/101",
+
+                request: {
+                    orderId: 101,
+                    proposedSum: 2500,
+
+                    comment:
+                        "Приеду вечером",
+
+                    availableAt: null,
+                },
             });
 
-            expect(saved).toMatchObject({
-                orderId: 101,
-                proposedSum: 2500,
-                comment: "Приеду вечером",
-                availableAt: null,
-                returnTo: "/order/101",
+            await expect(
+                sheet.getByRole("heading", {
+                    name: "Проверяем оплату",
+                })
+            ).toBeVisible();
+
+            expect(
+                payment.calls.directRequest
+            ).toBe(0);
+
+            payment.confirm();
+
+            await expect(
+                sheet.getByRole("heading", {
+                    name: "Отклик отправлен",
+                })
+            ).toBeVisible({
+                timeout: 15000,
             });
 
-            expect(requestCount).toBe(0);
+            expect(
+                payment.calls.create
+            ).toBe(1);
+
+            expect(
+                payment.calls.directRequest
+            ).toBe(0);
+        }
+    );
+    test(
+        "после возвращения из банка восстанавливает серверный результат",
+        async ({ page }) => {
+            await openRegularOrderPage(page);
+
+            const payment =
+                await mockDebtPayment(page);
+
+            payment.confirm();
+
+            await page.goto(
+                `${FRONT_URL}/order/101` +
+                "?platform=web" +
+                "&debtReturn=1" +
+                "&debtIntentId=9001"
+            );
+
+            const sheet = page.getByRole(
+                "dialog",
+                {
+                    name: "Оплата задолженности",
+                    exact: true,
+                }
+            );
+
+            await expect(sheet).toBeVisible();
+
+            await expect(
+                sheet.getByRole("heading", {
+                    name: "Отклик отправлен",
+                })
+            ).toBeVisible();
+
+            await expect(
+                sheet.getByText(
+                    "Заказ №101",
+                    {
+                        exact: true,
+                    }
+                )
+            ).toBeVisible();
+
+            await expect.poll(
+                () => page.url()
+            ).not.toContain("debtIntentId");
+
+            await expect.poll(
+                () => page.url()
+            ).not.toContain("debtReturn");
+
+            expect(
+                page.url()
+            ).toContain("platform=web");
+
+            expect(
+                payment.calls.create
+            ).toBe(0);
+
+            expect(
+                payment.calls.directRequest
+            ).toBe(0);
+
+            await sheet.getByRole("button", {
+                name: "Понятно",
+            }).click();
+
+            await expect(
+                sheet
+            ).not.toBeVisible();
         }
     );
 
     test(
-        "после погашения долга восстанавливает сохранённый отклик",
+        "не сообщает об успешном отклике, если заказ стал недоступен",
         async ({ page }) => {
             await openRegularOrderPage(page);
 
-            let requestBody = null;
+            const payment =
+                await mockDebtPayment(page, {
+                    requestStatus:
+                        "failed",
+                });
 
-            await page.route(
-                "**/api/orders/101/request",
-                async (route) => {
-                    requestBody = route.request().postDataJSON();
+            payment.confirm();
 
-                    await route.fulfill({
-                        status: 200,
-                        json: {
-                            success: true,
-                        },
-                    });
+            await page.goto(
+                `${FRONT_URL}/order/101` +
+                "?platform=web" +
+                "&debtReturn=1" +
+                "&debtIntentId=9001"
+            );
+
+            const sheet = page.getByRole(
+                "dialog",
+                {
+                    name: "Оплата задолженности",
+                    exact: true,
                 }
             );
 
-            await page.evaluate(() => {
-                sessionStorage.setItem(
-                    "pendingOrderRequestAfterDebtPayment",
-                    JSON.stringify({
-                        orderId: 101,
-                        proposedSum: 1800,
-                        comment: "После оплаты комиссии",
-                        availableAt: null,
-                        returnTo: "/order/101",
-                        createdAt: Date.now(),
-                    })
-                );
-            });
+            await expect(
+                sheet
+            ).toBeVisible();
 
-            // Имитируем возвращение с платёжной страницы.
-            // Платёжные сервисы не вызываются.
-            await page.goto(
-                `${FRONT_URL}/order/101?platform=web&debtReturn=1&resumeRequest=1`
-            );
+            await expect(
+                sheet.getByRole("heading", {
+                    name: "Платёж подтверждён",
+                })
+            ).toBeVisible();
 
-            await expect.poll(
-                () => requestBody
-            ).toEqual({
-                proposedSum: 1800,
-                comment: "После оплаты комиссии",
-                availableAt: null,
-            });
+            await expect(
+                sheet.getByText(
+                    "Заказ уже недоступен",
+                    {
+                        exact: true,
+                    }
+                )
+            ).toBeVisible();
 
-            await expect.poll(async () => {
-                return page.evaluate(() =>
-                    sessionStorage.getItem(
-                        "pendingOrderRequestAfterDebtPayment"
-                    )
-                );
-            }).toBeNull();
+            await expect(
+                sheet.getByRole("heading", {
+                    name: "Отклик отправлен",
+                })
+            ).toHaveCount(0);
 
-            await expect.poll(
-                () => page.url()
-            ).not.toContain("resumeRequest=1");
+            expect(
+                payment.calls.create
+            ).toBe(0);
 
-            await expect.poll(
-                () => page.url()
-            ).not.toContain("debtReturn=1");
+            expect(
+                payment.calls.directRequest
+            ).toBe(0);
         }
     );
 });

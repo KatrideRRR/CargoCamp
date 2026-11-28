@@ -4,6 +4,9 @@ import {
     mockOrderAssets,
 } from "./utils/mockOrderAssets";
 
+import {
+    mockDebtPayment,
+} from "./utils/mockDebtPayment";
 import { createMockJwt } from "./utils/mockAuthSession";
 
 const FRONT_URL = "http://localhost:3000";
@@ -2035,27 +2038,28 @@ test.describe("OrdersPage — фильтры, время и ограничени
     });
 
     test(
-        "при задолженности не отправляет отклик и сохраняет его до оплаты",
+        "при задолженности передаёт отклик платёжному намерению",
         async ({ page }) => {
             await openOrdersPage(page, {
                 statusDebt: 25000,
+
+                profileBody: {
+                    ...viewer,
+                    debt: 25000,
+
+                    yookassaPaymentMethodId:
+                        "test-saved-card",
+
+                    cardType: "МИР",
+                    cardLastFour: "4832",
+
+                    autoCommissionProvider:
+                        "none",
+                },
             });
 
-            let requestCount = 0;
-
-            await page.route(
-                "**/api/orders/101/request",
-                async (route) => {
-                    requestCount++;
-
-                    await route.fulfill({
-                        status: 200,
-                        json: {
-                            success: true,
-                        },
-                    });
-                }
-            );
+            const payment =
+                await mockDebtPayment(page);
 
             await openRequestModal(
                 page,
@@ -2074,36 +2078,247 @@ test.describe("OrdersPage — фильтры, время и ограничени
                 name: "Отправить запрос",
             }).click();
 
-            // Вместо отправки отклика открывается
-            // модальное окно погашения долга.
-            await expect(
-                page.locator(".modal-title")
-            ).toHaveText(
-                "Есть задолженность по комиссии"
+            const sheet = page.getByRole(
+                "dialog",
+                {
+                    name: "Оплата задолженности",
+                    exact: true,
+                }
             );
 
+            await expect(sheet).toBeVisible();
+
             await expect(
-                page.locator(".request-order-content")
-            ).not.toBeVisible();
+                sheet.getByRole("heading", {
+                    name: "Задолженность",
+                    exact: true,
+                })
+            ).toBeVisible();
 
-            const savedRequest = await page.evaluate(() => {
-                const raw = sessionStorage.getItem(
-                    "pendingOrderRequestAfterDebtPayment"
-                );
+            // До подтверждения пользователем
+            // банковский платёж не создаётся.
 
-                return raw ? JSON.parse(raw) : null;
+            expect(
+                payment.calls.create
+            ).toBe(0);
+
+            expect(
+                payment.calls.directRequest
+            ).toBe(0);
+
+            await expect(
+                sheet.getByText(
+                    "Включите автосписание комиссии",
+                    {
+                        exact: false,
+                    }
+                )
+            ).toBeVisible();
+
+            await sheet.getByRole("button", {
+                name: "Оплатить и запросить",
+                exact: true,
+            }).click();
+
+            await expect(
+                sheet.getByText(
+                    "Сохранённая карта",
+                    {
+                        exact: true,
+                    }
+                )
+            ).toBeVisible();
+
+            await expect(
+                sheet.getByText(
+                    "МИР •••• 4832"
+                )
+            ).toBeVisible();
+
+            // Даже открытие экрана выбора карты
+            // ещё не инициирует списание.
+
+            expect(
+                payment.calls.create
+            ).toBe(0);
+
+            await sheet.getByRole("button", {
+                name: /Оплатить\s+250/,
+            }).click();
+
+            await expect.poll(
+                () => payment.calls.create
+            ).toBe(1);
+
+            expect(
+                payment.calls.bodies[0]
+            ).toMatchObject({
+                paymentMode: "saved_card",
+
+                expectedAmountKopecks:
+                    25000,
+
+                returnPath:
+                    "/orders",
+
+                request: {
+                    orderId: 101,
+                    proposedSum: 2500,
+
+                    comment:
+                        "Могу приехать вечером",
+
+                    availableAt: null,
+                },
             });
 
-            expect(savedRequest).toMatchObject({
-                orderId: 101,
-                proposedSum: 2500,
-                comment: "Могу приехать вечером",
-                availableAt: null,
+            await expect(
+                sheet.getByRole("heading", {
+                    name: "Проверяем оплату",
+                })
+            ).toBeVisible();
+
+            expect(
+                payment.calls.directRequest
+            ).toBe(0);
+
+            payment.confirm();
+
+            await expect(
+                sheet.getByRole("heading", {
+                    name: "Отклик отправлен",
+                })
+            ).toBeVisible({
+                timeout: 15000,
             });
 
-            // До оплаты запрос не должен
-            // поступить заказчику.
-            expect(requestCount).toBe(0);
+            expect(
+                payment.calls.create
+            ).toBe(1);
+
+            expect(
+                payment.calls.directRequest
+            ).toBe(0);
+
+            await expect.poll(
+                async () =>
+                    page.evaluate(() =>
+                        sessionStorage.getItem(
+                            "pendingOrderRequestAfterDebtPayment"
+                        )
+                    )
+            ).toBeNull();
+
+            await sheet.getByRole("button", {
+                name: "Понятно",
+                exact: true,
+            }).click();
+
+            await expect(sheet).not.toBeVisible();
+        }
+    );
+
+    test(
+        "при отсутствии карты предлагает разовую оплату без привязки",
+        async ({ page }) => {
+            await openOrdersPage(page, {
+                statusDebt: 25000,
+
+                profileBody: {
+                    ...viewer,
+                    debt: 25000,
+
+                    yookassaPaymentMethodId:
+                        null,
+
+                    tbankCardBound: false,
+
+                    autoCommissionProvider:
+                        "none",
+                },
+            });
+
+            const payment =
+                await mockDebtPayment(page);
+
+            await openRequestModal(
+                page,
+                "Заказ №101"
+            );
+
+            await page.getByPlaceholder(
+                "Например: 2500"
+            ).fill("2500");
+
+            await page.getByRole("button", {
+                name: "Отправить запрос",
+            }).click();
+
+            const sheet = page.getByRole(
+                "dialog",
+                {
+                    name: "Оплата задолженности",
+                    exact: true,
+                }
+            );
+
+            await expect(sheet).toBeVisible();
+
+            await expect(
+                sheet.getByText(
+                    "Привяжите карту в профиле",
+                    {
+                        exact: false,
+                    }
+                )
+            ).toBeVisible();
+
+            await sheet.getByRole("button", {
+                name: "Оплатить и запросить",
+            }).click();
+
+            await expect(
+                sheet.getByText(
+                    "Разовая оплата",
+                    {
+                        exact: true,
+                    }
+                )
+            ).toBeVisible();
+
+            await expect(
+                sheet.getByText(
+                    "Сохранённая карта",
+                    {
+                        exact: true,
+                    }
+                )
+            ).toHaveCount(0);
+
+            await expect(
+                sheet.getByRole("button", {
+                    name: /привязать карту/i,
+                })
+            ).toHaveCount(0);
+
+            expect(
+                payment.calls.create
+            ).toBe(0);
+
+            expect(
+                payment.calls.directRequest
+            ).toBe(0);
+
+            await sheet.getByRole("button", {
+                name: "Назад",
+                exact: true,
+            }).click();
+
+            await expect(
+                sheet.getByRole("button", {
+                    name: "Оплатить и запросить",
+                })
+            ).toBeVisible();
         }
     );
 });
