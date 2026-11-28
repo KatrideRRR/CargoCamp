@@ -115,6 +115,43 @@ async function prepareCommissionChargeAttempt({
         return null;
     }
 
+    // Синхронизируем создание автоматического
+// списания с ручной оплатой задолженности.
+
+    await User.findByPk(user.id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+    });
+
+    const activeDebtPayments =
+        await sequelize.query(
+            `
+        SELECT id
+        FROM debt_payment_intents
+        WHERE user_id = :userId
+          AND payment_status IN (
+              'creating',
+              'pending',
+              'unknown'
+          )
+        LIMIT 1
+        FOR UPDATE
+        `,
+            {
+                replacements: {
+                    userId: user.id,
+                },
+                transaction,
+                type: QueryTypes.SELECT,
+            }
+        );
+
+    if (activeDebtPayments.length) {
+        // Новая комиссия остаётся задолженностью.
+        // Второе банковское списание не запускаем.
+        return null;
+    }
+
     const existing = await sequelize.query(
         `
         SELECT id

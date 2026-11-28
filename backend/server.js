@@ -460,6 +460,70 @@ monitoringSummaryTimer.unref?.();
 
 
 const PORT = process.env.PORT;
+const {
+    recoverDebtPayments,
+} = require("./services/debtPaymentReconciliationService");
+
+const DEBT_PAYMENT_RECOVERY_INTERVAL =
+    60 * 1000;
+
+let debtRecoveryInProgress = false;
+
+async function runDebtPaymentRecovery() {
+    if (debtRecoveryInProgress) {
+        return;
+    }
+
+    debtRecoveryInProgress = true;
+
+    try {
+        const result =
+            await recoverDebtPayments({
+                limit: 30,
+            });
+
+        if (
+            result.processed > 0 ||
+            result.errors > 0
+        ) {
+            console.info(
+                "[DebtRecovery]",
+                {
+                    processed:
+                    result.processed,
+
+                    errors:
+                    result.errors,
+                }
+            );
+        }
+
+    } catch (error) {
+        console.error(
+            "[DebtRecovery] Recovery failed:",
+            {
+                code:
+                    error?.code ||
+                    error?.name ||
+                    "Error",
+            }
+        );
+
+    } finally {
+        debtRecoveryInProgress = false;
+    }
+}
+
+const debtPaymentRecoveryTimer =
+    setInterval(
+        () => {
+            void runDebtPaymentRecovery();
+        },
+        DEBT_PAYMENT_RECOVERY_INTERVAL
+    );
+
+debtPaymentRecoveryTimer.unref();
 server.listen(PORT, "0.0.0.0", () => {
+    void runDebtPaymentRecovery();
     console.log(`Server running on http://0.0.0.0:${PORT}`);
 });

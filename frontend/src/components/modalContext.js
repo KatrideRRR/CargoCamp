@@ -1,6 +1,9 @@
 import { toast } from "react-toastify";
 import React, { createContext, useState, useRef, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import {
+    useNavigate,
+    useLocation,
+} from "react-router-dom";
 import { socket } from "../socketClient";
 import axiosInstance from "../utils/axiosInstance";
 import "../styles/modalContext.css";
@@ -16,6 +19,7 @@ import {
 import {
     downloadVerifiedContract,
 } from "../utils/downloadVerifiedContract";
+import DebtPaymentSheet from "./DebtPaymentSheet";
 import {
     Rocket,
     HardHat,
@@ -23,7 +27,6 @@ import {
     Star,
     Hourglass,
     PartyPopper,
-    AlertTriangle,
     Check,
     X,
 } from "lucide-react";
@@ -203,6 +206,10 @@ const getExpressCancelledModalKey = (
 
 export const ModalProvider = ({ children }) => {
     const navigate = useNavigate();
+    const location = useLocation();
+
+    const handledDebtReturnRef =
+        useRef(null);
     const [setModalData] = useState(null);
     const [userId, setUserId] = useState(null);
     const [notificationData, setNotificationData] = useState(null);
@@ -222,10 +229,104 @@ export const ModalProvider = ({ children }) => {
         useRef(false);
     const [completionSuccessData, setCompletionSuccessData] = useState(null);
 
-    const [selectedDebtProvider, setSelectedDebtProvider] = useState("yookassa");
     const [selectedNotificationDebtProvider, setSelectedNotificationDebtProvider] = useState("yookassa");
 
     const [orderRequestData, setOrderRequestData] = useState(null);
+
+    useEffect(() => {
+        if (!userId) {
+            return;
+        }
+
+        const params =
+            new URLSearchParams(
+                location.search
+            );
+
+        const rawIntentId =
+            params.get("debtIntentId");
+
+        if (!rawIntentId) {
+            return;
+        }
+
+        const intentId =
+            Number(rawIntentId);
+
+        if (
+            !Number.isSafeInteger(
+                intentId
+            ) ||
+            intentId <= 0
+        ) {
+            return;
+        }
+
+        const returnKey =
+            `${userId}:${intentId}:${location.key}`;
+
+        if (
+            handledDebtReturnRef.current ===
+            returnKey
+        ) {
+            return;
+        }
+
+        handledDebtReturnRef.current =
+            returnKey;
+
+        setDebtModalData({
+            title:
+                "Оплата задолженности",
+
+            amount: 0,
+
+            initialIntentId:
+            intentId,
+
+            request: null,
+
+            returnPath:
+            location.pathname,
+        });
+
+        // Удаляем только параметры оплаты.
+        // Остальные параметры страницы сохраняем.
+
+        params.delete("debtIntentId");
+        params.delete("debtReturn");
+        params.delete("resumeRequest");
+        params.delete("provider");
+
+        const query =
+            params.toString();
+
+        navigate(
+            {
+                pathname:
+                location.pathname,
+
+                search:
+                    query
+                        ? `?${query}`
+                        : "",
+
+                hash:
+                location.hash,
+            },
+            {
+                replace: true,
+            }
+        );
+
+    }, [
+        userId,
+        location.key,
+        location.pathname,
+        location.search,
+        location.hash,
+        navigate,
+    ]);
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -616,15 +717,6 @@ export const ModalProvider = ({ children }) => {
         } finally {
             setReviewLoading(false);
         }
-    };
-
-    const payDebtFromModal = async () => {
-        if (!debtModalData) return;
-
-        await payDebt({
-            returnPath: debtModalData.returnPath,
-            provider: selectedDebtProvider,
-        });
     };
 
     const handleNotificationClose = () => {
@@ -1054,14 +1146,34 @@ export const ModalProvider = ({ children }) => {
     ]);
 
 
-    const openDebtModal = ({ title, description, amount, returnPath }) => {
+    const openDebtModal = ({
+                               title,
+                               description,
+                               amount,
+                               returnPath,
+                               request = null,
+                           }) => {
         setDebtModalData({
-            title: title || "Нужно погасить задолженность",
+            title:
+                title ||
+                "Задолженность",
+
             description:
                 description ||
-                "У вас есть задолженность по комиссии. Чтобы взять заказ в работу, сначала оплатите её.",
-            amount: Number(amount || 0),
-            returnPath: returnPath || "/profile?debtReturn=1",
+                (
+                    request
+                        ? "После подтверждения оплаты отклик отправится автоматически."
+                        : "Погасите задолженность по комиссии."
+                ),
+
+            amount:
+                Number(amount || 0),
+
+            returnPath:
+                returnPath ||
+                "/profile?debtReturn=1",
+
+            request,
         });
     };
 
@@ -1724,52 +1836,71 @@ export const ModalProvider = ({ children }) => {
             )}
 
             {debtModalData && (
-                <div className="modal-overlay">
-                    <div className="modal modal-compact">
-                        <button
-                            className="modal-close"
-                            onClick={closeDebtModal}
-                            aria-label="Закрыть"
-                            type="button"
-                        >
-                            <X size={18} aria-hidden="true" />
-                        </button>
+                <DebtPaymentSheet
 
-                        <div className="modal-icon">
-                            <AlertTriangle size={26} aria-hidden="true" />
-                        </div>
-                        <h2 className="modal-title">{debtModalData.title}</h2>
-                        <p className="modal-text">{debtModalData.description}</p>
+                    open={true}
 
-                        <div className="modal-note">
-                            К оплате: <b>{Math.round(debtModalData.amount / 100)} ₽</b>
-                        </div>
+                    userId={userId}
 
-                        <PaymentProviderSelect
-                            selectedProvider={selectedDebtProvider}
-                            onSelect={setSelectedDebtProvider}
-                            disabled={debtPayLoading}
-                        />
+                    initialIntentId={
+                        debtModalData.initialIntentId ||
+                        null
+                    }
 
-                        <div className="modal-actions">
-                            <button
-                                className="modal-btn modal-btn-primary"
-                                onClick={payDebtFromModal}
-                                disabled={debtPayLoading}
-                            >
-                                {debtPayLoading ? "Переходим к оплате..." : "Оплатить сейчас"}
-                            </button>
+                    title={
+                        debtModalData.title
+                    }
 
-                            <button
-                                className="modal-btn modal-btn-ghost"
-                                onClick={closeDebtModal}
-                                disabled={debtPayLoading}
-                            >
-                                Позже
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                    description={
+                        debtModalData.description
+                    }
+                    key={`${userId}:${debtModalData.initialIntentId || "new"}`}
+                    amount={
+                        debtModalData.amount
+                    }
+
+                    request={
+                        debtModalData.request
+                    }
+
+                    returnPath={
+                        debtModalData.returnPath
+                    }
+
+                    onClose={
+                        closeDebtModal
+                    }
+
+                    onResolved={(result) => {
+                        if (
+                            result.paymentStatus ===
+                            "succeeded"
+                        ) {
+                            void axiosInstance
+                                .get("/auth/profile")
+                                .then((response) => {
+                                    if (
+                                        Number(
+                                            response.data?.id
+                                        ) !== Number(userId)
+                                    ) {
+                                        return;
+                                    }
+
+                                    setCurrUser(
+                                        response.data
+                                    );
+                                })
+                                .catch((error) => {
+                                    console.warn(
+                                        "Debt profile refresh failed:",
+                                        error?.message
+                                    );
+                                });
+                        }
+                    }}
+
+                />
             )}
 
             <ReviewModal

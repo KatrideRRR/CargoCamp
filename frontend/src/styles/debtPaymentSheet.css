@@ -1,0 +1,273 @@
+.cc-debt-sheet {
+    font: inherit;
+    color: inherit;
+}
+
+.cc-debt-sheet__content,
+.cc-debt-sheet__result {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+
+.cc-debt-sheet__content h3,
+.cc-debt-sheet__result h3 {
+    margin: 0;
+    font-size: 21px;
+    line-height: 1.3;
+    font-weight: 650;
+    letter-spacing: -0.5px;
+}
+
+.cc-debt-sheet__heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.cc-debt-sheet__heading svg {
+    flex-shrink: 0;
+    color: #d97706;
+}
+
+.cc-debt-sheet__amount {
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -1.6px;
+    font-variant-numeric: tabular-nums;
+}
+
+.cc-debt-sheet__description {
+    margin: 0 0 4px;
+    font-size: 14px;
+    line-height: 1.55;
+    opacity: 0.72;
+}
+
+.cc-debt-sheet__hint {
+    margin: -4px 4px 0;
+    text-align: center;
+    font-size: 12px;
+    line-height: 1.5;
+    opacity: 0.58;
+}
+
+.cc-debt-sheet__methods {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+.cc-debt-sheet__method {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    padding: 14px;
+
+    font: inherit;
+    color: inherit;
+    text-align: left;
+
+    background: transparent;
+
+    border: 1px solid
+    rgba(128, 128, 128, 0.23);
+
+    border-radius: 15px;
+
+    cursor: pointer;
+
+    transition:
+            background-color 160ms ease,
+            border-color 160ms ease,
+            transform 160ms ease;
+
+    -webkit-tap-highlight-color: transparent;
+}
+
+.cc-debt-sheet__method:active {
+    transform: scale(0.985);
+}
+
+.cc-debt-sheet__method:disabled {
+    cursor: default;
+    opacity: 0.6;
+}
+
+.cc-debt-sheet__method:focus-visible {
+    outline: 2px solid #64748b;
+    outline-offset: 3px;
+}
+
+.cc-debt-sheet__method--selected {
+    border-color: #64748b;
+
+    background:
+            rgba(128, 128, 128, 0.07);
+}
+
+.cc-debt-sheet__card-icon {
+    width: 42px;
+    height: 42px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    flex-shrink: 0;
+
+    border-radius: 12px;
+
+    background:
+            rgba(128, 128, 128, 0.12);
+}
+
+.cc-debt-sheet__method-text {
+    min-width: 0;
+    flex: 1;
+
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cc-debt-sheet__method-text strong {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.cc-debt-sheet__method-text small {
+    font-size: 12px;
+    line-height: 1.3;
+    opacity: 0.6;
+}
+
+.cc-debt-sheet__selected-icon {
+    color: #16a34a;
+    flex-shrink: 0;
+}
+
+.cc-debt-sheet__unselected-icon {
+    opacity: 0.35;
+    flex-shrink: 0;
+}
+
+.cc-debt-sheet__secure {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+
+    font-size: 12px;
+    opacity: 0.6;
+}
+
+.cc-debt-sheet__result {
+    align-items: center;
+    text-align: center;
+    padding: 6px 0;
+}
+
+.cc-debt-sheet__result p {
+    margin: 0 0 4px;
+    font-size: 14px;
+    line-height: 1.55;
+    opacity: 0.72;
+}
+
+.cc-debt-sheet__result-icon {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    width: 72px;
+    height: 72px;
+
+    border-radius: 24px;
+}
+
+.cc-debt-sheet__result-icon--success {
+    color: #16a34a;
+    background:
+            rgba(34, 197, 94, 0.12);
+}
+
+.cc-debt-sheet__result-icon--warning {
+    color: #d97706;
+    background:
+            rgba(245, 158, 11, 0.12);
+}
+
+.cc-debt-sheet__result-icon--neutral {
+    color: inherit;
+    background:
+            rgba(128, 128, 128, 0.12);
+}
+
+.cc-debt-sheet__error {
+    width: 100%;
+    box-sizing: border-box;
+
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+
+    padding: 12px;
+
+    font-size: 13px;
+    line-height: 1.5;
+    text-align: left;
+
+    color: #b45309;
+
+    border-radius: 12px;
+
+    background:
+            rgba(245, 158, 11, 0.1);
+}
+
+.cc-debt-sheet__error svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .cc-debt-sheet__heading svg,
+    .cc-debt-sheet__error,
+    .cc-debt-sheet__result-icon--warning {
+        color: #fbbf24;
+    }
+
+    .cc-debt-sheet__selected-icon,
+    .cc-debt-sheet__result-icon--success {
+        color: #4ade80;
+    }
+
+    .cc-debt-sheet__method--selected {
+        border-color: #94a3b8;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cc-debt-sheet__method {
+        transition: none;
+    }
+
+    .cc-debt-sheet__method:active {
+        transform: none;
+    }
+}
+
+.cc-debt-sheet__order-number {
+    font-size: 13px;
+    line-height: 1.4;
+    font-weight: 500;
+    opacity: 0.65;
+}

@@ -700,6 +700,36 @@ const OrdersPage = () => {
 
     useEffect(() => {
         if (!userId) {
+            return undefined;
+        }
+
+        const refreshAfterRequest = () => {
+            void Promise.allSettled([
+                fetchOrders(),
+                fetchBusyState(),
+            ]);
+        };
+
+        window.addEventListener(
+            "cargocamp:order-request-sent",
+            refreshAfterRequest
+        );
+
+        return () => {
+            window.removeEventListener(
+                "cargocamp:order-request-sent",
+                refreshAfterRequest
+            );
+        };
+
+    }, [
+        userId,
+        fetchOrders,
+        fetchBusyState,
+    ]);
+
+    useEffect(() => {
+        if (!userId) {
             setBusyState({
                 loading: false,
                 hasBusyRegular: false,

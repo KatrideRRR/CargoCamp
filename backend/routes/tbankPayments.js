@@ -4,6 +4,15 @@ const { Order, User } = require("../models");
 const {
     applyConfirmedPayment,
 } = require("../services/paymentReceiptService");
+const {
+    settleConfirmedDebtPayment,
+} = require("../services/debtPaymentSettlementService");
+const {
+    createTbankDebtPayment,
+} = require("../services/tbankDebtPaymentService");
+const {
+    reconcileDebtPayment,
+} = require("../services/debtPaymentReconciliationService");
 const db = require("../models");
 const authenticateToken = require("../middlewares/userAuth");
 const { requestTBank, verifyNotificationToken } = require("../config/tbankClient");
@@ -378,113 +387,140 @@ router.post("/premium/create", authenticateToken, async (req, res) => {
     }
 });
 
-router.post("/debt/create", authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const { returnPath } = req.body || {};
+router.post(
+    "/debt/intent/create",
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const result =
+                await createTbankDebtPayment({
+                    userId: req.user.id,
 
-        const user = await User.findByPk(userId);
+                    paymentMode:
+                    req.body?.paymentMode,
 
-        if (!user) {
-            return res.status(404).json({
+                    expectedAmountKopecks:
+                    req.body
+                        ?.expectedAmountKopecks,
+
+                    request:
+                        req.body?.request || null,
+
+                    returnPath:
+                    req.body?.returnPath,
+                });
+
+            res.setHeader(
+                "Cache-Control",
+                "no-store"
+            );
+
+            return res.json(result);
+
+        } catch (error) {
+            console.error(
+                "TBank debt intent error:",
+                error.message
+            );
+
+            return res.status(
+                error.httpStatus || 502
+            ).json({
                 success: false,
-                error: "Пользователь не найден",
+
+                error: error.httpStatus
+                    ? error.message
+                    : "Не удалось установить результат " +
+                    "платежа. Не повторяйте оплату.",
             });
         }
-
-        const debtKopecks = Number(user.debt || 0);
-
-        if (debtKopecks <= 0) {
-            return res.json({
-                success: true,
-                noDebt: true,
-            });
-        }
-
-        const safeReturnPath =
-            typeof returnPath === "string" && returnPath.startsWith("/")
-                ? returnPath
-                : "/profile?debtReturn=1";
-
-        const orderId = buildTBankOrderId("debt", userId);
-        const description = `Оплата комиссии пользователя #${userId}`;
-
-        const payment = await requestTBank("Init", {
-            Amount: debtKopecks,
-            OrderId: orderId,
-            Description: description,
-            SuccessURL: `${process.env.FRONTEND_URL}${safeReturnPath}${safeReturnPath.includes("?") ? "&" : "?"}provider=tbank`,
-            FailURL: `${process.env.FRONTEND_URL}/profile?debtReturn=0&provider=tbank`,
-            NotificationURL: `${process.env.BACKEND_URL}/api/tbank-payments/webhook`,
-            DATA: {
-                type: "debt",
-                userId: String(userId),
-                expectedKopecks: String(debtKopecks),
-            },
-            Receipt: buildReceipt({
-                user,
-                amountKopecks: debtKopecks,
-                description: "Оплата комиссии",
-            }),
-        });
-
-        await req.logAction?.({
-            req,
-            actorUserId: userId,
-            actorRole: "user",
-            actionType: "payment_create",
-            entityType: "payment",
-            paymentId: String(payment.PaymentId),
-            severity: "info",
-            meta: {
-                provider: "tbank",
-                type: "debt",
-                amount: kopecksToRubString(debtKopecks),
-                status: payment.Status,
-                tbankOrderId: orderId,
-            },
-        });
-
-        return res.json({
-            success: true,
-            provider: "tbank",
-            paidBySavedCard: false,
-            paymentId: String(payment.PaymentId),
-            orderId,
-            confirmationUrl: payment.PaymentURL,
-            status: payment.Status,
-        });
-    } catch (e) {
-        console.error("tbank debt/create error:", e);
-
-        notifyPaymentProblem({
-            provider: "T-Bank",
-            type: "webhook",
-
-            title: "🚨 Ошибка долга",
-
-            message: [
-                `Ошибка: ${e?.message || "Unknown error"}`,
-                req.body?.PaymentId
-                    ? `Payment ID: ${req.body.PaymentId}`
-                    : null,
-                req.body?.OrderId
-                    ? `Order ID: ${req.body.OrderId}`
-                    : null,
-                req.body?.Status
-                    ? `Статус: ${req.body.Status}`
-                    : null,
-            ]
-                .filter(Boolean)
-                .join("\n"),
-        });
-
-        return res.status(500).json({
-            success: false,
-            error: e?.message || "Internal server error",
-        });
     }
-});
+);
+
+router.post(
+    "/debt/create",
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const userId =
+                req.user.id;
+
+            const user =
+                await User.findByPk(
+                    userId
+                );
+
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    error:
+                        "Пользователь не найден",
+                });
+            }
+
+            const paymentMode =
+                req.body?.paymentMode ||
+                "redirect";
+
+            if (
+                ![
+                    "saved_card",
+                    "redirect",
+                ].includes(paymentMode)
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    error:
+                        "Неверный способ оплаты",
+                });
+            }
+
+            const result =
+                await createTbankDebtPayment({
+                    userId,
+                    paymentMode,
+
+                    expectedAmountKopecks:
+                        Number(
+                            user.debt || 0
+                        ),
+
+                    returnPath:
+                    req.body?.returnPath,
+                });
+
+            res.setHeader(
+                "Cache-Control",
+                "no-store"
+            );
+
+            return res.json({
+                ...result,
+
+                status:
+                    result.paymentStatus ||
+                    result.status,
+            });
+
+        } catch (error) {
+            console.error(
+                "Legacy TBank debt payment:",
+                error?.name || "Error"
+            );
+
+            return res.status(
+                error.httpStatus || 502
+            ).json({
+                success: false,
+
+                error: error.httpStatus
+                    ? error.message
+                    : "Не удалось проверить результат " +
+                    "оплаты. Не повторяйте платёж.",
+            });
+        }
+    }
+);
 
 router.post("/order/promotion/create", authenticateToken, async (req, res) => {
     try {
@@ -711,6 +747,12 @@ router.post("/webhook", async (req, res) => {
                 ? Number(autoChargeMatch[1])
                 : null;
 
+        const isDebtPaymentIntent =
+            type === "debt" &&
+            /^[a-f0-9]{32}$/i.test(
+                String(parsed.extra || "")
+            );
+
         await req.logAction?.({
             req,
             actorUserId: null,
@@ -744,6 +786,38 @@ router.post("/webhook", async (req, res) => {
         ]);
 
         if (problemStatuses.has(status)) {
+
+            if (isDebtPaymentIntent) {
+                const { QueryTypes } = require("sequelize");
+
+                const intents = await db.sequelize.query(
+                    `
+        SELECT id, user_id
+        FROM debt_payment_intents
+        WHERE provider = 'tbank'
+          AND provider_order_id = :bankOrderId
+          AND provider_payment_id = :paymentId
+          AND user_id = :userId
+        LIMIT 1
+        `,
+                    {
+                        replacements: {
+                            bankOrderId: String(body.OrderId),
+                            paymentId,
+                            userId,
+                        },
+                        type: QueryTypes.SELECT,
+                    }
+                );
+
+                if (intents.length === 1) {
+                    await reconcileDebtPayment({
+                        intentId: Number(intents[0].id),
+                        userId,
+                    });
+                }
+            }
+
             notifyPaymentProblem({
                 provider: "T-Bank",
                 type,
@@ -872,20 +946,29 @@ router.post("/webhook", async (req, res) => {
                 );
             }
 
-            const result = await applyConfirmedPayment({
-                provider: "tbank",
-                paymentId,
-                userId,
-                purpose: type,
-                duration:
-                    type === "premium" ? duration : null,
-                amountKopecks,
-                commissionAttemptId:
-                    type === "debt"
-                        ? commissionAttemptId
-                        : null,
-            });
-
+            const result = isDebtPaymentIntent
+                ? await settleConfirmedDebtPayment({
+                    provider: "tbank",
+                    paymentId,
+                    userId,
+                    amountKopecks,
+                    bankOrderId: String(verified.OrderId),
+                })
+                : await applyConfirmedPayment({
+                    provider: "tbank",
+                    paymentId,
+                    userId,
+                    purpose: type,
+                    duration:
+                        type === "premium"
+                            ? duration
+                            : null,
+                    amountKopecks,
+                    commissionAttemptId:
+                        type === "debt"
+                            ? commissionAttemptId
+                            : null,
+                });
 
             /*
              * Выручку передаём только после:

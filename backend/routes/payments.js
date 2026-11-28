@@ -5,6 +5,20 @@ const { Order, User } = require('../models'); // sequelize models
 const {
     applyConfirmedPayment,
 } = require("../services/paymentReceiptService");
+const {
+    settleConfirmedDebtPayment,
+} = require("../services/debtPaymentSettlementService");
+const {
+    createYooDebtPayment,
+} = require("../services/yooDebtPaymentService");
+const {
+    reconcileDebtPayment,
+} = require("../services/debtPaymentReconciliationService");
+const {
+    getDebtPaymentIntent,
+    getActiveDebtPaymentIntent,
+    publicDebtPaymentIntent,
+} = require("../services/debtPaymentIntentService");
 const db = require("../models");
 const authenticateToken = require('../middlewares/userAuth'); // если нужен
 const { randomUUID } = require('crypto');
@@ -338,182 +352,270 @@ router.post('/premium/create', authenticateToken, async (req, res) => {
     }
 });
 
-router.post('/debt/create', authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const { returnPath } = req.body || {};
+router.get(
+    "/debt/intent/active",
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const intent =
+                await getActiveDebtPaymentIntent({
+                    userId: req.user.id,
+                });
 
-        const user = await User.findByPk(userId);
-        if (!user) {
-            return res.status(404).json({ success: false, error: 'Пользователь не найден' });
-        }
-
-        const debtKopecks = Number(user.debt || 0);
-        if (debtKopecks <= 0) {
-            return res.json({ success: true, noDebt: true });
-        }
-
-        const amountValue = (debtKopecks / 100).toFixed(2);
-        const idempotenceKey = uuidv4();
-
-        const safeReturnPath =
-            typeof returnPath === "string" && returnPath.startsWith("/")
-                ? returnPath
-                : "/profile?debtReturn=1";
-
-        const returnUrl = `${process.env.FRONTEND_URL}${safeReturnPath}`;
-
-        const basePayload = {
-            amount: { value: amountValue, currency: 'RUB' },
-            capture: true,
-            description: `Оплата комиссии (задолженность) пользователя #${userId}`,
-            metadata: {
-                type: 'debt',
-                userId: String(userId),
-                expectedKopecks: String(debtKopecks),
-            },
-            receipt: {
-                customer: {
-                    phone: String(user.phone || '').replace(/[^\d+]/g, ''),
-                },
-                items: [
-                    {
-                        description: `Оплата комиссии (задолженность)`,
-                        quantity: 1,
-                        amount: { value: amountValue, currency: 'RUB' },
-                        vat_code: 1,
-                        payment_mode: 'full_payment',
-                        payment_subject: 'service',
-                    }
-                ],
-                tax_system_code: 2,
-            },
-        };
-
-        if (user.yookassa_payment_method_id) {
-            const payment = await yooKassa.createPayment(
-                {
-                    ...basePayload,
-                    payment_method_id: user.yookassa_payment_method_id,
-                },
-                idempotenceKey
+            res.setHeader(
+                "Cache-Control",
+                "no-store"
             );
-
-            await req.logAction?.({
-                req,
-                actorUserId: userId,
-                actorRole: "user",
-                actionType: "payment_create",
-                entityType: "payment",
-                paymentId: payment.id,
-                severity: payment.status === "canceled" ? "warn" : "info",
-                meta: {
-                    provider: "yookassa",
-                    type: "debt",
-                    amount: amountValue,
-                    status: payment.status,
-                    paidBySavedCard: true,
-                },
-            });
-
-            if (payment.status === "canceled") {
-
-                notifyPaymentProblem({
-                    provider: "YooKassa",
-                    type: "debt",
-                    title: "❌ Не удалось погасить задолженность",
-                    userId,
-                    message: [
-                        `Payment ID: ${payment.id}`,
-                        `Статус: ${payment.status}`,
-                        `Сумма: ${amountValue} ₽`,
-                    ].join("\n"),
-
-                });
-
-                return res.json({
-                    success: false,
-                    paidBySavedCard: true,
-                    paymentProcessing: false,
-                    paymentId: payment.id,
-                    status: payment.status,
-                    error:
-                        "Не удалось списать с привязанной карты. Проверьте баланс карты или выберите другой способ оплаты.",
-                });
-            }
 
             return res.json({
                 success: true,
-                paidBySavedCard: true,
-                paymentProcessing: true,
-                paid: false,
-                paymentId: payment.id,
-                status: payment.status,
-                message:
-                    "Платёж создан. Долг будет погашен после подтверждения оплаты.",
+
+                intent: intent
+                    ? publicDebtPaymentIntent(
+                        intent
+                    )
+                    : null,
+            });
+
+        } catch (error) {
+            return res.status(
+                error.httpStatus || 500
+            ).json({
+                success: false,
+
+                error:
+                    "Не удалось получить " +
+                    "состояние текущего платежа",
             });
         }
-
-        const payment = await yooKassa.createPayment(
-            {
-                ...basePayload,
-                confirmation: {
-                    type: 'redirect',
-                    return_url: returnUrl,
-                },
-            },
-            idempotenceKey
-        );
-
-        await req.logAction?.({
-            req,
-            actorUserId: userId,
-            actorRole: "user",
-            actionType: "payment_create",
-            entityType: "payment",
-            paymentId: payment.id,
-            severity: "info",
-            meta: {
-                provider: "yookassa",
-                type: "debt",
-                amount: amountValue,
-                status: payment.status,
-                paidBySavedCard: false,
-                returnUrl,
-            },
-        });
-
-        return res.json({
-            success: true,
-            paidBySavedCard: false,
-            paymentId: payment.id,
-            confirmationUrl: payment.confirmation?.confirmation_url,
-        });
-    } catch (e) {
-        console.error('debt/pay error:', e);
-
-        notifyPaymentProblem({
-
-            provider: "YooKassa",
-
-            type: "premium",
-
-            title: "🚨 Ошибка оплаты долга за заказ",
-
-            userId: req.user?.id,
-
-            message:
-
-                `Ошибка: ${e?.message || "Unknown error"}`,
-
-        });
-
-        return res.status(500).json({
-            success: false,
-            error: e?.message || 'Internal server error',
-        });
     }
-});
+);
+
+router.post(
+    "/debt/intent/create",
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const result =
+                await createYooDebtPayment({
+                    userId: req.user.id,
+
+                    paymentMode:
+                    req.body?.paymentMode,
+
+                    expectedAmountKopecks:
+                    req.body
+                        ?.expectedAmountKopecks,
+
+                    request:
+                        req.body?.request || null,
+
+                    returnPath:
+                    req.body?.returnPath,
+                });
+
+            res.setHeader(
+                "Cache-Control",
+                "no-store"
+            );
+
+            return res.json(result);
+
+        } catch (error) {
+            console.error(
+                "YooKassa debt intent error:",
+                error.message
+            );
+
+            return res.status(
+                error.httpStatus || 502
+            ).json({
+                success: false,
+
+                error: error.httpStatus
+                    ? error.message
+                    : "Не удалось установить результат " +
+                    "платежа. Не повторяйте оплату.",
+            });
+        }
+    }
+);
+
+router.get(
+    "/debt/intent/:id",
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const intent =
+                await getDebtPaymentIntent({
+                    intentId: req.params.id,
+                    userId: req.user.id,
+                });
+
+            res.setHeader(
+                "Cache-Control",
+                "no-store"
+            );
+
+            return res.json(
+                publicDebtPaymentIntent(
+                    intent
+                )
+            );
+
+        } catch (error) {
+            return res.status(
+                error.httpStatus || 500
+            ).json({
+                success: false,
+
+                error: error.httpStatus
+                    ? error.message
+                    : "Не удалось проверить платёж",
+            });
+        }
+    }
+);
+
+router.post(
+    "/debt/intent/:id/reconcile",
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const result =
+                await reconcileDebtPayment({
+                    intentId: req.params.id,
+                    userId: req.user.id,
+                });
+
+            res.setHeader(
+                "Cache-Control",
+                "no-store"
+            );
+
+            return res.json(result);
+
+        } catch (error) {
+            console.error(
+                "Debt reconciliation error:",
+                {
+                    intentId: req.params.id,
+
+                    errorCode:
+                        error?.code ||
+                        error?.name ||
+                        "Error",
+                }
+            );
+
+            return res.status(
+                error.httpStatus || 502
+            ).json({
+                success: false,
+
+                error: error.httpStatus
+                    ? error.message
+                    : "Не удалось подтвердить состояние " +
+                    "платежа. Не повторяйте оплату.",
+            });
+        }
+    }
+);
+
+router.post(
+    "/debt/create",
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const userId =
+                req.user.id;
+
+            const user =
+                await User.findByPk(
+                    userId
+                );
+
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    error:
+                        "Пользователь не найден",
+                });
+            }
+
+            const requestedMode =
+                req.body?.paymentMode ||
+                "legacy";
+
+            if (
+                ![
+                    "legacy",
+                    "saved_card",
+                    "redirect",
+                ].includes(requestedMode)
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    error:
+                        "Неверный способ оплаты",
+                });
+            }
+
+            const paymentMode =
+                requestedMode === "legacy"
+                    ? (
+                        user.yookassa_payment_method_id
+                            ? "saved_card"
+                            : "redirect"
+                    )
+                    : requestedMode;
+
+            const result =
+                await createYooDebtPayment({
+                    userId,
+                    paymentMode,
+
+                    expectedAmountKopecks:
+                        Number(
+                            user.debt || 0
+                        ),
+
+                    returnPath:
+                    req.body?.returnPath,
+                });
+
+            res.setHeader(
+                "Cache-Control",
+                "no-store"
+            );
+
+            return res.json({
+                ...result,
+
+                status:
+                    result.paymentStatus ||
+                    result.status,
+            });
+
+        } catch (error) {
+            console.error(
+                "Legacy YooKassa debt payment:",
+                error?.name || "Error"
+            );
+
+            return res.status(
+                error.httpStatus || 502
+            ).json({
+                success: false,
+
+                error: error.httpStatus
+                    ? error.message
+                    : "Не удалось проверить результат " +
+                    "оплаты. Не повторяйте платёж.",
+            });
+        }
+    }
+);
 
 router.post(
     "/order/promotion/retry/prepare",
@@ -1656,6 +1758,13 @@ router.post("/yookassa/webhook", async (req, res) => {
 
             if (eventName === "payment.canceled") {
 
+                if (meta.debtIntentId) {
+                    await reconcileDebtPayment({
+                        intentId: meta.debtIntentId,
+                        userId,
+                    });
+                }
+
                 notifyPaymentProblem({
                     provider: "YooKassa",
                     type: "debt",
@@ -1701,17 +1810,36 @@ router.post("/yookassa/webhook", async (req, res) => {
                 return res.sendStatus(200);
             }
 
-            const result = await applyConfirmedPayment({
-                provider: "yookassa",
-                paymentId: payment.id,
-                userId,
-                purpose: "debt",
-                amountKopecks: Math.round(
-                    Number(payment.amount.value) * 100
-                ),
-                commissionAttemptId:
-                    meta.autoAttemptId || null,
-            });
+            const amountKopecks = Math.round(
+                Number(payment.amount.value) * 100
+            );
+
+            if (
+                meta.debtIntentId &&
+                meta.autoAttemptId
+            ) {
+                throw new Error(
+                    "Конфликт назначения платежа"
+                );
+            }
+
+            const result = meta.debtIntentId
+                ? await settleConfirmedDebtPayment({
+                    provider: "yookassa",
+                    paymentId: payment.id,
+                    userId,
+                    amountKopecks,
+                    intentId: meta.debtIntentId,
+                })
+                : await applyConfirmedPayment({
+                    provider: "yookassa",
+                    paymentId: payment.id,
+                    userId,
+                    purpose: "debt",
+                    amountKopecks,
+                    commissionAttemptId:
+                        meta.autoAttemptId || null,
+                });
 
             if (!result.duplicate) {
                 await req.logAction?.({

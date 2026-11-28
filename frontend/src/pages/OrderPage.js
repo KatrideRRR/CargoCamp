@@ -459,6 +459,44 @@ const OrderPage = () => {
     );
 
     useEffect(() => {
+        if (!userId || isExpressPage) {
+            return undefined;
+        }
+
+        const refreshAfterRequest = (
+            event
+        ) => {
+            if (
+                Number(
+                    event.detail?.orderId
+                ) !== Number(id)
+            ) {
+                return;
+            }
+
+            void fetchOrderData();
+        };
+
+        window.addEventListener(
+            "cargocamp:order-request-sent",
+            refreshAfterRequest
+        );
+
+        return () => {
+            window.removeEventListener(
+                "cargocamp:order-request-sent",
+                refreshAfterRequest
+            );
+        };
+
+    }, [
+        userId,
+        id,
+        isExpressPage,
+        fetchOrderData,
+    ]);
+
+    useEffect(() => {
         if (isExpressPage) return;
 
         const params = new URLSearchParams(window.location.search);

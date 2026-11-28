@@ -44,6 +44,7 @@ async function createRegularOrderRequest({
                                              proposedSum,
                                              comment,
                                              availableAt,
+                                             transaction: existingTransaction = null,
                                          }) {
     const id = Number(orderId);
     const workerId = Number(executorId);
@@ -110,7 +111,7 @@ async function createRegularOrderRequest({
         );
     }
 
-    return sequelize.transaction(async (transaction) => {
+    const execute = async (transaction) => {
         /*
          * Сначала блокируем исполнителя.
          *
@@ -274,7 +275,13 @@ async function createRegularOrderRequest({
             comment: safeComment,
             sourceOrderId: activeRegular?.id || null,
         };
-    });
+    };
+
+    if (existingTransaction) {
+        return execute(existingTransaction);
+    }
+
+    return sequelize.transaction(execute);
 }
 
 module.exports = {

@@ -85,6 +85,32 @@ test(
                     },
                 },
 
+                "../services/debtPaymentSettlementService": {
+                    async settleConfirmedDebtPayment() {
+                        assert.fail(
+                            "Старый платёж не должен обрабатываться " +
+                            "через новое платёжное намерение"
+                        );
+                    },
+                },
+
+                "../services/tbankDebtPaymentService": {
+                    async createTbankDebtPayment() {
+                        assert.fail(
+                            "Webhook не должен создавать новый платёж"
+                        );
+                    },
+                },
+
+                "../services/debtPaymentReconciliationService": {
+                    async reconcileDebtPayment() {
+                        assert.fail(
+                            "Старый платёж не должен использовать " +
+                            "сверку нового платёжного намерения"
+                        );
+                    },
+                },
+
                 "../middlewares/userAuth":
                     (req, res, next) => next(),
 
